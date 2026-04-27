@@ -15,6 +15,8 @@ namespace Quantum.Physics
 
         public double Speed { get; set; }
 
+        public double Acceleration { get; set; }
+
         public bool LoopEnabled { get; set; }
 
         public Vector3d Position { get; private set; }
@@ -37,7 +39,8 @@ namespace Quantum.Physics
 
         public void Update(double deltaTime)
         {
-            double nextDistance = Distance + Speed * deltaTime;
+            double nextDistance = Distance + (Speed * deltaTime) + (0.5 * Acceleration * deltaTime * deltaTime);
+            Speed += Acceleration * deltaTime;
             Distance = NormalizeDistance(nextDistance);
             SampleCurrentState();
         }

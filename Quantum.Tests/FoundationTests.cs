@@ -119,6 +119,86 @@ public class FoundationTests
         Assert.InRange(follower.Distance, 9.0 - ValueTolerance, 9.0 + ValueTolerance);
     }
 
+    [Fact]
+    public void EasedParamCurve_EndpointsMatchInnerCurve_AndTangentsStayNormalized()
+    {
+        IParamCurve baseCurve = new LineCurve(new Vector3d(0, 0, 0), new Vector3d(10, 0, 0));
+
+        Type? easedCurveType = typeof(IParamCurve).Assembly.GetType("Quantum.Splines.EasedParamCurve");
+        Assert.True(easedCurveType is not null, "Expected Quantum.Splines.EasedParamCurve to exist.");
+        Assert.True(typeof(IParamCurve).IsAssignableFrom(easedCurveType), "EasedParamCurve must implement IParamCurve.");
+
+        var ctor = easedCurveType!.GetConstructor(new[] { typeof(IParamCurve), typeof(Func<double, double>) });
+        Assert.True(ctor is not null, "Expected EasedParamCurve(IParamCurve, Func<double,double>) constructor.");
+
+        Func<double, double> easeInQuadratic = t => t * t;
+        object? instance = ctor!.Invoke(new object[] { baseCurve, easeInQuadratic });
+        IParamCurve easedCurve = Assert.IsAssignableFrom<IParamCurve>(instance);
+
+        Vector3d expectedStart = baseCurve.Evaluate(0.0);
+        Vector3d expectedEnd = baseCurve.Evaluate(1.0);
+
+        Vector3d actualStart = easedCurve.Evaluate(0.0);
+        Vector3d actualEnd = easedCurve.Evaluate(1.0);
+
+        AssertVectorNear(expectedStart, actualStart, ValueTolerance);
+        AssertVectorNear(expectedEnd, actualEnd, ValueTolerance);
+
+        Vector3d startTangent = easedCurve.Tangent(0.0);
+        Vector3d endTangent = easedCurve.Tangent(1.0);
+
+        AssertFinite(startTangent);
+        AssertFinite(endTangent);
+        AssertNormalizedNonZero(startTangent);
+        AssertNormalizedNonZero(endTangent);
+    }
+
+    [Fact]
+    public void TrainFollowerState_MovingBackward_ClampsAtStart_WhenLoopDisabled()
+    {
+        IArcLengthCurve track = new LineCurve(new Vector3d(0, 0, 0), new Vector3d(10, 0, 0));
+        var follower = new TrainFollowerState(track, initialDistance: 1.0, speed: -5.0, loopEnabled: false);
+
+        follower.Update(1.0);
+
+        Assert.InRange(follower.Distance, 0.0 - ValueTolerance, 0.0 + ValueTolerance);
+        Assert.InRange(follower.Position.X, 0.0 - ValueTolerance, 0.0 + ValueTolerance);
+        AssertNormalizedNonZero(follower.Tangent);
+    }
+
+    [Fact]
+    public void TrainFollowerState_MovingBackward_Wraps_WhenLoopEnabled()
+    {
+        IArcLengthCurve track = new LineCurve(new Vector3d(0, 0, 0), new Vector3d(10, 0, 0));
+        var follower = new TrainFollowerState(track, initialDistance: 1.0, speed: -5.0, loopEnabled: true);
+
+        follower.Update(1.0);
+
+        Assert.InRange(follower.Distance, 6.0 - ValueTolerance, 6.0 + ValueTolerance);
+        Assert.InRange(follower.Position.X, 6.0 - ValueTolerance, 6.0 + ValueTolerance);
+        AssertNormalizedNonZero(follower.Tangent);
+    }
+
+    [Fact]
+    public void TrainFollowerState_UsesConstantAcceleration_ForDistanceAndVelocity()
+    {
+        IArcLengthCurve track = new LineCurve(new Vector3d(0, 0, 0), new Vector3d(100, 0, 0));
+        var follower = new TrainFollowerState(track, initialDistance: 2.0, speed: 3.0, loopEnabled: false);
+
+        const double acceleration = -1.5;
+        const double deltaTime = 2.0;
+
+        SetAccelerationOrFail(follower, acceleration);
+        follower.Update(deltaTime);
+
+        double expectedDistance = 2.0 + (3.0 * deltaTime) + (0.5 * acceleration * deltaTime * deltaTime);
+        double expectedSpeed = 3.0 + (acceleration * deltaTime);
+
+        Assert.InRange(follower.Distance, expectedDistance - ValueTolerance, expectedDistance + ValueTolerance);
+        Assert.InRange(follower.Position.X, expectedDistance - ValueTolerance, expectedDistance + ValueTolerance);
+        Assert.InRange(follower.Speed, expectedSpeed - ValueTolerance, expectedSpeed + ValueTolerance);
+    }
+
     private static IEnumerable<(string Name, IParamCurve Curve)> BuildCurves()
     {
         yield return ("Line", new LineCurve(new Vector3d(0, 0, 0), new Vector3d(10, 0, 0)));
@@ -179,6 +259,14 @@ public class FoundationTests
         Assert.InRange(System.Math.Abs(expected.X - actual.X), 0.0, tolerance);
         Assert.InRange(System.Math.Abs(expected.Y - actual.Y), 0.0, tolerance);
         Assert.InRange(System.Math.Abs(expected.Z - actual.Z), 0.0, tolerance);
+    }
+
+    private static void SetAccelerationOrFail(TrainFollowerState follower, double acceleration)
+    {
+        var accelerationProperty = typeof(TrainFollowerState).GetProperty("Acceleration");
+        Assert.True(accelerationProperty is not null, "Expected TrainFollowerState.Acceleration property to exist.");
+        Assert.True(accelerationProperty!.CanWrite, "Expected TrainFollowerState.Acceleration to be writable.");
+        accelerationProperty.SetValue(follower, acceleration);
     }
 
     private sealed class NearDegenerateCurve : IParamCurve
