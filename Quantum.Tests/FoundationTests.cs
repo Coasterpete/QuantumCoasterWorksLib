@@ -1,5 +1,6 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
+using System.Reflection;
 using Quantum.Math;
 using Quantum.Physics;
 using Quantum.Splines;
@@ -146,6 +147,271 @@ public class FoundationTests
     }
 
     [Fact]
+    public void CurveEasing_QuarticTransitions_StayFiniteAndWithinUnitInterval()
+    {
+        foreach (double t in DenseUnitSamples())
+        {
+            AssertFiniteUnitInterval(CurveEasing.EaseInQuart(t, tension: 1.8));
+            AssertFiniteUnitInterval(CurveEasing.EaseOutQuart(t, tension: 1.8));
+            AssertFiniteUnitInterval(CurveEasing.EaseInOutQuart(t, center: 0.35, tension: 1.8));
+        }
+
+        Assert.InRange(CurveEasing.EaseInQuart(0.0), 0.0, ValueTolerance);
+        Assert.InRange(System.Math.Abs(CurveEasing.EaseInQuart(1.0) - 1.0), 0.0, ValueTolerance);
+        Assert.InRange(CurveEasing.EaseOutQuart(0.0), 0.0, ValueTolerance);
+        Assert.InRange(System.Math.Abs(CurveEasing.EaseOutQuart(1.0) - 1.0), 0.0, ValueTolerance);
+        Assert.InRange(CurveEasing.EaseInOutQuart(0.0, center: 0.35, tension: 1.8), 0.0, ValueTolerance);
+        Assert.InRange(System.Math.Abs(CurveEasing.EaseInOutQuart(1.0, center: 0.35, tension: 1.8) - 1.0), 0.0, ValueTolerance);
+    }
+
+    [Fact]
+    public void CurveEasing_QuinticTransitions_StayFiniteAndWithinUnitInterval()
+    {
+        foreach (double t in DenseUnitSamples())
+        {
+            AssertFiniteUnitInterval(CurveEasing.EaseInQuint(t, tension: 1.6));
+            AssertFiniteUnitInterval(CurveEasing.EaseOutQuint(t, tension: 1.6));
+            AssertFiniteUnitInterval(CurveEasing.EaseInOutQuint(t, center: 0.65, tension: 1.6));
+        }
+
+        Assert.InRange(CurveEasing.EaseInQuint(0.0), 0.0, ValueTolerance);
+        Assert.InRange(System.Math.Abs(CurveEasing.EaseInQuint(1.0) - 1.0), 0.0, ValueTolerance);
+        Assert.InRange(CurveEasing.EaseOutQuint(0.0), 0.0, ValueTolerance);
+        Assert.InRange(System.Math.Abs(CurveEasing.EaseOutQuint(1.0) - 1.0), 0.0, ValueTolerance);
+        Assert.InRange(CurveEasing.EaseInOutQuint(0.0, center: 0.65, tension: 1.6), 0.0, ValueTolerance);
+        Assert.InRange(System.Math.Abs(CurveEasing.EaseInOutQuint(1.0, center: 0.65, tension: 1.6) - 1.0), 0.0, ValueTolerance);
+    }
+
+    [Fact]
+    public void CurveEasing_SinusoidalTransitions_StayFiniteAndWithinUnitInterval()
+    {
+        foreach (double t in DenseUnitSamples())
+        {
+            AssertFiniteUnitInterval(CurveEasing.EaseInSine(t, tension: 1.4));
+            AssertFiniteUnitInterval(CurveEasing.EaseOutSine(t, tension: 1.4));
+            AssertFiniteUnitInterval(CurveEasing.EaseInOutSine(t, center: 0.4, tension: 1.4));
+        }
+
+        Assert.InRange(CurveEasing.EaseInSine(0.0), 0.0, ValueTolerance);
+        Assert.InRange(System.Math.Abs(CurveEasing.EaseInSine(1.0) - 1.0), 0.0, ValueTolerance);
+        Assert.InRange(CurveEasing.EaseOutSine(0.0), 0.0, ValueTolerance);
+        Assert.InRange(System.Math.Abs(CurveEasing.EaseOutSine(1.0) - 1.0), 0.0, ValueTolerance);
+        Assert.InRange(CurveEasing.EaseInOutSine(0.0, center: 0.4, tension: 1.4), 0.0, ValueTolerance);
+        Assert.InRange(System.Math.Abs(CurveEasing.EaseInOutSine(1.0, center: 0.4, tension: 1.4) - 1.0), 0.0, ValueTolerance);
+    }
+
+    [Fact]
+    public void CurveEasing_MonotonicBehavior_HoldsForExpectedTransitions()
+    {
+        AssertNonDecreasing(t => CurveEasing.EaseInQuart(t));
+        AssertNonDecreasing(t => CurveEasing.EaseOutQuart(t));
+        AssertNonDecreasing(t => CurveEasing.EaseInOutQuart(t, center: 0.4, tension: 1.5));
+
+        AssertNonDecreasing(t => CurveEasing.EaseInQuint(t));
+        AssertNonDecreasing(t => CurveEasing.EaseOutQuint(t));
+        AssertNonDecreasing(t => CurveEasing.EaseInOutQuint(t, center: 0.6, tension: 1.5));
+
+        AssertNonDecreasing(t => CurveEasing.EaseInSine(t));
+        AssertNonDecreasing(t => CurveEasing.EaseOutSine(t));
+        AssertNonDecreasing(t => CurveEasing.EaseInOutSine(t, center: 0.45, tension: 1.5));
+
+        AssertNonDecreasing(t => CurveEasing.Plateau(t, plateauAmount: 0.4, center: 0.5, tension: 1.2));
+    }
+
+    [Fact]
+    public void CurveEasing_Center_ShiftsMidpointBehavior()
+    {
+        double leftPivot = CurveEasing.EaseInOutQuint(0.5, center: 0.3, tension: 1.0);
+        double rightPivot = CurveEasing.EaseInOutQuint(0.5, center: 0.7, tension: 1.0);
+
+        Assert.True(leftPivot > 0.5, $"Expected center=0.3 to advance output at t=0.5, got {leftPivot}.");
+        Assert.True(rightPivot < 0.5, $"Expected center=0.7 to delay output at t=0.5, got {rightPivot}.");
+    }
+
+    [Fact]
+    public void CurveEasing_Tension_ChangesSharpness_WithoutBreakingEndpoints()
+    {
+        double softLow = CurveEasing.EaseInOutQuart(0.25, center: 0.5, tension: 0.6);
+        double hardLow = CurveEasing.EaseInOutQuart(0.25, center: 0.5, tension: 3.0);
+        double softHigh = CurveEasing.EaseInOutQuart(0.75, center: 0.5, tension: 0.6);
+        double hardHigh = CurveEasing.EaseInOutQuart(0.75, center: 0.5, tension: 3.0);
+
+        Assert.True(hardLow < softLow, $"Expected higher tension to sharpen lower-half transition ({hardLow} < {softLow}).");
+        Assert.True(hardHigh > softHigh, $"Expected higher tension to sharpen upper-half transition ({hardHigh} > {softHigh}).");
+
+        Assert.InRange(CurveEasing.EaseInOutQuart(0.0, center: 0.5, tension: 3.0), 0.0, ValueTolerance);
+        Assert.InRange(System.Math.Abs(CurveEasing.EaseInOutQuart(1.0, center: 0.5, tension: 3.0) - 1.0), 0.0, ValueTolerance);
+    }
+
+    [Fact]
+    public void CurveEasing_PlateauAmount_ExpandsHeldRegion_WithoutBreakingEndpoints()
+    {
+        double noPlateau = CurveEasing.Plateau(0.4, plateauAmount: 0.0, center: 0.5, tension: 1.0);
+        double widePlateau = CurveEasing.Plateau(0.4, plateauAmount: 0.6, center: 0.5, tension: 1.0);
+
+        Assert.True(
+            System.Math.Abs(widePlateau - 0.5) < System.Math.Abs(noPlateau - 0.5),
+            $"Expected wider plateau to hold output nearer 0.5 at t=0.4 ({widePlateau} vs {noPlateau}).");
+
+        foreach (double t in DenseUnitSamples())
+        {
+            AssertFiniteUnitInterval(CurveEasing.Plateau(t, plateauAmount: 0.6, center: 0.5, tension: 1.3));
+        }
+
+        Assert.InRange(CurveEasing.Plateau(0.0, plateauAmount: 0.6, center: 0.5, tension: 1.3), 0.0, ValueTolerance);
+        Assert.InRange(System.Math.Abs(CurveEasing.Plateau(1.0, plateauAmount: 0.6, center: 0.5, tension: 1.3) - 1.0), 0.0, ValueTolerance);
+    }
+
+    [Fact]
+    public void NurbsCurve_Exists_AndEvaluatesFinitePositions()
+    {
+        IParamCurve nurbs = CreateNurbsOrFail(
+            new List<Vector3d>
+            {
+                new Vector3d(0, 0, 0),
+                new Vector3d(5, 0, 0),
+                new Vector3d(10, 5, 0),
+                new Vector3d(15, 0, 0)
+            },
+            new List<double> { 1.0, 0.8, 1.2, 1.0 },
+            degree: 3);
+
+        foreach (double t in SampleTs())
+        {
+            Vector3d pos = nurbs.Evaluate(t);
+            AssertFinite(pos);
+        }
+    }
+
+    [Fact]
+    public void NurbsCurve_Tangent_IsFiniteAndNormalized()
+    {
+        IParamCurve nurbs = CreateNurbsOrFail(
+            new List<Vector3d>
+            {
+                new Vector3d(0, 0, 0),
+                new Vector3d(5, 0, 0),
+                new Vector3d(10, 5, 0),
+                new Vector3d(15, 0, 0)
+            },
+            new List<double> { 1.0, 0.8, 1.2, 1.0 },
+            degree: 3);
+
+        foreach (double t in SampleTs())
+        {
+            Vector3d tan = nurbs.Tangent(t);
+            AssertFinite(tan);
+            AssertNormalizedNonZero(tan);
+        }
+    }
+
+    [Fact]
+    public void NurbsCurve_UnitWeights_MatchEquivalentBSplineCurve_WithinTolerance()
+    {
+        var controlPoints = new List<Vector3d>
+        {
+            new Vector3d(0, 0, 0),
+            new Vector3d(5, 0, 0),
+            new Vector3d(10, 5, 0),
+            new Vector3d(15, 0, 0)
+        };
+
+        const int degree = 3;
+        var weights = new List<double> { 1.0, 1.0, 1.0, 1.0 };
+        IParamCurve bspline = new BSplineCurve(controlPoints, degree);
+        IParamCurve nurbs = CreateNurbsOrFail(controlPoints, weights, degree);
+
+        foreach (double t in DenseUnitSamples())
+        {
+            Vector3d expected = bspline.Evaluate(t);
+            Vector3d actual = nurbs.Evaluate(t);
+            AssertVectorNear(expected, actual, ValueTolerance);
+        }
+    }
+
+    [Fact]
+    public void NurbsCurve_ParameterOutsideRange_ClampsSafely()
+    {
+        IParamCurve nurbs = CreateNurbsOrFail(
+            new List<Vector3d>
+            {
+                new Vector3d(0, 0, 0),
+                new Vector3d(5, 0, 0),
+                new Vector3d(10, 5, 0),
+                new Vector3d(15, 0, 0)
+            },
+            new List<double> { 1.0, 0.8, 1.2, 1.0 },
+            degree: 3);
+
+        Vector3d start = nurbs.Evaluate(0.0);
+        Vector3d end = nurbs.Evaluate(1.0);
+        Vector3d beforeStart = nurbs.Evaluate(-0.25);
+        Vector3d afterEnd = nurbs.Evaluate(1.25);
+
+        AssertVectorNear(start, beforeStart, ValueTolerance);
+        AssertVectorNear(end, afterEnd, ValueTolerance);
+
+        Vector3d tanBeforeStart = nurbs.Tangent(-0.25);
+        Vector3d tanAfterEnd = nurbs.Tangent(1.25);
+        AssertFinite(tanBeforeStart);
+        AssertFinite(tanAfterEnd);
+        AssertNormalizedNonZero(tanBeforeStart);
+        AssertNormalizedNonZero(tanAfterEnd);
+    }
+
+    [Fact]
+    public void NurbsCurve_InvalidWeights_Throw_ForCountMismatchAndNonPositiveValues()
+    {
+        _ = RequireNurbsType();
+
+        var controlPoints = new List<Vector3d>
+        {
+            new Vector3d(0, 0, 0),
+            new Vector3d(5, 0, 0),
+            new Vector3d(10, 5, 0),
+            new Vector3d(15, 0, 0)
+        };
+
+        Assert.ThrowsAny<Exception>(() =>
+            CreateNurbsOrFail(controlPoints, new List<double> { 1.0, 1.0, 1.0 }, degree: 3));
+
+        Assert.ThrowsAny<Exception>(() =>
+            CreateNurbsOrFail(controlPoints, new List<double> { 1.0, 0.0, 1.0, 1.0 }, degree: 3));
+
+        Assert.ThrowsAny<Exception>(() =>
+            CreateNurbsOrFail(controlPoints, new List<double> { 1.0, -1.0, 1.0, 1.0 }, degree: 3));
+    }
+
+    [Fact]
+    public void NurbsCurve_InvalidCustomKnots_Throw_ForWrongCountAndDecreasingSequence()
+    {
+        _ = RequireNurbsType();
+
+        var controlPoints = new List<Vector3d>
+        {
+            new Vector3d(0, 0, 0),
+            new Vector3d(5, 0, 0),
+            new Vector3d(10, 5, 0),
+            new Vector3d(15, 0, 0)
+        };
+        var weights = new List<double> { 1.0, 1.0, 1.0, 1.0 };
+
+        Assert.ThrowsAny<Exception>(() =>
+            CreateNurbsWithKnotsOrFail(
+                controlPoints,
+                weights,
+                degree: 3,
+                knots: new List<double> { 0.0, 0.0, 0.0, 0.5, 1.0, 1.0, 1.0 }));
+
+        Assert.ThrowsAny<Exception>(() =>
+            CreateNurbsWithKnotsOrFail(
+                controlPoints,
+                weights,
+                degree: 3,
+                knots: new List<double> { 0.0, 0.0, 0.0, 0.6, 0.5, 1.0, 1.0, 1.0 }));
+    }
+
+    [Fact]
     public void TrainFollowerState_MovingBackward_ClampsAtStart_WhenLoopDisabled()
     {
         IArcLengthCurve track = new LineCurve(new Vector3d(0, 0, 0), new Vector3d(10, 0, 0));
@@ -288,6 +554,39 @@ public class FoundationTests
         Assert.False(double.IsInfinity(value.X) || double.IsInfinity(value.Y) || double.IsInfinity(value.Z));
     }
 
+    private static void AssertFiniteUnitInterval(double value)
+    {
+        Assert.False(double.IsNaN(value));
+        Assert.False(double.IsInfinity(value));
+        Assert.InRange(value, 0.0, 1.0);
+    }
+
+    private static void AssertNonDecreasing(Func<double, double> function)
+    {
+        double previous = double.NegativeInfinity;
+
+        foreach (double t in DenseUnitSamples())
+        {
+            double current = function(t);
+            AssertFiniteUnitInterval(current);
+
+            if (!double.IsNegativeInfinity(previous))
+            {
+                Assert.True(
+                    current + ValueTolerance >= previous,
+                    $"Expected non-decreasing sequence at t={t:0.###}, current={current}, previous={previous}.");
+            }
+
+            previous = current;
+        }
+    }
+
+    private static IEnumerable<double> DenseUnitSamples()
+    {
+        for (int i = 0; i <= 20; i++)
+            yield return i / 20.0;
+    }
+
     private static void AssertNormalizedNonZero(Vector3d tangent)
     {
         double len = tangent.Length;
@@ -303,6 +602,46 @@ public class FoundationTests
         Assert.InRange(System.Math.Abs(expected.Z - actual.Z), 0.0, tolerance);
     }
 
+    private static IParamCurve CreateNurbsOrFail(
+        List<Vector3d> controlPoints,
+        List<double> weights,
+        int degree)
+    {
+        Type nurbsType = RequireNurbsType();
+        ConstructorInfo? ctor = nurbsType.GetConstructor(new[] { typeof(List<Vector3d>), typeof(List<double>), typeof(int) });
+
+        Assert.True(
+            ctor is not null,
+            "Expected NurbsCurve constructor: NurbsCurve(List<Vector3d>, List<double>, int).");
+
+        object? instance = ctor!.Invoke(new object[] { controlPoints, weights, degree });
+        return Assert.IsAssignableFrom<IParamCurve>(instance);
+    }
+
+    private static IParamCurve CreateNurbsWithKnotsOrFail(
+        List<Vector3d> controlPoints,
+        List<double> weights,
+        int degree,
+        List<double> knots)
+    {
+        Type nurbsType = RequireNurbsType();
+        ConstructorInfo? ctor = nurbsType.GetConstructor(
+            new[] { typeof(List<Vector3d>), typeof(List<double>), typeof(int), typeof(List<double>) });
+
+        Assert.True(
+            ctor is not null,
+            "Expected NurbsCurve constructor: NurbsCurve(List<Vector3d>, List<double>, int, List<double>)." );
+
+        object? instance = ctor!.Invoke(new object[] { controlPoints, weights, degree, knots });
+        return Assert.IsAssignableFrom<IParamCurve>(instance);
+    }
+
+    private static Type RequireNurbsType()
+    {
+        Type? type = typeof(IParamCurve).Assembly.GetType("Quantum.Splines.NurbsCurve");
+        Assert.True(type is not null, "Expected Quantum.Splines.NurbsCurve to exist.");
+        return type!;
+    }
     private sealed class NearDegenerateCurve : IParamCurve
     {
         public Vector3d Evaluate(double t)
@@ -320,3 +659,4 @@ public class FoundationTests
         }
     }
 }
+
