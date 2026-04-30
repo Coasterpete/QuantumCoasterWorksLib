@@ -684,6 +684,43 @@ public class FoundationTests
         Assert.InRange(updatedPosition.X, 6.0 - ValueTolerance, 6.0 + ValueTolerance);
     }
 
+    [Fact]
+    public void TrainFollowerState_GravityAccelerationAlongTrack_IsNearZero_OnFlatTangent()
+    {
+        IArcLengthCurve track = new LineCurve(new Vector3d(0, 0, 0), new Vector3d(10, 0, 0));
+        var follower = new TrainFollowerState(track, initialDistance: 5.0, speed: 0.0, loopEnabled: false);
+
+        double projectedAcceleration = follower.GravityAccelerationAlongTrack();
+
+        Assert.InRange(System.Math.Abs(projectedAcceleration), 0.0, ValueTolerance);
+    }
+
+    [Fact]
+    public void TrainFollowerState_GravityAccelerationAlongTrack_IsNegative_OnUphillTangent()
+    {
+        IArcLengthCurve track = new LineCurve(new Vector3d(0, 0, 0), new Vector3d(10, 10, 0));
+        var follower = new TrainFollowerState(track, initialDistance: track.Length * 0.5, speed: 0.0, loopEnabled: false);
+
+        double projectedAcceleration = follower.GravityAccelerationAlongTrack();
+        double expected = 9.81 * Vector3d.Dot(new Vector3d(0.0, -1.0, 0.0), follower.Frame.Tangent);
+
+        Assert.True(projectedAcceleration < 0.0, $"Expected uphill tangent to yield negative acceleration, got {projectedAcceleration}.");
+        Assert.InRange(System.Math.Abs(projectedAcceleration - expected), 0.0, ValueTolerance);
+    }
+
+    [Fact]
+    public void TrainFollowerState_GravityAccelerationAlongTrack_IsPositive_OnDownhillTangent()
+    {
+        IArcLengthCurve track = new LineCurve(new Vector3d(0, 10, 0), new Vector3d(10, 0, 0));
+        var follower = new TrainFollowerState(track, initialDistance: track.Length * 0.5, speed: 0.0, loopEnabled: false);
+
+        double projectedAcceleration = follower.GravityAccelerationAlongTrack();
+        double expected = 9.81 * Vector3d.Dot(new Vector3d(0.0, -1.0, 0.0), follower.Frame.Tangent);
+
+        Assert.True(projectedAcceleration > 0.0, $"Expected downhill tangent to yield positive acceleration, got {projectedAcceleration}.");
+        Assert.InRange(System.Math.Abs(projectedAcceleration - expected), 0.0, ValueTolerance);
+    }
+
     private static IEnumerable<(string Name, IParamCurve Curve)> BuildCurves()
     {
         yield return ("Line", new LineCurve(new Vector3d(0, 0, 0), new Vector3d(10, 0, 0)));

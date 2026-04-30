@@ -25,6 +25,15 @@ namespace Quantum.Physics
 
         public TrackFrame Frame { get; private set; }
 
+        /// <summary>
+        /// Projects gravity (negative Y direction) onto the current track tangent.
+        /// Negative means gravity opposes forward motion; positive means gravity assists it.
+        /// </summary>
+        public double GravityAccelerationAlongTrack(double gravityMagnitude = 9.81)
+        {
+            return gravityMagnitude * Vector3d.Dot(new Vector3d(0.0, -1.0, 0.0), Frame.Tangent);
+        }
+
         public TrainFollowerState(
             IArcLengthCurve track,
             double initialDistance = 0.0,
