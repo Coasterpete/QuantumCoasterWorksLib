@@ -721,6 +721,26 @@ public class FoundationTests
         Assert.InRange(System.Math.Abs(projectedAcceleration - expected), 0.0, ValueTolerance);
     }
 
+    [Fact]
+    public void TrainFollowerState_GravityAccelerationAlongTrack_ThrowsForNonFiniteMagnitude()
+    {
+        IArcLengthCurve track = new LineCurve(new Vector3d(0, 0, 0), new Vector3d(10, 0, 0));
+        var follower = new TrainFollowerState(track, initialDistance: 5.0, speed: 0.0, loopEnabled: false);
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => follower.GravityAccelerationAlongTrack(double.NaN));
+        Assert.Throws<ArgumentOutOfRangeException>(() => follower.GravityAccelerationAlongTrack(double.PositiveInfinity));
+        Assert.Throws<ArgumentOutOfRangeException>(() => follower.GravityAccelerationAlongTrack(double.NegativeInfinity));
+    }
+
+    [Fact]
+    public void TrainFollowerState_GravityAccelerationAlongTrack_ThrowsForNegativeMagnitude()
+    {
+        IArcLengthCurve track = new LineCurve(new Vector3d(0, 0, 0), new Vector3d(10, 0, 0));
+        var follower = new TrainFollowerState(track, initialDistance: 5.0, speed: 0.0, loopEnabled: false);
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => follower.GravityAccelerationAlongTrack(-0.01));
+    }
+
     private static IEnumerable<(string Name, IParamCurve Curve)> BuildCurves()
     {
         yield return ("Line", new LineCurve(new Vector3d(0, 0, 0), new Vector3d(10, 0, 0)));
