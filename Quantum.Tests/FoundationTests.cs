@@ -507,6 +507,183 @@ public class FoundationTests
         AssertNormalizedNonZero(follower.Tangent);
     }
 
+    [Fact]
+    public void TrackFrameSampler_SampleByLength_ClampsToEndpoints_AndReturnsFiniteNormalizedTangent()
+    {
+        Type samplerType = RequireTrackFrameSamplerType();
+        Type sampleType = RequireArcLengthSampleType();
+
+        MethodInfo? sampleByLength = samplerType.GetMethod(
+            "SampleByLength",
+            BindingFlags.Public | BindingFlags.Static,
+            binder: null,
+            types: new[] { typeof(IArcLengthCurve), typeof(double) },
+            modifiers: null);
+
+        Assert.True(
+            sampleByLength is not null,
+            "Expected method: TrackFrameSampler.SampleByLength(IArcLengthCurve, double).");
+
+        IArcLengthCurve track = new LineCurve(new Vector3d(0, 0, 0), new Vector3d(10, 0, 0));
+
+        object? beforeStartObject = sampleByLength!.Invoke(null, new object[] { track, -2.0 });
+        object? afterEndObject = sampleByLength.Invoke(null, new object[] { track, track.Length + 2.0 });
+
+        Assert.True(beforeStartObject is not null, "Expected SampleByLength to return a sample for s below start.");
+        Assert.True(afterEndObject is not null, "Expected SampleByLength to return a sample for s above end.");
+        Assert.Equal(sampleType, beforeStartObject!.GetType());
+        Assert.Equal(sampleType, afterEndObject!.GetType());
+
+        Vector3d beforeStartPosition = GetVector3dMember(beforeStartObject, "Position");
+        Vector3d beforeStartTangent = GetVector3dMember(beforeStartObject, "Tangent");
+        Vector3d afterEndPosition = GetVector3dMember(afterEndObject, "Position");
+        Vector3d afterEndTangent = GetVector3dMember(afterEndObject, "Tangent");
+
+        Assert.InRange(beforeStartPosition.X, 0.0 - ValueTolerance, 0.0 + ValueTolerance);
+        Assert.InRange(afterEndPosition.X, 10.0 - ValueTolerance, 10.0 + ValueTolerance);
+        AssertFinite(beforeStartTangent);
+        AssertFinite(afterEndTangent);
+        AssertNormalizedNonZero(beforeStartTangent);
+        AssertNormalizedNonZero(afterEndTangent);
+    }
+
+    [Fact]
+    public void TrackFrameSampler_SampleFrameByLength_ReturnsOrthonormalBasis()
+    {
+        Type samplerType = RequireTrackFrameSamplerType();
+        Type frameType = RequireTrackFrameType();
+
+        MethodInfo? sampleFrameByLength = samplerType.GetMethod(
+            "SampleFrameByLength",
+            BindingFlags.Public | BindingFlags.Static,
+            binder: null,
+            types: new[] { typeof(IArcLengthCurve), typeof(double), typeof(Vector3d) },
+            modifiers: null);
+
+        Assert.True(
+            sampleFrameByLength is not null,
+            "Expected method: TrackFrameSampler.SampleFrameByLength(IArcLengthCurve, double, Vector3d).");
+
+        IArcLengthCurve track = new LineCurve(new Vector3d(0, 0, 0), new Vector3d(10, 10, 0));
+        object? frameObject = sampleFrameByLength!.Invoke(null, new object[] { track, track.Length * 0.5, Vector3d.UnitZ });
+
+        Assert.True(frameObject is not null, "Expected SampleFrameByLength to return a frame.");
+        Assert.Equal(frameType, frameObject!.GetType());
+
+        Vector3d tangent = GetVector3dMember(frameObject, "Tangent");
+        Vector3d right = GetVector3dMember(frameObject, "Right");
+        Vector3d up = GetVector3dMember(frameObject, "Up");
+
+        AssertNormalizedNonZero(tangent);
+        AssertNormalizedNonZero(right);
+        AssertNormalizedNonZero(up);
+
+        Assert.InRange(System.Math.Abs(Vector3d.Dot(tangent, right)), 0.0, 1e-6);
+        Assert.InRange(System.Math.Abs(Vector3d.Dot(tangent, up)), 0.0, 1e-6);
+        Assert.InRange(System.Math.Abs(Vector3d.Dot(right, up)), 0.0, 1e-6);
+    }
+
+    [Fact]
+    public void TrackFrameSampler_SampleFrameByLength_HandlesReferenceUpParallelToTangent_WithoutNaNOrInfinity()
+    {
+        Type samplerType = RequireTrackFrameSamplerType();
+
+        MethodInfo? sampleFrameByLength = samplerType.GetMethod(
+            "SampleFrameByLength",
+            BindingFlags.Public | BindingFlags.Static,
+            binder: null,
+            types: new[] { typeof(IArcLengthCurve), typeof(double), typeof(Vector3d) },
+            modifiers: null);
+
+        Assert.True(
+            sampleFrameByLength is not null,
+            "Expected method: TrackFrameSampler.SampleFrameByLength(IArcLengthCurve, double, Vector3d).");
+
+        IArcLengthCurve track = new LineCurve(new Vector3d(0, 0, 0), new Vector3d(0, 10, 0));
+        object? frameObject = sampleFrameByLength!.Invoke(null, new object[] { track, track.Length * 0.5, Vector3d.UnitY });
+
+        Assert.True(frameObject is not null, "Expected SampleFrameByLength to return a frame.");
+
+        Vector3d tangent = GetVector3dMember(frameObject!, "Tangent");
+        Vector3d right = GetVector3dMember(frameObject, "Right");
+        Vector3d up = GetVector3dMember(frameObject, "Up");
+
+        AssertFinite(tangent);
+        AssertFinite(right);
+        AssertFinite(up);
+        AssertNormalizedNonZero(tangent);
+        AssertNormalizedNonZero(right);
+        AssertNormalizedNonZero(up);
+    }
+
+    [Fact]
+    public void TrackFrameSampler_SampleFramesUniform_IncludesStartAndEnd_WhenLengthNotDivisibleByStepLength()
+    {
+        Type samplerType = RequireTrackFrameSamplerType();
+
+        MethodInfo? sampleFramesUniform = samplerType.GetMethod(
+            "SampleFramesUniform",
+            BindingFlags.Public | BindingFlags.Static,
+            binder: null,
+            types: new[] { typeof(IArcLengthCurve), typeof(double), typeof(Vector3d) },
+            modifiers: null);
+
+        Assert.True(
+            sampleFramesUniform is not null,
+            "Expected method: TrackFrameSampler.SampleFramesUniform(IArcLengthCurve, double, Vector3d).");
+
+        IArcLengthCurve track = new LineCurve(new Vector3d(0, 0, 0), new Vector3d(10, 0, 0));
+        object? framesObject = sampleFramesUniform!.Invoke(null, new object[] { track, 3.0, Vector3d.UnitY });
+
+        Assert.True(framesObject is not null, "Expected SampleFramesUniform to return an enumerable of frames.");
+        Assert.True(
+            framesObject is System.Collections.IEnumerable,
+            "Expected SampleFramesUniform return value to implement IEnumerable.");
+
+        var frames = new List<object>();
+        foreach (object? frame in (System.Collections.IEnumerable)framesObject!)
+        {
+            Assert.True(frame is not null, "Expected all sampled frames to be non-null.");
+            frames.Add(frame!);
+        }
+
+        Assert.True(frames.Count >= 2, "Expected at least start and end frames.");
+
+        Vector3d startPosition = GetVector3dMember(frames[0], "Position");
+        Vector3d endPosition = GetVector3dMember(frames[frames.Count - 1], "Position");
+
+        Assert.InRange(startPosition.X, 0.0 - ValueTolerance, 0.0 + ValueTolerance);
+        Assert.InRange(endPosition.X, 10.0 - ValueTolerance, 10.0 + ValueTolerance);
+    }
+
+    [Fact]
+    public void TrainFollowerState_ExposesTrackFrame_AtCurrentDistance()
+    {
+        Type frameType = RequireTrackFrameType();
+        PropertyInfo? frameProperty = typeof(TrainFollowerState).GetProperty("Frame", BindingFlags.Public | BindingFlags.Instance);
+
+        Assert.True(frameProperty is not null, "Expected TrainFollowerState to expose a public Frame property.");
+        Assert.Equal(frameType, frameProperty!.PropertyType);
+
+        IArcLengthCurve track = new LineCurve(new Vector3d(0, 0, 0), new Vector3d(10, 0, 0));
+        var follower = new TrainFollowerState(track, initialDistance: 4.0, speed: 0.0, loopEnabled: false);
+
+        object? initialFrameObject = frameProperty.GetValue(follower);
+        Assert.True(initialFrameObject is not null, "Expected Frame to be initialized in constructor.");
+
+        Vector3d initialPosition = GetVector3dMember(initialFrameObject!, "Position");
+        Assert.InRange(initialPosition.X, 4.0 - ValueTolerance, 4.0 + ValueTolerance);
+
+        follower.Speed = 2.0;
+        follower.Update(1.0);
+
+        object? updatedFrameObject = frameProperty.GetValue(follower);
+        Assert.True(updatedFrameObject is not null, "Expected Frame to remain available after Update.");
+
+        Vector3d updatedPosition = GetVector3dMember(updatedFrameObject!, "Position");
+        Assert.InRange(updatedPosition.X, 6.0 - ValueTolerance, 6.0 + ValueTolerance);
+    }
+
     private static IEnumerable<(string Name, IParamCurve Curve)> BuildCurves()
     {
         yield return ("Line", new LineCurve(new Vector3d(0, 0, 0), new Vector3d(10, 0, 0)));
@@ -642,6 +819,51 @@ public class FoundationTests
         Assert.True(type is not null, "Expected Quantum.Splines.NurbsCurve to exist.");
         return type!;
     }
+
+    private static Type RequireArcLengthSampleType()
+    {
+        Type? type = typeof(IParamCurve).Assembly.GetType("Quantum.Splines.ArcLengthSample");
+        Assert.True(type is not null, "Expected Quantum.Splines.ArcLengthSample to exist.");
+        return type!;
+    }
+
+    private static Type RequireTrackFrameType()
+    {
+        Type? type = typeof(IParamCurve).Assembly.GetType("Quantum.Splines.TrackFrame");
+        Assert.True(type is not null, "Expected Quantum.Splines.TrackFrame to exist.");
+        return type!;
+    }
+
+    private static Type RequireTrackFrameSamplerType()
+    {
+        Type? type = typeof(IParamCurve).Assembly.GetType("Quantum.Splines.TrackFrameSampler");
+        Assert.True(type is not null, "Expected Quantum.Splines.TrackFrameSampler to exist.");
+        return type!;
+    }
+
+    private static Vector3d GetVector3dMember(object instance, string memberName)
+    {
+        Type type = instance.GetType();
+
+        PropertyInfo? property = type.GetProperty(memberName, BindingFlags.Public | BindingFlags.Instance);
+        if (property is not null)
+        {
+            object? value = property.GetValue(instance);
+            Assert.True(value is Vector3d, $"Expected {type.FullName}.{memberName} to be a Vector3d property.");
+            return (Vector3d)value!;
+        }
+
+        FieldInfo? field = type.GetField(memberName, BindingFlags.Public | BindingFlags.Instance);
+        if (field is not null)
+        {
+            object? value = field.GetValue(instance);
+            Assert.True(value is Vector3d, $"Expected {type.FullName}.{memberName} to be a Vector3d field.");
+            return (Vector3d)value!;
+        }
+
+        throw new Xunit.Sdk.XunitException($"Expected {type.FullName} to contain public member '{memberName}'.");
+    }
+
     private sealed class NearDegenerateCurve : IParamCurve
     {
         public Vector3d Evaluate(double t)

@@ -23,6 +23,8 @@ namespace Quantum.Physics
 
         public Vector3d Tangent { get; private set; }
 
+        public TrackFrame Frame { get; private set; }
+
         public TrainFollowerState(
             IArcLengthCurve track,
             double initialDistance = 0.0,
@@ -66,8 +68,9 @@ namespace Quantum.Physics
 
         private void SampleCurrentState()
         {
-            Position = Track.EvaluateByLength(Distance);
-            Tangent = Track.TangentByLength(Distance);
+            Frame = TrackFrameSampler.SampleFrameByLength(Track, Distance, Vector3d.UnitY);
+            Position = Frame.Position;
+            Tangent = Frame.Tangent;
         }
     }
 }
