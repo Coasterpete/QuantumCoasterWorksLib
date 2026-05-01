@@ -12,25 +12,40 @@ namespace Quantum.FVD
     {
         private readonly List<FvdControlNode> _controlNodes;
         private readonly List<FvdForceSample> _forceSamples;
+        private readonly List<FvdSectionDefinition> _sections;
 
         public IReadOnlyList<FvdControlNode> ControlNodes => _controlNodes;
 
         public IReadOnlyList<FvdForceSample> ForceSamples => _forceSamples;
 
+        public IReadOnlyList<FvdSectionDefinition> Sections => _sections;
+
         public int Degree { get; }
 
         public FvdGraph(List<FvdControlNode> controlNodes, int degree)
-            : this(controlNodes, degree, new List<FvdForceSample>())
+            : this(controlNodes, degree, new List<FvdForceSample>(), new List<FvdSectionDefinition>())
         {
         }
 
         public FvdGraph(List<FvdControlNode> controlNodes, int degree, List<FvdForceSample> forceSamples)
+            : this(controlNodes, degree, forceSamples, new List<FvdSectionDefinition>())
+        {
+        }
+
+        public FvdGraph(
+            List<FvdControlNode> controlNodes,
+            int degree,
+            List<FvdForceSample> forceSamples,
+            List<FvdSectionDefinition> sections)
         {
             if (controlNodes == null)
                 throw new ArgumentNullException(nameof(controlNodes));
 
             if (forceSamples == null)
                 throw new ArgumentNullException(nameof(forceSamples));
+
+            if (sections == null)
+                throw new ArgumentNullException(nameof(sections));
 
             if (degree < 1)
                 throw new ArgumentOutOfRangeException(nameof(degree), "Degree must be at least 1.");
@@ -87,6 +102,17 @@ namespace Quantum.FVD
                 _forceSamples.Add(sample);
                 previousU = sample.U;
                 hasPrevious = true;
+            }
+
+            _sections = new List<FvdSectionDefinition>(sections.Count);
+
+            for (int i = 0; i < sections.Count; i++)
+            {
+                FvdSectionDefinition section = sections[i] ?? throw new ArgumentException(
+                    $"Section at index {i} cannot be null.",
+                    nameof(sections));
+
+                _sections.Add(section);
             }
 
             Degree = degree;
