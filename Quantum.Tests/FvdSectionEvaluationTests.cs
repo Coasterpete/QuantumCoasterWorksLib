@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using System.Runtime.ExceptionServices;
 using Xunit;
@@ -138,6 +139,143 @@ public class FvdSectionEvaluationTests
         Assert.Contains("channel", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public void FvdSectionDefinition_EvaluateAllAt_ReturnsAllDefinedChannels_WithValuesMatchingEvaluateAt()
+    {
+        Type sectionDefinitionType = RequireSectionDefinitionType();
+        Type sectionFunctionType = RequireSectionFunctionType();
+
+        object rollRate = CreateSectionFunctionOrFail(
+            sectionFunctionType,
+            channelName: "RollRateDegPerSec",
+            CreateSectionSampleOrFail(0.0, 1.0),
+            CreateSectionSampleOrFail(10.0, 3.0));
+        object normal = CreateSectionFunctionOrFail(
+            sectionFunctionType,
+            channelName: "NormalG",
+            CreateSectionSampleOrFail(0.0, 2.0),
+            CreateSectionSampleOrFail(10.0, 6.0));
+        object lateral = CreateSectionFunctionOrFail(
+            sectionFunctionType,
+            channelName: "LateralG",
+            CreateSectionSampleOrFail(0.0, -1.0),
+            CreateSectionSampleOrFail(10.0, 1.0));
+
+        object section = CreateSectionDefinitionOrFail(
+            sectionDefinitionType,
+            kindName: "Force",
+            domainName: "Distance",
+            startX: 0.0,
+            endX: 10.0,
+            rollRate,
+            normal,
+            lateral);
+
+        const double x = 2.5;
+        IReadOnlyList<(string ChannelName, double Value)> evaluations = EvaluateAllSectionChannelsAtOrFail(section, x);
+
+        Assert.Equal(3, evaluations.Count);
+        Assert.Equal(
+            new[] { "NormalG", "LateralG", "RollRateDegPerSec" },
+            evaluations.Select(e => e.ChannelName).ToArray());
+
+        foreach ((string channelName, double value) in evaluations)
+        {
+            double expected = EvaluateSectionAtOrFail(section, channelName, x);
+            Assert.InRange(System.Math.Abs(value - expected), 0.0, ValueTolerance);
+        }
+    }
+
+    [Fact]
+    public void FvdSectionDefinition_EvaluateAllAt_OrdersOutputByCanonicalSectionChannelEnumOrder()
+    {
+        Type sectionDefinitionType = RequireSectionDefinitionType();
+        Type sectionFunctionType = RequireSectionFunctionType();
+
+        object rollRate = CreateSectionFunctionOrFail(
+            sectionFunctionType,
+            channelName: "RollRateDegPerSec",
+            CreateSectionSampleOrFail(0.0, 0.0),
+            CreateSectionSampleOrFail(10.0, 1.0));
+        object normal = CreateSectionFunctionOrFail(
+            sectionFunctionType,
+            channelName: "NormalG",
+            CreateSectionSampleOrFail(0.0, 1.0),
+            CreateSectionSampleOrFail(10.0, 2.0));
+        object lateral = CreateSectionFunctionOrFail(
+            sectionFunctionType,
+            channelName: "LateralG",
+            CreateSectionSampleOrFail(0.0, 2.0),
+            CreateSectionSampleOrFail(10.0, 3.0));
+
+        object section = CreateSectionDefinitionOrFail(
+            sectionDefinitionType,
+            kindName: "Force",
+            domainName: "Distance",
+            startX: 0.0,
+            endX: 10.0,
+            rollRate,
+            normal,
+            lateral);
+
+        IReadOnlyList<(string ChannelName, double Value)> evaluations = EvaluateAllSectionChannelsAtOrFail(section, 4.0);
+        string[] actualOrder = evaluations.Select(e => e.ChannelName).ToArray();
+
+        string[] expectedOrder = Enum
+            .GetNames(RequireSectionChannelType())
+            .Where(name => name is "NormalG" or "LateralG" or "RollRateDegPerSec")
+            .ToArray();
+
+        Assert.Equal(expectedOrder, actualOrder);
+    }
+
+    [Fact]
+    public void FvdSectionDefinition_EvaluateAllAt_RepeatedCallAtSameX_IsIdenticalAndOrdered()
+    {
+        Type sectionDefinitionType = RequireSectionDefinitionType();
+        Type sectionFunctionType = RequireSectionFunctionType();
+
+        object rollRate = CreateSectionFunctionOrFail(
+            sectionFunctionType,
+            channelName: "RollRateDegPerSec",
+            CreateSectionSampleOrFail(0.0, 4.0),
+            CreateSectionSampleOrFail(10.0, 8.0));
+        object normal = CreateSectionFunctionOrFail(
+            sectionFunctionType,
+            channelName: "NormalG",
+            CreateSectionSampleOrFail(0.0, -2.0),
+            CreateSectionSampleOrFail(10.0, 2.0));
+        object lateral = CreateSectionFunctionOrFail(
+            sectionFunctionType,
+            channelName: "LateralG",
+            CreateSectionSampleOrFail(0.0, 3.0),
+            CreateSectionSampleOrFail(10.0, 5.0));
+
+        object section = CreateSectionDefinitionOrFail(
+            sectionDefinitionType,
+            kindName: "Force",
+            domainName: "Distance",
+            startX: 0.0,
+            endX: 10.0,
+            rollRate,
+            normal,
+            lateral);
+
+        const double x = 1.25;
+        IReadOnlyList<(string ChannelName, double Value)> first = EvaluateAllSectionChannelsAtOrFail(section, x);
+        IReadOnlyList<(string ChannelName, double Value)> second = EvaluateAllSectionChannelsAtOrFail(section, x);
+
+        Assert.Equal(first.Select(e => e.ChannelName).ToArray(), second.Select(e => e.ChannelName).ToArray());
+        Assert.Equal(
+            new[] { "NormalG", "LateralG", "RollRateDegPerSec" },
+            first.Select(e => e.ChannelName).ToArray());
+
+        for (int i = 0; i < first.Count; i++)
+        {
+            Assert.InRange(System.Math.Abs(first[i].Value - second[i].Value), 0.0, ValueTolerance);
+        }
+    }
+
     private static double EvaluateFunctionAtOrFail(object function, double x)
     {
         Type functionType = function.GetType();
@@ -187,6 +325,63 @@ public class FvdSectionEvaluationTests
 
         Assert.True(value is double, "Expected section EvaluateAt to return a double.");
         return (double)value!;
+    }
+
+    private static IReadOnlyList<(string ChannelName, double Value)> EvaluateAllSectionChannelsAtOrFail(object section, double x)
+    {
+        Type sectionType = section.GetType();
+
+        MethodInfo? method = sectionType.GetMethod(
+            "EvaluateAllAt",
+            BindingFlags.Public | BindingFlags.Instance,
+            binder: null,
+            types: new[] { typeof(double) },
+            modifiers: null);
+
+        Assert.True(
+            method is not null,
+            "Expected method: FvdSectionDefinition.EvaluateAllAt(double x).");
+
+        object? result;
+        try
+        {
+            result = method!.Invoke(section, new object[] { x });
+        }
+        catch (TargetInvocationException ex) when (ex.InnerException is not null)
+        {
+            ExceptionDispatchInfo.Capture(ex.InnerException).Throw();
+            throw;
+        }
+
+        Assert.True(result is not null, "Expected EvaluateAllAt to return a non-null value.");
+        Assert.True(result is System.Collections.IEnumerable, "Expected EvaluateAllAt to return an enumerable.");
+
+        var evaluations = new List<(string ChannelName, double Value)>();
+        foreach (object? item in (System.Collections.IEnumerable)result!)
+        {
+            Assert.True(item is not null, "Expected each EvaluateAllAt item to be non-null.");
+
+            Type itemType = item!.GetType();
+            PropertyInfo? channelProperty = itemType.GetProperty("Channel", BindingFlags.Public | BindingFlags.Instance);
+            PropertyInfo? valueProperty = itemType.GetProperty("Value", BindingFlags.Public | BindingFlags.Instance);
+
+            Assert.True(
+                channelProperty is not null,
+                "Expected EvaluateAllAt item type to expose a Channel property.");
+            Assert.True(
+                valueProperty is not null,
+                "Expected EvaluateAllAt item type to expose a Value property.");
+
+            object? channelValue = channelProperty!.GetValue(item);
+            object? valueValue = valueProperty!.GetValue(item);
+
+            Assert.True(channelValue is not null, "Expected evaluation Channel to be non-null.");
+            Assert.True(valueValue is double, "Expected evaluation Value to be a double.");
+
+            evaluations.Add((Enum.GetName(channelValue!.GetType(), channelValue)!, (double)valueValue!));
+        }
+
+        return evaluations;
     }
 
     private static object CreateSectionDefinitionOrFail(

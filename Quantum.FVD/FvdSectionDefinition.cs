@@ -67,6 +67,28 @@ namespace Quantum.FVD
                 $"Section does not contain a function for channel '{channel}'.");
         }
 
+        public IReadOnlyList<FvdChannelEvaluation> EvaluateAllAt(double x)
+        {
+            var evaluations = new List<FvdChannelEvaluation>(_functions.Count);
+            var channelOrder = (FvdSectionChannel[])Enum.GetValues(typeof(FvdSectionChannel));
+
+            for (int channelIndex = 0; channelIndex < channelOrder.Length; channelIndex++)
+            {
+                FvdSectionChannel channel = channelOrder[channelIndex];
+
+                for (int functionIndex = 0; functionIndex < _functions.Count; functionIndex++)
+                {
+                    FvdSectionFunction function = _functions[functionIndex];
+                    if (function.Channel != channel)
+                        continue;
+
+                    evaluations.Add(new FvdChannelEvaluation(channel, function.EvaluateAt(x)));
+                }
+            }
+
+            return evaluations;
+        }
+
         private static void ValidateChannelForKind(FvdSectionKind kind, FvdSectionChannel channel)
         {
             bool valid = kind switch
