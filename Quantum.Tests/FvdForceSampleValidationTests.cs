@@ -9,6 +9,32 @@ namespace Quantum.Tests;
 public class FvdForceSampleValidationTests
 {
     [Fact]
+    public void FvdGraph_AcceptsSortedForceSamples_AndPreservesOrderAndValues()
+    {
+        List<FvdControlNode> controlNodes = BuildValidControlNodes();
+
+        var sortedSamples = new List<FvdForceSample>
+        {
+            new FvdForceSample(0.00, normalG: 1.00, lateralG: 0.00, rollRateDegPerSec: 0.00),
+            new FvdForceSample(0.30, normalG: 1.15, lateralG: 0.05, rollRateDegPerSec: 1.50),
+            new FvdForceSample(0.70, normalG: 1.25, lateralG: -0.10, rollRateDegPerSec: 3.25),
+            new FvdForceSample(1.00, normalG: 1.05, lateralG: 0.00, rollRateDegPerSec: 0.50)
+        };
+
+        var graph = new FvdGraph(controlNodes, degree: 3, sortedSamples);
+
+        Assert.Equal(sortedSamples.Count, graph.ForceSamples.Count);
+
+        for (int i = 0; i < sortedSamples.Count; i++)
+        {
+            Assert.Equal(sortedSamples[i].U, graph.ForceSamples[i].U);
+            Assert.Equal(sortedSamples[i].NormalG, graph.ForceSamples[i].NormalG);
+            Assert.Equal(sortedSamples[i].LateralG, graph.ForceSamples[i].LateralG);
+            Assert.Equal(sortedSamples[i].RollRateDegPerSec, graph.ForceSamples[i].RollRateDegPerSec);
+        }
+    }
+
+    [Fact]
     public void FvdGraph_RejectsOutOfRangeUValues_InForceSamples()
     {
         List<FvdControlNode> controlNodes = BuildValidControlNodes();
