@@ -54,6 +54,19 @@ namespace Quantum.FVD
             }
         }
 
+        public double EvaluateAt(FvdSectionChannel channel, double x)
+        {
+            for (int i = 0; i < _functions.Count; i++)
+            {
+                FvdSectionFunction function = _functions[i];
+                if (function.Channel == channel)
+                    return function.EvaluateAt(x);
+            }
+
+            throw new InvalidOperationException(
+                $"Section does not contain a function for channel '{channel}'.");
+        }
+
         private static void ValidateChannelForKind(FvdSectionKind kind, FvdSectionChannel channel)
         {
             bool valid = kind switch
