@@ -175,6 +175,99 @@ public class FvdSectionContractTests
     }
 
     [Fact]
+    public void FvdSectionDefinition_RejectsDuplicateChannelFunctions_InForceSections()
+    {
+        Type sectionDefinitionType = RequireSectionDefinitionType();
+        Type sectionFunctionType = RequireSectionFunctionType();
+
+        object normalA = CreateSectionFunctionOrFail(
+            sectionFunctionType,
+            channelName: "NormalG",
+            CreateSectionSampleOrFail(0.0, 1.0),
+            CreateSectionSampleOrFail(1.0, 1.2));
+
+        object normalB = CreateSectionFunctionOrFail(
+            sectionFunctionType,
+            channelName: "NormalG",
+            CreateSectionSampleOrFail(0.0, 1.1),
+            CreateSectionSampleOrFail(1.0, 1.3));
+
+        Assert.ThrowsAny<Exception>(() =>
+            CreateSectionDefinitionOrFail(
+                sectionDefinitionType,
+                kindName: "Force",
+                domainName: "Distance",
+                startX: 0.0,
+                endX: 1.0,
+                normalA,
+                normalB));
+    }
+
+    [Fact]
+    public void FvdSectionDefinition_RejectsDuplicateChannelFunctions_InGeometrySections()
+    {
+        Type sectionDefinitionType = RequireSectionDefinitionType();
+        Type sectionFunctionType = RequireSectionFunctionType();
+
+        object curvatureA = CreateSectionFunctionOrFail(
+            sectionFunctionType,
+            channelName: "Curvature",
+            CreateSectionSampleOrFail(0.0, 0.01),
+            CreateSectionSampleOrFail(1.0, 0.03));
+
+        object curvatureB = CreateSectionFunctionOrFail(
+            sectionFunctionType,
+            channelName: "Curvature",
+            CreateSectionSampleOrFail(0.0, 0.02),
+            CreateSectionSampleOrFail(1.0, 0.04));
+
+        Assert.ThrowsAny<Exception>(() =>
+            CreateSectionDefinitionOrFail(
+                sectionDefinitionType,
+                kindName: "Geometry",
+                domainName: "Distance",
+                startX: 0.0,
+                endX: 1.0,
+                curvatureA,
+                curvatureB));
+    }
+
+    [Fact]
+    public void FvdSectionDefinition_AcceptsDistinctChannelFunctions()
+    {
+        Type sectionDefinitionType = RequireSectionDefinitionType();
+        Type sectionFunctionType = RequireSectionFunctionType();
+
+        object normal = CreateSectionFunctionOrFail(
+            sectionFunctionType,
+            channelName: "NormalG",
+            CreateSectionSampleOrFail(0.0, 1.0),
+            CreateSectionSampleOrFail(1.0, 1.2));
+
+        object lateral = CreateSectionFunctionOrFail(
+            sectionFunctionType,
+            channelName: "LateralG",
+            CreateSectionSampleOrFail(0.0, 0.1),
+            CreateSectionSampleOrFail(1.0, 0.2));
+
+        object section = CreateSectionDefinitionOrFail(
+            sectionDefinitionType,
+            kindName: "Force",
+            domainName: "Distance",
+            startX: 0.0,
+            endX: 1.0,
+            normal,
+            lateral);
+
+        object functionsObject = GetRequiredMember(section, "Functions");
+        var functions = AsObjectList(functionsObject);
+
+        Assert.Equal(2, functions.Count);
+        Assert.Equal("NormalG", GetEnumMemberName(functions[0], "Channel"));
+        Assert.Equal("LateralG", GetEnumMemberName(functions[1], "Channel"));
+    }
+
+    [Fact]
     public void FvdSectionDefinition_AcceptsValidSection_AndPreservesShapeAndValues()
     {
         Type sectionDefinitionType = RequireSectionDefinitionType();

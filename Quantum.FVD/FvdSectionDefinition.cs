@@ -41,6 +41,7 @@ namespace Quantum.FVD
             StartX = startX;
             EndX = endX;
             _functions = new List<FvdSectionFunction>(functions.Count);
+            var seenChannels = new HashSet<FvdSectionChannel>();
 
             for (int i = 0; i < functions.Count; i++)
             {
@@ -49,6 +50,13 @@ namespace Quantum.FVD
                     nameof(functions));
 
                 ValidateChannelForKind(kind, function.Channel);
+                if (!seenChannels.Add(function.Channel))
+                {
+                    throw new ArgumentException(
+                        $"Duplicate channel '{function.Channel}' is not allowed within a single section.",
+                        nameof(functions));
+                }
+
                 ValidateSamples(function.Samples, startX, endX, i);
                 _functions.Add(function);
             }
