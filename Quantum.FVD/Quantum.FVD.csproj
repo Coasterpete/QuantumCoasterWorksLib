@@ -5,4 +5,9 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\Quantum.Math\Quantum.Math.csproj" />
+    <ProjectReference Include="..\Quantum.Splines\Quantum.Splines.csproj" />
+  </ItemGroup>
+
 </Project>
