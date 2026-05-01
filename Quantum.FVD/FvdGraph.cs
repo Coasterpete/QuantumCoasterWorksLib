@@ -66,7 +66,29 @@ namespace Quantum.FVD
                 hasPrevious = true;
             }
 
-            _forceSamples = new List<FvdForceSample>(forceSamples);
+            _forceSamples = new List<FvdForceSample>(forceSamples.Count);
+
+            previousU = double.NegativeInfinity;
+            hasPrevious = false;
+
+            for (int i = 0; i < forceSamples.Count; i++)
+            {
+                FvdForceSample sample = forceSamples[i];
+
+                ValidateForceSampleU(sample.U, i);
+
+                if (hasPrevious && sample.U <= previousU)
+                {
+                    throw new ArgumentException(
+                        "Force sample U values must be strictly increasing (sorted and non-duplicate).",
+                        nameof(forceSamples));
+                }
+
+                _forceSamples.Add(sample);
+                previousU = sample.U;
+                hasPrevious = true;
+            }
+
             Degree = degree;
         }
 
@@ -112,6 +134,16 @@ namespace Quantum.FVD
                 throw new ArgumentOutOfRangeException(
                     nameof(weight),
                     $"Control node weight at index {index} must be finite and > 0.");
+            }
+        }
+
+        private static void ValidateForceSampleU(double u, int index)
+        {
+            if (double.IsNaN(u) || double.IsInfinity(u) || u < 0.0 || u > 1.0)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(u),
+                    $"Force sample U at index {index} must be a finite value in [0, 1].");
             }
         }
     }
