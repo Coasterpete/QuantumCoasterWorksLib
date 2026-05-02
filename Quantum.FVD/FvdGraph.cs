@@ -144,6 +144,49 @@ namespace Quantum.FVD
             return new FvdNurbsBuildResult(paramCurve, arcCurve);
         }
 
+        public double EvaluateSectionChannelAt(
+            FvdSectionKind kind,
+            FvdFunctionDomain domain,
+            FvdSectionChannel channel,
+            double x)
+        {
+            if (double.IsNaN(x) || double.IsInfinity(x))
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(x),
+                    x,
+                    "Evaluation X must be a finite value.");
+            }
+
+            var matchingSections = new List<FvdSectionDefinition>();
+            FvdSectionDefinition? finalSection = null;
+
+            for (int i = 0; i < _sections.Count; i++)
+            {
+                FvdSectionDefinition section = _sections[i];
+                if (section.Kind != kind || section.Domain != domain)
+                    continue;
+
+                matchingSections.Add(section);
+
+                if (finalSection == null || section.EndX > finalSection.EndX)
+                    finalSection = section;
+            }
+
+            for (int i = 0; i < matchingSections.Count; i++)
+            {
+                FvdSectionDefinition section = matchingSections[i];
+                if (x >= section.StartX && x < section.EndX)
+                    return section.EvaluateAt(channel, x);
+            }
+
+            if (finalSection != null && x == finalSection.EndX && x >= finalSection.StartX)
+                return finalSection.EvaluateAt(channel, x);
+
+            throw new InvalidOperationException(
+                $"No section exists for kind '{kind}', domain '{domain}', and x={x}.");
+        }
+
         private static void ValidateU(double u, int index)
         {
             if (double.IsNaN(u) || double.IsInfinity(u) || u < 0.0 || u > 1.0)
