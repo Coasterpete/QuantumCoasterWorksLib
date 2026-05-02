@@ -162,6 +162,31 @@ namespace Quantum.FVD
             return section.EvaluateAt(channel, x);
         }
 
+        public bool TryEvaluateSectionChannelAt(
+            FvdSectionKind kind,
+            FvdFunctionDomain domain,
+            FvdSectionChannel channel,
+            double x,
+            out double value)
+        {
+            if (double.IsNaN(x) || double.IsInfinity(x))
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(x),
+                    x,
+                    "Evaluation X must be a finite value.");
+            }
+
+            if (!TryResolveSectionForEvaluation(kind, domain, x, out FvdSectionDefinition section))
+            {
+                value = default;
+                return false;
+            }
+
+            value = section.EvaluateAt(channel, x);
+            return true;
+        }
+
         public IReadOnlyList<FvdChannelEvaluation> EvaluateSectionAllAt(
             FvdSectionKind kind,
             FvdFunctionDomain domain,
@@ -179,35 +204,54 @@ namespace Quantum.FVD
             return section.EvaluateAllAt(x);
         }
 
-        private FvdSectionDefinition ResolveSectionForEvaluationOrThrow(
+        private bool TryResolveSectionForEvaluation(
             FvdSectionKind kind,
             FvdFunctionDomain domain,
-            double x)
+            double x,
+            out FvdSectionDefinition section)
         {
             var matchingSections = new List<FvdSectionDefinition>();
             FvdSectionDefinition? finalSection = null;
 
             for (int i = 0; i < _sections.Count; i++)
             {
-                FvdSectionDefinition section = _sections[i];
-                if (section.Kind != kind || section.Domain != domain)
+                FvdSectionDefinition candidate = _sections[i];
+                if (candidate.Kind != kind || candidate.Domain != domain)
                     continue;
 
-                matchingSections.Add(section);
+                matchingSections.Add(candidate);
 
-                if (finalSection == null || section.EndX > finalSection.EndX)
-                    finalSection = section;
+                if (finalSection == null || candidate.EndX > finalSection.EndX)
+                    finalSection = candidate;
             }
 
             for (int i = 0; i < matchingSections.Count; i++)
             {
-                FvdSectionDefinition section = matchingSections[i];
-                if (x >= section.StartX && x < section.EndX)
-                    return section;
+                FvdSectionDefinition candidate = matchingSections[i];
+                if (x >= candidate.StartX && x < candidate.EndX)
+                {
+                    section = candidate;
+                    return true;
+                }
             }
 
             if (finalSection != null && x == finalSection.EndX && x >= finalSection.StartX)
-                return finalSection;
+            {
+                section = finalSection;
+                return true;
+            }
+
+            section = null!;
+            return false;
+        }
+
+        private FvdSectionDefinition ResolveSectionForEvaluationOrThrow(
+            FvdSectionKind kind,
+            FvdFunctionDomain domain,
+            double x)
+        {
+            if (TryResolveSectionForEvaluation(kind, domain, x, out FvdSectionDefinition section))
+                return section;
 
             throw new InvalidOperationException(
                 $"No section exists for kind '{kind}', domain '{domain}', and x={x}.");
