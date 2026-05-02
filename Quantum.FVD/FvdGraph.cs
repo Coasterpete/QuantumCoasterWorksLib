@@ -112,6 +112,7 @@ namespace Quantum.FVD
                     $"Section at index {i} cannot be null.",
                     nameof(sections));
 
+                ValidateSectionOverlap(section, i);
                 _sections.Add(section);
             }
 
@@ -170,6 +171,29 @@ namespace Quantum.FVD
                 throw new ArgumentOutOfRangeException(
                     nameof(u),
                     $"Force sample U at index {index} must be a finite value in [0, 1].");
+            }
+        }
+
+        private void ValidateSectionOverlap(FvdSectionDefinition candidate, int candidateIndex)
+        {
+            for (int i = 0; i < _sections.Count; i++)
+            {
+                FvdSectionDefinition existing = _sections[i];
+
+                if (existing.Kind != candidate.Kind || existing.Domain != candidate.Domain)
+                    continue;
+
+                // Treat section ranges as half-open intervals [StartX, EndX):
+                // touching edges are allowed, true interior overlap is rejected.
+                bool overlaps = candidate.StartX < existing.EndX
+                                && existing.StartX < candidate.EndX;
+
+                if (!overlaps)
+                    continue;
+
+                throw new ArgumentException(
+                    $"Section at index {candidateIndex} overlaps section at index {i} for kind '{candidate.Kind}' and domain '{candidate.Domain}'.",
+                    nameof(candidate));
             }
         }
     }

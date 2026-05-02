@@ -376,6 +376,70 @@ public class FvdSectionContractTests
         Assert.Equal("Geometry", GetEnumMemberName(sections[1], "Kind"));
     }
 
+    [Fact]
+    public void FvdGraph_RejectsOverlappingSections_InSameKindAndDomain()
+    {
+        Type sectionDefinitionType = RequireSectionDefinitionType();
+        Type sectionFunctionType = RequireSectionFunctionType();
+
+        object firstFunction = CreateSectionFunctionOrFail(
+            sectionFunctionType,
+            channelName: "NormalG",
+            CreateSectionSampleOrFail(0.0, 1.0),
+            CreateSectionSampleOrFail(10.0, 1.2));
+
+        object secondFunction = CreateSectionFunctionOrFail(
+            sectionFunctionType,
+            channelName: "LateralG",
+            CreateSectionSampleOrFail(9.0, 0.1),
+            CreateSectionSampleOrFail(15.0, 0.2));
+
+        object firstSection = CreateSectionDefinitionOrFail(
+            sectionDefinitionType,
+            kindName: "Force",
+            domainName: "Distance",
+            startX: 0.0,
+            endX: 10.0,
+            firstFunction);
+
+        object secondSection = CreateSectionDefinitionOrFail(
+            sectionDefinitionType,
+            kindName: "Force",
+            domainName: "Distance",
+            startX: 9.0,
+            endX: 15.0,
+            secondFunction);
+
+        Type sectionListType = typeof(List<>).MakeGenericType(sectionDefinitionType);
+        object sectionList = CreateTypedList(sectionListType, firstSection, secondSection);
+
+        List<FvdControlNode> controlNodes = BuildValidControlNodes();
+        List<FvdForceSample> forceSamples = BuildValidForceSamples();
+
+        Type graphType = typeof(FvdGraph);
+        ConstructorInfo? ctor = graphType.GetConstructor(
+            new[] { typeof(List<FvdControlNode>), typeof(int), typeof(List<FvdForceSample>), sectionListType });
+
+        Assert.True(
+            ctor is not null,
+            "Expected constructor: FvdGraph(List<FvdControlNode>, int, List<FvdForceSample>, List<FvdSectionDefinition>).");
+
+        Exception ex = Assert.ThrowsAny<Exception>(() =>
+        {
+            try
+            {
+                ctor!.Invoke(new object[] { controlNodes, 3, forceSamples, sectionList });
+            }
+            catch (TargetInvocationException invocationEx) when (invocationEx.InnerException is not null)
+            {
+                throw invocationEx.InnerException;
+            }
+        });
+
+        Assert.Contains("overlap", ex.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("section", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
     private static object CreateSectionDefinitionOrFail(
         Type sectionDefinitionType,
         string kindName,
