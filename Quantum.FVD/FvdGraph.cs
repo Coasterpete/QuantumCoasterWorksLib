@@ -158,6 +158,32 @@ namespace Quantum.FVD
                     "Evaluation X must be a finite value.");
             }
 
+            FvdSectionDefinition section = ResolveSectionForEvaluationOrThrow(kind, domain, x);
+            return section.EvaluateAt(channel, x);
+        }
+
+        public IReadOnlyList<FvdChannelEvaluation> EvaluateSectionAllAt(
+            FvdSectionKind kind,
+            FvdFunctionDomain domain,
+            double x)
+        {
+            if (double.IsNaN(x) || double.IsInfinity(x))
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(x),
+                    x,
+                    "Evaluation X must be a finite value.");
+            }
+
+            FvdSectionDefinition section = ResolveSectionForEvaluationOrThrow(kind, domain, x);
+            return section.EvaluateAllAt(x);
+        }
+
+        private FvdSectionDefinition ResolveSectionForEvaluationOrThrow(
+            FvdSectionKind kind,
+            FvdFunctionDomain domain,
+            double x)
+        {
             var matchingSections = new List<FvdSectionDefinition>();
             FvdSectionDefinition? finalSection = null;
 
@@ -177,11 +203,11 @@ namespace Quantum.FVD
             {
                 FvdSectionDefinition section = matchingSections[i];
                 if (x >= section.StartX && x < section.EndX)
-                    return section.EvaluateAt(channel, x);
+                    return section;
             }
 
             if (finalSection != null && x == finalSection.EndX && x >= finalSection.StartX)
-                return finalSection.EvaluateAt(channel, x);
+                return finalSection;
 
             throw new InvalidOperationException(
                 $"No section exists for kind '{kind}', domain '{domain}', and x={x}.");

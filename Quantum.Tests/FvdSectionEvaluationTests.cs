@@ -376,6 +376,151 @@ public class FvdSectionEvaluationTests
         Assert.InRange(System.Math.Abs((double)value! - 7.0), 0.0, ValueTolerance);
     }
 
+    [Fact]
+    public void FvdGraph_EvaluateSectionAllAt_TouchingSections_UsesRightSectionAndReturnsCanonicalOrder()
+    {
+        Type sectionDefinitionType = RequireSectionDefinitionType();
+        Type sectionFunctionType = RequireSectionFunctionType();
+
+        object leftNormal = CreateSectionFunctionOrFail(
+            sectionFunctionType,
+            channelName: "NormalG",
+            CreateSectionSampleOrFail(0.0, 1.0),
+            CreateSectionSampleOrFail(10.0, 2.0));
+        object leftLateral = CreateSectionFunctionOrFail(
+            sectionFunctionType,
+            channelName: "LateralG",
+            CreateSectionSampleOrFail(0.0, -3.0),
+            CreateSectionSampleOrFail(10.0, -2.0));
+
+        object rightNormal = CreateSectionFunctionOrFail(
+            sectionFunctionType,
+            channelName: "NormalG",
+            CreateSectionSampleOrFail(10.0, 7.0),
+            CreateSectionSampleOrFail(20.0, 8.0));
+        object rightLateral = CreateSectionFunctionOrFail(
+            sectionFunctionType,
+            channelName: "LateralG",
+            CreateSectionSampleOrFail(10.0, 11.0),
+            CreateSectionSampleOrFail(20.0, 12.0));
+
+        object leftSection = CreateSectionDefinitionOrFail(
+            sectionDefinitionType,
+            kindName: "Force",
+            domainName: "Distance",
+            startX: 0.0,
+            endX: 10.0,
+            leftNormal,
+            leftLateral);
+
+        object rightSection = CreateSectionDefinitionOrFail(
+            sectionDefinitionType,
+            kindName: "Force",
+            domainName: "Distance",
+            startX: 10.0,
+            endX: 20.0,
+            rightNormal,
+            rightLateral);
+
+        Type sectionListType = typeof(List<>).MakeGenericType(sectionDefinitionType);
+        object sectionList = CreateTypedList(sectionListType, leftSection, rightSection);
+
+        Type nodeType = RequireFvdControlNodeType();
+        Type nodeListType = typeof(List<>).MakeGenericType(nodeType);
+        ConstructorInfo? nodeCtor = nodeType.GetConstructor(new[] { typeof(double), typeof(Quantum.Math.Vector3d), typeof(double) });
+
+        Assert.True(
+            nodeCtor is not null,
+            "Expected constructor: FvdControlNode(double u, Vector3d position, double weight).");
+
+        object nodeList = CreateTypedList(
+            nodeListType,
+            nodeCtor!.Invoke(new object[] { 0.00, new Quantum.Math.Vector3d(0, 0, 0), 1.0 })!,
+            nodeCtor!.Invoke(new object[] { 0.33, new Quantum.Math.Vector3d(4, 5, 0), 0.9 })!,
+            nodeCtor!.Invoke(new object[] { 0.66, new Quantum.Math.Vector3d(8, -3, 0), 1.2 })!,
+            nodeCtor!.Invoke(new object[] { 1.00, new Quantum.Math.Vector3d(12, 0, 0), 1.0 })!);
+
+        Type forceSampleType = RequireFvdForceSampleType();
+        Type forceSampleListType = typeof(List<>).MakeGenericType(forceSampleType);
+        object forceSampleList = CreateTypedList(forceSampleListType);
+
+        Type graphType = RequireFvdGraphType();
+        ConstructorInfo? graphCtor = graphType.GetConstructor(
+            new[] { nodeListType, typeof(int), forceSampleListType, sectionListType });
+
+        Assert.True(
+            graphCtor is not null,
+            "Expected constructor: FvdGraph(List<FvdControlNode>, int, List<FvdForceSample>, List<FvdSectionDefinition>).");
+
+        object graph = graphCtor!.Invoke(new[] { nodeList, (object)3, forceSampleList, sectionList })!;
+
+        Type sectionKindType = RequireSectionKindType();
+        Type functionDomainType = RequireFunctionDomainType();
+
+        MethodInfo? dispatchAllMethod = graphType.GetMethod(
+            "EvaluateSectionAllAt",
+            BindingFlags.Public | BindingFlags.Instance,
+            binder: null,
+            types: new[] { sectionKindType, functionDomainType, typeof(double) },
+            modifiers: null);
+
+        Assert.True(
+            dispatchAllMethod is not null,
+            "Expected method: FvdGraph.EvaluateSectionAllAt(FvdSectionKind kind, FvdFunctionDomain domain, double x).");
+
+        object kind = ParseEnumOrFail(sectionKindType, "Force");
+        object domain = ParseEnumOrFail(functionDomainType, "Distance");
+
+        object? evaluationsObject;
+        try
+        {
+            evaluationsObject = dispatchAllMethod!.Invoke(graph, new[] { kind, domain, (object)10.0 });
+        }
+        catch (TargetInvocationException ex) when (ex.InnerException is not null)
+        {
+            ExceptionDispatchInfo.Capture(ex.InnerException).Throw();
+            throw;
+        }
+
+        Assert.True(evaluationsObject is not null, "Expected EvaluateSectionAllAt to return a non-null value.");
+        Assert.True(evaluationsObject is System.Collections.IEnumerable, "Expected EvaluateSectionAllAt to return an enumerable.");
+
+        var evaluations = new List<(string ChannelName, double Value)>();
+        foreach (object? item in (System.Collections.IEnumerable)evaluationsObject!)
+        {
+            Assert.True(item is not null, "Expected each EvaluateSectionAllAt item to be non-null.");
+
+            Type itemType = item!.GetType();
+            PropertyInfo? channelProperty = itemType.GetProperty("Channel", BindingFlags.Public | BindingFlags.Instance);
+            PropertyInfo? valueProperty = itemType.GetProperty("Value", BindingFlags.Public | BindingFlags.Instance);
+
+            Assert.True(channelProperty is not null, "Expected EvaluateSectionAllAt item type to expose a Channel property.");
+            Assert.True(valueProperty is not null, "Expected EvaluateSectionAllAt item type to expose a Value property.");
+
+            object? channelValue = channelProperty!.GetValue(item);
+            object? valueValue = valueProperty!.GetValue(item);
+
+            Assert.True(channelValue is not null, "Expected evaluation Channel to be non-null.");
+            Assert.True(valueValue is double, "Expected evaluation Value to be a double.");
+
+            evaluations.Add((Enum.GetName(channelValue!.GetType(), channelValue)!, (double)valueValue!));
+        }
+
+        string[] actualOrder = evaluations.Select(e => e.ChannelName).ToArray();
+        string[] expectedOrder = Enum
+            .GetNames(RequireSectionChannelType())
+            .Where(name => name is "NormalG" or "LateralG")
+            .ToArray();
+
+        Assert.Equal(expectedOrder, actualOrder);
+
+        foreach ((string channelName, double value) in evaluations)
+        {
+            double expected = EvaluateSectionAtOrFail(rightSection, channelName, x: 10.0);
+            Assert.InRange(System.Math.Abs(value - expected), 0.0, ValueTolerance);
+        }
+    }
+
     private static double EvaluateFunctionAtOrFail(object function, double x)
     {
         Type functionType = function.GetType();
