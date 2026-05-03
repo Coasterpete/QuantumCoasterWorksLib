@@ -342,6 +342,86 @@ public sealed class TrainStepLoopTests
     }
 
     [Fact]
+    public void TrainStepLoop_WithForceTargetProvider_SamplesOncePerStepAtPreStepDistance()
+    {
+        IArcLengthCurve track = new LineCurve(
+            new Vector3d(0, 0, 0),
+            new Vector3d(100, 0, 0));
+
+        const double deltaTime = 0.2;
+        const int steps = 6;
+        const double initialDistance = 1.5;
+        const double initialSpeed = 4.0;
+
+        var stepByStepFollower = new TrainFollowerState(
+            track,
+            initialDistance: initialDistance,
+            speed: initialSpeed,
+            loopEnabled: false);
+
+        var batchFollower = new TrainFollowerState(
+            track,
+            initialDistance: initialDistance,
+            speed: initialSpeed,
+            loopEnabled: false);
+
+        var stepByStepProvider = new RecordingForceTargetProvider();
+        var batchProvider = new RecordingForceTargetProvider();
+
+        var stepByStepLoop = new TrainStepLoop(
+            stepByStepFollower,
+            deltaTime,
+            gravityMagnitude: 0.0,
+            linearDragCoefficient: 0.0,
+            quadraticDragCoefficient: 0.0,
+            rollingResistance: 0.0,
+            stepByStepProvider);
+
+        var batchLoop = new TrainStepLoop(
+            batchFollower,
+            deltaTime,
+            gravityMagnitude: 0.0,
+            linearDragCoefficient: 0.0,
+            quadraticDragCoefficient: 0.0,
+            rollingResistance: 0.0,
+            batchProvider);
+
+        var preStepDistances = new List<double>(steps);
+        for (int i = 0; i < steps; i++)
+        {
+            preStepDistances.Add(stepByStepFollower.Distance);
+            stepByStepLoop.Step();
+        }
+
+        batchLoop.Step(steps);
+
+        Assert.Equal(steps, stepByStepProvider.SampledDistances.Count);
+        Assert.Equal(steps, batchProvider.SampledDistances.Count);
+
+        for (int i = 0; i < steps; i++)
+        {
+            Assert.InRange(
+                System.Math.Abs(stepByStepProvider.SampledDistances[i] - preStepDistances[i]),
+                0.0,
+                ValueTolerance);
+
+            Assert.InRange(
+                System.Math.Abs(batchProvider.SampledDistances[i] - preStepDistances[i]),
+                0.0,
+                ValueTolerance);
+        }
+
+        Assert.InRange(
+            System.Math.Abs(stepByStepFollower.Distance - batchFollower.Distance),
+            0.0,
+            ValueTolerance);
+        Assert.InRange(
+            System.Math.Abs(stepByStepFollower.Speed - batchFollower.Speed),
+            0.0,
+            ValueTolerance);
+    }
+
+    [Fact]
     public void TrainStepLoop_SampleForDuration_UsesFloorStepsAndMatchesSample()
     {
         IArcLengthCurve track = new LineCurve(
@@ -668,6 +748,18 @@ public sealed class TrainStepLoopTests
     {
         public bool TryGetForceTargets(double x, out ForceTargets targets)
         {
+            targets = default;
+            return false;
+        }
+    }
+
+    private sealed class RecordingForceTargetProvider : IForceTargetProvider
+    {
+        public List<double> SampledDistances { get; } = new();
+
+        public bool TryGetForceTargets(double x, out ForceTargets targets)
+        {
+            SampledDistances.Add(x);
             targets = default;
             return false;
         }
