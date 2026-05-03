@@ -959,6 +959,121 @@ public class FoundationTests
         Assert.InRange(System.Math.Abs(backwardFollower.Speed), 0.0, ValueTolerance);
     }
 
+    [Fact]
+    public void TrainFollowerState_UpdateWithGravity_NoDrag_EnergyConservedOnSlope()
+    {
+        IParamCurve baseCurve = new QuadraticBezierCurve(
+            new Vector3d(0, 10, 0),
+            new Vector3d(5, 0, 0),
+            new Vector3d(10, 10, 0));
+        IArcLengthCurve track = new ArcLengthCurveAdapter(baseCurve, samples: 2000);
+
+        const double gravityMagnitude = 9.81;
+        const double deltaTime = 0.01;
+        const int maxSteps = 3000;
+        const double energyTolerance = 0.5;
+
+        var follower = new TrainFollowerState(track, initialDistance: 0.0, speed: 1.0, loopEnabled: true);
+        double initialEnergy = ComputeTotalMechanicalEnergy(follower, gravityMagnitude);
+
+        bool sawDownhill = false;
+        bool sawUphillAfterDownhill = false;
+
+        for (int i = 0; i < maxSteps; i++)
+        {
+            follower.UpdateWithGravity(
+                deltaTime,
+                gravityMagnitude,
+                linearDragCoefficient: 0.0,
+                quadraticDragCoefficient: 0.0,
+                rollingResistance: 0.0);
+
+            if (follower.Tangent.Y < -0.05)
+            {
+                sawDownhill = true;
+            }
+
+            if (sawDownhill && follower.Tangent.Y > 0.05)
+            {
+                sawUphillAfterDownhill = true;
+                break;
+            }
+        }
+
+        double finalEnergy = ComputeTotalMechanicalEnergy(follower, gravityMagnitude);
+
+        Assert.True(sawDownhill, "Expected trajectory to include downhill motion.");
+        Assert.True(sawUphillAfterDownhill, "Expected trajectory to include uphill motion after downhill.");
+        Assert.InRange(System.Math.Abs(finalEnergy - initialEnergy), 0.0, energyTolerance);
+    }
+
+    [Fact]
+    public void TrainFollowerState_UpdateWithGravity_WithDrag_EnergyDecreases()
+    {
+        IParamCurve baseCurve = new QuadraticBezierCurve(
+            new Vector3d(0, 10, 0),
+            new Vector3d(5, 0, 0),
+            new Vector3d(10, 10, 0));
+        IArcLengthCurve track = new ArcLengthCurveAdapter(baseCurve, samples: 2000);
+
+        const double gravityMagnitude = 9.81;
+        const double deltaTime = 0.01;
+        const int steps = 1200;
+
+        var follower = new TrainFollowerState(track, initialDistance: 0.0, speed: 3.0, loopEnabled: false);
+        double initialEnergy = ComputeTotalMechanicalEnergy(follower, gravityMagnitude);
+
+        for (int i = 0; i < steps; i++)
+        {
+            follower.UpdateWithGravity(
+                deltaTime,
+                gravityMagnitude,
+                linearDragCoefficient: 0.08,
+                quadraticDragCoefficient: 0.01,
+                rollingResistance: 0.05);
+        }
+
+        double finalEnergy = ComputeTotalMechanicalEnergy(follower, gravityMagnitude);
+
+        Assert.True(
+            finalEnergy < initialEnergy,
+            $"Expected drag to decrease total energy. Initial: {initialEnergy}, final: {finalEnergy}.");
+    }
+
+    [Fact]
+    public void TrainFollowerState_UpdateWithGravity_SmallerTimeStep_ProducesSimilarResult()
+    {
+        IArcLengthCurve track = new LineCurve(new Vector3d(0, 10, 0), new Vector3d(100, 0, 0));
+
+        const double gravityMagnitude = 9.81;
+        const double initialSpeed = 3.0;
+        const double initialDistance = 10.0;
+
+        var coarse = new TrainFollowerState(track, initialDistance: initialDistance, speed: initialSpeed, loopEnabled: false);
+        var fine = new TrainFollowerState(track, initialDistance: initialDistance, speed: initialSpeed, loopEnabled: false);
+
+        coarse.UpdateWithGravity(
+            1.0,
+            gravityMagnitude,
+            linearDragCoefficient: 0.0,
+            quadraticDragCoefficient: 0.0,
+            rollingResistance: 0.0);
+
+        for (int i = 0; i < 10; i++)
+        {
+            fine.UpdateWithGravity(
+                0.1,
+                gravityMagnitude,
+                linearDragCoefficient: 0.0,
+                quadraticDragCoefficient: 0.0,
+                rollingResistance: 0.0);
+        }
+
+        Assert.InRange(System.Math.Abs(coarse.Distance - fine.Distance), 0.0, 0.05);
+        Assert.InRange(System.Math.Abs(coarse.Speed - fine.Speed), 0.0, 0.05);
+        Assert.InRange(System.Math.Abs(coarse.Position.Y - fine.Position.Y), 0.0, 0.05);
+    }
+
     private static IEnumerable<(string Name, IParamCurve Curve)> BuildCurves()
     {
         yield return ("Line", new LineCurve(new Vector3d(0, 0, 0), new Vector3d(10, 0, 0)));
@@ -1011,6 +1126,13 @@ public class FoundationTests
         Assert.False(double.IsNaN(value));
         Assert.False(double.IsInfinity(value));
         Assert.InRange(value, 0.0, 1.0);
+    }
+
+    private static double ComputeTotalMechanicalEnergy(TrainFollowerState follower, double gravityMagnitude)
+    {
+        double kinetic = 0.5 * follower.Speed * follower.Speed;
+        double potential = gravityMagnitude * follower.Position.Y;
+        return kinetic + potential;
     }
 
     private static void AssertNonDecreasing(Func<double, double> function)
