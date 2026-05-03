@@ -9,6 +9,8 @@ namespace Quantum.Physics
     /// </summary>
     public static class TrainSampleAnalytics
     {
+        private const double StandardGravityMetersPerSecondSquared = 9.81;
+
         public static double GetMaxSpeed(IReadOnlyList<TrainFollowerState> samples)
         {
             RequireNonEmpty(samples);
@@ -57,6 +59,47 @@ namespace Quantum.Physics
             }
 
             return maxHeight;
+        }
+
+        public static (double MeanAbsoluteError, double RmsError) ComputeNormalGError(
+            IReadOnlyList<TrainFollowerState> samples,
+            IForceTargetProvider provider,
+            double dt)
+        {
+            RequireNonEmpty(samples);
+            if (provider is null)
+                throw new ArgumentNullException(nameof(provider));
+
+            Guard.RequirePositiveFinite(
+                dt,
+                nameof(dt),
+                "Delta time must be a finite, positive value.");
+
+            double absoluteErrorSum = 0.0;
+            double squaredErrorSum = 0.0;
+
+            for (int i = 0; i < samples.Count; i++)
+            {
+                TrainFollowerState sample = samples[i];
+                double x = sample.Distance;
+
+                if (!provider.TryGetForceTargets(x, out ForceTargets targets))
+                {
+                    throw new InvalidOperationException(
+                        $"No force targets available at sample distance x={x:0.######}.");
+                }
+
+                double realizedNormalG = sample.Acceleration / StandardGravityMetersPerSecondSquared;
+                double error = realizedNormalG - targets.NormalG;
+
+                absoluteErrorSum += System.Math.Abs(error);
+                squaredErrorSum += error * error;
+            }
+
+            double sampleCount = samples.Count;
+            return (
+                MeanAbsoluteError: absoluteErrorSum / sampleCount,
+                RmsError: System.Math.Sqrt(squaredErrorSum / sampleCount));
         }
 
         private static void RequireNonEmpty(IReadOnlyList<TrainFollowerState> samples)

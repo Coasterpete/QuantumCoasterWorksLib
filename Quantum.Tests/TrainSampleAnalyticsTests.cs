@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Quantum.FVD;
 using Quantum.Math;
 using Quantum.Physics;
 using Quantum.Splines;
@@ -69,5 +70,99 @@ public sealed class TrainSampleAnalyticsTests
 
         Assert.InRange(System.Math.Abs(minHeight - 0.0), 0.0, ValueTolerance);
         Assert.InRange(System.Math.Abs(maxHeight - 10.0), 0.0, ValueTolerance);
+    }
+
+    [Fact]
+    public void ComputeNormalGError_ConstantTargetAndSimulation_IsNearZero()
+    {
+        const double deltaTime = 0.1;
+        const int steps = 24;
+
+        IArcLengthCurve track = new LineCurve(
+            new Vector3d(0, 0, 0),
+            new Vector3d(100, 0, 0));
+
+        FvdForceTargetProviderAdapter adapter = CreateConstantNormalGAdapter(normalG: 1.0, endX: 100.0);
+
+        var follower = new TrainFollowerState(track);
+        var loop = new TrainStepLoop(
+            follower,
+            deltaTime,
+            gravityMagnitude: 0.0,
+            linearDragCoefficient: 0.0,
+            quadraticDragCoefficient: 0.0,
+            rollingResistance: 0.0,
+            forceTargetProvider: adapter);
+
+        IReadOnlyList<TrainFollowerState> samples = loop.Sample(steps);
+
+        (double meanAbsoluteError, double rmsError) = TrainSampleAnalytics.ComputeNormalGError(samples, adapter, deltaTime);
+
+        Assert.InRange(System.Math.Abs(meanAbsoluteError), 0.0, ValueTolerance);
+        Assert.InRange(System.Math.Abs(rmsError), 0.0, ValueTolerance);
+    }
+
+    [Fact]
+    public void ComputeNormalGError_TargetSimulationMismatch_IsNonZero()
+    {
+        const double deltaTime = 0.1;
+        const int steps = 16;
+
+        IArcLengthCurve track = new LineCurve(
+            new Vector3d(0, 0, 0),
+            new Vector3d(100, 0, 0));
+
+        FvdForceTargetProviderAdapter adapter = CreateConstantNormalGAdapter(normalG: 1.0, endX: 100.0);
+
+        var follower = new TrainFollowerState(track);
+        var loop = new TrainStepLoop(
+            follower,
+            deltaTime,
+            gravityMagnitude: 0.0,
+            linearDragCoefficient: 0.0,
+            quadraticDragCoefficient: 0.0,
+            rollingResistance: 0.0,
+            forceTargetProvider: null);
+
+        IReadOnlyList<TrainFollowerState> samples = loop.Sample(steps);
+
+        (double meanAbsoluteError, double rmsError) = TrainSampleAnalytics.ComputeNormalGError(samples, adapter, deltaTime);
+
+        Assert.InRange(System.Math.Abs(meanAbsoluteError - 1.0), 0.0, ValueTolerance);
+        Assert.InRange(System.Math.Abs(rmsError - 1.0), 0.0, ValueTolerance);
+        Assert.True(meanAbsoluteError > 0.0);
+        Assert.True(rmsError > 0.0);
+    }
+
+    private static FvdForceTargetProviderAdapter CreateConstantNormalGAdapter(double normalG, double endX)
+    {
+        var graph = new FvdGraph(
+            new List<FvdControlNode>
+            {
+                new(0.0, new Vector3d(0.0, 0.0, 0.0), 1.0),
+                new(1.0, new Vector3d(endX, 0.0, 0.0), 1.0)
+            },
+            degree: 1,
+            forceSamples: new List<FvdForceSample>(),
+            sections: new List<FvdSectionDefinition>
+            {
+                new(
+                    FvdSectionKind.Force,
+                    FvdFunctionDomain.Distance,
+                    startX: 0.0,
+                    endX: endX,
+                    new List<FvdSectionFunction>
+                    {
+                        new(
+                            FvdSectionChannel.NormalG,
+                            new List<FvdSectionSample>
+                            {
+                                new(0.0, normalG),
+                                new(endX, normalG)
+                            })
+                    })
+            });
+
+        return new FvdForceTargetProviderAdapter(graph, FvdFunctionDomain.Distance);
     }
 }
