@@ -851,6 +851,51 @@ public class FoundationTests
             $"Expected higher speed to lose more velocity. Low loss: {lowSpeedLoss}, high loss: {highSpeedLoss}.");
     }
 
+    [Fact]
+    public void TrainFollowerState_UpdateWithGravity_WithRollingResistance_ReducesSpeedAtConstantRate()
+    {
+        IArcLengthCurve track = new LineCurve(new Vector3d(0, 0, 0), new Vector3d(100, 0, 0));
+        const double initialDistance = 0.0;
+        const double lowInitialSpeed = 3.0;
+        const double highInitialSpeed = 9.0;
+        const double deltaTime = 1.0;
+        const double gravityMagnitude = 9.81;
+        const double linearDragCoefficient = 0.0;
+        const double quadraticDragCoefficient = 0.0;
+        const double rollingResistance = 0.5;
+
+        var lowSpeedFollower = new TrainFollowerState(track, initialDistance: initialDistance, speed: lowInitialSpeed, loopEnabled: false);
+        var highSpeedFollower = new TrainFollowerState(track, initialDistance: initialDistance, speed: highInitialSpeed, loopEnabled: false);
+
+        MethodInfo? updateWithGravityAndResistances = typeof(TrainFollowerState).GetMethod(
+            "UpdateWithGravity",
+            BindingFlags.Public | BindingFlags.Instance,
+            binder: null,
+            types: new[] { typeof(double), typeof(double), typeof(double), typeof(double), typeof(double) },
+            modifiers: null);
+
+        Assert.True(
+            updateWithGravityAndResistances is not null,
+            "Expected method: TrainFollowerState.UpdateWithGravity(double, double, double, double, double).");
+
+        updateWithGravityAndResistances!.Invoke(
+            lowSpeedFollower,
+            new object[] { deltaTime, gravityMagnitude, linearDragCoefficient, quadraticDragCoefficient, rollingResistance });
+
+        updateWithGravityAndResistances.Invoke(
+            highSpeedFollower,
+            new object[] { deltaTime, gravityMagnitude, linearDragCoefficient, quadraticDragCoefficient, rollingResistance });
+
+        double lowSpeedLoss = lowInitialSpeed - lowSpeedFollower.Speed;
+        double highSpeedLoss = highInitialSpeed - highSpeedFollower.Speed;
+
+        Assert.True(lowSpeedLoss > 0.0, $"Expected low speed to decrease, but loss was {lowSpeedLoss}.");
+        Assert.True(highSpeedLoss > 0.0, $"Expected high speed to decrease, but loss was {highSpeedLoss}.");
+        Assert.InRange(lowSpeedLoss, rollingResistance - ValueTolerance, rollingResistance + ValueTolerance);
+        Assert.InRange(highSpeedLoss, rollingResistance - ValueTolerance, rollingResistance + ValueTolerance);
+        Assert.InRange(highSpeedLoss - lowSpeedLoss, -ValueTolerance, ValueTolerance);
+    }
+
     private static IEnumerable<(string Name, IParamCurve Curve)> BuildCurves()
     {
         yield return ("Line", new LineCurve(new Vector3d(0, 0, 0), new Vector3d(10, 0, 0)));

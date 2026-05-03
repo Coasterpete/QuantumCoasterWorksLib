@@ -86,6 +86,21 @@ namespace Quantum.Physics
             double linearDragCoefficient,
             double quadraticDragCoefficient = 0.0)
         {
+            UpdateWithGravity(
+                deltaTime,
+                gravityMagnitude,
+                linearDragCoefficient,
+                quadraticDragCoefficient,
+                rollingResistance: 0.0);
+        }
+
+        public void UpdateWithGravity(
+            double deltaTime,
+            double gravityMagnitude,
+            double linearDragCoefficient,
+            double quadraticDragCoefficient,
+            double rollingResistance = 0.0)
+        {
             Guard.RequireNonNegativeFinite(
                 linearDragCoefficient,
                 nameof(linearDragCoefficient),
@@ -96,10 +111,16 @@ namespace Quantum.Physics
                 nameof(quadraticDragCoefficient),
                 "Quadratic drag coefficient must be a finite, non-negative value.");
 
+            Guard.RequireNonNegativeFinite(
+                rollingResistance,
+                nameof(rollingResistance),
+                "Rolling resistance must be a finite, non-negative value.");
+
             Acceleration =
                 GravityAccelerationAlongTrack(gravityMagnitude)
                 - (linearDragCoefficient * Speed)
                 - (quadraticDragCoefficient * Speed * System.Math.Abs(Speed));
+            Acceleration -= rollingResistance * System.Math.Sign(Speed);
             Update(deltaTime);
         }
 
