@@ -64,7 +64,17 @@ namespace Quantum.Physics
 
         public void UpdateWithGravity(double deltaTime, double gravityMagnitude = 9.81)
         {
-            Acceleration = GravityAccelerationAlongTrack(gravityMagnitude);
+            UpdateWithGravity(deltaTime, gravityMagnitude, linearDragCoefficient: 0.0);
+        }
+
+        public void UpdateWithGravity(double deltaTime, double gravityMagnitude, double linearDragCoefficient = 0.0)
+        {
+            Guard.RequireNonNegativeFinite(
+                linearDragCoefficient,
+                nameof(linearDragCoefficient),
+                "Linear drag coefficient must be a finite, non-negative value.");
+
+            Acceleration = GravityAccelerationAlongTrack(gravityMagnitude) - (linearDragCoefficient * Speed);
             Update(deltaTime);
         }
 

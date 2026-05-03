@@ -771,6 +771,40 @@ public class FoundationTests
         Assert.InRange(follower.Distance, expectedDistance - ValueTolerance, expectedDistance + ValueTolerance);
     }
 
+    [Fact]
+    public void TrainFollowerState_UpdateWithGravity_WithLinearDrag_ReducesSpeedAndDistanceAsExpected()
+    {
+        IArcLengthCurve track = new LineCurve(new Vector3d(0, 0, 0), new Vector3d(100, 0, 0));
+        const double initialDistance = 2.0;
+        const double initialSpeed = 10.0;
+        const double deltaTime = 1.0;
+        const double gravityMagnitude = 9.81;
+        const double linearDragCoefficient = 0.2;
+
+        var follower = new TrainFollowerState(track, initialDistance: initialDistance, speed: initialSpeed, loopEnabled: false);
+
+        MethodInfo? updateWithGravityAndDrag = typeof(TrainFollowerState).GetMethod(
+            "UpdateWithGravity",
+            BindingFlags.Public | BindingFlags.Instance,
+            binder: null,
+            types: new[] { typeof(double), typeof(double), typeof(double) },
+            modifiers: null);
+
+        Assert.True(
+            updateWithGravityAndDrag is not null,
+            "Expected method: TrainFollowerState.UpdateWithGravity(double, double, double).");
+
+        double expectedAcceleration = -linearDragCoefficient * initialSpeed;
+        double expectedSpeed = initialSpeed + (expectedAcceleration * deltaTime);
+        double expectedDistance = initialDistance + (initialSpeed * deltaTime) + (0.5 * expectedAcceleration * deltaTime * deltaTime);
+
+        updateWithGravityAndDrag!.Invoke(follower, new object[] { deltaTime, gravityMagnitude, linearDragCoefficient });
+
+        Assert.InRange(follower.Acceleration, expectedAcceleration - ValueTolerance, expectedAcceleration + ValueTolerance);
+        Assert.InRange(follower.Speed, expectedSpeed - ValueTolerance, expectedSpeed + ValueTolerance);
+        Assert.InRange(follower.Distance, expectedDistance - ValueTolerance, expectedDistance + ValueTolerance);
+    }
+
     private static IEnumerable<(string Name, IParamCurve Curve)> BuildCurves()
     {
         yield return ("Line", new LineCurve(new Vector3d(0, 0, 0), new Vector3d(10, 0, 0)));
