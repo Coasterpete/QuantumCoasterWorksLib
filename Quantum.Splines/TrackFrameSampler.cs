@@ -4,8 +4,28 @@ using Quantum.Math;
 
 namespace Quantum.Splines
 {
-    public static class TrackFrameSampler
+    public sealed class TrackFrameSampler
     {
+        private readonly IArcLengthCurve _curve;
+        private readonly Vector3d _referenceNormal;
+
+        public TrackFrameSampler(IArcLengthCurve curve)
+            : this(curve, Vector3d.UnitY)
+        {
+        }
+
+        public TrackFrameSampler(IArcLengthCurve curve, Vector3d referenceNormal)
+        {
+            _curve = curve ?? throw new ArgumentNullException(nameof(curve));
+            _referenceNormal = referenceNormal;
+        }
+
+        public TrackFrame GetFrameAt(double s)
+        {
+            ArcLengthSample sample = SampleByLength(_curve, s);
+            return BuildFrame(_curve, sample.S, sample.Position, sample.Tangent, _referenceNormal);
+        }
+
         public static ArcLengthSample SampleByLength(IArcLengthCurve curve, double s)
         {
             if (curve == null)
@@ -18,24 +38,16 @@ namespace Quantum.Splines
             return new ArcLengthSample(clampedS, position, tangent);
         }
 
+        public static TrackFrame GetFrameAt(IArcLengthCurve curve, double s)
+        {
+            var sampler = new TrackFrameSampler(curve, Vector3d.UnitY);
+            return sampler.GetFrameAt(s);
+        }
+
         public static TrackFrame SampleFrameByLength(IArcLengthCurve curve, double s, Vector3d referenceUp)
         {
-            ArcLengthSample sample = SampleByLength(curve, s);
-            Vector3d tangent = sample.Tangent;
-
-            Vector3d upHint = ResolveUpHint(referenceUp, tangent);
-            Vector3d right = Vector3d.Cross(upHint, tangent);
-
-            if (right.Length <= MathUtil.Epsilon)
-            {
-                Vector3d fallbackAxis = SelectFallbackAxis(tangent);
-                right = Vector3d.Cross(fallbackAxis, tangent);
-            }
-
-            right = NormalizeOrThrow(right, "right");
-            Vector3d up = NormalizeOrThrow(Vector3d.Cross(tangent, right), "up");
-
-            return new TrackFrame(sample.S, sample.Position, tangent, right, up);
+            var sampler = new TrackFrameSampler(curve, referenceUp);
+            return sampler.GetFrameAt(s);
         }
 
         public static List<TrackFrame> SampleFramesUniform(IArcLengthCurve curve, double stepLength, Vector3d referenceUp)
@@ -69,6 +81,57 @@ namespace Quantum.Splines
             return frames;
         }
 
+        private static TrackFrame BuildFrame(
+            IArcLengthCurve curve,
+            double s,
+            Vector3d position,
+            Vector3d tangent,
+            Vector3d referenceNormal)
+        {
+            Vector3d normal = ComputeNormal(curve, s, tangent, referenceNormal);
+            Vector3d binormal = NormalizeOrThrow(Vector3d.Cross(tangent, normal), "binormal");
+            normal = NormalizeOrThrow(Vector3d.Cross(binormal, tangent), "normal");
+
+            return new TrackFrame(s, position, tangent, normal, binormal);
+        }
+
+        private static Vector3d ComputeNormal(
+            IArcLengthCurve curve,
+            double s,
+            Vector3d tangent,
+            Vector3d referenceNormal)
+        {
+            double length = curve.Length;
+            if (length <= MathUtil.Epsilon)
+                return ResolveFallbackNormal(referenceNormal, tangent);
+
+            double deltaS = System.Math.Max(length * 1e-3, 1e-4);
+            double prevS = MathUtil.Clamp(s - deltaS, 0.0, length);
+            double nextS = MathUtil.Clamp(s + deltaS, 0.0, length);
+
+            if (nextS - prevS <= MathUtil.Epsilon)
+                return ResolveFallbackNormal(referenceNormal, tangent);
+
+            Vector3d prevTangent = NormalizeOrThrow(curve.TangentByLength(prevS), "tangent");
+            Vector3d nextTangent = NormalizeOrThrow(curve.TangentByLength(nextS), "tangent");
+
+            Vector3d normalCandidate = RejectAlong(nextTangent - prevTangent, tangent);
+            if (normalCandidate.Length <= MathUtil.Epsilon)
+                return ResolveFallbackNormal(referenceNormal, tangent);
+
+            Vector3d normal = NormalizeOrThrow(normalCandidate, "normal");
+
+            Vector3d projectedReference = RejectAlong(referenceNormal, tangent);
+            if (IsFinite(projectedReference) && projectedReference.Length > MathUtil.Epsilon)
+            {
+                Vector3d alignedReference = NormalizeOrThrow(projectedReference, "referenceNormal");
+                if (Vector3d.Dot(normal, alignedReference) < 0.0)
+                    normal = normal * -1.0;
+            }
+
+            return normal;
+        }
+
         private static double ClampDistance(IArcLengthCurve curve, double s)
         {
             double length = curve.Length;
@@ -79,18 +142,23 @@ namespace Quantum.Splines
             return MathUtil.Clamp(s, 0.0, length);
         }
 
-        private static Vector3d ResolveUpHint(Vector3d referenceUp, Vector3d tangent)
+        private static Vector3d ResolveFallbackNormal(Vector3d referenceNormal, Vector3d tangent)
         {
-            if (!IsFinite(referenceUp) || referenceUp.Length <= MathUtil.Epsilon)
-                return SelectFallbackAxis(tangent);
+            if (IsFinite(referenceNormal) && referenceNormal.Length > MathUtil.Epsilon)
+            {
+                Vector3d projectedReference = RejectAlong(referenceNormal, tangent);
+                if (projectedReference.Length > MathUtil.Epsilon)
+                    return NormalizeOrThrow(projectedReference, "normal");
+            }
 
-            Vector3d normalizedUp = NormalizeOrThrow(referenceUp, "referenceUp");
-            double alignment = System.Math.Abs(Vector3d.Dot(normalizedUp, tangent));
+            Vector3d fallbackAxis = SelectFallbackAxis(tangent);
+            Vector3d projectedAxis = RejectAlong(fallbackAxis, tangent);
+            return NormalizeOrThrow(projectedAxis, "normal");
+        }
 
-            if (alignment >= 1.0 - 1e-6)
-                return SelectFallbackAxis(tangent);
-
-            return normalizedUp;
+        private static Vector3d RejectAlong(Vector3d vector, Vector3d axis)
+        {
+            return vector - (Vector3d.Dot(vector, axis) * axis);
         }
 
         private static Vector3d SelectFallbackAxis(Vector3d tangent)
