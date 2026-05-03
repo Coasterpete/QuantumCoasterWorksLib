@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace Quantum.Physics
 {
@@ -60,6 +61,35 @@ namespace Quantum.Physics
             {
                 Step();
             }
+        }
+
+        public IReadOnlyList<TrainFollowerState> Sample(int steps)
+        {
+            if (steps < 0)
+                throw new ArgumentOutOfRangeException(nameof(steps), "Step count must be non-negative.");
+
+            TrainFollowerState initialSnapshot = CloneFollowerState(Follower);
+            var snapshots = new List<TrainFollowerState>(steps);
+
+            for (int i = 0; i < steps; i++)
+            {
+                Step();
+                snapshots.Add(CloneFollowerState(Follower));
+            }
+
+            return snapshots;
+        }
+
+        private static TrainFollowerState CloneFollowerState(TrainFollowerState source)
+        {
+            var clone = new TrainFollowerState(
+                source.Track,
+                initialDistance: source.Distance,
+                speed: source.Speed,
+                loopEnabled: source.LoopEnabled);
+
+            clone.Acceleration = source.Acceleration;
+            return clone;
         }
     }
 }
