@@ -141,6 +141,74 @@ public sealed class TrainStepLoopTests
         }
     }
 
+    [Fact]
+    public void TrainStepLoop_SampleForDuration_UsesFloorStepsAndMatchesSample()
+    {
+        IArcLengthCurve track = new LineCurve(
+            new Vector3d(0, 10, 0),
+            new Vector3d(100, 0, 0));
+
+        const double deltaTime = 0.05;
+        const double gravityMagnitude = 9.81;
+        const double linearDrag = 0.08;
+        const double quadraticDrag = 0.01;
+        const double rollingResistance = 0.05;
+        const double durationSeconds = 1.03;
+        const double initialDistance = 12.5;
+        const double initialSpeed = 3.25;
+
+        int expectedSteps = (int)System.Math.Floor(durationSeconds / deltaTime);
+
+        var durationFollower = new TrainFollowerState(
+            track,
+            initialDistance: initialDistance,
+            speed: initialSpeed,
+            loopEnabled: false);
+
+        var stepFollower = new TrainFollowerState(
+            track,
+            initialDistance: initialDistance,
+            speed: initialSpeed,
+            loopEnabled: false);
+
+        var durationLoop = new TrainStepLoop(
+            durationFollower,
+            deltaTime,
+            gravityMagnitude,
+            linearDrag,
+            quadraticDrag,
+            rollingResistance);
+
+        var stepLoop = new TrainStepLoop(
+            stepFollower,
+            deltaTime,
+            gravityMagnitude,
+            linearDrag,
+            quadraticDrag,
+            rollingResistance);
+
+        IReadOnlyList<TrainFollowerState> byDuration = durationLoop.SampleForDuration(durationSeconds);
+        IReadOnlyList<TrainFollowerState> bySteps = stepLoop.Sample(expectedSteps);
+
+        Assert.Equal(expectedSteps, byDuration.Count);
+        Assert.Equal(bySteps.Count, byDuration.Count);
+
+        for (int i = 0; i < byDuration.Count; i++)
+        {
+            TrainFollowerState expected = bySteps[i];
+            TrainFollowerState actual = byDuration[i];
+
+            Assert.InRange(System.Math.Abs(expected.Distance - actual.Distance), 0.0, ValueTolerance);
+            Assert.InRange(System.Math.Abs(expected.Speed - actual.Speed), 0.0, ValueTolerance);
+            Assert.InRange(System.Math.Abs(expected.Position.X - actual.Position.X), 0.0, ValueTolerance);
+            Assert.InRange(System.Math.Abs(expected.Position.Y - actual.Position.Y), 0.0, ValueTolerance);
+            Assert.InRange(System.Math.Abs(expected.Position.Z - actual.Position.Z), 0.0, ValueTolerance);
+            Assert.InRange(System.Math.Abs(expected.Tangent.X - actual.Tangent.X), 0.0, ValueTolerance);
+            Assert.InRange(System.Math.Abs(expected.Tangent.Y - actual.Tangent.Y), 0.0, ValueTolerance);
+            Assert.InRange(System.Math.Abs(expected.Tangent.Z - actual.Tangent.Z), 0.0, ValueTolerance);
+        }
+    }
+
     private static TrainFollowerState CloneFollowerState(TrainFollowerState source)
     {
         var clone = new TrainFollowerState(

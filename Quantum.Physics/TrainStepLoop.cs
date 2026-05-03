@@ -80,6 +80,12 @@ namespace Quantum.Physics
             return snapshots;
         }
 
+        public IReadOnlyList<TrainFollowerState> SampleForDuration(double durationSeconds)
+        {
+            int steps = (int)System.Math.Floor(durationSeconds / DeltaTime);
+            return Sample(steps);
+        }
+
         private static TrainFollowerState CloneFollowerState(TrainFollowerState source)
         {
             var clone = new TrainFollowerState(
