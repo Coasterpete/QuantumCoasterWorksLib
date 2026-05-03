@@ -111,6 +111,31 @@ public class FvdSolverPrototypeTests
         Assert.Equal(1, changedInteriorYCount);
     }
 
+    [Fact]
+    public void Fvd2dNormalGSolver_Step_NonFiniteRealizedNormalG_ReturnsNoOpStatus()
+    {
+        const double midpointX = 50.0;
+
+        FvdGraph graph = BuildSimple2dGraphWithForceDistanceSection(
+            includeNormalTarget: true,
+            midpointNormalGTarget: 1.80);
+
+        var beforeNodes = SnapshotNodes(graph.ControlNodes);
+        int beforeDegree = graph.Degree;
+
+        object result = StepGraphOnceOrFail(graph, midpointX, speedMps: double.MaxValue);
+        string statusName = ReadEnumNamePropertyOrFail(result, "Status");
+        double beforeError = ReadDoublePropertyOrFail(result, "BeforeAbsoluteNormalGError");
+        double afterError = ReadDoublePropertyOrFail(result, "AfterAbsoluteNormalGError");
+        FvdGraph afterGraph = ReadGraphPropertyOrFail(result, "Graph");
+
+        Assert.Equal("NoImprovement", statusName);
+        Assert.Equal(0.0, beforeError);
+        Assert.Equal(0.0, afterError);
+        Assert.Equal(beforeDegree, afterGraph.Degree);
+        AssertNodesEqual(beforeNodes, afterGraph.ControlNodes);
+    }
+
     private static FvdGraph BuildSimple2dGraphWithForceDistanceSection(
         bool includeNormalTarget,
         double midpointNormalGTarget,
@@ -180,7 +205,12 @@ public class FvdSolverPrototypeTests
             sections: sections);
     }
 
-    private static object StepGraphOnceOrFail(FvdGraph graph, double evaluationX)
+    private static object StepGraphOnceOrFail(
+        FvdGraph graph,
+        double evaluationX,
+        double speedMps = 20.0,
+        double finiteDifferenceDeltaY = 0.50,
+        double maxDeltaYStep = 1.00)
     {
         Type solverType = RequireFvdType("Quantum.FVD.Fvd2dNormalGSolver");
         Type optionsType = RequireFvdType("Quantum.FVD.Fvd2dNormalGSolverOptions");
@@ -192,9 +222,9 @@ public class FvdSolverPrototypeTests
 
         SetPropertyIfPresent(options, "Domain", FvdFunctionDomain.Distance);
         SetPropertyIfPresent(options, "EvaluationX", evaluationX);
-        SetPropertyIfPresent(options, "SpeedMps", 20.0);
-        SetPropertyIfPresent(options, "FiniteDifferenceDeltaY", 0.50);
-        SetPropertyIfPresent(options, "MaxDeltaYStep", 1.00);
+        SetPropertyIfPresent(options, "SpeedMps", speedMps);
+        SetPropertyIfPresent(options, "FiniteDifferenceDeltaY", finiteDifferenceDeltaY);
+        SetPropertyIfPresent(options, "MaxDeltaYStep", maxDeltaYStep);
 
         MethodInfo? stepMethod = solverType.GetMethod(
             "Step",

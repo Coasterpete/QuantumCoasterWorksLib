@@ -69,6 +69,16 @@ namespace Quantum.FVD
                 options.EvaluationX,
                 options.SpeedMps,
                 arcLengthSamples);
+
+            if (!IsFinite(beforeRealizedNormalG))
+            {
+                return new Fvd2dNormalGSolverResult(
+                    graph,
+                    Fvd2dNormalGSolverStatus.NoImprovement,
+                    beforeAbsoluteNormalGError: 0.0,
+                    afterAbsoluteNormalGError: 0.0);
+            }
+
             double beforeError = Abs(beforeRealizedNormalG - targetNormalG);
 
             int interiorIndex = SelectInteriorNodeIndex(graph.ControlNodes.Count);
@@ -81,7 +91,25 @@ namespace Quantum.FVD
                 options.SpeedMps,
                 arcLengthSamples);
 
+            if (!IsFinite(plusRealizedNormalG))
+            {
+                return new Fvd2dNormalGSolverResult(
+                    graph,
+                    Fvd2dNormalGSolverStatus.NoImprovement,
+                    beforeError,
+                    beforeError);
+            }
+
             double derivative = (plusRealizedNormalG - beforeRealizedNormalG) / finiteDifferenceDeltaY;
+
+            if (!IsFinite(derivative))
+            {
+                return new Fvd2dNormalGSolverResult(
+                    graph,
+                    Fvd2dNormalGSolverStatus.NoImprovement,
+                    beforeError,
+                    beforeError);
+            }
 
             if (Abs(derivative) <= DerivativeEpsilon)
             {
@@ -112,6 +140,16 @@ namespace Quantum.FVD
                 options.EvaluationX,
                 options.SpeedMps,
                 arcLengthSamples);
+
+            if (!IsFinite(afterRealizedNormalG))
+            {
+                return new Fvd2dNormalGSolverResult(
+                    graph,
+                    Fvd2dNormalGSolverStatus.NoImprovement,
+                    beforeError,
+                    beforeError);
+            }
+
             double afterError = Abs(afterRealizedNormalG - targetNormalG);
 
             if (afterError >= beforeError)
@@ -277,6 +315,11 @@ namespace Quantum.FVD
                      || double.IsInfinity(value.Y)
                      || double.IsNaN(value.Z)
                      || double.IsInfinity(value.Z));
+        }
+
+        private static bool IsFinite(double value)
+        {
+            return !(double.IsNaN(value) || double.IsInfinity(value));
         }
 
         private static void ValidateFinite(double value, string paramName)
