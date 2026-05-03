@@ -62,6 +62,12 @@ namespace Quantum.Physics
             SampleCurrentState();
         }
 
+        public void UpdateWithGravity(double deltaTime, double gravityMagnitude = 9.81)
+        {
+            Acceleration = GravityAccelerationAlongTrack(gravityMagnitude);
+            Update(deltaTime);
+        }
+
         private double NormalizeDistance(double value)
         {
             double length = Track.Length;

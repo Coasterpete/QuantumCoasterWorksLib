@@ -741,6 +741,36 @@ public class FoundationTests
         Assert.Throws<ArgumentOutOfRangeException>(() => follower.GravityAccelerationAlongTrack(-0.01));
     }
 
+    [Fact]
+    public void TrainFollowerState_UpdateWithGravity_UsesGravityProjectionAsAcceleration()
+    {
+        IArcLengthCurve track = new LineCurve(new Vector3d(0, 10, 0), new Vector3d(10, 0, 0));
+        const double deltaTime = 1.0;
+        const double gravityMagnitude = 9.81;
+
+        var follower = new TrainFollowerState(track, initialDistance: 0.0, speed: 0.0, loopEnabled: false);
+        double gAlongTrack = follower.GravityAccelerationAlongTrack(gravityMagnitude);
+
+        MethodInfo? updateWithGravity = typeof(TrainFollowerState).GetMethod(
+            "UpdateWithGravity",
+            BindingFlags.Public | BindingFlags.Instance,
+            binder: null,
+            types: new[] { typeof(double), typeof(double) },
+            modifiers: null);
+
+        Assert.True(
+            updateWithGravity is not null,
+            "Expected method: TrainFollowerState.UpdateWithGravity(double, double).");
+
+        updateWithGravity!.Invoke(follower, new object[] { deltaTime, gravityMagnitude });
+
+        double expectedSpeed = gAlongTrack * deltaTime;
+        double expectedDistance = 0.5 * gAlongTrack * deltaTime * deltaTime;
+
+        Assert.InRange(follower.Speed, expectedSpeed - ValueTolerance, expectedSpeed + ValueTolerance);
+        Assert.InRange(follower.Distance, expectedDistance - ValueTolerance, expectedDistance + ValueTolerance);
+    }
+
     private static IEnumerable<(string Name, IParamCurve Curve)> BuildCurves()
     {
         yield return ("Line", new LineCurve(new Vector3d(0, 0, 0), new Vector3d(10, 0, 0)));
