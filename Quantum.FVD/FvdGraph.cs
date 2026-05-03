@@ -183,8 +183,19 @@ namespace Quantum.FVD
                 return false;
             }
 
-            value = section.EvaluateAt(channel, x);
-            return true;
+            IReadOnlyList<FvdSectionFunction> functions = section.Functions;
+            for (int i = 0; i < functions.Count; i++)
+            {
+                FvdSectionFunction function = functions[i];
+                if (function.Channel != channel)
+                    continue;
+
+                value = function.EvaluateAt(x);
+                return true;
+            }
+
+            value = default;
+            return false;
         }
 
         public IReadOnlyList<FvdChannelEvaluation> EvaluateSectionAllAt(

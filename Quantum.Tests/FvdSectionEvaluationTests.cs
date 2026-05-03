@@ -609,6 +609,95 @@ public class FvdSectionEvaluationTests
     }
 
     [Fact]
+    public void FvdGraph_TryEvaluateSectionChannelAt_MatchingSectionMissingChannel_ReturnsFalse_AndDoesNotThrow()
+    {
+        Type sectionDefinitionType = RequireSectionDefinitionType();
+        Type sectionFunctionType = RequireSectionFunctionType();
+
+        object normal = CreateSectionFunctionOrFail(
+            sectionFunctionType,
+            channelName: "NormalG",
+            CreateSectionSampleOrFail(0.0, 1.0),
+            CreateSectionSampleOrFail(10.0, 2.0));
+
+        object section = CreateSectionDefinitionOrFail(
+            sectionDefinitionType,
+            kindName: "Force",
+            domainName: "Distance",
+            startX: 0.0,
+            endX: 10.0,
+            normal);
+
+        Type sectionListType = typeof(List<>).MakeGenericType(sectionDefinitionType);
+        object sectionList = CreateTypedList(sectionListType, section);
+
+        Type nodeType = RequireFvdControlNodeType();
+        Type nodeListType = typeof(List<>).MakeGenericType(nodeType);
+        ConstructorInfo? nodeCtor = nodeType.GetConstructor(new[] { typeof(double), typeof(Quantum.Math.Vector3d), typeof(double) });
+
+        Assert.True(
+            nodeCtor is not null,
+            "Expected constructor: FvdControlNode(double u, Vector3d position, double weight).");
+
+        object nodeList = CreateTypedList(
+            nodeListType,
+            nodeCtor!.Invoke(new object[] { 0.00, new Quantum.Math.Vector3d(0, 0, 0), 1.0 })!,
+            nodeCtor!.Invoke(new object[] { 0.33, new Quantum.Math.Vector3d(4, 5, 0), 0.9 })!,
+            nodeCtor!.Invoke(new object[] { 0.66, new Quantum.Math.Vector3d(8, -3, 0), 1.2 })!,
+            nodeCtor!.Invoke(new object[] { 1.00, new Quantum.Math.Vector3d(12, 0, 0), 1.0 })!);
+
+        Type forceSampleType = RequireFvdForceSampleType();
+        Type forceSampleListType = typeof(List<>).MakeGenericType(forceSampleType);
+        object forceSampleList = CreateTypedList(forceSampleListType);
+
+        Type graphType = RequireFvdGraphType();
+        ConstructorInfo? graphCtor = graphType.GetConstructor(
+            new[] { nodeListType, typeof(int), forceSampleListType, sectionListType });
+
+        Assert.True(
+            graphCtor is not null,
+            "Expected constructor: FvdGraph(List<FvdControlNode>, int, List<FvdForceSample>, List<FvdSectionDefinition>).");
+
+        object graph = graphCtor!.Invoke(new[] { nodeList, (object)3, forceSampleList, sectionList })!;
+
+        Type sectionKindType = RequireSectionKindType();
+        Type functionDomainType = RequireFunctionDomainType();
+        Type sectionChannelType = RequireSectionChannelType();
+
+        MethodInfo? tryDispatchMethod = graphType.GetMethod(
+            "TryEvaluateSectionChannelAt",
+            BindingFlags.Public | BindingFlags.Instance,
+            binder: null,
+            types: new[] { sectionKindType, functionDomainType, sectionChannelType, typeof(double), typeof(double).MakeByRefType() },
+            modifiers: null);
+
+        Assert.True(
+            tryDispatchMethod is not null,
+            "Expected method: FvdGraph.TryEvaluateSectionChannelAt(FvdSectionKind kind, FvdFunctionDomain domain, FvdSectionChannel channel, double x, out double value).");
+
+        object kind = ParseEnumOrFail(sectionKindType, "Force");
+        object domain = ParseEnumOrFail(functionDomainType, "Distance");
+        object channel = ParseEnumOrFail(sectionChannelType, "LateralG");
+        object[] invocationArgs = new object[] { kind, domain, channel, 5.0, 0.0 };
+
+        object? returned;
+        try
+        {
+            returned = tryDispatchMethod!.Invoke(graph, invocationArgs);
+        }
+        catch (TargetInvocationException ex) when (ex.InnerException is not null)
+        {
+            ExceptionDispatchInfo.Capture(ex.InnerException).Throw();
+            throw;
+        }
+
+        Assert.True(returned is bool, "Expected TryEvaluateSectionChannelAt to return a bool.");
+        Assert.False((bool)returned!);
+        Assert.True(invocationArgs[4] is double, "Expected out value to be a double.");
+        Assert.Equal(0.0, (double)invocationArgs[4]!);
+    }
+
+    [Fact]
     public void FvdGraph_TryEvaluateSectionAllAt_NoCoveringSection_ReturnsFalse_AndEmpty()
     {
         Type sectionDefinitionType = RequireSectionDefinitionType();
