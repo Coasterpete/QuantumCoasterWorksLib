@@ -41,7 +41,18 @@ namespace Quantum.FVD
                 lateralG = lateralFromFvd;
             }
 
-            targets = new ForceTargets(normalG, lateralG, rollRateDegPerSec: 0.0);
+            double rollRateDegPerSec = 0.0;
+            if (_graph.TryEvaluateSectionChannelAt(
+                FvdSectionKind.Force,
+                _domain,
+                FvdSectionChannel.RollRateDegPerSec,
+                x,
+                out double rollRateFromFvd))
+            {
+                rollRateDegPerSec = rollRateFromFvd;
+            }
+
+            targets = new ForceTargets(normalG, lateralG, rollRateDegPerSec);
             return true;
         }
     }
