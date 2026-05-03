@@ -24,6 +24,12 @@ namespace Quantum.FVD
             ValidateFinite(options.EvaluationX, nameof(options.EvaluationX));
             ValidateFinite(options.SpeedMps, nameof(options.SpeedMps));
 
+            if (options.Domain == FvdFunctionDomain.Time)
+            {
+                throw new NotSupportedException(
+                    "Fvd2dNormalGSolver currently supports only Distance domain. Time domain solving is not implemented yet.");
+            }
+
             if (options.SpeedMps < 0.0)
                 throw new ArgumentOutOfRangeException(nameof(options.SpeedMps), "Speed must be non-negative.");
 

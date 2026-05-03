@@ -158,6 +158,26 @@ public class FvdSolverPrototypeTests
     }
 
     [Fact]
+    public void Fvd2dNormalGSolver_Step_TimeDomain_ReturnsUnsupportedOrThrowsClearly()
+    {
+        const double midpointX = 50.0;
+
+        FvdGraph graph = BuildSimple2dGraphWithForceDistanceSection(
+            includeNormalTarget: true,
+            midpointNormalGTarget: 1.80);
+
+        TargetInvocationException exception = Assert.Throws<TargetInvocationException>(
+            () => StepGraphOnceOrFail(
+                graph,
+                midpointX,
+                domain: FvdFunctionDomain.Time));
+
+        NotSupportedException inner = Assert.IsType<NotSupportedException>(exception.InnerException);
+        Assert.Contains("Distance domain", inner.Message);
+        Assert.Contains("Time domain", inner.Message);
+    }
+
+    [Fact]
     public void Fvd2dNormalGSolver_AcceptanceMatrix_Current2dSingleNodeNormalGScope()
     {
         const double NodeEqualityTolerance = 1e-12;
@@ -706,7 +726,8 @@ public class FvdSolverPrototypeTests
         double maxDeltaYStep = 1.00,
         double? derivativeEpsilon = null,
         bool? enableDeterministicInteriorNodeSweep = null,
-        int? interiorNodeSweepStartIndex = null)
+        int? interiorNodeSweepStartIndex = null,
+        FvdFunctionDomain? domain = null)
     {
         Type solverType = RequireFvdType("Quantum.FVD.Fvd2dNormalGSolver");
         Type optionsType = RequireFvdType("Quantum.FVD.Fvd2dNormalGSolverOptions");
@@ -716,7 +737,7 @@ public class FvdSolverPrototypeTests
         object options = Activator.CreateInstance(optionsType)
             ?? throw new Xunit.Sdk.XunitException("Expected to create Fvd2dNormalGSolverOptions.");
 
-        SetPropertyIfPresent(options, "Domain", FvdFunctionDomain.Distance);
+        SetPropertyIfPresent(options, "Domain", domain ?? FvdFunctionDomain.Distance);
         SetPropertyIfPresent(options, "EvaluationX", evaluationX);
         SetPropertyIfPresent(options, "SpeedMps", speedMps);
         SetPropertyIfPresent(options, "FiniteDifferenceDeltaY", finiteDifferenceDeltaY);
