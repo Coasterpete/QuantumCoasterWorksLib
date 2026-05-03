@@ -73,6 +73,9 @@ namespace Quantum.Physics
                 accelerationFromNormalG = targets.NormalG * 9.81;
             }
 
+            double halfStepVelocityKick = 0.5 * accelerationFromNormalG * DeltaTime;
+            Follower.Speed += halfStepVelocityKick;
+
             Follower.UpdateWithGravity(
                 DeltaTime,
                 GravityMagnitude,
@@ -80,8 +83,8 @@ namespace Quantum.Physics
                 QuadraticDragCoefficient,
                 RollingResistance);
 
+            Follower.Speed += halfStepVelocityKick;
             Follower.Acceleration += accelerationFromNormalG;
-            Follower.Speed += accelerationFromNormalG * DeltaTime;
 
             Tick++;
             ElapsedTimeSeconds += DeltaTime;

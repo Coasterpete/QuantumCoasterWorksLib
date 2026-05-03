@@ -224,11 +224,16 @@ public sealed class TrainStepLoopTests
             new Vector3d(100, 0, 0));
 
         const double deltaTime = 0.1;
+        const double normalG = 1.0;
+        const double expectedAcceleration = normalG * 9.81;
         const double gravityMagnitude = 0.0;
         const double linearDrag = 0.0;
         const double quadraticDrag = 0.0;
         const double rollingResistance = 0.0;
         const int steps = 10;
+        double elapsedTime = steps * deltaTime;
+        double expectedSpeed = expectedAcceleration * elapsedTime;
+        double expectedDistance = 0.5 * expectedAcceleration * elapsedTime * elapsedTime;
 
         var baselineFollower = new TrainFollowerState(track);
         var providerFollower = new TrainFollowerState(track);
@@ -248,15 +253,92 @@ public sealed class TrainStepLoopTests
             linearDrag,
             quadraticDrag,
             rollingResistance,
-            new ConstantNormalForceTargetProvider(1.0));
+            new ConstantNormalForceTargetProvider(normalG));
 
         baselineLoop.Step(steps);
         providerLoop.Step(steps);
 
         Assert.InRange(System.Math.Abs(baselineFollower.Speed), 0.0, ValueTolerance);
+        Assert.InRange(System.Math.Abs(baselineFollower.Distance), 0.0, ValueTolerance);
         Assert.True(
             providerFollower.Speed > baselineFollower.Speed + ValueTolerance,
             "Expected constant positive NormalG target to increase speed relative to baseline.");
+        Assert.InRange(System.Math.Abs(providerFollower.Speed - expectedSpeed), 0.0, ValueTolerance);
+        Assert.InRange(System.Math.Abs(providerFollower.Distance - expectedDistance), 0.0, ValueTolerance);
+        Assert.InRange(System.Math.Abs(providerFollower.Acceleration - expectedAcceleration), 0.0, ValueTolerance);
+    }
+
+    [Fact]
+    public void TrainStepLoop_WithForceTargetProvider_ReturnsFalse_MatchesBaseline()
+    {
+        IArcLengthCurve track = new LineCurve(
+            new Vector3d(0, 10, 0),
+            new Vector3d(100, 0, 0));
+
+        const double deltaTime = 0.05;
+        const double gravityMagnitude = 9.81;
+        const double linearDrag = 0.08;
+        const double quadraticDrag = 0.01;
+        const double rollingResistance = 0.05;
+        const int steps = 120;
+        const double initialDistance = 12.5;
+        const double initialSpeed = 3.25;
+
+        var baselineFollower = new TrainFollowerState(
+            track,
+            initialDistance: initialDistance,
+            speed: initialSpeed,
+            loopEnabled: false);
+
+        var providerFollower = new TrainFollowerState(
+            track,
+            initialDistance: initialDistance,
+            speed: initialSpeed,
+            loopEnabled: false);
+
+        var baselineLoop = new TrainStepLoop(
+            baselineFollower,
+            deltaTime,
+            gravityMagnitude,
+            linearDrag,
+            quadraticDrag,
+            rollingResistance);
+
+        var providerLoop = new TrainStepLoop(
+            providerFollower,
+            deltaTime,
+            gravityMagnitude,
+            linearDrag,
+            quadraticDrag,
+            rollingResistance,
+            new FalseForceTargetProvider());
+
+        IReadOnlyList<TrainFollowerState> baselineSamples = baselineLoop.Sample(steps);
+        IReadOnlyList<TrainFollowerState> withProviderSamples = providerLoop.Sample(steps);
+
+        Assert.Equal(baselineSamples.Count, withProviderSamples.Count);
+
+        for (int i = 0; i < baselineSamples.Count; i++)
+        {
+            TrainFollowerState expected = baselineSamples[i];
+            TrainFollowerState actual = withProviderSamples[i];
+
+            Assert.InRange(System.Math.Abs(expected.Distance - actual.Distance), 0.0, ValueTolerance);
+            Assert.InRange(System.Math.Abs(expected.Speed - actual.Speed), 0.0, ValueTolerance);
+            Assert.InRange(System.Math.Abs(expected.Acceleration - actual.Acceleration), 0.0, ValueTolerance);
+            Assert.InRange(System.Math.Abs(expected.Position.X - actual.Position.X), 0.0, ValueTolerance);
+            Assert.InRange(System.Math.Abs(expected.Position.Y - actual.Position.Y), 0.0, ValueTolerance);
+            Assert.InRange(System.Math.Abs(expected.Position.Z - actual.Position.Z), 0.0, ValueTolerance);
+            Assert.InRange(System.Math.Abs(expected.Tangent.X - actual.Tangent.X), 0.0, ValueTolerance);
+            Assert.InRange(System.Math.Abs(expected.Tangent.Y - actual.Tangent.Y), 0.0, ValueTolerance);
+            Assert.InRange(System.Math.Abs(expected.Tangent.Z - actual.Tangent.Z), 0.0, ValueTolerance);
+        }
+
+        Assert.Equal(baselineLoop.Tick, providerLoop.Tick);
+        Assert.InRange(
+            System.Math.Abs(baselineLoop.ElapsedTimeSeconds - providerLoop.ElapsedTimeSeconds),
+            0.0,
+            ValueTolerance);
     }
 
     [Fact]
@@ -579,6 +661,15 @@ public sealed class TrainStepLoopTests
         {
             targets = new ForceTargets(_normalG, lateralG: 0.0, rollRateDegPerSec: 0.0);
             return true;
+        }
+    }
+
+    private sealed class FalseForceTargetProvider : IForceTargetProvider
+    {
+        public bool TryGetForceTargets(double x, out ForceTargets targets)
+        {
+            targets = default;
+            return false;
         }
     }
 }
