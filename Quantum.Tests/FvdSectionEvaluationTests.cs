@@ -698,6 +698,81 @@ public class FvdSectionEvaluationTests
     }
 
     [Fact]
+    public void FvdGraph_TryEvaluateForceTargetsAt_CoveringForceSectionWithAllForceChannels_ReturnsTrueAndExpectedValues()
+    {
+        Type sectionDefinitionType = RequireSectionDefinitionType();
+        Type sectionFunctionType = RequireSectionFunctionType();
+
+        object normal = CreateSectionFunctionOrFail(
+            sectionFunctionType,
+            channelName: "NormalG",
+            CreateSectionSampleOrFail(0.0, 1.0),
+            CreateSectionSampleOrFail(10.0, 3.0));
+        object lateral = CreateSectionFunctionOrFail(
+            sectionFunctionType,
+            channelName: "LateralG",
+            CreateSectionSampleOrFail(0.0, -1.0),
+            CreateSectionSampleOrFail(10.0, 1.0));
+        object rollRate = CreateSectionFunctionOrFail(
+            sectionFunctionType,
+            channelName: "RollRateDegPerSec",
+            CreateSectionSampleOrFail(0.0, 10.0),
+            CreateSectionSampleOrFail(10.0, 14.0));
+
+        object section = CreateSectionDefinitionOrFail(
+            sectionDefinitionType,
+            kindName: "Force",
+            domainName: "Distance",
+            startX: 0.0,
+            endX: 10.0,
+            normal,
+            lateral,
+            rollRate);
+
+        object graph = CreateGraphWithSectionsOrFail(section);
+
+        (bool returned, double normalG, double lateralG, double rollRateDegPerSec) =
+            TryEvaluateForceTargetsAtOrFail(graph, domainName: "Distance", x: 2.5);
+
+        Assert.True(returned);
+        Assert.InRange(System.Math.Abs(normalG - 1.5), 0.0, ValueTolerance);
+        Assert.InRange(System.Math.Abs(lateralG - (-0.5)), 0.0, ValueTolerance);
+        Assert.InRange(System.Math.Abs(rollRateDegPerSec - 11.0), 0.0, ValueTolerance);
+    }
+
+    [Fact]
+    public void FvdGraph_TryEvaluateForceTargetsAt_MissingAnyForceChannel_ReturnsFalse_AndDoesNotThrow()
+    {
+        Type sectionDefinitionType = RequireSectionDefinitionType();
+        Type sectionFunctionType = RequireSectionFunctionType();
+
+        object normal = CreateSectionFunctionOrFail(
+            sectionFunctionType,
+            channelName: "NormalG",
+            CreateSectionSampleOrFail(0.0, 1.0),
+            CreateSectionSampleOrFail(10.0, 3.0));
+        object lateral = CreateSectionFunctionOrFail(
+            sectionFunctionType,
+            channelName: "LateralG",
+            CreateSectionSampleOrFail(0.0, -1.0),
+            CreateSectionSampleOrFail(10.0, 1.0));
+
+        object section = CreateSectionDefinitionOrFail(
+            sectionDefinitionType,
+            kindName: "Force",
+            domainName: "Distance",
+            startX: 0.0,
+            endX: 10.0,
+            normal,
+            lateral);
+
+        object graph = CreateGraphWithSectionsOrFail(section);
+
+        (bool returned, _, _, _) = TryEvaluateForceTargetsAtOrFail(graph, domainName: "Distance", x: 5.0);
+        Assert.False(returned);
+    }
+
+    [Fact]
     public void FvdGraph_TryEvaluateSectionAllAt_NoCoveringSection_ReturnsFalse_AndEmpty()
     {
         Type sectionDefinitionType = RequireSectionDefinitionType();
@@ -787,6 +862,96 @@ public class FvdSectionEvaluationTests
         Assert.True(invocationArgs[3] is not null, "Expected out evaluations to be non-null.");
         Assert.True(invocationArgs[3] is System.Collections.IEnumerable, "Expected out evaluations to be enumerable.");
         Assert.Empty(((System.Collections.IEnumerable)invocationArgs[3]!).Cast<object>());
+    }
+
+    private static object CreateGraphWithSectionsOrFail(params object[] sections)
+    {
+        Type sectionDefinitionType = RequireSectionDefinitionType();
+        Type sectionListType = typeof(List<>).MakeGenericType(sectionDefinitionType);
+        object sectionList = CreateTypedList(sectionListType, sections);
+
+        Type nodeType = RequireFvdControlNodeType();
+        Type nodeListType = typeof(List<>).MakeGenericType(nodeType);
+        ConstructorInfo? nodeCtor = nodeType.GetConstructor(new[] { typeof(double), typeof(Quantum.Math.Vector3d), typeof(double) });
+
+        Assert.True(
+            nodeCtor is not null,
+            "Expected constructor: FvdControlNode(double u, Vector3d position, double weight).");
+
+        object nodeList = CreateTypedList(
+            nodeListType,
+            nodeCtor!.Invoke(new object[] { 0.00, new Quantum.Math.Vector3d(0, 0, 0), 1.0 })!,
+            nodeCtor!.Invoke(new object[] { 0.33, new Quantum.Math.Vector3d(4, 5, 0), 0.9 })!,
+            nodeCtor!.Invoke(new object[] { 0.66, new Quantum.Math.Vector3d(8, -3, 0), 1.2 })!,
+            nodeCtor!.Invoke(new object[] { 1.00, new Quantum.Math.Vector3d(12, 0, 0), 1.0 })!);
+
+        Type forceSampleType = RequireFvdForceSampleType();
+        Type forceSampleListType = typeof(List<>).MakeGenericType(forceSampleType);
+        object forceSampleList = CreateTypedList(forceSampleListType);
+
+        Type graphType = RequireFvdGraphType();
+        ConstructorInfo? graphCtor = graphType.GetConstructor(
+            new[] { nodeListType, typeof(int), forceSampleListType, sectionListType });
+
+        Assert.True(
+            graphCtor is not null,
+            "Expected constructor: FvdGraph(List<FvdControlNode>, int, List<FvdForceSample>, List<FvdSectionDefinition>).");
+
+        object? graph = graphCtor!.Invoke(new[] { nodeList, (object)3, forceSampleList, sectionList });
+        Assert.True(graph is not null, "Expected FvdGraph constructor to return a non-null instance.");
+        return graph!;
+    }
+
+    private static (bool Returned, double NormalG, double LateralG, double RollRateDegPerSec) TryEvaluateForceTargetsAtOrFail(
+        object graph,
+        string domainName,
+        double x)
+    {
+        Type graphType = graph.GetType();
+        Type functionDomainType = RequireFunctionDomainType();
+
+        MethodInfo? method = graphType.GetMethod(
+            "TryEvaluateForceTargetsAt",
+            BindingFlags.Public | BindingFlags.Instance,
+            binder: null,
+            types: new[]
+            {
+                functionDomainType,
+                typeof(double),
+                typeof(double).MakeByRefType(),
+                typeof(double).MakeByRefType(),
+                typeof(double).MakeByRefType()
+            },
+            modifiers: null);
+
+        Assert.True(
+            method is not null,
+            "Expected method: FvdGraph.TryEvaluateForceTargetsAt(FvdFunctionDomain domain, double x, out double normalG, out double lateralG, out double rollRateDegPerSec).");
+
+        object domain = ParseEnumOrFail(functionDomainType, domainName);
+        object[] invocationArgs = new object[] { domain, x, 0.0, 0.0, 0.0 };
+
+        object? returned;
+        try
+        {
+            returned = method!.Invoke(graph, invocationArgs);
+        }
+        catch (TargetInvocationException ex) when (ex.InnerException is not null)
+        {
+            ExceptionDispatchInfo.Capture(ex.InnerException).Throw();
+            throw;
+        }
+
+        Assert.True(returned is bool, "Expected TryEvaluateForceTargetsAt to return a bool.");
+        Assert.True(invocationArgs[2] is double, "Expected out normalG to be a double.");
+        Assert.True(invocationArgs[3] is double, "Expected out lateralG to be a double.");
+        Assert.True(invocationArgs[4] is double, "Expected out rollRateDegPerSec to be a double.");
+
+        return (
+            (bool)returned!,
+            (double)invocationArgs[2]!,
+            (double)invocationArgs[3]!,
+            (double)invocationArgs[4]!);
     }
 
     private static double EvaluateFunctionAtOrFail(object function, double x)

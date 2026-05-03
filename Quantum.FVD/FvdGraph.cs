@@ -239,6 +239,65 @@ namespace Quantum.FVD
             return true;
         }
 
+        public bool TryEvaluateForceTargetsAt(
+            FvdFunctionDomain domain,
+            double x,
+            out double normalG,
+            out double lateralG,
+            out double rollRateDegPerSec)
+        {
+            if (!TryEvaluateSectionAllAt(FvdSectionKind.Force, domain, x, out IReadOnlyList<FvdChannelEvaluation> evaluations))
+            {
+                normalG = default;
+                lateralG = default;
+                rollRateDegPerSec = default;
+                return false;
+            }
+
+            bool hasNormal = false;
+            bool hasLateral = false;
+            bool hasRollRate = false;
+            double normalValue = default;
+            double lateralValue = default;
+            double rollRateValue = default;
+
+            for (int i = 0; i < evaluations.Count; i++)
+            {
+                FvdChannelEvaluation evaluation = evaluations[i];
+
+                switch (evaluation.Channel)
+                {
+                    case FvdSectionChannel.NormalG:
+                        hasNormal = true;
+                        normalValue = evaluation.Value;
+                        break;
+
+                    case FvdSectionChannel.LateralG:
+                        hasLateral = true;
+                        lateralValue = evaluation.Value;
+                        break;
+
+                    case FvdSectionChannel.RollRateDegPerSec:
+                        hasRollRate = true;
+                        rollRateValue = evaluation.Value;
+                        break;
+                }
+            }
+
+            if (!(hasNormal && hasLateral && hasRollRate))
+            {
+                normalG = default;
+                lateralG = default;
+                rollRateDegPerSec = default;
+                return false;
+            }
+
+            normalG = normalValue;
+            lateralG = lateralValue;
+            rollRateDegPerSec = rollRateValue;
+            return true;
+        }
+
         private bool TryResolveSectionForEvaluation(
             FvdSectionKind kind,
             FvdFunctionDomain domain,
