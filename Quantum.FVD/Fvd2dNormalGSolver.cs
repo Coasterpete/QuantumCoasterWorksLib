@@ -12,7 +12,6 @@ namespace Quantum.FVD
     public sealed class Fvd2dNormalGSolver
     {
         private const double GravityMps2 = 9.81;
-        private const double DerivativeEpsilon = 1e-12;
 
         public Fvd2dNormalGSolverResult Step(FvdGraph graph, Fvd2dNormalGSolverOptions options)
         {
@@ -37,6 +36,10 @@ namespace Quantum.FVD
                 options.MaxDeltaYStep,
                 nameof(options.MaxDeltaYStep),
                 fallback: 1.0);
+
+            double derivativeEpsilon = ValidateStrictlyPositiveFinite(
+                options.DerivativeEpsilon,
+                nameof(options.DerivativeEpsilon));
 
             int arcLengthSamples = options.ArcLengthSamples < 2 ? 2 : options.ArcLengthSamples;
 
@@ -111,7 +114,7 @@ namespace Quantum.FVD
                     beforeError);
             }
 
-            if (Abs(derivative) <= DerivativeEpsilon)
+            if (Abs(derivative) <= derivativeEpsilon)
             {
                 return new Fvd2dNormalGSolverResult(
                     graph,
@@ -124,7 +127,7 @@ namespace Quantum.FVD
             double rawStep = -signedError / derivative;
             double clampedStep = MathUtil.Clamp(rawStep, -maxDeltaYStep, maxDeltaYStep);
 
-            if (Abs(clampedStep) <= DerivativeEpsilon)
+            if (Abs(clampedStep) <= derivativeEpsilon)
             {
                 return new Fvd2dNormalGSolverResult(
                     graph,
@@ -345,6 +348,27 @@ namespace Quantum.FVD
 
             if (value <= MathUtil.Epsilon)
                 return fallback;
+
+            return value;
+        }
+
+        private static double ValidateStrictlyPositiveFinite(double value, string paramName)
+        {
+            if (double.IsNaN(value) || double.IsInfinity(value))
+            {
+                throw new ArgumentOutOfRangeException(
+                    paramName,
+                    value,
+                    "Value must be finite.");
+            }
+
+            if (value <= 0.0)
+            {
+                throw new ArgumentOutOfRangeException(
+                    paramName,
+                    value,
+                    "Value must be positive.");
+            }
 
             return value;
         }

@@ -1,3 +1,5 @@
+using Quantum.Math;
+
 namespace Quantum.FVD
 {
     /// <summary>
@@ -14,6 +16,8 @@ namespace Quantum.FVD
         public double FiniteDifferenceDeltaY { get; set; } = 0.5;
 
         public double MaxDeltaYStep { get; set; } = 1.0;
+
+        public double DerivativeEpsilon { get; set; } = MathUtil.Epsilon;
 
         public int ArcLengthSamples { get; set; } = 256;
     }

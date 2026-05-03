@@ -136,6 +136,27 @@ public class FvdSolverPrototypeTests
         AssertNodesEqual(beforeNodes, afterGraph.ControlNodes);
     }
 
+    [Fact]
+    public void Fvd2dNormalGSolver_Step_InvalidDerivativeEpsilon_ThrowsArgumentOutOfRange()
+    {
+        const double midpointX = 50.0;
+
+        FvdGraph graph = BuildSimple2dGraphWithForceDistanceSection(
+            includeNormalTarget: true,
+            midpointNormalGTarget: 1.80);
+
+        TargetInvocationException nonFinite = Assert.Throws<TargetInvocationException>(
+            () => StepGraphOnceOrFail(graph, midpointX, derivativeEpsilon: double.NaN));
+        TargetInvocationException nonPositive = Assert.Throws<TargetInvocationException>(
+            () => StepGraphOnceOrFail(graph, midpointX, derivativeEpsilon: 0.0));
+
+        ArgumentOutOfRangeException nonFiniteInner = Assert.IsType<ArgumentOutOfRangeException>(nonFinite.InnerException);
+        ArgumentOutOfRangeException nonPositiveInner = Assert.IsType<ArgumentOutOfRangeException>(nonPositive.InnerException);
+
+        Assert.Equal("DerivativeEpsilon", nonFiniteInner.ParamName);
+        Assert.Equal("DerivativeEpsilon", nonPositiveInner.ParamName);
+    }
+
     private static FvdGraph BuildSimple2dGraphWithForceDistanceSection(
         bool includeNormalTarget,
         double midpointNormalGTarget,
@@ -210,7 +231,8 @@ public class FvdSolverPrototypeTests
         double evaluationX,
         double speedMps = 20.0,
         double finiteDifferenceDeltaY = 0.50,
-        double maxDeltaYStep = 1.00)
+        double maxDeltaYStep = 1.00,
+        double? derivativeEpsilon = null)
     {
         Type solverType = RequireFvdType("Quantum.FVD.Fvd2dNormalGSolver");
         Type optionsType = RequireFvdType("Quantum.FVD.Fvd2dNormalGSolverOptions");
@@ -225,6 +247,8 @@ public class FvdSolverPrototypeTests
         SetPropertyIfPresent(options, "SpeedMps", speedMps);
         SetPropertyIfPresent(options, "FiniteDifferenceDeltaY", finiteDifferenceDeltaY);
         SetPropertyIfPresent(options, "MaxDeltaYStep", maxDeltaYStep);
+        if (derivativeEpsilon.HasValue)
+            SetPropertyIfPresent(options, "DerivativeEpsilon", derivativeEpsilon.Value);
 
         MethodInfo? stepMethod = solverType.GetMethod(
             "Step",
