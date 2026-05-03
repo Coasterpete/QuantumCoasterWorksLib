@@ -20,5 +20,17 @@ namespace Quantum.FVD
         public double DerivativeEpsilon { get; set; } = MathUtil.Epsilon;
 
         public int ArcLengthSamples { get; set; } = 256;
+
+        /// <summary>
+        /// When enabled, Step(...) tries interior nodes in deterministic order until one succeeds.
+        /// Default false preserves legacy single-midpoint behavior.
+        /// </summary>
+        public bool EnableDeterministicInteriorNodeSweep { get; set; }
+
+        /// <summary>
+        /// Starting interior-node offset used when deterministic sweep is enabled.
+        /// Zero starts from the first interior node; values are wrapped modulo interior count.
+        /// </summary>
+        public int InteriorNodeSweepStartIndex { get; set; }
     }
 }

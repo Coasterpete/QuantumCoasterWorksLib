@@ -83,9 +83,85 @@ namespace Quantum.FVD
             }
 
             double beforeError = Abs(beforeRealizedNormalG - targetNormalG);
+            List<int> interiorNodeOrder = BuildInteriorNodeOrder(graph.ControlNodes.Count, options);
+            Fvd2dNormalGSolverResult? firstNonSuccess = null;
 
-            int interiorIndex = SelectInteriorNodeIndex(graph.ControlNodes.Count);
+            for (int i = 0; i < interiorNodeOrder.Count; i++)
+            {
+                int interiorIndex = interiorNodeOrder[i];
 
+                Fvd2dNormalGSolverResult candidate = StepSingleInteriorNode(
+                    graph,
+                    options,
+                    targetNormalG,
+                    beforeRealizedNormalG,
+                    beforeError,
+                    finiteDifferenceDeltaY,
+                    maxDeltaYStep,
+                    derivativeEpsilon,
+                    arcLengthSamples,
+                    interiorIndex);
+
+                if (candidate.Status == Fvd2dNormalGSolverStatus.Success)
+                    return candidate;
+
+                firstNonSuccess ??= candidate;
+            }
+
+            return firstNonSuccess
+                ?? new Fvd2dNormalGSolverResult(
+                    graph,
+                    Fvd2dNormalGSolverStatus.NoImprovement,
+                    beforeError,
+                    beforeError);
+        }
+
+        private static List<int> BuildInteriorNodeOrder(int controlNodeCount, Fvd2dNormalGSolverOptions options)
+        {
+            int firstInterior = 1;
+            int lastInterior = controlNodeCount - 2;
+            int interiorCount = lastInterior - firstInterior + 1;
+
+            if (!options.EnableDeterministicInteriorNodeSweep || interiorCount <= 1)
+            {
+                return new List<int>
+                {
+                    SelectMidpointInteriorNodeIndex(controlNodeCount)
+                };
+            }
+
+            int normalizedStartOffset = NormalizeModulo(options.InteriorNodeSweepStartIndex, interiorCount);
+            var order = new List<int>(interiorCount);
+
+            for (int i = 0; i < interiorCount; i++)
+            {
+                int wrappedOffset = (normalizedStartOffset + i) % interiorCount;
+                order.Add(firstInterior + wrappedOffset);
+            }
+
+            return order;
+        }
+
+        private static int SelectMidpointInteriorNodeIndex(int controlNodeCount)
+        {
+            int firstInterior = 1;
+            int lastInterior = controlNodeCount - 2;
+
+            return (firstInterior + lastInterior) / 2;
+        }
+
+        private static Fvd2dNormalGSolverResult StepSingleInteriorNode(
+            FvdGraph graph,
+            Fvd2dNormalGSolverOptions options,
+            double targetNormalG,
+            double beforeRealizedNormalG,
+            double beforeError,
+            double finiteDifferenceDeltaY,
+            double maxDeltaYStep,
+            double derivativeEpsilon,
+            int arcLengthSamples,
+            int interiorIndex)
+        {
             FvdGraph plusGraph = CreateGraphWithAdjustedNodeY(graph, interiorIndex, finiteDifferenceDeltaY);
             double plusRealizedNormalG = EvaluateRealizedNormalGProxy(
                 plusGraph,
@@ -171,12 +247,16 @@ namespace Quantum.FVD
                 afterError);
         }
 
-        private static int SelectInteriorNodeIndex(int controlNodeCount)
+        private static int NormalizeModulo(int value, int modulo)
         {
-            int firstInterior = 1;
-            int lastInterior = controlNodeCount - 2;
+            if (modulo <= 0)
+                return 0;
 
-            return (firstInterior + lastInterior) / 2;
+            int normalized = value % modulo;
+            if (normalized < 0)
+                normalized += modulo;
+
+            return normalized;
         }
 
         private static double EvaluateRealizedNormalGProxy(

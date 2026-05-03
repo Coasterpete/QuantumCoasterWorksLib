@@ -323,6 +323,42 @@ public class FvdSolverPrototypeTests
         }
     }
 
+    [Fact]
+    public void Fvd2dNormalGSolver_MultiInteriorNodeOrchestration_CanonicalFiveNode_RedContract()
+    {
+        const double NodeEqualityTolerance = 1e-12;
+        const double ErrorEqualityTolerance = 1e-12;
+        const double MonotonicTolerance = 1e-9;
+        const double maxDeltaYStep = 0.5;
+        const double evaluationX = 50.0;
+
+        MultiNodeOrchestrationRun firstRun = RunMultiInteriorOrchestrationContractOnce(
+            BuildCanonicalFiveNodeGraphWithForceDistanceSection(midpointNormalGTarget: 2.2),
+            evaluationX,
+            maxDeltaYStep,
+            NodeEqualityTolerance,
+            ErrorEqualityTolerance,
+            MonotonicTolerance);
+
+        MultiNodeOrchestrationRun secondRun = RunMultiInteriorOrchestrationContractOnce(
+            BuildCanonicalFiveNodeGraphWithForceDistanceSection(midpointNormalGTarget: 2.2),
+            evaluationX,
+            maxDeltaYStep,
+            NodeEqualityTolerance,
+            ErrorEqualityTolerance,
+            MonotonicTolerance);
+
+        Assert.Equal(firstRun.ChangedInteriorNodeOrder.Count, secondRun.ChangedInteriorNodeOrder.Count);
+        for (int i = 0; i < firstRun.ChangedInteriorNodeOrder.Count; i++)
+            Assert.Equal(firstRun.ChangedInteriorNodeOrder[i], secondRun.ChangedInteriorNodeOrder[i]);
+
+        var uniqueChangedInteriorNodes = new HashSet<int>(firstRun.ChangedInteriorNodeOrder);
+        Assert.Equal(3, uniqueChangedInteriorNodes.Count);
+        Assert.Contains(1, uniqueChangedInteriorNodes);
+        Assert.Contains(2, uniqueChangedInteriorNodes);
+        Assert.Contains(3, uniqueChangedInteriorNodes);
+    }
+
     private static FvdGraph BuildSimple2dGraphWithForceDistanceSection(
         bool includeNormalTarget,
         double midpointNormalGTarget,
@@ -432,13 +468,245 @@ public class FvdSolverPrototypeTests
             sections: sections);
     }
 
+    private static FvdGraph BuildCanonicalFiveNodeGraphWithForceDistanceSection(double midpointNormalGTarget)
+    {
+        var controlNodes = new List<FvdControlNode>
+        {
+            new FvdControlNode(0.00, new Vector3d(0.0, 0.0, 0.0), 1.0),
+            new FvdControlNode(0.25, new Vector3d(8.0, 3.0, 0.0), 1.0),
+            new FvdControlNode(0.50, new Vector3d(16.0, -3.0, 0.0), 1.0),
+            new FvdControlNode(0.75, new Vector3d(24.0, 3.0, 0.0), 1.0),
+            new FvdControlNode(1.00, new Vector3d(32.0, 0.0, 0.0), 1.0)
+        };
+
+        var sections = new List<FvdSectionDefinition>
+        {
+            new FvdSectionDefinition(
+                FvdSectionKind.Force,
+                FvdFunctionDomain.Distance,
+                startX: 0.0,
+                endX: 100.0,
+                new List<FvdSectionFunction>
+                {
+                    new FvdSectionFunction(
+                        FvdSectionChannel.NormalG,
+                        new List<FvdSectionSample>
+                        {
+                            new FvdSectionSample(0.0, midpointNormalGTarget),
+                            new FvdSectionSample(50.0, midpointNormalGTarget),
+                            new FvdSectionSample(100.0, midpointNormalGTarget)
+                        })
+                })
+        };
+
+        return new FvdGraph(
+            controlNodes,
+            degree: 3,
+            forceSamples: new List<FvdForceSample>(),
+            sections: sections);
+    }
+
+    private static MultiNodeOrchestrationRun RunMultiInteriorOrchestrationContractOnce(
+        FvdGraph initialGraph,
+        double evaluationX,
+        double maxDeltaYStep,
+        double nodeEqualityTolerance,
+        double errorEqualityTolerance,
+        double monotonicTolerance)
+    {
+        var initialNodes = SnapshotNodes(initialGraph.ControlNodes);
+        int initialDegree = initialGraph.Degree;
+
+        FvdGraph currentGraph = initialGraph;
+        var changedInteriorNodeOrder = new List<int>(capacity: 3);
+        double initialAbsoluteError = double.NaN;
+        double finalAbsoluteError = double.NaN;
+
+        for (int step = 0; step < 3; step++)
+        {
+            object result = StepGraphOnceOrFail(
+                currentGraph,
+                evaluationX,
+                speedMps: 20.0,
+                maxDeltaYStep: maxDeltaYStep,
+                enableDeterministicInteriorNodeSweep: true,
+                interiorNodeSweepStartIndex: step);
+
+            string statusName = ReadEnumNamePropertyOrFail(result, "Status");
+            double beforeError = ReadDoublePropertyOrFail(result, "BeforeAbsoluteNormalGError");
+            double afterError = ReadDoublePropertyOrFail(result, "AfterAbsoluteNormalGError");
+            FvdGraph nextGraph = ReadGraphPropertyOrFail(result, "Graph");
+
+            AssertCompatibleWithCurrentStatusErrorModel(statusName, beforeError, afterError, errorEqualityTolerance, monotonicTolerance);
+
+            if (step == 0)
+                initialAbsoluteError = beforeError;
+
+            finalAbsoluteError = afterError;
+
+            Assert.Equal(initialDegree, nextGraph.Degree);
+            Assert.Equal(initialNodes.Count, nextGraph.ControlNodes.Count);
+
+            int changedInteriorIndex = AssertSingleInteriorYChangeAndReturnIndex(
+                currentGraph.ControlNodes,
+                nextGraph.ControlNodes,
+                nodeEqualityTolerance);
+
+            changedInteriorNodeOrder.Add(changedInteriorIndex);
+            currentGraph = nextGraph;
+        }
+
+        Assert.InRange(finalAbsoluteError, 0.0, initialAbsoluteError + monotonicTolerance);
+
+        AssertEndpointUnchanged(initialNodes, currentGraph.ControlNodes, nodeEqualityTolerance);
+        AssertPerNodeInvariantFieldsUnchanged(initialNodes, currentGraph.ControlNodes, nodeEqualityTolerance);
+        AssertFinalInteriorDeltasWithinStepBound(initialNodes, currentGraph.ControlNodes, maxDeltaYStep, nodeEqualityTolerance);
+
+        return new MultiNodeOrchestrationRun(changedInteriorNodeOrder, initialAbsoluteError, finalAbsoluteError);
+    }
+
+    private static void AssertCompatibleWithCurrentStatusErrorModel(
+        string statusName,
+        double beforeError,
+        double afterError,
+        double errorEqualityTolerance,
+        double monotonicTolerance)
+    {
+        Assert.Contains(
+            statusName,
+            new[]
+            {
+                "Success",
+                "NoNormalTarget",
+                "NoInteriorNode",
+                "FlatDerivative",
+                "NoImprovement"
+            });
+
+        Assert.False(double.IsNaN(beforeError));
+        Assert.False(double.IsInfinity(beforeError));
+        Assert.False(double.IsNaN(afterError));
+        Assert.False(double.IsInfinity(afterError));
+        Assert.True(beforeError >= 0.0);
+        Assert.True(afterError >= 0.0);
+
+        if (statusName == "Success")
+        {
+            Assert.InRange(afterError, 0.0, beforeError + monotonicTolerance);
+            return;
+        }
+
+        if (statusName == "NoNormalTarget" || statusName == "NoInteriorNode")
+        {
+            Assert.InRange(System.Math.Abs(beforeError), 0.0, errorEqualityTolerance);
+            Assert.InRange(System.Math.Abs(afterError), 0.0, errorEqualityTolerance);
+            return;
+        }
+
+        Assert.InRange(System.Math.Abs(afterError - beforeError), 0.0, errorEqualityTolerance);
+    }
+
+    private static int AssertSingleInteriorYChangeAndReturnIndex(
+        IReadOnlyList<FvdControlNode> beforeNodes,
+        IReadOnlyList<FvdControlNode> afterNodes,
+        double nodeEqualityTolerance)
+    {
+        Assert.Equal(beforeNodes.Count, afterNodes.Count);
+
+        int changedInteriorIndex = -1;
+
+        for (int i = 0; i < beforeNodes.Count; i++)
+        {
+            FvdControlNode before = beforeNodes[i];
+            FvdControlNode after = afterNodes[i];
+
+            Assert.InRange(System.Math.Abs(before.U - after.U), 0.0, nodeEqualityTolerance);
+            Assert.InRange(System.Math.Abs(before.Position.X - after.Position.X), 0.0, nodeEqualityTolerance);
+            Assert.InRange(System.Math.Abs(before.Position.Z - after.Position.Z), 0.0, nodeEqualityTolerance);
+            Assert.InRange(System.Math.Abs(before.Weight - after.Weight), 0.0, nodeEqualityTolerance);
+
+            double deltaY = after.Position.Y - before.Position.Y;
+            if (System.Math.Abs(deltaY) <= nodeEqualityTolerance)
+                continue;
+
+            bool isInterior = i > 0 && i < beforeNodes.Count - 1;
+            Assert.True(isInterior, "Only interior node Y values may change.");
+
+            if (changedInteriorIndex >= 0)
+            {
+                throw new Xunit.Sdk.XunitException(
+                    $"Expected exactly one changed interior node per step, but found indices {changedInteriorIndex} and {i}.");
+            }
+
+            changedInteriorIndex = i;
+        }
+
+        Assert.True(changedInteriorIndex >= 0, "Expected one interior node Y change per orchestration step.");
+        return changedInteriorIndex;
+    }
+
+    private static void AssertEndpointUnchanged(
+        IReadOnlyList<NodeSnapshot> before,
+        IReadOnlyList<FvdControlNode> after,
+        double nodeEqualityTolerance)
+    {
+        Assert.Equal(before.Count, after.Count);
+
+        int first = 0;
+        int last = before.Count - 1;
+
+        Assert.InRange(System.Math.Abs(before[first].Y - after[first].Position.Y), 0.0, nodeEqualityTolerance);
+        Assert.InRange(System.Math.Abs(before[last].Y - after[last].Position.Y), 0.0, nodeEqualityTolerance);
+    }
+
+    private static void AssertPerNodeInvariantFieldsUnchanged(
+        IReadOnlyList<NodeSnapshot> before,
+        IReadOnlyList<FvdControlNode> after,
+        double nodeEqualityTolerance)
+    {
+        Assert.Equal(before.Count, after.Count);
+
+        for (int i = 0; i < before.Count; i++)
+        {
+            NodeSnapshot left = before[i];
+            FvdControlNode right = after[i];
+
+            Assert.InRange(System.Math.Abs(left.X - right.Position.X), 0.0, nodeEqualityTolerance);
+            Assert.InRange(System.Math.Abs(left.Z - right.Position.Z), 0.0, nodeEqualityTolerance);
+            Assert.InRange(System.Math.Abs(left.Weight - right.Weight), 0.0, nodeEqualityTolerance);
+        }
+    }
+
+    private static void AssertFinalInteriorDeltasWithinStepBound(
+        IReadOnlyList<NodeSnapshot> before,
+        IReadOnlyList<FvdControlNode> after,
+        double maxDeltaYStep,
+        double nodeEqualityTolerance)
+    {
+        Assert.Equal(before.Count, after.Count);
+
+        for (int i = 1; i < before.Count - 1; i++)
+        {
+            double deltaY = after[i].Position.Y - before[i].Y;
+            if (System.Math.Abs(deltaY) <= nodeEqualityTolerance)
+                continue;
+
+            Assert.InRange(
+                System.Math.Abs(deltaY),
+                0.0,
+                maxDeltaYStep + nodeEqualityTolerance);
+        }
+    }
+
     private static object StepGraphOnceOrFail(
         FvdGraph graph,
         double evaluationX,
         double speedMps = 20.0,
         double finiteDifferenceDeltaY = 0.50,
         double maxDeltaYStep = 1.00,
-        double? derivativeEpsilon = null)
+        double? derivativeEpsilon = null,
+        bool? enableDeterministicInteriorNodeSweep = null,
+        int? interiorNodeSweepStartIndex = null)
     {
         Type solverType = RequireFvdType("Quantum.FVD.Fvd2dNormalGSolver");
         Type optionsType = RequireFvdType("Quantum.FVD.Fvd2dNormalGSolverOptions");
@@ -455,6 +723,10 @@ public class FvdSolverPrototypeTests
         SetPropertyIfPresent(options, "MaxDeltaYStep", maxDeltaYStep);
         if (derivativeEpsilon.HasValue)
             SetPropertyIfPresent(options, "DerivativeEpsilon", derivativeEpsilon.Value);
+        if (enableDeterministicInteriorNodeSweep.HasValue)
+            SetPropertyIfPresent(options, "EnableDeterministicInteriorNodeSweep", enableDeterministicInteriorNodeSweep.Value);
+        if (interiorNodeSweepStartIndex.HasValue)
+            SetPropertyIfPresent(options, "InteriorNodeSweepStartIndex", interiorNodeSweepStartIndex.Value);
 
         MethodInfo? stepMethod = solverType.GetMethod(
             "Step",
@@ -599,6 +871,11 @@ public class FvdSolverPrototypeTests
         bool ExpectAfterEqualsBefore,
         bool ExpectZeroErrors,
         bool ExpectSingleInteriorYChange);
+
+    private readonly record struct MultiNodeOrchestrationRun(
+        IReadOnlyList<int> ChangedInteriorNodeOrder,
+        double InitialAbsoluteError,
+        double FinalAbsoluteError);
 
     private readonly record struct NodeSnapshot(double U, double X, double Y, double Z, double Weight);
 }
