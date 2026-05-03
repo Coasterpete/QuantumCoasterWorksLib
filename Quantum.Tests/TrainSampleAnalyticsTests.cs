@@ -134,6 +134,38 @@ public sealed class TrainSampleAnalyticsTests
         Assert.True(rmsError > 0.0);
     }
 
+    [Fact]
+    public void ComputeNormalGError_ThrowsWhenProviderHasNoTargetAtSampleDistance()
+    {
+        const double deltaTime = 0.1;
+        const int steps = 3;
+
+        IArcLengthCurve track = new LineCurve(
+            new Vector3d(0, 0, 0),
+            new Vector3d(100, 0, 0));
+
+        var provider = new PartialCoverageForceTargetProvider(
+            coveredDistanceMaxExclusive: 0.1,
+            normalG: 1.0);
+
+        var follower = new TrainFollowerState(track);
+        var loop = new TrainStepLoop(
+            follower,
+            deltaTime,
+            gravityMagnitude: 0.0,
+            linearDragCoefficient: 0.0,
+            quadraticDragCoefficient: 0.0,
+            rollingResistance: 0.0,
+            forceTargetProvider: provider);
+
+        IReadOnlyList<TrainFollowerState> samples = loop.Sample(steps);
+
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() =>
+            TrainSampleAnalytics.ComputeNormalGError(samples, provider, deltaTime));
+
+        Assert.Contains("No force targets available at sample distance", ex.Message);
+    }
+
     private static FvdForceTargetProviderAdapter CreateConstantNormalGAdapter(double normalG, double endX)
     {
         var graph = new FvdGraph(
@@ -164,5 +196,29 @@ public sealed class TrainSampleAnalyticsTests
             });
 
         return new FvdForceTargetProviderAdapter(graph, FvdFunctionDomain.Distance);
+    }
+
+    private sealed class PartialCoverageForceTargetProvider : IForceTargetProvider
+    {
+        private readonly double _coveredDistanceMaxExclusive;
+        private readonly double _normalG;
+
+        public PartialCoverageForceTargetProvider(double coveredDistanceMaxExclusive, double normalG)
+        {
+            _coveredDistanceMaxExclusive = coveredDistanceMaxExclusive;
+            _normalG = normalG;
+        }
+
+        public bool TryGetForceTargets(double x, out ForceTargets targets)
+        {
+            if (x < _coveredDistanceMaxExclusive)
+            {
+                targets = new ForceTargets(_normalG, lateralG: 0.0, rollRateDegPerSec: 0.0);
+                return true;
+            }
+
+            targets = default;
+            return false;
+        }
     }
 }
