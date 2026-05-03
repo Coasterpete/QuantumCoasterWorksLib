@@ -68,6 +68,7 @@ namespace Quantum.FVD
 
                 ValidateU(node.U, i);
                 ValidateWeight(node.Weight, i);
+                ValidatePosition(node.Position, i);
 
                 if (hasPrevious && node.U <= previousU)
                 {
@@ -91,6 +92,9 @@ namespace Quantum.FVD
                 FvdForceSample sample = forceSamples[i];
 
                 ValidateForceSampleU(sample.U, i);
+                ValidateForceSamplePayloadValue(sample.NormalG, nameof(sample.NormalG), i);
+                ValidateForceSamplePayloadValue(sample.LateralG, nameof(sample.LateralG), i);
+                ValidateForceSamplePayloadValue(sample.RollRateDegPerSec, nameof(sample.RollRateDegPerSec), i);
 
                 if (hasPrevious && sample.U <= previousU)
                 {
@@ -415,6 +419,18 @@ namespace Quantum.FVD
             }
         }
 
+        private static void ValidatePosition(Vector3d position, int index)
+        {
+            if (double.IsNaN(position.X) || double.IsInfinity(position.X)
+                || double.IsNaN(position.Y) || double.IsInfinity(position.Y)
+                || double.IsNaN(position.Z) || double.IsInfinity(position.Z))
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(position),
+                    $"Control node position at index {index} must have finite X/Y/Z components.");
+            }
+        }
+
         private static void ValidateForceSampleU(double u, int index)
         {
             if (double.IsNaN(u) || double.IsInfinity(u) || u < 0.0 || u > 1.0)
@@ -422,6 +438,16 @@ namespace Quantum.FVD
                 throw new ArgumentOutOfRangeException(
                     nameof(u),
                     $"Force sample U at index {index} must be a finite value in [0, 1].");
+            }
+        }
+
+        private static void ValidateForceSamplePayloadValue(double value, string fieldName, int index)
+        {
+            if (double.IsNaN(value) || double.IsInfinity(value))
+            {
+                throw new ArgumentOutOfRangeException(
+                    fieldName,
+                    $"Force sample {fieldName} at index {index} must be finite.");
             }
         }
 

@@ -114,6 +114,43 @@ public class FvdFoundationTests
     }
 
     [Fact]
+    public void FvdGraph_RejectsNonFiniteControlNodePositionComponents()
+    {
+        Type graphType = RequireFvdGraphType();
+        Type nodeType = RequireFvdControlNodeType();
+
+        Assert.ThrowsAny<Exception>(() =>
+            CreateGraphOrFail(
+                graphType,
+                nodeType,
+                degree: 3,
+                CreateNodeOrFail(nodeType, 0.00, new Vector3d(double.NaN, 0, 0), 1.0),
+                CreateNodeOrFail(nodeType, 0.33, new Vector3d(4, 3, 0), 1.0),
+                CreateNodeOrFail(nodeType, 0.66, new Vector3d(7, 3, 0), 1.0),
+                CreateNodeOrFail(nodeType, 1.00, new Vector3d(10, 0, 0), 1.0)));
+
+        Assert.ThrowsAny<Exception>(() =>
+            CreateGraphOrFail(
+                graphType,
+                nodeType,
+                degree: 3,
+                CreateNodeOrFail(nodeType, 0.00, new Vector3d(0, 0, 0), 1.0),
+                CreateNodeOrFail(nodeType, 0.33, new Vector3d(4, double.PositiveInfinity, 0), 1.0),
+                CreateNodeOrFail(nodeType, 0.66, new Vector3d(7, 3, 0), 1.0),
+                CreateNodeOrFail(nodeType, 1.00, new Vector3d(10, 0, 0), 1.0)));
+
+        Assert.ThrowsAny<Exception>(() =>
+            CreateGraphOrFail(
+                graphType,
+                nodeType,
+                degree: 3,
+                CreateNodeOrFail(nodeType, 0.00, new Vector3d(0, 0, 0), 1.0),
+                CreateNodeOrFail(nodeType, 0.33, new Vector3d(4, 3, 0), 1.0),
+                CreateNodeOrFail(nodeType, 0.66, new Vector3d(7, 3, double.NegativeInfinity), 1.0),
+                CreateNodeOrFail(nodeType, 1.00, new Vector3d(10, 0, 0), 1.0)));
+    }
+
+    [Fact]
     public void FvdGraph_RejectsInsufficientControlNodesForDegree()
     {
         Type graphType = RequireFvdGraphType();

@@ -138,6 +138,43 @@ public class FvdSectionContractTests
     }
 
     [Fact]
+    public void FvdSectionDefinition_RejectsNonFiniteSampleValues()
+    {
+        Type sectionDefinitionType = RequireSectionDefinitionType();
+        Type sectionFunctionType = RequireSectionFunctionType();
+
+        object nanValueFunction = CreateSectionFunctionOrFail(
+            sectionFunctionType,
+            channelName: "NormalG",
+            CreateSectionSampleOrFail(0.0, 1.0),
+            CreateSectionSampleOrFail(1.0, double.NaN));
+
+        object infinityValueFunction = CreateSectionFunctionOrFail(
+            sectionFunctionType,
+            channelName: "NormalG",
+            CreateSectionSampleOrFail(0.0, 1.0),
+            CreateSectionSampleOrFail(1.0, double.PositiveInfinity));
+
+        Assert.ThrowsAny<Exception>(() =>
+            CreateSectionDefinitionOrFail(
+                sectionDefinitionType,
+                kindName: "Force",
+                domainName: "Distance",
+                startX: 0.0,
+                endX: 1.0,
+                nanValueFunction));
+
+        Assert.ThrowsAny<Exception>(() =>
+            CreateSectionDefinitionOrFail(
+                sectionDefinitionType,
+                kindName: "Force",
+                domainName: "Distance",
+                startX: 0.0,
+                endX: 1.0,
+                infinityValueFunction));
+    }
+
+    [Fact]
     public void FvdSectionDefinition_RejectsInvalidChannelForSectionKind()
     {
         Type sectionDefinitionType = RequireSectionDefinitionType();

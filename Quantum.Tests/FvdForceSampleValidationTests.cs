@@ -54,6 +54,45 @@ public class FvdForceSampleValidationTests
     }
 
     [Fact]
+    public void FvdGraph_RejectsNonFiniteNormalG_InForceSamples()
+    {
+        List<FvdControlNode> controlNodes = BuildValidControlNodes();
+
+        var samples = new List<FvdForceSample>
+        {
+            new FvdForceSample(0.00, normalG: double.NaN, lateralG: 0.0, rollRateDegPerSec: 0.0)
+        };
+
+        Assert.ThrowsAny<Exception>(() => new FvdGraph(controlNodes, degree: 3, samples));
+    }
+
+    [Fact]
+    public void FvdGraph_RejectsNonFiniteLateralG_InForceSamples()
+    {
+        List<FvdControlNode> controlNodes = BuildValidControlNodes();
+
+        var samples = new List<FvdForceSample>
+        {
+            new FvdForceSample(0.00, normalG: 1.0, lateralG: double.PositiveInfinity, rollRateDegPerSec: 0.0)
+        };
+
+        Assert.ThrowsAny<Exception>(() => new FvdGraph(controlNodes, degree: 3, samples));
+    }
+
+    [Fact]
+    public void FvdGraph_RejectsNonFiniteRollRateDegPerSec_InForceSamples()
+    {
+        List<FvdControlNode> controlNodes = BuildValidControlNodes();
+
+        var samples = new List<FvdForceSample>
+        {
+            new FvdForceSample(0.00, normalG: 1.0, lateralG: 0.0, rollRateDegPerSec: double.NegativeInfinity)
+        };
+
+        Assert.ThrowsAny<Exception>(() => new FvdGraph(controlNodes, degree: 3, samples));
+    }
+
+    [Fact]
     public void FvdGraph_RejectsUnsortedForceSamples()
     {
         List<FvdControlNode> controlNodes = BuildValidControlNodes();

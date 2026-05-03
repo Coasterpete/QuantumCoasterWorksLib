@@ -151,6 +151,13 @@ namespace Quantum.FVD
                         $"Sample X at function index {functionIndex}, sample index {i} must be within [StartX, EndX].");
                 }
 
+                if (!IsFinite(sample.Value))
+                {
+                    throw new ArgumentOutOfRangeException(
+                        nameof(sample.Value),
+                        $"Sample Value at function index {functionIndex}, sample index {i} must be finite.");
+                }
+
                 if (hasPrevious && sample.X <= previousX)
                 {
                     throw new ArgumentException(
