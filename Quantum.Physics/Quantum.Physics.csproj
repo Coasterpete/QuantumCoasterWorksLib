@@ -6,6 +6,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Quantum.Core\Quantum.Core.csproj" />
     <ProjectReference Include="..\Quantum.Math\Quantum.Math.csproj" />
     <ProjectReference Include="..\Quantum.Splines\Quantum.Splines.csproj" />
   </ItemGroup>

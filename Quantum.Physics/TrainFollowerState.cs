@@ -1,4 +1,5 @@
 ﻿using System;
+using Quantum.Core;
 using Quantum.Math;
 using Quantum.Splines;
 
@@ -31,17 +32,10 @@ namespace Quantum.Physics
         /// </summary>
         public double GravityAccelerationAlongTrack(double gravityMagnitude = 9.81)
         {
-            if (double.IsNaN(gravityMagnitude) || double.IsInfinity(gravityMagnitude))
-                throw new ArgumentOutOfRangeException(
-                    nameof(gravityMagnitude),
-                    gravityMagnitude,
-                    "Gravity magnitude must be a finite, non-negative value.");
-
-            if (gravityMagnitude < 0.0)
-                throw new ArgumentOutOfRangeException(
-                    nameof(gravityMagnitude),
-                    gravityMagnitude,
-                    "Gravity magnitude must be a finite, non-negative value.");
+            Guard.RequireNonNegativeFinite(
+                gravityMagnitude,
+                nameof(gravityMagnitude),
+                "Gravity magnitude must be a finite, non-negative value.");
 
             return gravityMagnitude * Vector3d.Dot(new Vector3d(0.0, -1.0, 0.0), Frame.Tangent);
         }
