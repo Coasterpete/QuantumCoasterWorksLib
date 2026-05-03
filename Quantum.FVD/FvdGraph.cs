@@ -246,11 +246,29 @@ namespace Quantum.FVD
             out double lateralG,
             out double rollRateDegPerSec)
         {
+            return TryEvaluateForceTargetsAt(
+                domain,
+                x,
+                out normalG,
+                out lateralG,
+                out rollRateDegPerSec,
+                out _);
+        }
+
+        public bool TryEvaluateForceTargetsAt(
+            FvdFunctionDomain domain,
+            double x,
+            out double normalG,
+            out double lateralG,
+            out double rollRateDegPerSec,
+            out FvdForceTargetDiagnostic diagnostic)
+        {
             if (!TryEvaluateSectionAllAt(FvdSectionKind.Force, domain, x, out IReadOnlyList<FvdChannelEvaluation> evaluations))
             {
                 normalG = default;
                 lateralG = default;
                 rollRateDegPerSec = default;
+                diagnostic = FvdForceTargetDiagnostic.NoForceSection;
                 return false;
             }
 
@@ -284,7 +302,18 @@ namespace Quantum.FVD
                 }
             }
 
-            if (!(hasNormal && hasLateral && hasRollRate))
+            diagnostic = FvdForceTargetDiagnostic.None;
+
+            if (!hasNormal)
+                diagnostic |= FvdForceTargetDiagnostic.MissingNormalG;
+
+            if (!hasLateral)
+                diagnostic |= FvdForceTargetDiagnostic.MissingLateralG;
+
+            if (!hasRollRate)
+                diagnostic |= FvdForceTargetDiagnostic.MissingRollRateDegPerSec;
+
+            if (diagnostic != FvdForceTargetDiagnostic.None)
             {
                 normalG = default;
                 lateralG = default;
@@ -295,6 +324,7 @@ namespace Quantum.FVD
             normalG = normalValue;
             lateralG = lateralValue;
             rollRateDegPerSec = rollRateValue;
+            diagnostic = FvdForceTargetDiagnostic.None;
             return true;
         }
 
