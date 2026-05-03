@@ -28,6 +28,26 @@ public class FvdSolverPrototypeTests
     }
 
     [Fact]
+    public void Fvd2dNormalGSolver_Step_NormalGOnlyForceSection_DoesNotRequireOtherForceChannels()
+    {
+        const double midpointX = 50.0;
+
+        FvdGraph graph = BuildSimple2dGraphWithForceDistanceSection(
+            includeNormalTarget: true,
+            midpointNormalGTarget: 1.80,
+            includeLateralTarget: false,
+            includeRollRateTarget: false);
+
+        object result = StepGraphOnceOrFail(graph, midpointX);
+        string statusName = ReadEnumNamePropertyOrFail(result, "Status");
+        double beforeError = ReadDoublePropertyOrFail(result, "BeforeAbsoluteNormalGError");
+        double afterError = ReadDoublePropertyOrFail(result, "AfterAbsoluteNormalGError");
+
+        Assert.Equal("Success", statusName);
+        Assert.InRange(afterError, 0.0, beforeError + 1e-9);
+    }
+
+    [Fact]
     public void Fvd2dNormalGSolver_Step_MissingNormalGTarget_ReturnsNoOpStatus()
     {
         const double midpointX = 50.0;
@@ -91,7 +111,11 @@ public class FvdSolverPrototypeTests
         Assert.Equal(1, changedInteriorYCount);
     }
 
-    private static FvdGraph BuildSimple2dGraphWithForceDistanceSection(bool includeNormalTarget, double midpointNormalGTarget)
+    private static FvdGraph BuildSimple2dGraphWithForceDistanceSection(
+        bool includeNormalTarget,
+        double midpointNormalGTarget,
+        bool includeLateralTarget = true,
+        bool includeRollRateTarget = true)
     {
         var controlNodes = new List<FvdControlNode>
         {
@@ -115,23 +139,29 @@ public class FvdSolverPrototypeTests
                 }));
         }
 
-        functions.Add(new FvdSectionFunction(
-            FvdSectionChannel.LateralG,
-            new List<FvdSectionSample>
-            {
-                new FvdSectionSample(0.0, 0.0),
-                new FvdSectionSample(50.0, 0.0),
-                new FvdSectionSample(100.0, 0.0)
-            }));
+        if (includeLateralTarget)
+        {
+            functions.Add(new FvdSectionFunction(
+                FvdSectionChannel.LateralG,
+                new List<FvdSectionSample>
+                {
+                    new FvdSectionSample(0.0, 0.0),
+                    new FvdSectionSample(50.0, 0.0),
+                    new FvdSectionSample(100.0, 0.0)
+                }));
+        }
 
-        functions.Add(new FvdSectionFunction(
-            FvdSectionChannel.RollRateDegPerSec,
-            new List<FvdSectionSample>
-            {
-                new FvdSectionSample(0.0, 0.0),
-                new FvdSectionSample(50.0, 0.0),
-                new FvdSectionSample(100.0, 0.0)
-            }));
+        if (includeRollRateTarget)
+        {
+            functions.Add(new FvdSectionFunction(
+                FvdSectionChannel.RollRateDegPerSec,
+                new List<FvdSectionSample>
+                {
+                    new FvdSectionSample(0.0, 0.0),
+                    new FvdSectionSample(50.0, 0.0),
+                    new FvdSectionSample(100.0, 0.0)
+                }));
+        }
 
         var sections = new List<FvdSectionDefinition>
         {

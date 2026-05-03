@@ -40,12 +40,12 @@ namespace Quantum.FVD
 
             int arcLengthSamples = options.ArcLengthSamples < 2 ? 2 : options.ArcLengthSamples;
 
-            if (!graph.TryEvaluateForceTargetsAt(
+            if (!graph.TryEvaluateSectionChannelAt(
+                    FvdSectionKind.Force,
                     options.Domain,
+                    FvdSectionChannel.NormalG,
                     options.EvaluationX,
-                    out double targetNormalG,
-                    out _,
-                    out _))
+                    out double targetNormalG))
             {
                 return new Fvd2dNormalGSolverResult(
                     graph,
