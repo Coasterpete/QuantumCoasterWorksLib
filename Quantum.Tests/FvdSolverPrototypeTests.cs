@@ -157,6 +157,172 @@ public class FvdSolverPrototypeTests
         Assert.Equal("DerivativeEpsilon", nonPositiveInner.ParamName);
     }
 
+    [Fact]
+    public void Fvd2dNormalGSolver_AcceptanceMatrix_Current2dSingleNodeNormalGScope()
+    {
+        const double NodeEqualityTolerance = 1e-12;
+        const double ErrorEqualityTolerance = 1e-12;
+        const double MonotonicTolerance = 1e-9;
+        const double midpointX = 50.0;
+        const double maxDeltaYStep = 1.0;
+
+        SolverAcceptanceScenario[] scenarios =
+        {
+            new SolverAcceptanceScenario(
+                "S1 Success_ImprovesError",
+                () => BuildSimple2dGraphWithForceDistanceSection(includeNormalTarget: true, midpointNormalGTarget: 1.80),
+                EvaluationX: midpointX,
+                SpeedMps: 20.0,
+                MaxDeltaYStep: maxDeltaYStep,
+                ExpectedStatus: "Success",
+                ExpectGraphUnchanged: false,
+                ExpectStrictImprovement: true,
+                ExpectAfterEqualsBefore: false,
+                ExpectZeroErrors: false,
+                ExpectSingleInteriorYChange: true),
+            new SolverAcceptanceScenario(
+                "S2 NoNormalTarget_NoOp",
+                () => BuildSimple2dGraphWithForceDistanceSection(includeNormalTarget: false, midpointNormalGTarget: 1.80),
+                EvaluationX: midpointX,
+                SpeedMps: 20.0,
+                MaxDeltaYStep: maxDeltaYStep,
+                ExpectedStatus: "NoNormalTarget",
+                ExpectGraphUnchanged: true,
+                ExpectStrictImprovement: false,
+                ExpectAfterEqualsBefore: false,
+                ExpectZeroErrors: true,
+                ExpectSingleInteriorYChange: false),
+            new SolverAcceptanceScenario(
+                "S3 NoInteriorNode_NoOp",
+                () => BuildTwoNodeLineGraphWithForceDistanceSection(includeNormalTarget: true, midpointNormalGTarget: 1.80),
+                EvaluationX: midpointX,
+                SpeedMps: 20.0,
+                MaxDeltaYStep: maxDeltaYStep,
+                ExpectedStatus: "NoInteriorNode",
+                ExpectGraphUnchanged: true,
+                ExpectStrictImprovement: false,
+                ExpectAfterEqualsBefore: false,
+                ExpectZeroErrors: true,
+                ExpectSingleInteriorYChange: false),
+            new SolverAcceptanceScenario(
+                "S4 FlatDerivative_NoOp",
+                () => BuildSimple2dGraphWithForceDistanceSection(includeNormalTarget: true, midpointNormalGTarget: 1.80),
+                EvaluationX: midpointX,
+                SpeedMps: 0.0,
+                MaxDeltaYStep: maxDeltaYStep,
+                ExpectedStatus: "FlatDerivative",
+                ExpectGraphUnchanged: true,
+                ExpectStrictImprovement: false,
+                ExpectAfterEqualsBefore: true,
+                ExpectZeroErrors: false,
+                ExpectSingleInteriorYChange: false),
+            new SolverAcceptanceScenario(
+                "S5 NonFiniteRealized_NoOp",
+                () => BuildSimple2dGraphWithForceDistanceSection(includeNormalTarget: true, midpointNormalGTarget: 1.80),
+                EvaluationX: midpointX,
+                SpeedMps: double.MaxValue,
+                MaxDeltaYStep: maxDeltaYStep,
+                ExpectedStatus: "NoImprovement",
+                ExpectGraphUnchanged: true,
+                ExpectStrictImprovement: false,
+                ExpectAfterEqualsBefore: false,
+                ExpectZeroErrors: true,
+                ExpectSingleInteriorYChange: false)
+        };
+
+        foreach (SolverAcceptanceScenario scenario in scenarios)
+        {
+            FvdGraph graph = scenario.BuildGraph();
+            var beforeNodes = SnapshotNodes(graph.ControlNodes);
+            int beforeDegree = graph.Degree;
+
+            object result = StepGraphOnceOrFail(
+                graph,
+                evaluationX: scenario.EvaluationX,
+                speedMps: scenario.SpeedMps,
+                maxDeltaYStep: scenario.MaxDeltaYStep);
+
+            string statusName = ReadEnumNamePropertyOrFail(result, "Status");
+            double beforeError = ReadDoublePropertyOrFail(result, "BeforeAbsoluteNormalGError");
+            double afterError = ReadDoublePropertyOrFail(result, "AfterAbsoluteNormalGError");
+            FvdGraph afterGraph = ReadGraphPropertyOrFail(result, "Graph");
+
+            Assert.Equal(scenario.ExpectedStatus, statusName);
+
+            if (scenario.ExpectGraphUnchanged)
+            {
+                Assert.Equal(beforeDegree, afterGraph.Degree);
+                AssertNodesEqual(beforeNodes, afterGraph.ControlNodes);
+            }
+
+            if (scenario.ExpectZeroErrors)
+            {
+                Assert.InRange(System.Math.Abs(beforeError), 0.0, ErrorEqualityTolerance);
+                Assert.InRange(System.Math.Abs(afterError), 0.0, ErrorEqualityTolerance);
+            }
+
+            if (scenario.ExpectAfterEqualsBefore)
+            {
+                Assert.InRange(System.Math.Abs(afterError - beforeError), 0.0, ErrorEqualityTolerance);
+            }
+
+            if (scenario.ExpectStrictImprovement)
+            {
+                Assert.True(
+                    afterError < beforeError,
+                    $"{scenario.Name}: expected strict improvement but before={beforeError}, after={afterError}.");
+                Assert.InRange(afterError, 0.0, beforeError + MonotonicTolerance);
+            }
+
+            if (scenario.ExpectSingleInteriorYChange)
+            {
+                Assert.Equal(beforeDegree, afterGraph.Degree);
+                Assert.Equal(beforeNodes.Count, afterGraph.ControlNodes.Count);
+
+                int changedInteriorYCount = 0;
+                double changedInteriorYDeltaMagnitude = 0.0;
+
+                for (int i = 0; i < beforeNodes.Count; i++)
+                {
+                    NodeSnapshot before = beforeNodes[i];
+                    FvdControlNode after = afterGraph.ControlNodes[i];
+
+                    Assert.InRange(System.Math.Abs(before.U - after.U), 0.0, NodeEqualityTolerance);
+                    Assert.InRange(System.Math.Abs(before.X - after.Position.X), 0.0, NodeEqualityTolerance);
+                    Assert.InRange(System.Math.Abs(before.Z - after.Position.Z), 0.0, NodeEqualityTolerance);
+                    Assert.InRange(System.Math.Abs(before.Weight - after.Weight), 0.0, NodeEqualityTolerance);
+
+                    double yDelta = after.Position.Y - before.Y;
+                    bool yChanged = System.Math.Abs(yDelta) > NodeEqualityTolerance;
+
+                    if (!yChanged)
+                    {
+                        Assert.InRange(System.Math.Abs(yDelta), 0.0, NodeEqualityTolerance);
+                        continue;
+                    }
+
+                    bool isInterior = i > 0 && i < beforeNodes.Count - 1;
+                    Assert.True(isInterior, $"{scenario.Name}: only interior node Y values may change.");
+
+                    changedInteriorYCount++;
+                    changedInteriorYDeltaMagnitude = System.Math.Abs(yDelta);
+                }
+
+                Assert.Equal(1, changedInteriorYCount);
+                Assert.InRange(
+                    changedInteriorYDeltaMagnitude,
+                    0.0,
+                    scenario.MaxDeltaYStep + NodeEqualityTolerance);
+
+                FvdNurbsBuildResult buildResult = afterGraph.BuildNurbsCurve(64);
+                Assert.NotNull(buildResult);
+                Assert.False(double.IsNaN(buildResult.ArcCurve.Length));
+                Assert.False(double.IsInfinity(buildResult.ArcCurve.Length));
+                Assert.True(buildResult.ArcCurve.Length >= 0.0);
+            }
+        }
+    }
+
     private static FvdGraph BuildSimple2dGraphWithForceDistanceSection(
         bool includeNormalTarget,
         double midpointNormalGTarget,
@@ -222,6 +388,46 @@ public class FvdSolverPrototypeTests
         return new FvdGraph(
             controlNodes,
             degree: 3,
+            forceSamples: new List<FvdForceSample>(),
+            sections: sections);
+    }
+
+    private static FvdGraph BuildTwoNodeLineGraphWithForceDistanceSection(
+        bool includeNormalTarget,
+        double midpointNormalGTarget)
+    {
+        var controlNodes = new List<FvdControlNode>
+        {
+            new FvdControlNode(0.0, new Vector3d(0.0, 0.0, 0.0), 1.0),
+            new FvdControlNode(1.0, new Vector3d(30.0, 0.0, 0.0), 1.0)
+        };
+
+        var functions = new List<FvdSectionFunction>();
+        if (includeNormalTarget)
+        {
+            functions.Add(new FvdSectionFunction(
+                FvdSectionChannel.NormalG,
+                new List<FvdSectionSample>
+                {
+                    new FvdSectionSample(0.0, midpointNormalGTarget),
+                    new FvdSectionSample(50.0, midpointNormalGTarget),
+                    new FvdSectionSample(100.0, midpointNormalGTarget)
+                }));
+        }
+
+        var sections = new List<FvdSectionDefinition>
+        {
+            new FvdSectionDefinition(
+                FvdSectionKind.Force,
+                FvdFunctionDomain.Distance,
+                startX: 0.0,
+                endX: 100.0,
+                functions)
+        };
+
+        return new FvdGraph(
+            controlNodes,
+            degree: 1,
             forceSamples: new List<FvdForceSample>(),
             sections: sections);
     }
@@ -380,6 +586,19 @@ public class FvdSolverPrototypeTests
     {
         Assert.InRange(System.Math.Abs(expected - actual), 0.0, EqualityTolerance);
     }
+
+    private readonly record struct SolverAcceptanceScenario(
+        string Name,
+        Func<FvdGraph> BuildGraph,
+        double EvaluationX,
+        double SpeedMps,
+        double MaxDeltaYStep,
+        string ExpectedStatus,
+        bool ExpectGraphUnchanged,
+        bool ExpectStrictImprovement,
+        bool ExpectAfterEqualsBefore,
+        bool ExpectZeroErrors,
+        bool ExpectSingleInteriorYChange);
 
     private readonly record struct NodeSnapshot(double U, double X, double Y, double Z, double Weight);
 }
