@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>netstandard2.1</TargetFramework>
@@ -8,6 +8,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Quantum.Math\Quantum.Math.csproj" />
     <ProjectReference Include="..\Quantum.Splines\Quantum.Splines.csproj" />
+    <ProjectReference Include="..\Quantum.Physics\Quantum.Physics.csproj" />
   </ItemGroup>
 
 </Project>
