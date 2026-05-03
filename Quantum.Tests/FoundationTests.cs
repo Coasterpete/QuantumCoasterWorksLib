@@ -896,6 +896,69 @@ public class FoundationTests
         Assert.InRange(highSpeedLoss - lowSpeedLoss, -ValueTolerance, ValueTolerance);
     }
 
+    [Fact]
+    public void TrainFollowerState_UpdateWithGravity_WithRollingResistance_DoesNotOscillateAroundZero()
+    {
+        IArcLengthCurve track = new LineCurve(new Vector3d(0, 0, 0), new Vector3d(100, 0, 0));
+        const double deltaTime = 1.0;
+        const double gravityMagnitude = 9.81;
+        const double rollingResistance = 1.0;
+
+        var follower = new TrainFollowerState(track, initialDistance: 0.0, speed: 0.4, loopEnabled: false);
+
+        follower.UpdateWithGravity(
+            deltaTime,
+            gravityMagnitude,
+            linearDragCoefficient: 0.0,
+            quadraticDragCoefficient: 0.0,
+            rollingResistance: rollingResistance);
+
+        Assert.InRange(System.Math.Abs(follower.Speed), 0.0, ValueTolerance);
+
+        for (int i = 0; i < 5; i++)
+        {
+            follower.UpdateWithGravity(
+                deltaTime,
+                gravityMagnitude,
+                linearDragCoefficient: 0.0,
+                quadraticDragCoefficient: 0.0,
+                rollingResistance: rollingResistance);
+
+            Assert.InRange(System.Math.Abs(follower.Speed), 0.0, ValueTolerance);
+        }
+    }
+
+    [Fact]
+    public void TrainFollowerState_UpdateWithGravity_WithLinearDrag_DoesNotReverseDirectionFromDragAlone()
+    {
+        IArcLengthCurve track = new LineCurve(new Vector3d(0, 0, 0), new Vector3d(100, 0, 0));
+        const double deltaTime = 1.0;
+        const double gravityMagnitude = 9.81;
+        const double linearDragCoefficient = 3.0;
+
+        var forwardFollower = new TrainFollowerState(track, initialDistance: 0.0, speed: 0.5, loopEnabled: false);
+        var backwardFollower = new TrainFollowerState(track, initialDistance: 0.0, speed: -0.5, loopEnabled: false);
+
+        forwardFollower.UpdateWithGravity(
+            deltaTime,
+            gravityMagnitude,
+            linearDragCoefficient: linearDragCoefficient,
+            quadraticDragCoefficient: 0.0,
+            rollingResistance: 0.0);
+
+        backwardFollower.UpdateWithGravity(
+            deltaTime,
+            gravityMagnitude,
+            linearDragCoefficient: linearDragCoefficient,
+            quadraticDragCoefficient: 0.0,
+            rollingResistance: 0.0);
+
+        Assert.InRange(forwardFollower.Acceleration, -1.5 - ValueTolerance, -1.5 + ValueTolerance);
+        Assert.InRange(backwardFollower.Acceleration, 1.5 - ValueTolerance, 1.5 + ValueTolerance);
+        Assert.InRange(System.Math.Abs(forwardFollower.Speed), 0.0, ValueTolerance);
+        Assert.InRange(System.Math.Abs(backwardFollower.Speed), 0.0, ValueTolerance);
+    }
+
     private static IEnumerable<(string Name, IParamCurve Curve)> BuildCurves()
     {
         yield return ("Line", new LineCurve(new Vector3d(0, 0, 0), new Vector3d(10, 0, 0)));

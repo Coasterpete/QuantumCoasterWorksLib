@@ -58,6 +58,7 @@ namespace Quantum.Physics
         {
             double nextDistance = Distance + (Speed * deltaTime) + (0.5 * Acceleration * deltaTime * deltaTime);
             Speed += Acceleration * deltaTime;
+            ClampSpeedNearZero();
             Distance = NormalizeDistance(nextDistance);
             SampleCurrentState();
         }
@@ -101,6 +102,8 @@ namespace Quantum.Physics
             double quadraticDragCoefficient,
             double rollingResistance = 0.0)
         {
+            double previousSpeed = Speed;
+
             Guard.RequireNonNegativeFinite(
                 linearDragCoefficient,
                 nameof(linearDragCoefficient),
@@ -116,12 +119,21 @@ namespace Quantum.Physics
                 nameof(rollingResistance),
                 "Rolling resistance must be a finite, non-negative value.");
 
+            double gravityAcceleration = GravityAccelerationAlongTrack(gravityMagnitude);
+
             Acceleration =
-                GravityAccelerationAlongTrack(gravityMagnitude)
+                gravityAcceleration
                 - (linearDragCoefficient * Speed)
                 - (quadraticDragCoefficient * Speed * System.Math.Abs(Speed));
             Acceleration -= rollingResistance * System.Math.Sign(Speed);
+
+            double speedWithoutResistance = previousSpeed + (gravityAcceleration * deltaTime);
             Update(deltaTime);
+
+            if (DidReverseDirection(previousSpeed, Speed) && !DidReverseDirection(previousSpeed, speedWithoutResistance))
+            {
+                Speed = 0.0;
+            }
         }
 
         private double NormalizeDistance(double value)
@@ -148,6 +160,25 @@ namespace Quantum.Physics
             Frame = TrackFrameSampler.SampleFrameByLength(Track, Distance, Vector3d.UnitY);
             Position = Frame.Position;
             Tangent = Frame.Tangent;
+        }
+
+        private void ClampSpeedNearZero()
+        {
+            if (System.Math.Abs(Speed) < MathUtil.Epsilon)
+            {
+                Speed = 0.0;
+            }
+        }
+
+        private static bool DidReverseDirection(double previousSpeed, double newSpeed)
+        {
+            if (previousSpeed > 0.0)
+                return newSpeed < 0.0;
+
+            if (previousSpeed < 0.0)
+                return newSpeed > 0.0;
+
+            return false;
         }
     }
 }
