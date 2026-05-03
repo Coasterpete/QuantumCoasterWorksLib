@@ -268,7 +268,9 @@ namespace Quantum.FVD
                 normalG = default;
                 lateralG = default;
                 rollRateDegPerSec = default;
-                diagnostic = FvdForceTargetDiagnostic.NoForceSection;
+                diagnostic = HasSections(FvdSectionKind.Force, domain)
+                    ? FvdForceTargetDiagnostic.OutsideForceSectionCoverage
+                    : FvdForceTargetDiagnostic.NoForceSection;
                 return false;
             }
 
@@ -326,6 +328,18 @@ namespace Quantum.FVD
             rollRateDegPerSec = rollRateValue;
             diagnostic = FvdForceTargetDiagnostic.None;
             return true;
+        }
+
+        private bool HasSections(FvdSectionKind kind, FvdFunctionDomain domain)
+        {
+            for (int i = 0; i < _sections.Count; i++)
+            {
+                FvdSectionDefinition section = _sections[i];
+                if (section.Kind == kind && section.Domain == domain)
+                    return true;
+            }
+
+            return false;
         }
 
         private bool TryResolveSectionForEvaluation(

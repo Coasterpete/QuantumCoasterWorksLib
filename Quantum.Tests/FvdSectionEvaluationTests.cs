@@ -859,7 +859,55 @@ public class FvdSectionEvaluationTests
     }
 
     [Fact]
-    public void FvdGraph_TryEvaluateForceTargetsAt_WithDiagnostics_NoCoveringForceSection_ReturnsFalseNoForceSectionAndZeroOutputs()
+    public void FvdGraph_TryEvaluateForceTargetsAt_WithDiagnostics_ExistingForceSectionOutsideCoverage_ReturnsFalseOutsideCoverageAndZeroOutputs()
+    {
+        Type sectionDefinitionType = RequireSectionDefinitionType();
+        Type sectionFunctionType = RequireSectionFunctionType();
+        Type diagnosticType = RequireForceTargetDiagnosticType();
+
+        object normal = CreateSectionFunctionOrFail(
+            sectionFunctionType,
+            channelName: "NormalG",
+            CreateSectionSampleOrFail(0.0, 1.0),
+            CreateSectionSampleOrFail(10.0, 3.0));
+        object lateral = CreateSectionFunctionOrFail(
+            sectionFunctionType,
+            channelName: "LateralG",
+            CreateSectionSampleOrFail(0.0, -1.0),
+            CreateSectionSampleOrFail(10.0, 1.0));
+        object rollRate = CreateSectionFunctionOrFail(
+            sectionFunctionType,
+            channelName: "RollRateDegPerSec",
+            CreateSectionSampleOrFail(0.0, 10.0),
+            CreateSectionSampleOrFail(10.0, 14.0));
+
+        object section = CreateSectionDefinitionOrFail(
+            sectionDefinitionType,
+            kindName: "Force",
+            domainName: "Distance",
+            startX: 0.0,
+            endX: 10.0,
+            normal,
+            lateral,
+            rollRate);
+
+        object graph = CreateGraphWithSectionsOrFail(section);
+        object expectedOutsideCoverageDiagnostic = ParseEnumOrFail(diagnosticType, "OutsideForceSectionCoverage");
+        object noForceSectionDiagnostic = ParseEnumOrFail(diagnosticType, "NoForceSection");
+
+        (bool returned, double normalG, double lateralG, double rollRateDegPerSec, object diagnostic) =
+            TryEvaluateForceTargetsAtWithDiagnosticsOrFail(graph, domainName: "Distance", x: 12.0);
+
+        Assert.False(returned);
+        Assert.Equal(0.0, normalG);
+        Assert.Equal(0.0, lateralG);
+        Assert.Equal(0.0, rollRateDegPerSec);
+        AssertDiagnosticIncludesFlag(diagnostic, expectedOutsideCoverageDiagnostic);
+        AssertDiagnosticExcludesFlag(diagnostic, noForceSectionDiagnostic);
+    }
+
+    [Fact]
+    public void FvdGraph_TryEvaluateForceTargetsAt_WithDiagnostics_NoForceSectionInRequestedDomain_ReturnsFalseNoForceSectionAndZeroOutputs()
     {
         Type sectionDefinitionType = RequireSectionDefinitionType();
         Type sectionFunctionType = RequireSectionFunctionType();
@@ -895,7 +943,7 @@ public class FvdSectionEvaluationTests
         object expectedDiagnostic = ParseEnumOrFail(diagnosticType, "NoForceSection");
 
         (bool returned, double normalG, double lateralG, double rollRateDegPerSec, object diagnostic) =
-            TryEvaluateForceTargetsAtWithDiagnosticsOrFail(graph, domainName: "Distance", x: 12.0);
+            TryEvaluateForceTargetsAtWithDiagnosticsOrFail(graph, domainName: "Time", x: 5.0);
 
         Assert.False(returned);
         Assert.Equal(expectedDiagnostic, diagnostic);
@@ -1327,6 +1375,38 @@ public class FvdSectionEvaluationTests
         object? parsed = Enum.Parse(enumType, memberName, ignoreCase: false);
         Assert.True(parsed is not null, $"Expected enum member '{memberName}' in {enumType.FullName}.");
         return parsed!;
+    }
+
+    private static void AssertDiagnosticIncludesFlag(object diagnostic, object expectedFlag)
+    {
+        Assert.True(diagnostic is Enum, "Expected diagnostic value to be enum-valued.");
+        Assert.True(expectedFlag is Enum, "Expected diagnostic flag value to be enum-valued.");
+
+        Enum diagnosticEnum = (Enum)diagnostic;
+        Enum expectedFlagEnum = (Enum)expectedFlag;
+
+        Assert.True(
+            diagnosticEnum.GetType() == expectedFlagEnum.GetType(),
+            "Expected diagnostic and expected flag to use the same enum type.");
+        Assert.True(
+            diagnosticEnum.HasFlag(expectedFlagEnum),
+            $"Expected diagnostic '{diagnosticEnum}' to include flag '{expectedFlagEnum}'.");
+    }
+
+    private static void AssertDiagnosticExcludesFlag(object diagnostic, object excludedFlag)
+    {
+        Assert.True(diagnostic is Enum, "Expected diagnostic value to be enum-valued.");
+        Assert.True(excludedFlag is Enum, "Expected diagnostic flag value to be enum-valued.");
+
+        Enum diagnosticEnum = (Enum)diagnostic;
+        Enum excludedFlagEnum = (Enum)excludedFlag;
+
+        Assert.True(
+            diagnosticEnum.GetType() == excludedFlagEnum.GetType(),
+            "Expected diagnostic and excluded flag to use the same enum type.");
+        Assert.False(
+            diagnosticEnum.HasFlag(excludedFlagEnum),
+            $"Expected diagnostic '{diagnosticEnum}' to exclude flag '{excludedFlagEnum}'.");
     }
 
     private static object CreateTypedList(Type listType, params object[] items)
