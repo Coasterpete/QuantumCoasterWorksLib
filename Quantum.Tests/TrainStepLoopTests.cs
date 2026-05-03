@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Reflection;
 using Quantum.Math;
 using Quantum.Physics;
 using Quantum.Splines;
@@ -142,6 +143,123 @@ public sealed class TrainStepLoopTests
     }
 
     [Fact]
+    public void TrainStepLoop_WithForceTargetProvider_ZeroTargets_MatchesBaseline()
+    {
+        IArcLengthCurve track = new LineCurve(
+            new Vector3d(0, 10, 0),
+            new Vector3d(100, 0, 0));
+
+        const double deltaTime = 0.05;
+        const double gravityMagnitude = 9.81;
+        const double linearDrag = 0.08;
+        const double quadraticDrag = 0.01;
+        const double rollingResistance = 0.05;
+        const int steps = 120;
+        const double initialDistance = 12.5;
+        const double initialSpeed = 3.25;
+
+        var baselineFollower = new TrainFollowerState(
+            track,
+            initialDistance: initialDistance,
+            speed: initialSpeed,
+            loopEnabled: false);
+
+        var providerFollower = new TrainFollowerState(
+            track,
+            initialDistance: initialDistance,
+            speed: initialSpeed,
+            loopEnabled: false);
+
+        var baselineLoop = new TrainStepLoop(
+            baselineFollower,
+            deltaTime,
+            gravityMagnitude,
+            linearDrag,
+            quadraticDrag,
+            rollingResistance);
+
+        object provider = CreateZeroForceTargetProviderStubOrFail();
+
+        TrainStepLoop providerLoop = CreateTrainStepLoopWithForceTargetProviderOrFail(
+            providerFollower,
+            deltaTime,
+            gravityMagnitude,
+            linearDrag,
+            quadraticDrag,
+            rollingResistance,
+            provider);
+
+        IReadOnlyList<TrainFollowerState> baselineSamples = baselineLoop.Sample(steps);
+        IReadOnlyList<TrainFollowerState> withProviderSamples = providerLoop.Sample(steps);
+
+        Assert.Equal(baselineSamples.Count, withProviderSamples.Count);
+
+        for (int i = 0; i < baselineSamples.Count; i++)
+        {
+            TrainFollowerState expected = baselineSamples[i];
+            TrainFollowerState actual = withProviderSamples[i];
+
+            Assert.InRange(System.Math.Abs(expected.Distance - actual.Distance), 0.0, ValueTolerance);
+            Assert.InRange(System.Math.Abs(expected.Speed - actual.Speed), 0.0, ValueTolerance);
+            Assert.InRange(System.Math.Abs(expected.Position.X - actual.Position.X), 0.0, ValueTolerance);
+            Assert.InRange(System.Math.Abs(expected.Position.Y - actual.Position.Y), 0.0, ValueTolerance);
+            Assert.InRange(System.Math.Abs(expected.Position.Z - actual.Position.Z), 0.0, ValueTolerance);
+            Assert.InRange(System.Math.Abs(expected.Tangent.X - actual.Tangent.X), 0.0, ValueTolerance);
+            Assert.InRange(System.Math.Abs(expected.Tangent.Y - actual.Tangent.Y), 0.0, ValueTolerance);
+            Assert.InRange(System.Math.Abs(expected.Tangent.Z - actual.Tangent.Z), 0.0, ValueTolerance);
+        }
+
+        Assert.Equal(baselineLoop.Tick, providerLoop.Tick);
+        Assert.InRange(
+            System.Math.Abs(baselineLoop.ElapsedTimeSeconds - providerLoop.ElapsedTimeSeconds),
+            0.0,
+            ValueTolerance);
+    }
+
+    [Fact]
+    public void TrainStepLoop_WithForceTargetProvider_NormalGInfluencesAcceleration()
+    {
+        IArcLengthCurve track = new LineCurve(
+            new Vector3d(0, 0, 0),
+            new Vector3d(100, 0, 0));
+
+        const double deltaTime = 0.1;
+        const double gravityMagnitude = 0.0;
+        const double linearDrag = 0.0;
+        const double quadraticDrag = 0.0;
+        const double rollingResistance = 0.0;
+        const int steps = 10;
+
+        var baselineFollower = new TrainFollowerState(track);
+        var providerFollower = new TrainFollowerState(track);
+
+        var baselineLoop = new TrainStepLoop(
+            baselineFollower,
+            deltaTime,
+            gravityMagnitude,
+            linearDrag,
+            quadraticDrag,
+            rollingResistance);
+
+        var providerLoop = new TrainStepLoop(
+            providerFollower,
+            deltaTime,
+            gravityMagnitude,
+            linearDrag,
+            quadraticDrag,
+            rollingResistance,
+            new ConstantNormalForceTargetProvider(1.0));
+
+        baselineLoop.Step(steps);
+        providerLoop.Step(steps);
+
+        Assert.InRange(System.Math.Abs(baselineFollower.Speed), 0.0, ValueTolerance);
+        Assert.True(
+            providerFollower.Speed > baselineFollower.Speed + ValueTolerance,
+            "Expected constant positive NormalG target to increase speed relative to baseline.");
+    }
+
+    [Fact]
     public void TrainStepLoop_SampleForDuration_UsesFloorStepsAndMatchesSample()
     {
         IArcLengthCurve track = new LineCurve(
@@ -209,6 +327,83 @@ public sealed class TrainStepLoopTests
         }
     }
 
+    private static TrainStepLoop CreateTrainStepLoopWithForceTargetProviderOrFail(
+        TrainFollowerState follower,
+        double deltaTime,
+        double gravityMagnitude,
+        double linearDragCoefficient,
+        double quadraticDragCoefficient,
+        double rollingResistance,
+        object forceTargetProvider)
+    {
+        Type providerType = RequireForceTargetProviderInterfaceType();
+
+        Assert.True(
+            providerType.IsInstanceOfType(forceTargetProvider),
+            "Expected stub provider to implement Quantum.Physics.IForceTargetProvider.");
+
+        ConstructorInfo? constructor = typeof(TrainStepLoop).GetConstructor(
+            BindingFlags.Public | BindingFlags.Instance,
+            binder: null,
+            types: new[]
+            {
+                typeof(TrainFollowerState),
+                typeof(double),
+                typeof(double),
+                typeof(double),
+                typeof(double),
+                typeof(double),
+                providerType
+            },
+            modifiers: null);
+
+        Assert.True(
+            constructor is not null,
+            "Expected constructor: TrainStepLoop(TrainFollowerState follower, double deltaTime, double gravityMagnitude, double linearDragCoefficient, double quadraticDragCoefficient, double rollingResistance, IForceTargetProvider forceTargetProvider).");
+
+        object? loop = constructor!.Invoke(
+            new object?[]
+            {
+                follower,
+                deltaTime,
+                gravityMagnitude,
+                linearDragCoefficient,
+                quadraticDragCoefficient,
+                rollingResistance,
+                forceTargetProvider
+            });
+
+        return Assert.IsType<TrainStepLoop>(loop);
+    }
+
+    private static object CreateZeroForceTargetProviderStubOrFail()
+    {
+        Type providerType = RequireForceTargetProviderInterfaceType();
+
+        object provider = DispatchProxy.Create(providerType, typeof(ZeroForceTargetProviderDispatchProxy));
+
+        Assert.True(
+            providerType.IsInstanceOfType(provider),
+            "Expected zero-force stub to be assignable to Quantum.Physics.IForceTargetProvider.");
+
+        return provider;
+    }
+
+    private static Type RequireForceTargetProviderInterfaceType()
+    {
+        Type? providerType = typeof(TrainStepLoop).Assembly.GetType("Quantum.Physics.IForceTargetProvider");
+
+        Assert.True(
+            providerType is not null,
+            "Expected Quantum.Physics.IForceTargetProvider to exist.");
+
+        Assert.True(
+            providerType!.IsInterface,
+            "Expected Quantum.Physics.IForceTargetProvider to be an interface.");
+
+        return providerType!;
+    }
+
     private static TrainFollowerState CloneFollowerState(TrainFollowerState source)
     {
         var clone = new TrainFollowerState(
@@ -219,5 +414,171 @@ public sealed class TrainStepLoopTests
 
         clone.Acceleration = source.Acceleration;
         return clone;
+    }
+
+    private class ZeroForceTargetProviderDispatchProxy : DispatchProxy
+    {
+        protected override object? Invoke(MethodInfo? targetMethod, object?[]? args)
+        {
+            if (targetMethod is null)
+                throw new InvalidOperationException("Expected a provider method invocation.");
+
+            ParameterInfo[] parameters = targetMethod.GetParameters();
+
+            if (args is not null)
+            {
+                for (int i = 0; i < parameters.Length && i < args.Length; i++)
+                {
+                    Type parameterType = parameters[i].ParameterType;
+                    if (!parameterType.IsByRef)
+                        continue;
+
+                    Type? elementType = parameterType.GetElementType();
+                    args[i] = elementType is null ? null : CreateZeroValue(elementType);
+                }
+            }
+
+            Type returnType = targetMethod.ReturnType;
+            if (returnType == typeof(void))
+                return null;
+
+            if (returnType == typeof(bool))
+                return true;
+
+            return CreateZeroValue(returnType);
+        }
+
+        private static object? CreateZeroValue(Type type)
+        {
+            if (type == typeof(string))
+                return string.Empty;
+
+            if (type.IsValueType)
+                return Activator.CreateInstance(type);
+
+            if (TryCreateReferenceTypeInstance(type, out object? instance) && instance is not null)
+            {
+                TrySetDoubleProperty(instance, "NormalG", 0.0);
+                TrySetDoubleProperty(instance, "LateralG", 0.0);
+                TrySetDoubleProperty(instance, "RollRate", 0.0);
+                TrySetDoubleProperty(instance, "RollRateDegPerSec", 0.0);
+                return instance;
+            }
+
+            return null;
+        }
+
+        private static bool TryCreateReferenceTypeInstance(Type type, out object? instance)
+        {
+            instance = null;
+
+            if (type.IsInterface || type.IsAbstract)
+                return false;
+
+            try
+            {
+                instance = Activator.CreateInstance(type);
+                if (instance is not null)
+                    return true;
+            }
+            catch
+            {
+                // Fall through to constructor probing.
+            }
+
+            ConstructorInfo[] constructors = type.GetConstructors(BindingFlags.Public | BindingFlags.Instance);
+            for (int i = 0; i < constructors.Length; i++)
+            {
+                ConstructorInfo constructor = constructors[i];
+                ParameterInfo[] parameters = constructor.GetParameters();
+                var values = new object?[parameters.Length];
+
+                bool canBuildArguments = true;
+                for (int p = 0; p < parameters.Length; p++)
+                {
+                    if (!TryCreateConstructorArgument(parameters[p].ParameterType, out object? value))
+                    {
+                        canBuildArguments = false;
+                        break;
+                    }
+
+                    values[p] = value;
+                }
+
+                if (!canBuildArguments)
+                    continue;
+
+                try
+                {
+                    instance = constructor.Invoke(values);
+                    if (instance is not null)
+                        return true;
+                }
+                catch
+                {
+                    // Try next constructor.
+                }
+            }
+
+            return false;
+        }
+
+        private static bool TryCreateConstructorArgument(Type type, out object? value)
+        {
+            if (type == typeof(string))
+            {
+                value = string.Empty;
+                return true;
+            }
+
+            if (type.IsValueType)
+            {
+                value = Activator.CreateInstance(type);
+                return true;
+            }
+
+            if (type == typeof(object))
+            {
+                value = new object();
+                return true;
+            }
+
+            if (TryCreateReferenceTypeInstance(type, out object? instance))
+            {
+                value = instance;
+                return true;
+            }
+
+            value = null;
+            return false;
+        }
+
+        private static void TrySetDoubleProperty(object instance, string propertyName, double value)
+        {
+            PropertyInfo? property = instance.GetType().GetProperty(
+                propertyName,
+                BindingFlags.Public | BindingFlags.Instance);
+
+            if (property is null || !property.CanWrite || property.PropertyType != typeof(double))
+                return;
+
+            property.SetValue(instance, value);
+        }
+    }
+
+    private sealed class ConstantNormalForceTargetProvider : IForceTargetProvider
+    {
+        private readonly double _normalG;
+
+        public ConstantNormalForceTargetProvider(double normalG)
+        {
+            _normalG = normalG;
+        }
+
+        public bool TryGetForceTargets(double x, out ForceTargets targets)
+        {
+            targets = new ForceTargets(_normalG, lateralG: 0.0, rollRateDegPerSec: 0.0);
+            return true;
+        }
     }
 }

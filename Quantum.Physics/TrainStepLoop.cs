@@ -8,6 +8,8 @@ namespace Quantum.Physics
     /// </summary>
     public sealed class TrainStepLoop
     {
+        private readonly IForceTargetProvider? _forceTargetProvider;
+
         public TrainFollowerState Follower { get; }
 
         public double DeltaTime { get; }
@@ -31,6 +33,25 @@ namespace Quantum.Physics
             double linearDragCoefficient,
             double quadraticDragCoefficient,
             double rollingResistance)
+            : this(
+                follower,
+                deltaTime,
+                gravityMagnitude,
+                linearDragCoefficient,
+                quadraticDragCoefficient,
+                rollingResistance,
+                forceTargetProvider: null)
+        {
+        }
+
+        public TrainStepLoop(
+            TrainFollowerState follower,
+            double deltaTime,
+            double gravityMagnitude,
+            double linearDragCoefficient,
+            double quadraticDragCoefficient,
+            double rollingResistance,
+            IForceTargetProvider? forceTargetProvider)
         {
             Follower = follower ?? throw new ArgumentNullException(nameof(follower));
             DeltaTime = deltaTime;
@@ -38,18 +59,29 @@ namespace Quantum.Physics
             LinearDragCoefficient = linearDragCoefficient;
             QuadraticDragCoefficient = quadraticDragCoefficient;
             RollingResistance = rollingResistance;
+            _forceTargetProvider = forceTargetProvider;
             Tick = 0;
             ElapsedTimeSeconds = 0.0;
         }
 
         public void Step()
         {
+            double accelerationFromNormalG = 0.0;
+            if (_forceTargetProvider != null &&
+                _forceTargetProvider.TryGetForceTargets(Follower.Distance, out ForceTargets targets))
+            {
+                accelerationFromNormalG = targets.NormalG * 9.81;
+            }
+
             Follower.UpdateWithGravity(
                 DeltaTime,
                 GravityMagnitude,
                 LinearDragCoefficient,
                 QuadraticDragCoefficient,
                 RollingResistance);
+
+            Follower.Acceleration += accelerationFromNormalG;
+            Follower.Speed += accelerationFromNormalG * DeltaTime;
 
             Tick++;
             ElapsedTimeSeconds += DeltaTime;
