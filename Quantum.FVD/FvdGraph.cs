@@ -204,6 +204,30 @@ namespace Quantum.FVD
             return section.EvaluateAllAt(x);
         }
 
+        public bool TryEvaluateSectionAllAt(
+            FvdSectionKind kind,
+            FvdFunctionDomain domain,
+            double x,
+            out IReadOnlyList<FvdChannelEvaluation> evaluations)
+        {
+            if (double.IsNaN(x) || double.IsInfinity(x))
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(x),
+                    x,
+                    "Evaluation X must be a finite value.");
+            }
+
+            if (!TryResolveSectionForEvaluation(kind, domain, x, out FvdSectionDefinition section))
+            {
+                evaluations = Array.Empty<FvdChannelEvaluation>();
+                return false;
+            }
+
+            evaluations = section.EvaluateAllAt(x);
+            return true;
+        }
+
         private bool TryResolveSectionForEvaluation(
             FvdSectionKind kind,
             FvdFunctionDomain domain,
