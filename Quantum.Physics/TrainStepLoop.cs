@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Quantum.Math;
 
 namespace Quantum.Physics
 {
@@ -70,7 +71,8 @@ namespace Quantum.Physics
             if (_forceTargetProvider != null &&
                 _forceTargetProvider.TryGetForceTargets(Follower.Distance, out ForceTargets targets))
             {
-                accelerationFromNormalG = targets.NormalG * 9.81;
+                Vector3d projectedForceVector = ForceTargetProjection.ComputeForceVector(targets, Follower.Frame);
+                accelerationFromNormalG = Vector3d.Dot(projectedForceVector, Follower.Frame.Normal);
             }
 
             double halfStepVelocityKick = 0.5 * accelerationFromNormalG * DeltaTime;

@@ -269,6 +269,55 @@ public sealed class TrainStepLoopTests
     }
 
     [Fact]
+    public void TrainStepLoop_WithForceTargetProvider_LateralAndRollDoNotChangeCurrent1dIntegration()
+    {
+        IArcLengthCurve track = new LineCurve(
+            new Vector3d(0, 0, 0),
+            new Vector3d(100, 0, 0));
+
+        const double deltaTime = 0.1;
+        const double normalG = 1.0;
+        const double lateralG = 2.5;
+        const double rollRateDegPerSec = 45.0;
+        const double gravityMagnitude = 0.0;
+        const double linearDrag = 0.0;
+        const double quadraticDrag = 0.0;
+        const double rollingResistance = 0.0;
+        const int steps = 10;
+
+        var normalOnlyFollower = new TrainFollowerState(track);
+        var normalPlusLateralFollower = new TrainFollowerState(track);
+
+        var normalOnlyLoop = new TrainStepLoop(
+            normalOnlyFollower,
+            deltaTime,
+            gravityMagnitude,
+            linearDrag,
+            quadraticDrag,
+            rollingResistance,
+            new ConstantNormalForceTargetProvider(normalG));
+
+        var normalPlusLateralLoop = new TrainStepLoop(
+            normalPlusLateralFollower,
+            deltaTime,
+            gravityMagnitude,
+            linearDrag,
+            quadraticDrag,
+            rollingResistance,
+            new ConstantForceTargetProvider(normalG, lateralG, rollRateDegPerSec));
+
+        normalOnlyLoop.Step(steps);
+        normalPlusLateralLoop.Step(steps);
+
+        Assert.InRange(System.Math.Abs(normalOnlyFollower.Speed - normalPlusLateralFollower.Speed), 0.0, ValueTolerance);
+        Assert.InRange(System.Math.Abs(normalOnlyFollower.Distance - normalPlusLateralFollower.Distance), 0.0, ValueTolerance);
+        Assert.InRange(
+            System.Math.Abs(normalOnlyFollower.Acceleration - normalPlusLateralFollower.Acceleration),
+            0.0,
+            ValueTolerance);
+    }
+
+    [Fact]
     public void TrainStepLoop_WithForceTargetProvider_ReturnsFalse_MatchesBaseline()
     {
         IArcLengthCurve track = new LineCurve(
@@ -740,6 +789,26 @@ public sealed class TrainStepLoopTests
         public bool TryGetForceTargets(double x, out ForceTargets targets)
         {
             targets = new ForceTargets(_normalG, lateralG: 0.0, rollRateDegPerSec: 0.0);
+            return true;
+        }
+    }
+
+    private sealed class ConstantForceTargetProvider : IForceTargetProvider
+    {
+        private readonly double _normalG;
+        private readonly double _lateralG;
+        private readonly double _rollRateDegPerSec;
+
+        public ConstantForceTargetProvider(double normalG, double lateralG, double rollRateDegPerSec)
+        {
+            _normalG = normalG;
+            _lateralG = lateralG;
+            _rollRateDegPerSec = rollRateDegPerSec;
+        }
+
+        public bool TryGetForceTargets(double x, out ForceTargets targets)
+        {
+            targets = new ForceTargets(_normalG, _lateralG, _rollRateDegPerSec);
             return true;
         }
     }
