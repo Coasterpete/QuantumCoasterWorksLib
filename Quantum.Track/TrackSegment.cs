@@ -1,9 +1,18 @@
 namespace Quantum.Track
 {
-    public class TrackSegment
+    public abstract class TrackSegment
     {
-        public TrackSegment()
+        protected TrackSegment(double length, string? id = null, string? forceSegmentReference = null)
         {
+            Length = length;
+            Id = id;
+            ForceSegmentReference = forceSegmentReference;
         }
+
+        public double Length { get; }
+
+        public string? Id { get; }
+
+        public string? ForceSegmentReference { get; }
     }
 }
