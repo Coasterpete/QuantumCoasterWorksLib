@@ -85,4 +85,67 @@ public sealed class TrackFoundationTests
         Assert.NotNull(result.Error);
         Assert.Equal(1, result.EvaluatedSegmentCount);
     }
+
+    [Fact]
+    public void TrackEvaluator_EvaluateAt_FirstSegment_ReturnsSegmentAndLocalT()
+    {
+        var evaluator = new TrackEvaluator();
+        var first = new StraightSegment(length: 5.0, id: "s-01");
+        var second = new CurvedSegment(length: 7.5, id: "c-01");
+        var document = new TrackDocument(new TrackSegment[] { first, second });
+
+        TrackEvaluationPoint result = evaluator.EvaluateAt(document, new TrackPosition(segmentIndex: 0, localT: 0.25));
+
+        Assert.Same(first, result.Segment);
+        Assert.Equal(0.25, result.LocalT);
+    }
+
+    [Fact]
+    public void TrackEvaluator_EvaluateAt_SecondSegment_ReturnsSegmentAndLocalT()
+    {
+        var evaluator = new TrackEvaluator();
+        var first = new StraightSegment(length: 5.0, id: "s-01");
+        var second = new CurvedSegment(length: 7.5, id: "c-01");
+        var document = new TrackDocument(new TrackSegment[] { first, second });
+
+        TrackEvaluationPoint result = evaluator.EvaluateAt(document, new TrackPosition(segmentIndex: 1, localT: 0.75));
+
+        Assert.Same(second, result.Segment);
+        Assert.Equal(0.75, result.LocalT);
+    }
+
+    [Fact]
+    public void TrackEvaluator_EvaluateAt_OutOfRangeSegmentIndex_ThrowsArgumentOutOfRangeException()
+    {
+        var evaluator = new TrackEvaluator();
+        var document = new TrackDocument(new TrackSegment[]
+        {
+            new StraightSegment(length: 3.0),
+            new CurvedSegment(length: 4.0)
+        });
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => evaluator.EvaluateAt(document, new TrackPosition(segmentIndex: -1, localT: 0.5)));
+        Assert.Throws<ArgumentOutOfRangeException>(() => evaluator.EvaluateAt(document, new TrackPosition(segmentIndex: 2, localT: 0.5)));
+    }
+
+    [Fact]
+    public void TrackEvaluator_EvaluateAt_EmptyDocument_ThrowsArgumentOutOfRangeException()
+    {
+        var evaluator = new TrackEvaluator();
+        var document = new TrackDocument();
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => evaluator.EvaluateAt(document, new TrackPosition(segmentIndex: 0, localT: 0.5)));
+    }
+
+    [Fact]
+    public void TrackEvaluator_EvaluateAt_InvalidLocalT_ThrowsArgumentOutOfRangeException()
+    {
+        var evaluator = new TrackEvaluator();
+        var document = new TrackDocument(new TrackSegment[] { new StraightSegment(length: 4.0) });
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => evaluator.EvaluateAt(document, new TrackPosition(segmentIndex: 0, localT: -0.01)));
+        Assert.Throws<ArgumentOutOfRangeException>(() => evaluator.EvaluateAt(document, new TrackPosition(segmentIndex: 0, localT: 1.01)));
+        Assert.Throws<ArgumentOutOfRangeException>(() => evaluator.EvaluateAt(document, new TrackPosition(segmentIndex: 0, localT: double.NaN)));
+        Assert.Throws<ArgumentOutOfRangeException>(() => evaluator.EvaluateAt(document, new TrackPosition(segmentIndex: 0, localT: double.PositiveInfinity)));
+    }
 }
