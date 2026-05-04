@@ -1,9 +1,13 @@
 using Quantum.Math;
+using Quantum.Splines;
 
 namespace Quantum.Track
 {
     public class TrackEvaluator
     {
+        private const double MinimumVectorMagnitude = 1e-9;
+        private const double ParallelAxisThreshold = 0.99;
+
         public TrackEvaluator()
         {
         }
@@ -72,6 +76,20 @@ namespace Quantum.Track
         public Transform3d EvaluateTransform(TrackDocument doc, TrackPosition position)
         {
             TrackEvaluationPoint evaluationPoint = EvaluateAt(doc, position);
+
+            if (evaluationPoint.Segment.Spline is IParamCurve spline)
+            {
+                Vector3d splinePosition = spline.Evaluate(evaluationPoint.LocalT);
+                Vector3d splineTangent = NormalizeOrThrow(spline.Tangent(evaluationPoint.LocalT), "tangent");
+                TrackFrame frame = BuildTrackFrame(evaluationPoint, splinePosition, splineTangent);
+                return Transform3d.FromTrackFrame(frame, splinePosition);
+            }
+
+            return EvaluateFallbackTransform(doc, position, evaluationPoint);
+        }
+
+        private static Transform3d EvaluateFallbackTransform(TrackDocument doc, TrackPosition position, TrackEvaluationPoint evaluationPoint)
+        {
             double distanceAlongTrack = 0.0;
 
             for (int i = 0; i < position.SegmentIndex; i++)
@@ -91,6 +109,58 @@ namespace Quantum.Track
             return new Transform3d(
                 Matrix3x3.Identity,
                 new Vector3d(distanceAlongTrack, 0.0, 0.0));
+        }
+
+        private static TrackFrame BuildTrackFrame(TrackEvaluationPoint evaluationPoint, Vector3d position, Vector3d tangent)
+        {
+            Vector3d normalizedTangent = NormalizeOrThrow(tangent, "tangent");
+            Vector3d referenceUp = SelectReferenceUp(normalizedTangent);
+            Vector3d binormal = NormalizeOrThrow(Vector3d.Cross(normalizedTangent, referenceUp), "binormal");
+            Vector3d normal = NormalizeOrThrow(Vector3d.Cross(binormal, normalizedTangent), "normal");
+            double s = evaluationPoint.LocalT * evaluationPoint.Segment.Length;
+
+            return new TrackFrame(s, position, normalizedTangent, normal, binormal);
+        }
+
+        private static Vector3d SelectReferenceUp(Vector3d tangent)
+        {
+            if (System.Math.Abs(Vector3d.Dot(tangent, Vector3d.UnitY)) < ParallelAxisThreshold)
+            {
+                return Vector3d.UnitY;
+            }
+
+            if (System.Math.Abs(Vector3d.Dot(tangent, Vector3d.UnitZ)) < ParallelAxisThreshold)
+            {
+                return Vector3d.UnitZ;
+            }
+
+            return Vector3d.UnitX;
+        }
+
+        private static Vector3d NormalizeOrThrow(Vector3d vector, string label)
+        {
+            if (!IsFinite(vector))
+            {
+                throw new System.InvalidOperationException($"Unable to normalize {label}: vector contains non-finite components.");
+            }
+
+            double length = vector.Length;
+            if (length <= MinimumVectorMagnitude)
+            {
+                throw new System.InvalidOperationException($"Unable to normalize {label}: vector magnitude is near zero.");
+            }
+
+            return vector / length;
+        }
+
+        private static bool IsFinite(Vector3d vector)
+        {
+            return !(double.IsNaN(vector.X) ||
+                     double.IsNaN(vector.Y) ||
+                     double.IsNaN(vector.Z) ||
+                     double.IsInfinity(vector.X) ||
+                     double.IsInfinity(vector.Y) ||
+                     double.IsInfinity(vector.Z));
         }
 
         public TrackEvaluationPoint EvaluateAtDistance(TrackDocument doc, double distance)
