@@ -71,7 +71,8 @@ namespace Quantum.Physics
             double accelerationFromNormalG = 0.0;
             if (TryGetProjectedAcceleration(Follower.Distance, Follower.Frame, out Vector3d projectedAcceleration))
             {
-                accelerationFromNormalG = Vector3d.Dot(projectedAcceleration, Follower.Frame.Normal);
+                AccelerationComponents components = AccelerationDecomposer.Decompose(projectedAcceleration, Follower.Frame);
+                accelerationFromNormalG = components.Normal;
             }
 
             double halfStepVelocityKick = 0.5 * accelerationFromNormalG * DeltaTime;
@@ -148,10 +149,11 @@ namespace Quantum.Physics
 
         private static void ApplyProjectedAccelerationDiagnostics(TrainFollowerState sample, Vector3d projectedAcceleration)
         {
+            AccelerationComponents components = AccelerationDecomposer.Decompose(projectedAcceleration, sample.Frame);
             sample.ProjectedAcceleration = projectedAcceleration;
-            sample.TangentialAcceleration = Vector3d.Dot(projectedAcceleration, sample.Frame.Tangent);
-            sample.NormalAcceleration = Vector3d.Dot(projectedAcceleration, sample.Frame.Normal);
-            sample.BinormalAcceleration = Vector3d.Dot(projectedAcceleration, sample.Frame.Binormal);
+            sample.TangentialAcceleration = components.Tangential;
+            sample.NormalAcceleration = components.Normal;
+            sample.BinormalAcceleration = components.Binormal;
         }
 
         private bool TryGetProjectedAcceleration(double distance, TrackFrame frame, out Vector3d projectedAcceleration)
