@@ -402,6 +402,72 @@ public sealed class TrainStepLoopTests
     }
 
     [Fact]
+    public void TrainStepLoop_Step_FlatTrackWithGravity_ComputesZeroTangentialAccelerationIntermediate()
+    {
+        IArcLengthCurve track = new LineCurve(
+            new Vector3d(0, 0, 0),
+            new Vector3d(100, 0, 0));
+
+        const double deltaTime = 0.1;
+        const double initialSpeed = 2.0;
+
+        var follower = new TrainFollowerState(
+            track,
+            initialDistance: 0.0,
+            speed: initialSpeed,
+            loopEnabled: false);
+
+        var loop = new TrainStepLoop(
+            follower,
+            deltaTime,
+            gravityMagnitude: 9.81,
+            linearDragCoefficient: 0.0,
+            quadraticDragCoefficient: 0.0,
+            rollingResistance: 0.0,
+            new ConstantNormalForceTargetProvider(normalG: 0.0));
+
+        loop.Step();
+
+        Assert.True(follower.TangentialAcceleration.HasValue);
+        Assert.InRange(System.Math.Abs(follower.TangentialAcceleration.Value), 0.0, ValueTolerance);
+        Assert.InRange(System.Math.Abs(follower.Speed - initialSpeed), 0.0, ValueTolerance);
+        Assert.InRange(System.Math.Abs(follower.Acceleration), 0.0, ValueTolerance);
+    }
+
+    [Fact]
+    public void TrainStepLoop_Step_WithNormalGInput_ComputesZeroTangentialAccelerationWithoutChangingCurrentIntegration()
+    {
+        IArcLengthCurve track = new LineCurve(
+            new Vector3d(0, 0, 0),
+            new Vector3d(100, 0, 0));
+
+        const double deltaTime = 0.1;
+        const double normalG = 1.5;
+        const double gravityMagnitude = 0.0;
+        const double expectedAcceleration = normalG * 9.81;
+        const double expectedSpeed = expectedAcceleration * deltaTime;
+        const double expectedDistance = 0.5 * expectedAcceleration * deltaTime * deltaTime;
+
+        var follower = new TrainFollowerState(track);
+        var loop = new TrainStepLoop(
+            follower,
+            deltaTime,
+            gravityMagnitude,
+            linearDragCoefficient: 0.0,
+            quadraticDragCoefficient: 0.0,
+            rollingResistance: 0.0,
+            new ConstantNormalForceTargetProvider(normalG));
+
+        loop.Step();
+
+        Assert.True(follower.TangentialAcceleration.HasValue);
+        Assert.InRange(System.Math.Abs(follower.TangentialAcceleration.Value), 0.0, ValueTolerance);
+        Assert.InRange(System.Math.Abs(follower.Speed - expectedSpeed), 0.0, ValueTolerance);
+        Assert.InRange(System.Math.Abs(follower.Distance - expectedDistance), 0.0, ValueTolerance);
+        Assert.InRange(System.Math.Abs(follower.Acceleration - expectedAcceleration), 0.0, ValueTolerance);
+    }
+
+    [Fact]
     public void TrainStepLoop_Sample_WithForceTargetProvider_NormalGProjectionUsesSampleDistance()
     {
         IArcLengthCurve track = new LineCurve(

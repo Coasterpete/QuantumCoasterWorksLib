@@ -69,11 +69,16 @@ namespace Quantum.Physics
         public void Step()
         {
             double accelerationFromNormalG = 0.0;
+            double? tangentialAcceleration = null;
             if (TryGetProjectedAcceleration(Follower.Distance, Follower.Frame, out Vector3d projectedAcceleration))
             {
                 AccelerationComponents components = AccelerationDecomposer.Decompose(projectedAcceleration, Follower.Frame);
+                double a_t = components.Tangential;
+                tangentialAcceleration = a_t;
                 accelerationFromNormalG = components.Normal;
             }
+
+            Follower.TangentialAcceleration = tangentialAcceleration;
 
             double halfStepVelocityKick = 0.5 * accelerationFromNormalG * DeltaTime;
             Follower.Speed += halfStepVelocityKick;
