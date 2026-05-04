@@ -19,37 +19,27 @@ namespace Quantum.FVD
 
         public bool TryGetForceTargets(double x, out ForceTargets targets)
         {
-            if (!_graph.TryEvaluateSectionChannelAt(
-                FvdSectionKind.Force,
+            if (!_graph.TryEvaluateForceTargetsPermissiveAt(
                 _domain,
-                FvdSectionChannel.NormalG,
                 x,
-                out double normalG))
+                out double normalG,
+                out double lateralG,
+                out double rollRateDegPerSec))
             {
                 targets = default;
                 return false;
             }
 
-            double lateralG = 0.0;
-            if (_graph.TryEvaluateSectionChannelAt(
+            // Preserve adapter semantics: successful reads require a NormalG target.
+            if (!_graph.TryEvaluateSectionChannelAt(
                 FvdSectionKind.Force,
                 _domain,
-                FvdSectionChannel.LateralG,
+                FvdSectionChannel.NormalG,
                 x,
-                out double lateralFromFvd))
+                out _))
             {
-                lateralG = lateralFromFvd;
-            }
-
-            double rollRateDegPerSec = 0.0;
-            if (_graph.TryEvaluateSectionChannelAt(
-                FvdSectionKind.Force,
-                _domain,
-                FvdSectionChannel.RollRateDegPerSec,
-                x,
-                out double rollRateFromFvd))
-            {
-                rollRateDegPerSec = rollRateFromFvd;
+                targets = default;
+                return false;
             }
 
             targets = new ForceTargets(normalG, lateralG, rollRateDegPerSec);
