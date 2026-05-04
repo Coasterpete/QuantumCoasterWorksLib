@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Reflection;
+using Quantum.FVD;
 using Quantum.Math;
 using Quantum.Physics;
 using Quantum.Splines;
@@ -71,6 +72,26 @@ public sealed class TrainStepLoopTests
 
         Assert.Equal(steps, loop.Tick);
         Assert.InRange(System.Math.Abs(loop.ElapsedTimeSeconds - (steps * deltaTime)), 0.0, ValueTolerance);
+    }
+
+    [Fact]
+    public void Step_NegativeSteps_Throws()
+    {
+        IArcLengthCurve track = new LineCurve(
+            new Vector3d(0, 0, 0),
+            new Vector3d(100, 0, 0));
+
+        var follower = new TrainFollowerState(track);
+        var loop = new TrainStepLoop(
+            follower,
+            deltaTime: 0.1,
+            gravityMagnitude: 0.0,
+            linearDragCoefficient: 0.0,
+            quadraticDragCoefficient: 0.0,
+            rollingResistance: 0.0);
+
+        ArgumentOutOfRangeException ex = Assert.Throws<ArgumentOutOfRangeException>(() => loop.Step(-1));
+        Assert.Equal("steps", ex.ParamName);
     }
 
     [Fact]
@@ -266,6 +287,69 @@ public sealed class TrainStepLoopTests
         Assert.InRange(System.Math.Abs(providerFollower.Speed - expectedSpeed), 0.0, ValueTolerance);
         Assert.InRange(System.Math.Abs(providerFollower.Distance - expectedDistance), 0.0, ValueTolerance);
         Assert.InRange(System.Math.Abs(providerFollower.Acceleration - expectedAcceleration), 0.0, ValueTolerance);
+    }
+
+    [Fact]
+    public void TrainStepLoop_WithRealFvdAdapter_NormalGConstant_ProducesExpectedKinematics()
+    {
+        IArcLengthCurve track = new LineCurve(
+            new Vector3d(0, 0, 0),
+            new Vector3d(100, 0, 0));
+
+        const double deltaTime = 0.1;
+        const int steps = 10;
+        const double normalG = 1.0;
+        const double gravityMagnitude = 0.0;
+        const double linearDrag = 0.0;
+        const double quadraticDrag = 0.0;
+        const double rollingResistance = 0.0;
+        const double expectedAcceleration = normalG * 9.81;
+        double elapsedTime = steps * deltaTime;
+        double expectedSpeed = expectedAcceleration * elapsedTime;
+        double expectedDistance = 0.5 * expectedAcceleration * elapsedTime * elapsedTime;
+
+        var graph = new FvdGraph(
+            new List<FvdControlNode>
+            {
+                new(0.0, new Vector3d(0.0, 0.0, 0.0), 1.0),
+                new(1.0, new Vector3d(10.0, 0.0, 0.0), 1.0)
+            },
+            degree: 1,
+            forceSamples: new List<FvdForceSample>(),
+            sections: new List<FvdSectionDefinition>
+            {
+                new(
+                    FvdSectionKind.Force,
+                    FvdFunctionDomain.Distance,
+                    startX: 0.0,
+                    endX: 10.0,
+                    new List<FvdSectionFunction>
+                    {
+                        new(
+                            FvdSectionChannel.NormalG,
+                            new List<FvdSectionSample>
+                            {
+                                new(0.0, normalG),
+                                new(10.0, normalG)
+                            })
+                    })
+            });
+
+        var adapter = new FvdForceTargetProviderAdapter(graph, FvdFunctionDomain.Distance);
+        var follower = new TrainFollowerState(track);
+        var loop = new TrainStepLoop(
+            follower,
+            deltaTime,
+            gravityMagnitude,
+            linearDrag,
+            quadraticDrag,
+            rollingResistance,
+            adapter);
+
+        loop.Step(steps);
+
+        Assert.InRange(System.Math.Abs(follower.Speed - expectedSpeed), 0.0, ValueTolerance);
+        Assert.InRange(System.Math.Abs(follower.Distance - expectedDistance), 0.0, ValueTolerance);
     }
 
     [Fact]

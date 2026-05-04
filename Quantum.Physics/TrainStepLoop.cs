@@ -94,6 +94,9 @@ namespace Quantum.Physics
 
         public void Step(int steps)
         {
+            if (steps < 0)
+                throw new ArgumentOutOfRangeException(nameof(steps), "Step count must be non-negative.");
+
             for (int i = 0; i < steps; i++)
             {
                 Step();
@@ -105,7 +108,6 @@ namespace Quantum.Physics
             if (steps < 0)
                 throw new ArgumentOutOfRangeException(nameof(steps), "Step count must be non-negative.");
 
-            TrainFollowerState initialSnapshot = CloneFollowerState(Follower);
             var snapshots = new List<TrainFollowerState>(steps);
 
             for (int i = 0; i < steps; i++)
