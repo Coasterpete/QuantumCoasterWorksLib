@@ -29,7 +29,18 @@ Read `structure.md` before making changes.
 
 ## Current Backend State
 
-- Current validation: 159/159 tests passing.
+- Current validation: 187/187 tests passing.
+- `Quantum.Track` exists.
+- `TrackDocument`, `TrackSegment`, `StraightSegment`, and `CurvedSegment` exist.
+- `TrackEvaluator` supports:
+  - `Evaluate`
+  - `EvaluateAt`
+  - `EvaluateAtDistance`
+  - `EvaluateTransform`
+  - `EvaluateFrame`
+- Spline-based spatial evaluation exists.
+- `TrackFrame` sampling exists.
+- `TrainStepLoop`/physics integration remains untouched.
 - `Matrix3x3` exists in `Quantum.Math` as the minimal 3x3 basis transform primitive.
 - `Transform3d` exists in `Quantum.Math` with:
   - `Matrix3x3 Rotation`
@@ -79,14 +90,13 @@ Read `structure.md` before making changes.
 - Unity integration.
 - Audio system.
 - Production editor UI.
-- Circuit/shuttle/switch/tilt/drop/bounce systems.
+- Routing/switch/tilt/drop/bounce systems.
 
 ## Next Recommended Lane
 
-- Continue incremental spatial tooling on top of current `Matrix3x3` + `Transform3d` foundation.
-- `Matrix4x4` is intentionally not needed yet.
-- Quaternion/roll transform expansion can come later once requirements are concrete.
-- `Quantum.Track` and special track systems should wait until track evaluation architecture is planned.
+- Continue incremental spatial tooling on top of current track evaluation architecture.
+- Next safe milestone: add distance-based frame/transform helpers (for example `EvaluateFrameAtDistance` and `EvaluateTransformAtDistance`) without integrating into `TrainStepLoop` yet.
+- Keep `TrainStepLoop` behavior untouched while expanding evaluation helpers.
 
 Preserve deterministic behavior and keep special-track expansion gated behind architecture readiness.
 
