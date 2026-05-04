@@ -29,7 +29,7 @@ Read `structure.md` before making changes.
 
 ## Current Backend State
 
-- Current validation: 141/141 tests passing.
+- Current validation: 152/152 tests passing.
 - FVD force target pipeline exists.
 - `FvdGraph` supports strict and permissive force target queries.
 - `FvdForceTargetProviderAdapter` uses permissive query behavior but requires `NormalG`.
@@ -38,14 +38,19 @@ Read `structure.md` before making changes.
   - tangential
   - normal
   - binormal
-- `TrainStepLoop` remains deterministic and still uses the current 1D integration behavior.
-- `TangentialAcceleration` is computed as an intermediate but is not yet used to drive motion.
+- `TrainStepLoop` now supports integration modes, including `TangentialProjected`.
+- `LegacyNormalComponent` remains the default mode and behavior-preserved.
+- `TangentialProjected` integration mode is implemented and validated with:
+  - inclined-track gravity projection
+  - energy sanity/no-drag
+  - constant-force kinematics
+  - divergence from legacy mode when `NormalG` exists
 - Sampled `TrainFollowerState` includes:
   - `ProjectedAcceleration`
   - `TangentialAcceleration`
   - `NormalAcceleration`
   - `BinormalAcceleration`
-- `LateralG` and `RollRate` are currently diagnostics/data-path only and must not affect motion yet.
+- `LateralG` and `RollRate` are currently diagnostics/data-path only and do not affect 1D motion.
 
 ## Locked Contracts
 
@@ -61,17 +66,19 @@ Read `structure.md` before making changes.
 
 - Full 3D train motion.
 - Lateral/roll force coupling.
-- Tangential-acceleration-driven integration.
 - Time-domain FVD solver.
 - Unity integration.
 - Audio system.
 - Production editor UI.
+- Circuit/shuttle/switch/tilt/drop/bounce systems.
 
-## Next Safe Milestone
+## Next Recommended Lane
 
-Add an explicit integration-mode seam or strategy before switching `TrainStepLoop` to tangential-acceleration-driven motion.
+- Short cleanup/context pass.
+- Then establish math transform foundation such as `Matrix3x3`/`Matrix4x4` or frame-to-transform helpers.
+- Do not expand special track systems until track evaluation architecture exists.
 
-Do not directly replace the current integration path without tests and a compatibility plan.
+Preserve deterministic behavior and keep special-track expansion gated behind architecture readiness.
 
 ## AI Instructions
 
