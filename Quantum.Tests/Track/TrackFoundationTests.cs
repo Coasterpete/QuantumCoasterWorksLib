@@ -35,6 +35,19 @@ public sealed class TrackFoundationTests
     }
 
     [Fact]
+    public void TrackDocument_TotalLength_SumsSegmentLengths()
+    {
+        var document = new TrackDocument(new TrackSegment[]
+        {
+            new StraightSegment(length: 12.5),
+            new CurvedSegment(length: 3.0),
+            new StraightSegment(length: 9.75)
+        });
+
+        Assert.Equal(25.25, document.TotalLength);
+    }
+
+    [Fact]
     public void TrackEvaluator_Evaluate_EmptyDocument_ReturnsSuccessWithZeroSegments()
     {
         var evaluator = new TrackEvaluator();
@@ -112,6 +125,71 @@ public sealed class TrackFoundationTests
 
         Assert.Same(second, result.Segment);
         Assert.Equal(0.75, result.LocalT);
+    }
+
+    [Fact]
+    public void TrackEvaluator_EvaluateAtDistance_ZeroDistance_ReturnsFirstSegmentAtZero()
+    {
+        var evaluator = new TrackEvaluator();
+        var first = new StraightSegment(length: 10.0, id: "s-01");
+        var second = new CurvedSegment(length: 5.0, id: "c-01");
+        var document = new TrackDocument(new TrackSegment[] { first, second });
+
+        TrackEvaluationPoint result = evaluator.EvaluateAtDistance(document, 0.0);
+
+        Assert.Same(first, result.Segment);
+        Assert.Equal(0.0, result.LocalT);
+    }
+
+    [Fact]
+    public void TrackEvaluator_EvaluateAtDistance_MiddleOfFirstSegment_ReturnsFirstSegmentWithExpectedLocalT()
+    {
+        var evaluator = new TrackEvaluator();
+        var first = new StraightSegment(length: 10.0, id: "s-01");
+        var second = new CurvedSegment(length: 5.0, id: "c-01");
+        var document = new TrackDocument(new TrackSegment[] { first, second });
+
+        TrackEvaluationPoint result = evaluator.EvaluateAtDistance(document, 4.0);
+
+        Assert.Same(first, result.Segment);
+        Assert.Equal(0.4, result.LocalT);
+    }
+
+    [Fact]
+    public void TrackEvaluator_EvaluateAtDistance_BoundaryBetweenSegments_ReturnsSecondSegmentAtZero()
+    {
+        var evaluator = new TrackEvaluator();
+        var first = new StraightSegment(length: 10.0, id: "s-01");
+        var second = new CurvedSegment(length: 5.0, id: "c-01");
+        var document = new TrackDocument(new TrackSegment[] { first, second });
+
+        TrackEvaluationPoint result = evaluator.EvaluateAtDistance(document, 10.0);
+
+        Assert.Same(second, result.Segment);
+        Assert.Equal(0.0, result.LocalT);
+    }
+
+    [Fact]
+    public void TrackEvaluator_EvaluateAtDistance_DistanceBeyondTotalLength_ClampsToLastSegmentAtOne()
+    {
+        var evaluator = new TrackEvaluator();
+        var first = new StraightSegment(length: 10.0, id: "s-01");
+        var second = new CurvedSegment(length: 5.0, id: "c-01");
+        var document = new TrackDocument(new TrackSegment[] { first, second });
+
+        TrackEvaluationPoint result = evaluator.EvaluateAtDistance(document, 999.0);
+
+        Assert.Same(second, result.Segment);
+        Assert.Equal(1.0, result.LocalT);
+    }
+
+    [Fact]
+    public void TrackEvaluator_EvaluateAtDistance_EmptyDocument_ThrowsArgumentOutOfRangeException()
+    {
+        var evaluator = new TrackEvaluator();
+        var document = new TrackDocument();
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => evaluator.EvaluateAtDistance(document, 0.0));
     }
 
     [Fact]

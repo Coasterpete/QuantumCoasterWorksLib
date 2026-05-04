@@ -12,5 +12,27 @@ namespace Quantum.Track
         }
 
         public IList<TrackSegment> Segments { get; }
+
+        public double TotalLength
+        {
+            get
+            {
+                double totalLength = 0.0;
+
+                for (int i = 0; i < Segments.Count; i++)
+                {
+                    TrackSegment segment = Segments[i];
+
+                    if (segment is null)
+                    {
+                        throw new System.InvalidOperationException("TrackDocument contains a null segment entry.");
+                    }
+
+                    totalLength += segment.Length;
+                }
+
+                return totalLength;
+            }
+        }
     }
 }
