@@ -91,6 +91,65 @@ public sealed class TrackEvaluatorSplineTransformTests
         AssertDoubleNear(1.0, transform.Rotation.M22);
     }
 
+    [Fact]
+    public void TrackEvaluator_EvaluateTransformAtDistance_ConsistentWithEvaluateAtAndEvaluateAtDistance()
+    {
+        var evaluator = new TrackEvaluator();
+        var first = new StraightSegment(length: 10.0, id: "s-01");
+        var second = new CurvedSegment(length: 5.0, id: "c-01");
+        var document = new TrackDocument(new TrackSegment[] { first, second });
+        double distance = 12.0;
+
+        TrackEvaluationPoint fromDistance = evaluator.EvaluateAtDistance(document, distance);
+        TrackEvaluationPoint fromPosition = evaluator.EvaluateAt(document, new TrackPosition(segmentIndex: 1, localT: 0.4));
+        Transform3d transformFromDistance = evaluator.EvaluateTransformAtDistance(document, distance);
+        Transform3d transformFromPosition = evaluator.EvaluateTransform(document, new TrackPosition(segmentIndex: 1, localT: fromDistance.LocalT));
+
+        Assert.Same(fromPosition.Segment, fromDistance.Segment);
+        AssertDoubleNear(fromPosition.LocalT, fromDistance.LocalT);
+        AssertDoubleNear(transformFromPosition.Position.X, transformFromDistance.Position.X);
+        AssertDoubleNear(transformFromPosition.Position.Y, transformFromDistance.Position.Y);
+        AssertDoubleNear(transformFromPosition.Position.Z, transformFromDistance.Position.Z);
+        AssertDoubleNear(transformFromPosition.Rotation.M00, transformFromDistance.Rotation.M00);
+        AssertDoubleNear(transformFromPosition.Rotation.M01, transformFromDistance.Rotation.M01);
+        AssertDoubleNear(transformFromPosition.Rotation.M02, transformFromDistance.Rotation.M02);
+        AssertDoubleNear(transformFromPosition.Rotation.M10, transformFromDistance.Rotation.M10);
+        AssertDoubleNear(transformFromPosition.Rotation.M11, transformFromDistance.Rotation.M11);
+        AssertDoubleNear(transformFromPosition.Rotation.M12, transformFromDistance.Rotation.M12);
+        AssertDoubleNear(transformFromPosition.Rotation.M20, transformFromDistance.Rotation.M20);
+        AssertDoubleNear(transformFromPosition.Rotation.M21, transformFromDistance.Rotation.M21);
+        AssertDoubleNear(transformFromPosition.Rotation.M22, transformFromDistance.Rotation.M22);
+    }
+
+    [Fact]
+    public void TrackEvaluator_EvaluateTransformAtDistance_PositionIncreasesCorrectly()
+    {
+        var evaluator = new TrackEvaluator();
+        var document = new TrackDocument(new TrackSegment[]
+        {
+            new StraightSegment(length: 10.0),
+            new CurvedSegment(length: 5.0)
+        });
+
+        Transform3d first = evaluator.EvaluateTransformAtDistance(document, 2.0);
+        Transform3d second = evaluator.EvaluateTransformAtDistance(document, 12.0);
+
+        Assert.True(second.Position.X > first.Position.X);
+        AssertDoubleNear(2.0, first.Position.X);
+        AssertDoubleNear(12.0, second.Position.X);
+        AssertDoubleNear(0.0, second.Position.Y);
+        AssertDoubleNear(0.0, second.Position.Z);
+    }
+
+    [Fact]
+    public void TrackEvaluator_EvaluateTransformAtDistance_EmptyDocument_ThrowsArgumentOutOfRangeException()
+    {
+        var evaluator = new TrackEvaluator();
+        var document = new TrackDocument();
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => evaluator.EvaluateTransformAtDistance(document, 0.0));
+    }
+
     private static void AssertVectorNear(Vector3d actual, Vector3d expected)
     {
         AssertDoubleNear(expected.X, actual.X);

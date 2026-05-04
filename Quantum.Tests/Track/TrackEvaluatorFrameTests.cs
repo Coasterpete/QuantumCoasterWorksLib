@@ -98,6 +98,61 @@ public sealed class TrackEvaluatorFrameTests
         AssertDoubleNear(0.0, frame.Position.Z);
     }
 
+    [Fact]
+    public void TrackEvaluator_EvaluateFrameAtDistance_ConsistentWithEvaluateAtAndEvaluateAtDistance()
+    {
+        var evaluator = new TrackEvaluator();
+        var first = new StraightSegment(length: 10.0, id: "s-01");
+        var second = new CurvedSegment(length: 5.0, id: "c-01");
+        var document = new TrackDocument(new TrackSegment[] { first, second });
+        double distance = 12.0;
+
+        TrackEvaluationPoint fromDistance = evaluator.EvaluateAtDistance(document, distance);
+        TrackEvaluationPoint fromPosition = evaluator.EvaluateAt(document, new TrackPosition(segmentIndex: 1, localT: 0.4));
+        TrackFrame frameFromDistance = evaluator.EvaluateFrameAtDistance(document, distance);
+        TrackFrame frameFromPosition = evaluator.EvaluateFrame(document, new TrackPosition(segmentIndex: 1, localT: fromDistance.LocalT));
+
+        Assert.Same(fromPosition.Segment, fromDistance.Segment);
+        AssertDoubleNear(fromPosition.LocalT, fromDistance.LocalT);
+        AssertDoubleNear(frameFromPosition.S, frameFromDistance.S);
+        AssertVectorNear(frameFromPosition.Position, frameFromDistance.Position);
+        AssertVectorNear(frameFromPosition.Tangent, frameFromDistance.Tangent);
+        AssertVectorNear(frameFromPosition.Normal, frameFromDistance.Normal);
+        AssertVectorNear(frameFromPosition.Binormal, frameFromDistance.Binormal);
+    }
+
+    [Fact]
+    public void TrackEvaluator_EvaluateFrameAtDistance_WithCurvedSpline_FrameChangesWithDistance()
+    {
+        var evaluator = new TrackEvaluator();
+        IParamCurve spline = new CubicBezierCurve(
+            new Vector3d(0.0, 0.0, 0.0),
+            new Vector3d(5.0, 0.0, 0.0),
+            new Vector3d(5.0, 5.0, 0.0),
+            new Vector3d(0.0, 5.0, 0.0));
+        var document = new TrackDocument(new TrackSegment[]
+        {
+            new CurvedSegment(length: 10.0, spline: spline)
+        });
+
+        TrackFrame start = evaluator.EvaluateFrameAtDistance(document, 1.0);
+        TrackFrame end = evaluator.EvaluateFrameAtDistance(document, 9.0);
+
+        double tangentDot = Vector3d.Dot(start.Tangent, end.Tangent);
+
+        Assert.True(tangentDot < -0.5);
+        Assert.True(end.Position.Y > start.Position.Y);
+    }
+
+    [Fact]
+    public void TrackEvaluator_EvaluateFrameAtDistance_EmptyDocument_ThrowsArgumentOutOfRangeException()
+    {
+        var evaluator = new TrackEvaluator();
+        var document = new TrackDocument();
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => evaluator.EvaluateFrameAtDistance(document, 0.0));
+    }
+
     private static void AssertUnit(Vector3d vector)
     {
         Assert.InRange(System.Math.Abs(vector.Length - 1.0), 0.0, Tolerance);

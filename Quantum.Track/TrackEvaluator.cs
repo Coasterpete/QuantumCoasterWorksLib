@@ -79,6 +79,20 @@ namespace Quantum.Track
             return Transform3d.FromTrackFrame(frame, frame.Position);
         }
 
+        public TrackFrame EvaluateFrameAtDistance(TrackDocument doc, double distance)
+        {
+            TrackEvaluationPoint evaluationPoint = EvaluateAtDistance(doc, distance);
+            TrackPosition position = ResolveTrackPosition(doc, evaluationPoint);
+            return EvaluateFrame(doc, position);
+        }
+
+        public Transform3d EvaluateTransformAtDistance(TrackDocument doc, double distance)
+        {
+            TrackEvaluationPoint evaluationPoint = EvaluateAtDistance(doc, distance);
+            TrackPosition position = ResolveTrackPosition(doc, evaluationPoint);
+            return EvaluateTransform(doc, position);
+        }
+
         public TrackFrame EvaluateFrame(TrackDocument doc, TrackPosition position)
         {
             TrackEvaluationPoint evaluationPoint = EvaluateAt(doc, position);
@@ -172,6 +186,19 @@ namespace Quantum.Track
                      double.IsInfinity(vector.X) ||
                      double.IsInfinity(vector.Y) ||
                      double.IsInfinity(vector.Z));
+        }
+
+        private static TrackPosition ResolveTrackPosition(TrackDocument doc, TrackEvaluationPoint evaluationPoint)
+        {
+            for (int i = 0; i < doc.Segments.Count; i++)
+            {
+                if (object.ReferenceEquals(doc.Segments[i], evaluationPoint.Segment))
+                {
+                    return new TrackPosition(i, evaluationPoint.LocalT);
+                }
+            }
+
+            throw new System.InvalidOperationException("TrackDocument could not resolve the evaluated segment.");
         }
 
         public TrackEvaluationPoint EvaluateAtDistance(TrackDocument doc, double distance)
