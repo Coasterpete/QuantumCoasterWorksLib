@@ -5,7 +5,7 @@ namespace Quantum.Splines
     /// <summary>
     /// Orthonormal frame sampled along a track.
     /// </summary>
-    public readonly struct TrackFrame
+    public readonly struct TrackFrame : ITrackFrameBasis
     {
         public double S { get; }
 
