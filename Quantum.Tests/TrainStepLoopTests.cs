@@ -924,6 +924,136 @@ public sealed class TrainStepLoopTests
         }
     }
 
+    [Fact]
+    public void TrainStepLoop_DefaultIntegrationMode_PreservesExistingBehavior()
+    {
+        IArcLengthCurve track = new LineCurve(
+            new Vector3d(0, 10, 0),
+            new Vector3d(100, 0, 0));
+
+        const double deltaTime = 0.05;
+        const double gravityMagnitude = 9.81;
+        const double linearDrag = 0.08;
+        const double quadraticDrag = 0.01;
+        const double rollingResistance = 0.05;
+        const int steps = 100;
+        const double initialDistance = 12.5;
+        const double initialSpeed = 3.25;
+
+        var directFollower = new TrainFollowerState(
+            track,
+            initialDistance: initialDistance,
+            speed: initialSpeed,
+            loopEnabled: false);
+
+        var loopFollower = new TrainFollowerState(
+            track,
+            initialDistance: initialDistance,
+            speed: initialSpeed,
+            loopEnabled: false);
+
+        for (int i = 0; i < steps; i++)
+        {
+            directFollower.UpdateWithGravity(
+                deltaTime,
+                gravityMagnitude,
+                linearDragCoefficient: linearDrag,
+                quadraticDragCoefficient: quadraticDrag,
+                rollingResistance: rollingResistance);
+        }
+
+        var loop = new TrainStepLoop(
+            loopFollower,
+            deltaTime,
+            gravityMagnitude,
+            linearDrag,
+            quadraticDrag,
+            rollingResistance);
+
+        loop.Step(steps);
+
+        Assert.Equal(TrainIntegrationMode.LegacyNormalComponent, loop.IntegrationMode);
+        Assert.InRange(System.Math.Abs(directFollower.Distance - loopFollower.Distance), 0.0, ValueTolerance);
+        Assert.InRange(System.Math.Abs(directFollower.Speed - loopFollower.Speed), 0.0, ValueTolerance);
+        Assert.InRange(System.Math.Abs(directFollower.Acceleration - loopFollower.Acceleration), 0.0, ValueTolerance);
+        Assert.InRange(System.Math.Abs(directFollower.Position.X - loopFollower.Position.X), 0.0, ValueTolerance);
+        Assert.InRange(System.Math.Abs(directFollower.Position.Y - loopFollower.Position.Y), 0.0, ValueTolerance);
+        Assert.InRange(System.Math.Abs(directFollower.Position.Z - loopFollower.Position.Z), 0.0, ValueTolerance);
+    }
+
+    [Fact]
+    public void TrainStepLoop_ExplicitLegacyNormalComponent_PreservesDefaultModeBehavior()
+    {
+        IArcLengthCurve track = new LineCurve(
+            new Vector3d(0, 0, 0),
+            new Vector3d(100, 0, 0));
+
+        const double deltaTime = 0.1;
+        const double normalG = 1.0;
+        const int steps = 12;
+
+        var defaultFollower = new TrainFollowerState(track);
+        var explicitLegacyFollower = new TrainFollowerState(track);
+
+        var defaultLoop = new TrainStepLoop(
+            defaultFollower,
+            deltaTime,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            new ConstantNormalForceTargetProvider(normalG));
+
+        var explicitLegacyLoop = new TrainStepLoop(
+            explicitLegacyFollower,
+            deltaTime,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            new ConstantNormalForceTargetProvider(normalG),
+            TrainIntegrationMode.LegacyNormalComponent);
+
+        defaultLoop.Step(steps);
+        explicitLegacyLoop.Step(steps);
+
+        Assert.Equal(TrainIntegrationMode.LegacyNormalComponent, defaultLoop.IntegrationMode);
+        Assert.Equal(TrainIntegrationMode.LegacyNormalComponent, explicitLegacyLoop.IntegrationMode);
+        Assert.InRange(System.Math.Abs(defaultFollower.Distance - explicitLegacyFollower.Distance), 0.0, ValueTolerance);
+        Assert.InRange(System.Math.Abs(defaultFollower.Speed - explicitLegacyFollower.Speed), 0.0, ValueTolerance);
+        Assert.InRange(System.Math.Abs(defaultFollower.Acceleration - explicitLegacyFollower.Acceleration), 0.0, ValueTolerance);
+        Assert.Equal(defaultLoop.Tick, explicitLegacyLoop.Tick);
+        Assert.InRange(
+            System.Math.Abs(defaultLoop.ElapsedTimeSeconds - explicitLegacyLoop.ElapsedTimeSeconds),
+            0.0,
+            ValueTolerance);
+    }
+
+    [Fact]
+    public void TrainStepLoop_TangentialProjectedMode_Step_ThrowsNotSupportedException()
+    {
+        IArcLengthCurve track = new LineCurve(
+            new Vector3d(0, 0, 0),
+            new Vector3d(100, 0, 0));
+
+        var follower = new TrainFollowerState(track);
+        var loop = new TrainStepLoop(
+            follower,
+            0.1,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            TrainIntegrationMode.TangentialProjected);
+
+        NotSupportedException ex = Assert.Throws<NotSupportedException>(() => loop.Step());
+
+        Assert.Contains(nameof(TrainIntegrationMode.TangentialProjected), ex.Message);
+        Assert.Equal(TrainIntegrationMode.TangentialProjected, loop.IntegrationMode);
+        Assert.Equal(0, loop.Tick);
+        Assert.InRange(System.Math.Abs(loop.ElapsedTimeSeconds), 0.0, ValueTolerance);
+    }
+
     private static TrainStepLoop CreateTrainStepLoopWithForceTargetProviderOrFail(
         TrainFollowerState follower,
         double deltaTime,

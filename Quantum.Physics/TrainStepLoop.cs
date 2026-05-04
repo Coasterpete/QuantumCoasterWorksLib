@@ -12,6 +12,8 @@ namespace Quantum.Physics
     {
         private readonly IForceTargetProvider? _forceTargetProvider;
 
+        public TrainIntegrationMode IntegrationMode { get; }
+
         public TrainFollowerState Follower { get; }
 
         public double DeltaTime { get; }
@@ -42,7 +44,28 @@ namespace Quantum.Physics
                 linearDragCoefficient,
                 quadraticDragCoefficient,
                 rollingResistance,
-                forceTargetProvider: null)
+                forceTargetProvider: null,
+                integrationMode: TrainIntegrationMode.LegacyNormalComponent)
+        {
+        }
+
+        public TrainStepLoop(
+            TrainFollowerState follower,
+            double deltaTime,
+            double gravityMagnitude,
+            double linearDragCoefficient,
+            double quadraticDragCoefficient,
+            double rollingResistance,
+            TrainIntegrationMode integrationMode)
+            : this(
+                follower,
+                deltaTime,
+                gravityMagnitude,
+                linearDragCoefficient,
+                quadraticDragCoefficient,
+                rollingResistance,
+                forceTargetProvider: null,
+                integrationMode: integrationMode)
         {
         }
 
@@ -54,6 +77,27 @@ namespace Quantum.Physics
             double quadraticDragCoefficient,
             double rollingResistance,
             IForceTargetProvider? forceTargetProvider)
+            : this(
+                follower,
+                deltaTime,
+                gravityMagnitude,
+                linearDragCoefficient,
+                quadraticDragCoefficient,
+                rollingResistance,
+                forceTargetProvider,
+                integrationMode: TrainIntegrationMode.LegacyNormalComponent)
+        {
+        }
+
+        public TrainStepLoop(
+            TrainFollowerState follower,
+            double deltaTime,
+            double gravityMagnitude,
+            double linearDragCoefficient,
+            double quadraticDragCoefficient,
+            double rollingResistance,
+            IForceTargetProvider? forceTargetProvider,
+            TrainIntegrationMode integrationMode)
         {
             Follower = follower ?? throw new ArgumentNullException(nameof(follower));
             DeltaTime = deltaTime;
@@ -62,11 +106,30 @@ namespace Quantum.Physics
             QuadraticDragCoefficient = quadraticDragCoefficient;
             RollingResistance = rollingResistance;
             _forceTargetProvider = forceTargetProvider;
+            IntegrationMode = integrationMode;
             Tick = 0;
             ElapsedTimeSeconds = 0.0;
         }
 
         public void Step()
+        {
+            switch (IntegrationMode)
+            {
+                case TrainIntegrationMode.LegacyNormalComponent:
+                    StepLegacyNormalComponent();
+                    break;
+                case TrainIntegrationMode.TangentialProjected:
+                    throw new NotSupportedException(
+                        "Train integration mode TangentialProjected is not supported yet.");
+                default:
+                    throw new ArgumentOutOfRangeException(
+                        nameof(IntegrationMode),
+                        IntegrationMode,
+                        "Unknown train integration mode.");
+            }
+        }
+
+        private void StepLegacyNormalComponent()
         {
             double accelerationFromNormalG = 0.0;
             double? tangentialAcceleration = null;
