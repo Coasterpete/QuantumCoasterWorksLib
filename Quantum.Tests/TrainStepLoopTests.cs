@@ -1054,6 +1054,141 @@ public sealed class TrainStepLoopTests
         Assert.InRange(System.Math.Abs(loop.ElapsedTimeSeconds), 0.0, ValueTolerance);
     }
 
+    [Fact]
+    public void TrainStepLoop_TangentialProjectedMode_FlatTrackWithGravity_ProducesExpectedMotion()
+    {
+        IArcLengthCurve track = new LineCurve(
+            new Vector3d(0, 0, 0),
+            new Vector3d(100, 0, 0));
+
+        const double deltaTime = 0.1;
+        const int steps = 25;
+        const double initialDistance = 1.25;
+        const double initialSpeed = 3.0;
+
+        var directFollower = new TrainFollowerState(
+            track,
+            initialDistance: initialDistance,
+            speed: initialSpeed,
+            loopEnabled: false);
+
+        var tangentialFollower = new TrainFollowerState(
+            track,
+            initialDistance: initialDistance,
+            speed: initialSpeed,
+            loopEnabled: false);
+
+        for (int i = 0; i < steps; i++)
+        {
+            directFollower.UpdateWithGravity(
+                deltaTime,
+                gravityMagnitude: 9.81,
+                linearDragCoefficient: 0.0,
+                quadraticDragCoefficient: 0.0,
+                rollingResistance: 0.0);
+        }
+
+        var loop = new TrainStepLoop(
+            tangentialFollower,
+            deltaTime,
+            gravityMagnitude: 9.81,
+            linearDragCoefficient: 0.0,
+            quadraticDragCoefficient: 0.0,
+            rollingResistance: 0.0,
+            new ConstantNormalForceTargetProvider(normalG: 0.0),
+            TrainIntegrationMode.TangentialProjected);
+
+        loop.Step(steps);
+
+        Assert.Equal(TrainIntegrationMode.TangentialProjected, loop.IntegrationMode);
+        Assert.True(tangentialFollower.TangentialAcceleration.HasValue);
+        Assert.InRange(System.Math.Abs(tangentialFollower.TangentialAcceleration.Value), 0.0, ValueTolerance);
+        Assert.InRange(System.Math.Abs(tangentialFollower.Distance - directFollower.Distance), 0.0, ValueTolerance);
+        Assert.InRange(System.Math.Abs(tangentialFollower.Speed - directFollower.Speed), 0.0, ValueTolerance);
+        Assert.InRange(System.Math.Abs(tangentialFollower.Acceleration - directFollower.Acceleration), 0.0, ValueTolerance);
+    }
+
+    [Fact]
+    public void TrainStepLoop_TangentialProjectedMode_DiffersFromLegacy_WhenNormalComponentExists()
+    {
+        IArcLengthCurve track = new LineCurve(
+            new Vector3d(0, 0, 0),
+            new Vector3d(100, 0, 0));
+
+        const double deltaTime = 0.1;
+        const double normalG = 1.0;
+        const int steps = 12;
+
+        var legacyFollower = new TrainFollowerState(track);
+        var tangentialFollower = new TrainFollowerState(track);
+
+        var legacyLoop = new TrainStepLoop(
+            legacyFollower,
+            deltaTime,
+            gravityMagnitude: 0.0,
+            linearDragCoefficient: 0.0,
+            quadraticDragCoefficient: 0.0,
+            rollingResistance: 0.0,
+            new ConstantNormalForceTargetProvider(normalG),
+            TrainIntegrationMode.LegacyNormalComponent);
+
+        var tangentialLoop = new TrainStepLoop(
+            tangentialFollower,
+            deltaTime,
+            gravityMagnitude: 0.0,
+            linearDragCoefficient: 0.0,
+            quadraticDragCoefficient: 0.0,
+            rollingResistance: 0.0,
+            new ConstantNormalForceTargetProvider(normalG),
+            TrainIntegrationMode.TangentialProjected);
+
+        legacyLoop.Step(steps);
+        tangentialLoop.Step(steps);
+
+        Assert.True(
+            legacyFollower.Speed > tangentialFollower.Speed + ValueTolerance,
+            "Expected legacy mode to integrate normal acceleration while tangential mode ignores it.");
+        Assert.True(
+            legacyFollower.Distance > tangentialFollower.Distance + ValueTolerance,
+            "Expected legacy mode to travel farther when only normal acceleration is provided.");
+        Assert.InRange(System.Math.Abs(tangentialFollower.Speed), 0.0, ValueTolerance);
+        Assert.InRange(System.Math.Abs(tangentialFollower.Distance), 0.0, ValueTolerance);
+    }
+
+    [Fact]
+    public void TrainStepLoop_LegacyNormalComponent_ExplicitMode_RemainsUnchanged()
+    {
+        IArcLengthCurve track = new LineCurve(
+            new Vector3d(0, 0, 0),
+            new Vector3d(100, 0, 0));
+
+        const double deltaTime = 0.1;
+        const double normalG = 1.5;
+        const double expectedAcceleration = normalG * 9.81;
+        const int steps = 10;
+
+        double elapsedTime = steps * deltaTime;
+        double expectedSpeed = expectedAcceleration * elapsedTime;
+        double expectedDistance = 0.5 * expectedAcceleration * elapsedTime * elapsedTime;
+
+        var follower = new TrainFollowerState(track);
+        var loop = new TrainStepLoop(
+            follower,
+            deltaTime,
+            gravityMagnitude: 0.0,
+            linearDragCoefficient: 0.0,
+            quadraticDragCoefficient: 0.0,
+            rollingResistance: 0.0,
+            new ConstantNormalForceTargetProvider(normalG),
+            TrainIntegrationMode.LegacyNormalComponent);
+
+        loop.Step(steps);
+
+        Assert.InRange(System.Math.Abs(follower.Speed - expectedSpeed), 0.0, ValueTolerance);
+        Assert.InRange(System.Math.Abs(follower.Distance - expectedDistance), 0.0, ValueTolerance);
+        Assert.InRange(System.Math.Abs(follower.Acceleration - expectedAcceleration), 0.0, ValueTolerance);
+    }
+
     private static TrainStepLoop CreateTrainStepLoopWithForceTargetProviderOrFail(
         TrainFollowerState follower,
         double deltaTime,

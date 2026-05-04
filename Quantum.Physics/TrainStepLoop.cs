@@ -119,8 +119,8 @@ namespace Quantum.Physics
                     StepLegacyNormalComponent();
                     break;
                 case TrainIntegrationMode.TangentialProjected:
-                    throw new NotSupportedException(
-                        "Train integration mode TangentialProjected is not supported yet.");
+                    StepTangentialProjected();
+                    break;
                 default:
                     throw new ArgumentOutOfRangeException(
                         nameof(IntegrationMode),
@@ -155,6 +155,35 @@ namespace Quantum.Physics
 
             Follower.Speed += halfStepVelocityKick;
             Follower.Acceleration += accelerationFromNormalG;
+
+            Tick++;
+            ElapsedTimeSeconds += DeltaTime;
+        }
+
+        private void StepTangentialProjected()
+        {
+            if (!TryGetProjectedAcceleration(Follower.Distance, Follower.Frame, out Vector3d projectedAcceleration))
+            {
+                throw new NotSupportedException(
+                    "Train integration mode TangentialProjected requires projected acceleration data.");
+            }
+
+            AccelerationComponents components = AccelerationDecomposer.Decompose(projectedAcceleration, Follower.Frame);
+            double accelerationFromTangentialProjection = components.Tangential;
+            Follower.TangentialAcceleration = accelerationFromTangentialProjection;
+
+            double halfStepVelocityKick = 0.5 * accelerationFromTangentialProjection * DeltaTime;
+            Follower.Speed += halfStepVelocityKick;
+
+            Follower.UpdateWithGravity(
+                DeltaTime,
+                GravityMagnitude,
+                LinearDragCoefficient,
+                QuadraticDragCoefficient,
+                RollingResistance);
+
+            Follower.Speed += halfStepVelocityKick;
+            Follower.Acceleration += accelerationFromTangentialProjection;
 
             Tick++;
             ElapsedTimeSeconds += DeltaTime;
