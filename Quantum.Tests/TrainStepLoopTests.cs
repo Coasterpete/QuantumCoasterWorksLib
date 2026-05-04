@@ -441,6 +441,84 @@ public sealed class TrainStepLoopTests
         Assert.InRange(System.Math.Abs(actualProjectedAcceleration.X - expectedProjectedAcceleration.X), 0.0, ValueTolerance);
         Assert.InRange(System.Math.Abs(actualProjectedAcceleration.Y - expectedProjectedAcceleration.Y), 0.0, ValueTolerance);
         Assert.InRange(System.Math.Abs(actualProjectedAcceleration.Z - expectedProjectedAcceleration.Z), 0.0, ValueTolerance);
+
+        Assert.True(sample.TangentialAcceleration.HasValue, "Expected sampled state to include tangential acceleration diagnostics.");
+        Assert.True(sample.NormalAcceleration.HasValue, "Expected sampled state to include normal acceleration diagnostics.");
+        Assert.True(sample.BinormalAcceleration.HasValue, "Expected sampled state to include binormal acceleration diagnostics.");
+
+        double expectedTangential = Vector3d.Dot(expectedProjectedAcceleration, sample.Frame.Tangent);
+        double expectedNormal = Vector3d.Dot(expectedProjectedAcceleration, sample.Frame.Normal);
+        double expectedBinormal = Vector3d.Dot(expectedProjectedAcceleration, sample.Frame.Binormal);
+
+        Assert.InRange(System.Math.Abs(sample.TangentialAcceleration.Value - expectedTangential), 0.0, ValueTolerance);
+        Assert.InRange(System.Math.Abs(sample.NormalAcceleration.Value - expectedNormal), 0.0, ValueTolerance);
+        Assert.InRange(System.Math.Abs(sample.BinormalAcceleration.Value - expectedBinormal), 0.0, ValueTolerance);
+
+        Assert.InRange(System.Math.Abs(sample.TangentialAcceleration.Value), 0.0, ValueTolerance);
+        Assert.True(sample.NormalAcceleration.Value > ValueTolerance);
+        Assert.InRange(System.Math.Abs(sample.BinormalAcceleration.Value), 0.0, ValueTolerance);
+    }
+
+    [Fact]
+    public void TrainStepLoop_Sample_WithForceTargetProvider_LateralGOnly_UsesBinormalDiagnosticsWithoutChangingKinematics()
+    {
+        IArcLengthCurve track = new LineCurve(
+            new Vector3d(0, 0, 0),
+            new Vector3d(100, 0, 0));
+
+        const double deltaTime = 0.1;
+        const double lateralG = 2.5;
+        const double gravityMagnitude = 0.0;
+        const double linearDrag = 0.0;
+        const double quadraticDrag = 0.0;
+        const double rollingResistance = 0.0;
+        const int steps = 10;
+
+        var baselineFollower = new TrainFollowerState(track);
+        var lateralOnlyFollower = new TrainFollowerState(track);
+
+        var baselineLoop = new TrainStepLoop(
+            baselineFollower,
+            deltaTime,
+            gravityMagnitude,
+            linearDrag,
+            quadraticDrag,
+            rollingResistance);
+
+        var lateralOnlyLoop = new TrainStepLoop(
+            lateralOnlyFollower,
+            deltaTime,
+            gravityMagnitude,
+            linearDrag,
+            quadraticDrag,
+            rollingResistance,
+            new ConstantForceTargetProvider(normalG: 0.0, lateralG: lateralG, rollRateDegPerSec: 0.0));
+
+        IReadOnlyList<TrainFollowerState> baselineSamples = baselineLoop.Sample(steps);
+        IReadOnlyList<TrainFollowerState> lateralOnlySamples = lateralOnlyLoop.Sample(steps);
+
+        Assert.Equal(baselineSamples.Count, lateralOnlySamples.Count);
+
+        for (int i = 0; i < lateralOnlySamples.Count; i++)
+        {
+            TrainFollowerState baselineSample = baselineSamples[i];
+            TrainFollowerState lateralOnlySample = lateralOnlySamples[i];
+
+            Assert.InRange(System.Math.Abs(lateralOnlySample.Speed - baselineSample.Speed), 0.0, ValueTolerance);
+            Assert.InRange(System.Math.Abs(lateralOnlySample.Distance - baselineSample.Distance), 0.0, ValueTolerance);
+            Assert.InRange(System.Math.Abs(lateralOnlySample.Acceleration - baselineSample.Acceleration), 0.0, ValueTolerance);
+
+            Assert.True(lateralOnlySample.TangentialAcceleration.HasValue);
+            Assert.True(lateralOnlySample.NormalAcceleration.HasValue);
+            Assert.True(lateralOnlySample.BinormalAcceleration.HasValue);
+
+            Assert.InRange(System.Math.Abs(lateralOnlySample.TangentialAcceleration.Value), 0.0, ValueTolerance);
+            Assert.InRange(System.Math.Abs(lateralOnlySample.NormalAcceleration.Value), 0.0, ValueTolerance);
+            Assert.InRange(
+                System.Math.Abs(lateralOnlySample.BinormalAcceleration.Value - (lateralG * 9.81)),
+                0.0,
+                ValueTolerance);
+        }
     }
 
     [Fact]
@@ -499,9 +577,19 @@ public sealed class TrainStepLoopTests
                 System.Math.Abs(normalOnlySample.Distance - normalPlusLateralSample.Distance),
                 0.0,
                 ValueTolerance);
+            Assert.InRange(
+                System.Math.Abs(normalOnlySample.Acceleration - normalPlusLateralSample.Acceleration),
+                0.0,
+                ValueTolerance);
 
             Assert.True(normalOnlySample.ProjectedAcceleration.HasValue);
             Assert.True(normalPlusLateralSample.ProjectedAcceleration.HasValue);
+            Assert.True(normalOnlySample.TangentialAcceleration.HasValue);
+            Assert.True(normalOnlySample.NormalAcceleration.HasValue);
+            Assert.True(normalOnlySample.BinormalAcceleration.HasValue);
+            Assert.True(normalPlusLateralSample.TangentialAcceleration.HasValue);
+            Assert.True(normalPlusLateralSample.NormalAcceleration.HasValue);
+            Assert.True(normalPlusLateralSample.BinormalAcceleration.HasValue);
 
             Vector3d expectedNormalOnlyProjection = ForceTargetProjection.ComputeForceVector(
                 new ForceTargets(normalG, lateralG: 0.0, rollRateDegPerSec: 0.0),
@@ -527,6 +615,23 @@ public sealed class TrainStepLoopTests
             Assert.InRange(System.Math.Abs(normalOnlyBinormalComponent), 0.0, ValueTolerance);
             Assert.InRange(
                 System.Math.Abs(normalPlusLateralBinormalComponent - (lateralG * 9.81)),
+                0.0,
+                ValueTolerance);
+
+            Assert.InRange(System.Math.Abs(normalOnlySample.TangentialAcceleration.Value), 0.0, ValueTolerance);
+            Assert.InRange(
+                System.Math.Abs(normalOnlySample.NormalAcceleration.Value - (normalG * 9.81)),
+                0.0,
+                ValueTolerance);
+            Assert.InRange(System.Math.Abs(normalOnlySample.BinormalAcceleration.Value), 0.0, ValueTolerance);
+
+            Assert.InRange(System.Math.Abs(normalPlusLateralSample.TangentialAcceleration.Value), 0.0, ValueTolerance);
+            Assert.InRange(
+                System.Math.Abs(normalPlusLateralSample.NormalAcceleration.Value - (normalG * 9.81)),
+                0.0,
+                ValueTolerance);
+            Assert.InRange(
+                System.Math.Abs(normalPlusLateralSample.BinormalAcceleration.Value - (lateralG * 9.81)),
                 0.0,
                 ValueTolerance);
         }

@@ -115,7 +115,7 @@ namespace Quantum.Physics
                 TrainFollowerState snapshot = CloneFollowerState(Follower);
                 if (TryGetProjectedAcceleration(snapshot.Distance, snapshot.Frame, out Vector3d projectedAcceleration))
                 {
-                    snapshot.ProjectedAcceleration = projectedAcceleration;
+                    ApplyProjectedAccelerationDiagnostics(snapshot, projectedAcceleration);
                 }
 
                 snapshots.Add(snapshot);
@@ -140,7 +140,18 @@ namespace Quantum.Physics
 
             clone.Acceleration = source.Acceleration;
             clone.ProjectedAcceleration = source.ProjectedAcceleration;
+            clone.TangentialAcceleration = source.TangentialAcceleration;
+            clone.NormalAcceleration = source.NormalAcceleration;
+            clone.BinormalAcceleration = source.BinormalAcceleration;
             return clone;
+        }
+
+        private static void ApplyProjectedAccelerationDiagnostics(TrainFollowerState sample, Vector3d projectedAcceleration)
+        {
+            sample.ProjectedAcceleration = projectedAcceleration;
+            sample.TangentialAcceleration = Vector3d.Dot(projectedAcceleration, sample.Frame.Tangent);
+            sample.NormalAcceleration = Vector3d.Dot(projectedAcceleration, sample.Frame.Normal);
+            sample.BinormalAcceleration = Vector3d.Dot(projectedAcceleration, sample.Frame.Binormal);
         }
 
         private bool TryGetProjectedAcceleration(double distance, TrackFrame frame, out Vector3d projectedAcceleration)
