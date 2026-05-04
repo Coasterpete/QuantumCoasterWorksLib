@@ -75,17 +75,22 @@ namespace Quantum.Track
 
         public Transform3d EvaluateTransform(TrackDocument doc, TrackPosition position)
         {
+            TrackFrame frame = EvaluateFrame(doc, position);
+            return Transform3d.FromTrackFrame(frame, frame.Position);
+        }
+
+        public TrackFrame EvaluateFrame(TrackDocument doc, TrackPosition position)
+        {
             TrackEvaluationPoint evaluationPoint = EvaluateAt(doc, position);
 
             if (evaluationPoint.Segment.Spline is IParamCurve spline)
             {
                 Vector3d splinePosition = spline.Evaluate(evaluationPoint.LocalT);
                 Vector3d splineTangent = NormalizeOrThrow(spline.Tangent(evaluationPoint.LocalT), "tangent");
-                TrackFrame frame = BuildTrackFrame(evaluationPoint, splinePosition, splineTangent);
-                return Transform3d.FromTrackFrame(frame, splinePosition);
+                return BuildTrackFrame(evaluationPoint, splinePosition, splineTangent);
             }
 
-            return EvaluateFallbackTransform(doc, position, evaluationPoint);
+            return EvaluateFallbackFrame(doc, position, evaluationPoint);
         }
 
         private static Transform3d EvaluateFallbackTransform(TrackDocument doc, TrackPosition position, TrackEvaluationPoint evaluationPoint)
@@ -109,6 +114,12 @@ namespace Quantum.Track
             return new Transform3d(
                 Matrix3x3.Identity,
                 new Vector3d(distanceAlongTrack, 0.0, 0.0));
+        }
+
+        private static TrackFrame EvaluateFallbackFrame(TrackDocument doc, TrackPosition position, TrackEvaluationPoint evaluationPoint)
+        {
+            Transform3d fallbackTransform = EvaluateFallbackTransform(doc, position, evaluationPoint);
+            return BuildTrackFrame(evaluationPoint, fallbackTransform.Position, Vector3d.UnitX);
         }
 
         private static TrackFrame BuildTrackFrame(TrackEvaluationPoint evaluationPoint, Vector3d position, Vector3d tangent)
