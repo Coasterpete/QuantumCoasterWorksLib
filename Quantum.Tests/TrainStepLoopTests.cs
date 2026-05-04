@@ -1156,6 +1156,54 @@ public sealed class TrainStepLoopTests
     }
 
     [Fact]
+    public void TrainStepLoop_TangentialProjectedMode_LateralAndRollDoNotAffectMotion()
+    {
+        IArcLengthCurve track = new LineCurve(
+            new Vector3d(0, 0, 0),
+            new Vector3d(100, 0, 0));
+
+        const double deltaTime = 0.1;
+        const double normalG = 1.0;
+        const double lateralG = 2.5;
+        const double rollRateDegPerSec = 45.0;
+        const int steps = 10;
+
+        var normalOnlyFollower = new TrainFollowerState(track);
+        var normalPlusLateralFollower = new TrainFollowerState(track);
+
+        var normalOnlyLoop = new TrainStepLoop(
+            normalOnlyFollower,
+            deltaTime,
+            gravityMagnitude: 0.0,
+            linearDragCoefficient: 0.0,
+            quadraticDragCoefficient: 0.0,
+            rollingResistance: 0.0,
+            new ConstantNormalForceTargetProvider(normalG),
+            TrainIntegrationMode.TangentialProjected);
+
+        var normalPlusLateralLoop = new TrainStepLoop(
+            normalPlusLateralFollower,
+            deltaTime,
+            gravityMagnitude: 0.0,
+            linearDragCoefficient: 0.0,
+            quadraticDragCoefficient: 0.0,
+            rollingResistance: 0.0,
+            new ConstantForceTargetProvider(normalG, lateralG, rollRateDegPerSec),
+            TrainIntegrationMode.TangentialProjected);
+
+        normalOnlyLoop.Step(steps);
+        normalPlusLateralLoop.Step(steps);
+
+        Assert.InRange(System.Math.Abs(normalOnlyFollower.Speed - normalPlusLateralFollower.Speed), 0.0, ValueTolerance);
+        Assert.InRange(System.Math.Abs(normalOnlyFollower.Distance - normalPlusLateralFollower.Distance), 0.0, ValueTolerance);
+        Assert.InRange(System.Math.Abs(normalOnlyFollower.Acceleration - normalPlusLateralFollower.Acceleration), 0.0, ValueTolerance);
+        Assert.InRange(System.Math.Abs(normalOnlyFollower.Speed), 0.0, ValueTolerance);
+        Assert.InRange(System.Math.Abs(normalOnlyFollower.Distance), 0.0, ValueTolerance);
+        Assert.InRange(System.Math.Abs(normalPlusLateralFollower.Speed), 0.0, ValueTolerance);
+        Assert.InRange(System.Math.Abs(normalPlusLateralFollower.Distance), 0.0, ValueTolerance);
+    }
+
+    [Fact]
     public void TrainStepLoop_LegacyNormalComponent_ExplicitMode_RemainsUnchanged()
     {
         IArcLengthCurve track = new LineCurve(
