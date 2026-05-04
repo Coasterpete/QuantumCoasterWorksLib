@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Quantum.Math;
+using Quantum.Splines;
 
 namespace Quantum.Physics
 {
@@ -68,11 +69,9 @@ namespace Quantum.Physics
         public void Step()
         {
             double accelerationFromNormalG = 0.0;
-            if (_forceTargetProvider != null &&
-                _forceTargetProvider.TryGetForceTargets(Follower.Distance, out ForceTargets targets))
+            if (TryGetProjectedAcceleration(Follower.Distance, Follower.Frame, out Vector3d projectedAcceleration))
             {
-                Vector3d projectedForceVector = ForceTargetProjection.ComputeForceVector(targets, Follower.Frame);
-                accelerationFromNormalG = Vector3d.Dot(projectedForceVector, Follower.Frame.Normal);
+                accelerationFromNormalG = Vector3d.Dot(projectedAcceleration, Follower.Frame.Normal);
             }
 
             double halfStepVelocityKick = 0.5 * accelerationFromNormalG * DeltaTime;
@@ -113,7 +112,13 @@ namespace Quantum.Physics
             for (int i = 0; i < steps; i++)
             {
                 Step();
-                snapshots.Add(CloneFollowerState(Follower));
+                TrainFollowerState snapshot = CloneFollowerState(Follower);
+                if (TryGetProjectedAcceleration(snapshot.Distance, snapshot.Frame, out Vector3d projectedAcceleration))
+                {
+                    snapshot.ProjectedAcceleration = projectedAcceleration;
+                }
+
+                snapshots.Add(snapshot);
             }
 
             return snapshots;
@@ -134,7 +139,21 @@ namespace Quantum.Physics
                 loopEnabled: source.LoopEnabled);
 
             clone.Acceleration = source.Acceleration;
+            clone.ProjectedAcceleration = source.ProjectedAcceleration;
             return clone;
+        }
+
+        private bool TryGetProjectedAcceleration(double distance, TrackFrame frame, out Vector3d projectedAcceleration)
+        {
+            if (_forceTargetProvider != null &&
+                _forceTargetProvider.TryGetForceTargets(distance, out ForceTargets targets))
+            {
+                projectedAcceleration = ForceTargetProjection.ComputeForceVector(targets, frame);
+                return true;
+            }
+
+            projectedAcceleration = default;
+            return false;
         }
     }
 }

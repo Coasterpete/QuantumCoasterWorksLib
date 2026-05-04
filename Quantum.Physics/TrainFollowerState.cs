@@ -18,6 +18,8 @@ namespace Quantum.Physics
 
         public double Acceleration { get; set; }
 
+        public Vector3d? ProjectedAcceleration { get; set; }
+
         public bool LoopEnabled { get; set; }
 
         public Vector3d Position { get; private set; }

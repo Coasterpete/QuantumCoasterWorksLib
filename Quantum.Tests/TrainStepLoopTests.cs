@@ -402,6 +402,137 @@ public sealed class TrainStepLoopTests
     }
 
     [Fact]
+    public void TrainStepLoop_Sample_WithForceTargetProvider_NormalGProjectionUsesSampleDistance()
+    {
+        IArcLengthCurve track = new LineCurve(
+            new Vector3d(0, 0, 0),
+            new Vector3d(100, 0, 0));
+
+        const double deltaTime = 0.25;
+
+        var follower = new TrainFollowerState(
+            track,
+            initialDistance: 0.0,
+            speed: 2.0,
+            loopEnabled: false);
+
+        var loop = new TrainStepLoop(
+            follower,
+            deltaTime,
+            gravityMagnitude: 0.0,
+            linearDragCoefficient: 0.0,
+            quadraticDragCoefficient: 0.0,
+            rollingResistance: 0.0,
+            new DistanceScaledNormalForceTargetProvider());
+
+        IReadOnlyList<TrainFollowerState> samples = loop.Sample(1);
+        TrainFollowerState sample = Assert.Single(samples);
+
+        Assert.True(sample.ProjectedAcceleration.HasValue, "Expected sampled state to include projected acceleration diagnostics.");
+
+        Vector3d expectedProjectedAcceleration = ForceTargetProjection.ComputeForceVector(
+            new ForceTargets(
+                normalG: sample.Distance,
+                lateralG: 0.0,
+                rollRateDegPerSec: 0.0),
+            sample.Frame);
+
+        Vector3d actualProjectedAcceleration = sample.ProjectedAcceleration.Value;
+        Assert.InRange(System.Math.Abs(actualProjectedAcceleration.X - expectedProjectedAcceleration.X), 0.0, ValueTolerance);
+        Assert.InRange(System.Math.Abs(actualProjectedAcceleration.Y - expectedProjectedAcceleration.Y), 0.0, ValueTolerance);
+        Assert.InRange(System.Math.Abs(actualProjectedAcceleration.Z - expectedProjectedAcceleration.Z), 0.0, ValueTolerance);
+    }
+
+    [Fact]
+    public void TrainStepLoop_Sample_WithForceTargetProvider_LateralDiagnosticsAppearWithoutChanging1dKinematics()
+    {
+        IArcLengthCurve track = new LineCurve(
+            new Vector3d(0, 0, 0),
+            new Vector3d(100, 0, 0));
+
+        const double deltaTime = 0.1;
+        const double normalG = 1.0;
+        const double lateralG = 2.5;
+        const double rollRateDegPerSec = 45.0;
+        const double gravityMagnitude = 0.0;
+        const double linearDrag = 0.0;
+        const double quadraticDrag = 0.0;
+        const double rollingResistance = 0.0;
+        const int steps = 10;
+
+        var normalOnlyFollower = new TrainFollowerState(track);
+        var normalPlusLateralFollower = new TrainFollowerState(track);
+
+        var normalOnlyLoop = new TrainStepLoop(
+            normalOnlyFollower,
+            deltaTime,
+            gravityMagnitude,
+            linearDrag,
+            quadraticDrag,
+            rollingResistance,
+            new ConstantNormalForceTargetProvider(normalG));
+
+        var normalPlusLateralLoop = new TrainStepLoop(
+            normalPlusLateralFollower,
+            deltaTime,
+            gravityMagnitude,
+            linearDrag,
+            quadraticDrag,
+            rollingResistance,
+            new ConstantForceTargetProvider(normalG, lateralG, rollRateDegPerSec));
+
+        IReadOnlyList<TrainFollowerState> normalOnlySamples = normalOnlyLoop.Sample(steps);
+        IReadOnlyList<TrainFollowerState> normalPlusLateralSamples = normalPlusLateralLoop.Sample(steps);
+
+        Assert.Equal(normalOnlySamples.Count, normalPlusLateralSamples.Count);
+
+        for (int i = 0; i < normalOnlySamples.Count; i++)
+        {
+            TrainFollowerState normalOnlySample = normalOnlySamples[i];
+            TrainFollowerState normalPlusLateralSample = normalPlusLateralSamples[i];
+
+            Assert.InRange(
+                System.Math.Abs(normalOnlySample.Speed - normalPlusLateralSample.Speed),
+                0.0,
+                ValueTolerance);
+            Assert.InRange(
+                System.Math.Abs(normalOnlySample.Distance - normalPlusLateralSample.Distance),
+                0.0,
+                ValueTolerance);
+
+            Assert.True(normalOnlySample.ProjectedAcceleration.HasValue);
+            Assert.True(normalPlusLateralSample.ProjectedAcceleration.HasValue);
+
+            Vector3d expectedNormalOnlyProjection = ForceTargetProjection.ComputeForceVector(
+                new ForceTargets(normalG, lateralG: 0.0, rollRateDegPerSec: 0.0),
+                normalOnlySample.Frame);
+            Vector3d expectedNormalPlusLateralProjection = ForceTargetProjection.ComputeForceVector(
+                new ForceTargets(normalG, lateralG, rollRateDegPerSec),
+                normalPlusLateralSample.Frame);
+
+            Vector3d actualNormalOnlyProjection = normalOnlySample.ProjectedAcceleration.Value;
+            Vector3d actualNormalPlusLateralProjection = normalPlusLateralSample.ProjectedAcceleration.Value;
+
+            Assert.InRange(System.Math.Abs(actualNormalOnlyProjection.X - expectedNormalOnlyProjection.X), 0.0, ValueTolerance);
+            Assert.InRange(System.Math.Abs(actualNormalOnlyProjection.Y - expectedNormalOnlyProjection.Y), 0.0, ValueTolerance);
+            Assert.InRange(System.Math.Abs(actualNormalOnlyProjection.Z - expectedNormalOnlyProjection.Z), 0.0, ValueTolerance);
+
+            Assert.InRange(System.Math.Abs(actualNormalPlusLateralProjection.X - expectedNormalPlusLateralProjection.X), 0.0, ValueTolerance);
+            Assert.InRange(System.Math.Abs(actualNormalPlusLateralProjection.Y - expectedNormalPlusLateralProjection.Y), 0.0, ValueTolerance);
+            Assert.InRange(System.Math.Abs(actualNormalPlusLateralProjection.Z - expectedNormalPlusLateralProjection.Z), 0.0, ValueTolerance);
+
+            double normalOnlyBinormalComponent = Vector3d.Dot(actualNormalOnlyProjection, normalOnlySample.Frame.Binormal);
+            double normalPlusLateralBinormalComponent = Vector3d.Dot(actualNormalPlusLateralProjection, normalPlusLateralSample.Frame.Binormal);
+
+            Assert.InRange(System.Math.Abs(normalOnlyBinormalComponent), 0.0, ValueTolerance);
+            Assert.InRange(
+                System.Math.Abs(normalPlusLateralBinormalComponent - (lateralG * 9.81)),
+                0.0,
+                ValueTolerance);
+        }
+    }
+
+    [Fact]
     public void TrainStepLoop_WithForceTargetProvider_ReturnsFalse_MatchesBaseline()
     {
         IArcLengthCurve track = new LineCurve(
@@ -915,6 +1046,15 @@ public sealed class TrainStepLoopTests
             SampledDistances.Add(x);
             targets = default;
             return false;
+        }
+    }
+
+    private sealed class DistanceScaledNormalForceTargetProvider : IForceTargetProvider
+    {
+        public bool TryGetForceTargets(double x, out ForceTargets targets)
+        {
+            targets = new ForceTargets(normalG: x, lateralG: 0.0, rollRateDegPerSec: 0.0);
+            return true;
         }
     }
 }
