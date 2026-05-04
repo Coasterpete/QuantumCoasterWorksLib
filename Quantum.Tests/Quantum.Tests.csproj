@@ -24,6 +24,7 @@
     <ProjectReference Include="..\Quantum.FVD\Quantum.FVD.csproj" />
     <ProjectReference Include="..\Quantum.Physics\Quantum.Physics.csproj" />
     <ProjectReference Include="..\Quantum.Splines\Quantum.Splines.csproj" />
+    <ProjectReference Include="..\Quantum.Track\Quantum.Track.csproj" />
   </ItemGroup>
 
 </Project>
