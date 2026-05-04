@@ -1,3 +1,4 @@
+using Quantum.Math;
 using Quantum.Track;
 using Xunit;
 
@@ -190,6 +191,64 @@ public sealed class TrackFoundationTests
         var document = new TrackDocument();
 
         Assert.Throws<ArgumentOutOfRangeException>(() => evaluator.EvaluateAtDistance(document, 0.0));
+    }
+
+    [Fact]
+    public void TrackEvaluator_EvaluateTransform_ReturnsNonNullTransformWithIdentityRotation()
+    {
+        var evaluator = new TrackEvaluator();
+        var document = new TrackDocument(new TrackSegment[] { new StraightSegment(length: 10.0) });
+
+        Transform3d transform = evaluator.EvaluateTransform(document, new TrackPosition(segmentIndex: 0, localT: 0.5));
+
+        Assert.Equal(5.0, transform.Position.X, 10);
+        Assert.Equal(1.0, transform.Rotation.M00);
+        Assert.Equal(0.0, transform.Rotation.M01);
+        Assert.Equal(0.0, transform.Rotation.M02);
+        Assert.Equal(0.0, transform.Rotation.M10);
+        Assert.Equal(1.0, transform.Rotation.M11);
+        Assert.Equal(0.0, transform.Rotation.M12);
+        Assert.Equal(0.0, transform.Rotation.M20);
+        Assert.Equal(0.0, transform.Rotation.M21);
+        Assert.Equal(1.0, transform.Rotation.M22);
+    }
+
+    [Fact]
+    public void TrackEvaluator_EvaluateTransform_PositionIncreasesWithDistance()
+    {
+        var evaluator = new TrackEvaluator();
+        var document = new TrackDocument(new TrackSegment[]
+        {
+            new StraightSegment(length: 10.0),
+            new CurvedSegment(length: 5.0)
+        });
+
+        Transform3d first = evaluator.EvaluateTransform(document, new TrackPosition(segmentIndex: 0, localT: 0.25));
+        Transform3d second = evaluator.EvaluateTransform(document, new TrackPosition(segmentIndex: 1, localT: 0.5));
+
+        Assert.True(second.Position.X > first.Position.X);
+        Assert.Equal(0.0, second.Position.Y);
+        Assert.Equal(0.0, second.Position.Z);
+    }
+
+    [Fact]
+    public void TrackEvaluator_EvaluateTransform_ConsistentWithEvaluateAtAndEvaluateAtDistance()
+    {
+        var evaluator = new TrackEvaluator();
+        var first = new StraightSegment(length: 10.0, id: "s-01");
+        var second = new CurvedSegment(length: 5.0, id: "c-01");
+        var document = new TrackDocument(new TrackSegment[] { first, second });
+        double distance = 12.0;
+
+        TrackEvaluationPoint fromPosition = evaluator.EvaluateAt(document, new TrackPosition(segmentIndex: 1, localT: 0.4));
+        TrackEvaluationPoint fromDistance = evaluator.EvaluateAtDistance(document, distance);
+        Transform3d transform = evaluator.EvaluateTransform(
+            document,
+            new TrackPosition(segmentIndex: 1, localT: fromDistance.LocalT));
+
+        Assert.Same(fromPosition.Segment, fromDistance.Segment);
+        Assert.Equal(fromPosition.LocalT, fromDistance.LocalT, 10);
+        Assert.Equal(distance, transform.Position.X, 10);
     }
 
     [Fact]

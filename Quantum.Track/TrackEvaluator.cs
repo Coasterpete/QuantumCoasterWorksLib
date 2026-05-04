@@ -1,3 +1,5 @@
+using Quantum.Math;
+
 namespace Quantum.Track
 {
     public class TrackEvaluator
@@ -65,6 +67,30 @@ namespace Quantum.Track
             }
 
             return new TrackEvaluationPoint(segment, position.LocalT);
+        }
+
+        public Transform3d EvaluateTransform(TrackDocument doc, TrackPosition position)
+        {
+            TrackEvaluationPoint evaluationPoint = EvaluateAt(doc, position);
+            double distanceAlongTrack = 0.0;
+
+            for (int i = 0; i < position.SegmentIndex; i++)
+            {
+                TrackSegment priorSegment = doc.Segments[i];
+
+                if (priorSegment is null)
+                {
+                    throw new System.InvalidOperationException("TrackDocument contains a null segment entry.");
+                }
+
+                distanceAlongTrack += priorSegment.Length;
+            }
+
+            distanceAlongTrack += evaluationPoint.LocalT * evaluationPoint.Segment.Length;
+
+            return new Transform3d(
+                Matrix3x3.Identity,
+                new Vector3d(distanceAlongTrack, 0.0, 0.0));
         }
 
         public TrackEvaluationPoint EvaluateAtDistance(TrackDocument doc, double distance)
