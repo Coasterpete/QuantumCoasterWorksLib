@@ -11,6 +11,164 @@ public sealed class FvdForceTargetProviderAdapterTests
     private const double ValueTolerance = 1e-9;
 
     [Fact]
+    public void Adapter_MissingLateralG_DefaultsToZero()
+    {
+        var graph = new FvdGraph(
+            new List<FvdControlNode>
+            {
+                new(0.0, new Vector3d(0.0, 0.0, 0.0), 1.0),
+                new(1.0, new Vector3d(10.0, 0.0, 0.0), 1.0)
+            },
+            degree: 1,
+            forceSamples: new List<FvdForceSample>(),
+            sections: new List<FvdSectionDefinition>
+            {
+                new(
+                    FvdSectionKind.Force,
+                    FvdFunctionDomain.Distance,
+                    startX: 0.0,
+                    endX: 10.0,
+                    new List<FvdSectionFunction>
+                    {
+                        new(
+                            FvdSectionChannel.NormalG,
+                            new List<FvdSectionSample>
+                            {
+                                new(0.0, 1.0),
+                                new(10.0, 3.0)
+                            })
+                    })
+            });
+
+        var adapter = new FvdForceTargetProviderAdapter(graph, FvdFunctionDomain.Distance);
+
+        bool success = adapter.TryGetForceTargets(5.0, out ForceTargets targets);
+
+        Assert.True(success);
+        Assert.InRange(System.Math.Abs(targets.LateralG), 0.0, ValueTolerance);
+    }
+
+    [Fact]
+    public void Adapter_MissingRollRate_DefaultsToZero()
+    {
+        var graph = new FvdGraph(
+            new List<FvdControlNode>
+            {
+                new(0.0, new Vector3d(0.0, 0.0, 0.0), 1.0),
+                new(1.0, new Vector3d(10.0, 0.0, 0.0), 1.0)
+            },
+            degree: 1,
+            forceSamples: new List<FvdForceSample>(),
+            sections: new List<FvdSectionDefinition>
+            {
+                new(
+                    FvdSectionKind.Force,
+                    FvdFunctionDomain.Distance,
+                    startX: 0.0,
+                    endX: 10.0,
+                    new List<FvdSectionFunction>
+                    {
+                        new(
+                            FvdSectionChannel.NormalG,
+                            new List<FvdSectionSample>
+                            {
+                                new(0.0, 1.0),
+                                new(10.0, 3.0)
+                            }),
+                        new(
+                            FvdSectionChannel.LateralG,
+                            new List<FvdSectionSample>
+                            {
+                                new(0.0, 2.0),
+                                new(10.0, 4.0)
+                            })
+                    })
+            });
+
+        var adapter = new FvdForceTargetProviderAdapter(graph, FvdFunctionDomain.Distance);
+
+        bool success = adapter.TryGetForceTargets(5.0, out ForceTargets targets);
+
+        Assert.True(success);
+        Assert.InRange(System.Math.Abs(targets.RollRateDegPerSec), 0.0, ValueTolerance);
+    }
+
+    [Fact]
+    public void Adapter_NoTargetsAtX_ReturnsFalse()
+    {
+        var graph = new FvdGraph(
+            new List<FvdControlNode>
+            {
+                new(0.0, new Vector3d(0.0, 0.0, 0.0), 1.0),
+                new(1.0, new Vector3d(10.0, 0.0, 0.0), 1.0)
+            },
+            degree: 1,
+            forceSamples: new List<FvdForceSample>(),
+            sections: new List<FvdSectionDefinition>
+            {
+                new(
+                    FvdSectionKind.Force,
+                    FvdFunctionDomain.Distance,
+                    startX: 0.0,
+                    endX: 10.0,
+                    new List<FvdSectionFunction>
+                    {
+                        new(
+                            FvdSectionChannel.NormalG,
+                            new List<FvdSectionSample>
+                            {
+                                new(0.0, 1.0),
+                                new(10.0, 3.0)
+                            })
+                    })
+            });
+
+        var adapter = new FvdForceTargetProviderAdapter(graph, FvdFunctionDomain.Distance);
+
+        bool success = adapter.TryGetForceTargets(15.0, out ForceTargets targets);
+
+        Assert.False(success);
+        Assert.Equal(default, targets);
+    }
+
+    [Fact]
+    public void Adapter_PartialChannels_DoNotFail()
+    {
+        var graph = new FvdGraph(
+            new List<FvdControlNode>
+            {
+                new(0.0, new Vector3d(0.0, 0.0, 0.0), 1.0),
+                new(1.0, new Vector3d(10.0, 0.0, 0.0), 1.0)
+            },
+            degree: 1,
+            forceSamples: new List<FvdForceSample>(),
+            sections: new List<FvdSectionDefinition>
+            {
+                new(
+                    FvdSectionKind.Force,
+                    FvdFunctionDomain.Distance,
+                    startX: 0.0,
+                    endX: 10.0,
+                    new List<FvdSectionFunction>
+                    {
+                        new(
+                            FvdSectionChannel.NormalG,
+                            new List<FvdSectionSample>
+                            {
+                                new(0.0, 2.0),
+                                new(10.0, 2.0)
+                            })
+                    })
+            });
+
+        var adapter = new FvdForceTargetProviderAdapter(graph, FvdFunctionDomain.Distance);
+
+        bool success = adapter.TryGetForceTargets(5.0, out _);
+
+        Assert.True(success);
+    }
+
+    [Fact]
     public void FvdForceTargetProviderAdapter_ReturnsNormalGFromFvd()
     {
         var graph = new FvdGraph(
