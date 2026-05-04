@@ -29,7 +29,15 @@ Read `structure.md` before making changes.
 
 ## Current Backend State
 
-- Current validation: 152/152 tests passing.
+- Current validation: 159/159 tests passing.
+- `Matrix3x3` exists in `Quantum.Math` as the minimal 3x3 basis transform primitive.
+- `Transform3d` exists in `Quantum.Math` with:
+  - `Matrix3x3 Rotation`
+  - `Vector3d Position`
+  - point/direction transform helpers and simple rigid inverse
+- `ITrackFrameBasis` exists in `Quantum.Math` to avoid `Quantum.Math -> Quantum.Splines` dependency cycles.
+- `TrackFrame` implements `ITrackFrameBasis`.
+- `Transform3d.FromTrackFrame(...)` provides the spatial bridge from track frame basis to world transform.
 - FVD force target pipeline exists.
 - `FvdGraph` supports strict and permissive force target queries.
 - `FvdForceTargetProviderAdapter` uses permissive query behavior but requires `NormalG`.
@@ -51,6 +59,7 @@ Read `structure.md` before making changes.
   - `NormalAcceleration`
   - `BinormalAcceleration`
 - `LateralG` and `RollRate` are currently diagnostics/data-path only and do not affect 1D motion.
+- Physics loop behavior is unchanged; `TrainStepLoop` behavior remains preserved.
 
 ## Locked Contracts
 
@@ -74,9 +83,10 @@ Read `structure.md` before making changes.
 
 ## Next Recommended Lane
 
-- Short cleanup/context pass.
-- Then establish math transform foundation such as `Matrix3x3`/`Matrix4x4` or frame-to-transform helpers.
-- Do not expand special track systems until track evaluation architecture exists.
+- Continue incremental spatial tooling on top of current `Matrix3x3` + `Transform3d` foundation.
+- `Matrix4x4` is intentionally not needed yet.
+- Quaternion/roll transform expansion can come later once requirements are concrete.
+- `Quantum.Track` and special track systems should wait until track evaluation architecture is planned.
 
 Preserve deterministic behavior and keep special-track expansion gated behind architecture readiness.
 
