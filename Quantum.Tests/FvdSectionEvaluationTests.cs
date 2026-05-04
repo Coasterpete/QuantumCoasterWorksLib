@@ -953,6 +953,133 @@ public class FvdSectionEvaluationTests
     }
 
     [Fact]
+    public void FvdGraph_TryEvaluateForceTargetsPermissiveAt_MissingLateralG_DefaultsToZeroAndReturnsTrue()
+    {
+        Type sectionDefinitionType = RequireSectionDefinitionType();
+        Type sectionFunctionType = RequireSectionFunctionType();
+
+        object normal = CreateSectionFunctionOrFail(
+            sectionFunctionType,
+            channelName: "NormalG",
+            CreateSectionSampleOrFail(0.0, 1.0),
+            CreateSectionSampleOrFail(10.0, 3.0));
+
+        object section = CreateSectionDefinitionOrFail(
+            sectionDefinitionType,
+            kindName: "Force",
+            domainName: "Distance",
+            startX: 0.0,
+            endX: 10.0,
+            normal);
+
+        object graph = CreateGraphWithSectionsOrFail(section);
+
+        (bool returned, double normalG, double lateralG, double rollRateDegPerSec) =
+            TryEvaluateForceTargetsPermissiveAtOrFail(graph, domainName: "Distance", x: 5.0);
+
+        Assert.True(returned);
+        Assert.InRange(System.Math.Abs(normalG - 2.0), 0.0, ValueTolerance);
+        Assert.Equal(0.0, lateralG);
+        Assert.Equal(0.0, rollRateDegPerSec);
+    }
+
+    [Fact]
+    public void FvdGraph_TryEvaluateForceTargetsPermissiveAt_MissingRollRate_DefaultsToZeroAndReturnsTrue()
+    {
+        Type sectionDefinitionType = RequireSectionDefinitionType();
+        Type sectionFunctionType = RequireSectionFunctionType();
+
+        object normal = CreateSectionFunctionOrFail(
+            sectionFunctionType,
+            channelName: "NormalG",
+            CreateSectionSampleOrFail(0.0, 1.0),
+            CreateSectionSampleOrFail(10.0, 3.0));
+        object lateral = CreateSectionFunctionOrFail(
+            sectionFunctionType,
+            channelName: "LateralG",
+            CreateSectionSampleOrFail(0.0, 2.0),
+            CreateSectionSampleOrFail(10.0, 4.0));
+
+        object section = CreateSectionDefinitionOrFail(
+            sectionDefinitionType,
+            kindName: "Force",
+            domainName: "Distance",
+            startX: 0.0,
+            endX: 10.0,
+            normal,
+            lateral);
+
+        object graph = CreateGraphWithSectionsOrFail(section);
+
+        (bool returned, double normalG, double lateralG, double rollRateDegPerSec) =
+            TryEvaluateForceTargetsPermissiveAtOrFail(graph, domainName: "Distance", x: 5.0);
+
+        Assert.True(returned);
+        Assert.InRange(System.Math.Abs(normalG - 2.0), 0.0, ValueTolerance);
+        Assert.InRange(System.Math.Abs(lateralG - 3.0), 0.0, ValueTolerance);
+        Assert.Equal(0.0, rollRateDegPerSec);
+    }
+
+    [Fact]
+    public void FvdGraph_TryEvaluateForceTargetsPermissiveAt_PartialChannels_DoNotFail()
+    {
+        Type sectionDefinitionType = RequireSectionDefinitionType();
+        Type sectionFunctionType = RequireSectionFunctionType();
+
+        object normal = CreateSectionFunctionOrFail(
+            sectionFunctionType,
+            channelName: "NormalG",
+            CreateSectionSampleOrFail(0.0, 2.0),
+            CreateSectionSampleOrFail(10.0, 2.0));
+
+        object section = CreateSectionDefinitionOrFail(
+            sectionDefinitionType,
+            kindName: "Force",
+            domainName: "Distance",
+            startX: 0.0,
+            endX: 10.0,
+            normal);
+
+        object graph = CreateGraphWithSectionsOrFail(section);
+
+        (bool returned, _, _, _) =
+            TryEvaluateForceTargetsPermissiveAtOrFail(graph, domainName: "Distance", x: 5.0);
+
+        Assert.True(returned);
+    }
+
+    [Fact]
+    public void FvdGraph_TryEvaluateForceTargetsPermissiveAt_NoTargetsAtX_ReturnsFalseAndZeroOutputs()
+    {
+        Type sectionDefinitionType = RequireSectionDefinitionType();
+        Type sectionFunctionType = RequireSectionFunctionType();
+
+        object normal = CreateSectionFunctionOrFail(
+            sectionFunctionType,
+            channelName: "NormalG",
+            CreateSectionSampleOrFail(0.0, 1.0),
+            CreateSectionSampleOrFail(10.0, 3.0));
+
+        object section = CreateSectionDefinitionOrFail(
+            sectionDefinitionType,
+            kindName: "Force",
+            domainName: "Distance",
+            startX: 0.0,
+            endX: 10.0,
+            normal);
+
+        object graph = CreateGraphWithSectionsOrFail(section);
+
+        (bool returned, double normalG, double lateralG, double rollRateDegPerSec) =
+            TryEvaluateForceTargetsPermissiveAtOrFail(graph, domainName: "Distance", x: 15.0);
+
+        Assert.False(returned);
+        Assert.Equal(0.0, normalG);
+        Assert.Equal(0.0, lateralG);
+        Assert.Equal(0.0, rollRateDegPerSec);
+    }
+
+    [Fact]
     public void FvdGraph_TryEvaluateSectionAllAt_NoCoveringSection_ReturnsFalse_AndEmpty()
     {
         Type sectionDefinitionType = RequireSectionDefinitionType();
@@ -1192,6 +1319,58 @@ public class FvdSectionEvaluationTests
             (double)invocationArgs[3]!,
             (double)invocationArgs[4]!,
             invocationArgs[5]!);
+    }
+
+    private static (bool Returned, double NormalG, double LateralG, double RollRateDegPerSec) TryEvaluateForceTargetsPermissiveAtOrFail(
+        object graph,
+        string domainName,
+        double x)
+    {
+        Type graphType = graph.GetType();
+        Type functionDomainType = RequireFunctionDomainType();
+
+        MethodInfo? method = graphType.GetMethod(
+            "TryEvaluateForceTargetsPermissiveAt",
+            BindingFlags.Public | BindingFlags.Instance,
+            binder: null,
+            types: new[]
+            {
+                functionDomainType,
+                typeof(double),
+                typeof(double).MakeByRefType(),
+                typeof(double).MakeByRefType(),
+                typeof(double).MakeByRefType()
+            },
+            modifiers: null);
+
+        Assert.True(
+            method is not null,
+            "Expected method: FvdGraph.TryEvaluateForceTargetsPermissiveAt(FvdFunctionDomain domain, double x, out double normalG, out double lateralG, out double rollRateDegPerSec).");
+
+        object domain = ParseEnumOrFail(functionDomainType, domainName);
+        object[] invocationArgs = new object[] { domain, x, 0.0, 0.0, 0.0 };
+
+        object? returned;
+        try
+        {
+            returned = method!.Invoke(graph, invocationArgs);
+        }
+        catch (TargetInvocationException ex) when (ex.InnerException is not null)
+        {
+            ExceptionDispatchInfo.Capture(ex.InnerException).Throw();
+            throw;
+        }
+
+        Assert.True(returned is bool, "Expected TryEvaluateForceTargetsPermissiveAt to return a bool.");
+        Assert.True(invocationArgs[2] is double, "Expected out normalG to be a double.");
+        Assert.True(invocationArgs[3] is double, "Expected out lateralG to be a double.");
+        Assert.True(invocationArgs[4] is double, "Expected out rollRateDegPerSec to be a double.");
+
+        return (
+            (bool)returned!,
+            (double)invocationArgs[2]!,
+            (double)invocationArgs[3]!,
+            (double)invocationArgs[4]!);
     }
 
     private static double EvaluateFunctionAtOrFail(object function, double x)

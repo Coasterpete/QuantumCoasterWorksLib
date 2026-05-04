@@ -259,6 +259,48 @@ namespace Quantum.FVD
                 out _);
         }
 
+        public bool TryEvaluateForceTargetsPermissiveAt(
+            FvdFunctionDomain domain,
+            double x,
+            out double normalG,
+            out double lateralG,
+            out double rollRateDegPerSec)
+        {
+            if (!TryEvaluateSectionAllAt(FvdSectionKind.Force, domain, x, out IReadOnlyList<FvdChannelEvaluation> evaluations))
+            {
+                normalG = default;
+                lateralG = default;
+                rollRateDegPerSec = default;
+                return false;
+            }
+
+            normalG = 0.0;
+            lateralG = 0.0;
+            rollRateDegPerSec = 0.0;
+
+            for (int i = 0; i < evaluations.Count; i++)
+            {
+                FvdChannelEvaluation evaluation = evaluations[i];
+
+                switch (evaluation.Channel)
+                {
+                    case FvdSectionChannel.NormalG:
+                        normalG = evaluation.Value;
+                        break;
+
+                    case FvdSectionChannel.LateralG:
+                        lateralG = evaluation.Value;
+                        break;
+
+                    case FvdSectionChannel.RollRateDegPerSec:
+                        rollRateDegPerSec = evaluation.Value;
+                        break;
+                }
+            }
+
+            return true;
+        }
+
         public bool TryEvaluateForceTargetsAt(
             FvdFunctionDomain domain,
             double x,
