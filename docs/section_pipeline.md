@@ -115,7 +115,7 @@ This aligns `Quantum.Track` with the proven structure already present in `Quantu
 - Match Kex-style behavior at the section evaluation layer first.
 - Delay graph/node orchestration until section-to-spline and section-to-physics mappings are stable and test-covered.
 
-## 5) Smallest Safe Next Milestone
+## 5) Completed Milestone: Deterministic Section Pipeline
 
 ### Objective
 Add the minimum new contracts needed to make section evaluation deterministic and testable, without changing simulation behavior.
@@ -145,13 +145,14 @@ Phase 1 complete:
 
 All interpolation modes are opt-in and preserve existing behavior by default.
 
-### Next Phase
-Expand interpolation support with additional preset modes:
+### Completed Phase 2 Presets
 - Quadratic
 - Cubic
 - Quartic
 - Quintic
 - Sinusoidal
+
+### Deferred
 - Plateau
 
 ### Future Direction
@@ -166,10 +167,10 @@ Plateau interpolation is reserved for future force-profile shapes where a channe
 - No automatic section-to-physics coupling.
 - Existing constant-section tests must remain unchanged.
 
-### Custom Easing Design Direction
-Custom easings should not be added directly to `ForceInterpolationMode` as enum values. Instead, they should be represented as reusable channel/easing definitions that can be referenced by force channels later.
+### Custom Easing Abstraction
 
-Initial custom easing support should remain data-layer only and should not change default physics behavior.
+Status:
+A minimal easing abstraction (`IForceEasingFunction`) has been introduced. Built-in interpolation modes are currently wrapped through this interface, enabling future extension without modifying the enum-based system.
 
 ## References
 - KexEdit node graph and section concepts: <https://individualkex.github.io/KexEdit/reference/node-graph.html>
