@@ -159,6 +159,8 @@ Expand interpolation support with additional preset modes:
 - Keyframed channel curves
 - FVD-style channel functions
 
+Plateau interpolation is reserved for future force-profile shapes where a channel rises to a target, holds, then optionally falls. It should not be added to the basic `start → end` interpolation enum until the API supports multi-stage channel profiles.
+
 ### Guardrails
 - No default physics behavior changes.
 - No automatic section-to-physics coupling.
