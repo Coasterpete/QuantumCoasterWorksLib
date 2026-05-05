@@ -11,7 +11,8 @@ namespace Quantum.Track
             double? startNormalG = null,
             double? endNormalG = null,
             double? startLateralG = null,
-            double? endLateralG = null)
+            double? endLateralG = null,
+            IForceEasingFunction? easingFunction = null)
         {
             TargetNormalG = targetNormalG;
             TargetLateralG = targetLateralG;
@@ -22,6 +23,7 @@ namespace Quantum.Track
             EndNormalG = endNormalG;
             StartLateralG = startLateralG;
             EndLateralG = endLateralG;
+            EasingFunction = easingFunction;
         }
 
         public double? TargetNormalG { get; }
@@ -41,5 +43,7 @@ namespace Quantum.Track
         public double? StartLateralG { get; }
 
         public double? EndLateralG { get; }
+
+        public IForceEasingFunction? EasingFunction { get; }
     }
 }

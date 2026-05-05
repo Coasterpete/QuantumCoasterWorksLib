@@ -49,6 +49,7 @@ namespace Quantum.Track
 
             double? targetNormalG = SampleChannel(
                 resolvedSection.InterpolationMode,
+                resolvedSection.EasingFunction,
                 resolvedSection.TargetNormalG,
                 resolvedSection.StartNormalG,
                 resolvedSection.EndNormalG,
@@ -56,6 +57,7 @@ namespace Quantum.Track
 
             double? targetLateralG = SampleChannel(
                 resolvedSection.InterpolationMode,
+                resolvedSection.EasingFunction,
                 resolvedSection.TargetLateralG,
                 resolvedSection.StartLateralG,
                 resolvedSection.EndLateralG,
@@ -71,16 +73,20 @@ namespace Quantum.Track
 
         private static double? SampleChannel(
             ForceInterpolationMode mode,
+            IForceEasingFunction? easingFunction,
             double? constantValue,
             double? startValue,
             double? endValue,
             double normalizedT)
         {
+            if (easingFunction is null && mode == ForceInterpolationMode.Constant)
+            {
+                return constantValue;
+            }
+
             switch (mode)
             {
                 case ForceInterpolationMode.Constant:
-                    return constantValue;
-
                 case ForceInterpolationMode.Linear:
                 case ForceInterpolationMode.SmoothStep:
                 case ForceInterpolationMode.Quadratic:
@@ -96,7 +102,8 @@ namespace Quantum.Track
                         return null;
                     }
 
-                    double adjustedT = InterpolationEvaluator.Evaluate(normalizedT, mode);
+                    double adjustedT = easingFunction?.Evaluate(normalizedT)
+                        ?? InterpolationEvaluator.Evaluate(normalizedT, mode);
 
                     return MathUtil.Lerp(resolvedStart.Value, resolvedEnd.Value, adjustedT);
 

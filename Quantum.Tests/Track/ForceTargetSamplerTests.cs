@@ -514,6 +514,50 @@ public sealed class ForceTargetSamplerTests
         Assert.Equal(0.1, sampled.TargetLateralG.Value, 10);
     }
 
+    [Fact]
+    public void ForceTargetSampler_Sample_CustomEasing_OverridesInterpolationModeBehavior()
+    {
+        var section = new ForceSection(
+            targetNormalG: 1.0,
+            length: 10.0,
+            interpolationMode: ForceInterpolationMode.Constant,
+            startNormalG: 10.0,
+            endNormalG: 20.0,
+            easingFunction: new FixedForceEasingFunction(0.75));
+
+        IReadOnlyList<ResolvedSectionInterval<ForceSection>> intervals = ForceTargetResolver.Resolve(new[]
+        {
+            (section, 10.0)
+        });
+
+        SampledForceTarget sampled = ForceTargetSampler.Sample(intervals, 5.0);
+
+        Assert.True(sampled.TargetNormalG.HasValue);
+        Assert.Equal(17.5, sampled.TargetNormalG.Value, 10);
+        Assert.NotEqual(1.0, sampled.TargetNormalG.Value);
+    }
+
+    [Fact]
+    public void ForceTargetSampler_Sample_NullCustomEasing_PreservesInterpolationModeBehavior()
+    {
+        var section = new ForceSection(
+            length: 10.0,
+            interpolationMode: ForceInterpolationMode.SmoothStep,
+            startNormalG: 2.0,
+            endNormalG: 4.0,
+            easingFunction: null);
+
+        IReadOnlyList<ResolvedSectionInterval<ForceSection>> intervals = ForceTargetResolver.Resolve(new[]
+        {
+            (section, 10.0)
+        });
+
+        SampledForceTarget sampled = ForceTargetSampler.Sample(intervals, 2.5);
+
+        Assert.True(sampled.TargetNormalG.HasValue);
+        Assert.Equal(2.3125, sampled.TargetNormalG.Value, 10);
+    }
+
     [Theory]
     [InlineData(-0.0001)]
     [InlineData(5.0001)]
@@ -529,5 +573,20 @@ public sealed class ForceTargetSamplerTests
         });
 
         Assert.Throws<ArgumentOutOfRangeException>(() => ForceTargetSampler.Sample(intervals, distance));
+    }
+
+    private sealed class FixedForceEasingFunction : IForceEasingFunction
+    {
+        private readonly double _value;
+
+        public FixedForceEasingFunction(double value)
+        {
+            _value = value;
+        }
+
+        public double Evaluate(double t)
+        {
+            return _value;
+        }
     }
 }
