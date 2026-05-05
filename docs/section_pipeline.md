@@ -210,6 +210,7 @@ A minimal channel container abstraction has been introduced via `ForceChannelSet
 
 - `ForceChannel` is a lightweight adapter over `IForceEasingFunction`.
 
+
 ### Resolution Priority
 
 When sampling a section:
@@ -223,6 +224,36 @@ When sampling a section:
 - This change is fully backward compatible.
 - Existing `ForceSection` scalar and interpolation behavior remains unchanged.
 - The container enables future expansion toward multi-channel, domain-aware section definitions.
+
+### ForceSection Multi-Channel Support (v3)
+
+Status:
+`ForceChannelSet` now supports multiple channels per force type.
+
+- Additional optional collections:
+  - `NormalGChannels : IReadOnlyList<IForceChannel>?`
+  - `LateralGChannels : IReadOnlyList<IForceChannel>?`
+  - `RollRateChannels : IReadOnlyList<IForceChannel>?`
+
+### Resolution Priority (Multi-Channel)
+
+When sampling a section (per force type):
+
+1. Multi-channel list (`*Channels`) is used when non-null and non-empty
+2. Single channel from `ForceChannelSet` (v2)
+3. Individual `ForceSection` channel properties (v1)
+4. Fallback to start/end + interpolation behavior (v1)
+
+### Combination Rule
+
+- When multiple channels are present, each channel is evaluated at `t`
+- Results are combined via deterministic summation
+
+### Notes
+
+- This change is fully backward compatible
+- Existing single-channel behavior remains unchanged
+- Multi-channel support enables layered force definitions and is a step toward full FVD-style channel composition
 
 ## References
 - KexEdit node graph and section concepts: <https://individualkex.github.io/KexEdit/reference/node-graph.html>
