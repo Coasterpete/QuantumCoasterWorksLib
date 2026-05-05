@@ -458,6 +458,30 @@ Renderer-agnostic debug geometry for train cars has been added.
 - No TrainStepLoop or physics changes
 - This extends the debug visualization layer for spatial verification
 
+### Camera Transform System
+
+Status:
+A renderer-agnostic camera transform system has been introduced based on `TrackFrame`.
+
+Supported camera modes:
+- Ride camera
+- Target camera
+- Fly-by camera
+- B-roll camera
+
+### Behavior
+
+- Ride cameras use local offsets in T/N/B space.
+- Target cameras look from a camera position toward a target position.
+- Fly-by cameras use a fixed camera position and target a moving track/train frame.
+- B-roll cameras support local offsets and optional look-ahead along the track.
+
+### Notes
+
+- All camera modes output `CameraTransform`.
+- Camera transforms are interop-ready through `Matrix4x4`.
+- No renderer, Unity, TrainStepLoop, or physics behavior changes were made.
+
 ## References
 - KexEdit node graph and section concepts: <https://individualkex.github.io/KexEdit/reference/node-graph.html>
 
