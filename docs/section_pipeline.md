@@ -284,6 +284,36 @@ When a multi-channel list is used:
 - Blend modes only affect multi-channel lists.
 - Single-channel paths and legacy fallback behavior remain unchanged.
 
+### ForceSection Domain Support (v5)
+
+Status:
+Force channel domain plumbing has been introduced.
+
+- `ForceChannelDomain` supports:
+  - `Distance`
+  - `Time`
+
+- `ForceSection` now exposes:
+  - `Domain : ForceChannelDomain`
+
+- `ForceChannelSet` may optionally override the section domain:
+  - `Domain : ForceChannelDomain?`
+
+### Domain Resolution
+
+When sampling a section:
+
+1. `ForceSection.Channels.Domain` is used when present
+2. Otherwise `ForceSection.Domain` is used
+3. Default domain is `Distance`
+
+### Notes
+
+- `Distance` preserves existing behavior.
+- `Time` is currently a stub and uses the same normalized sampling value as `Distance`.
+- No time-based integration behavior is active yet.
+- This prepares the system for future time-domain force sections.
+
 ## References
 - KexEdit node graph and section concepts: <https://individualkex.github.io/KexEdit/reference/node-graph.html>
 
