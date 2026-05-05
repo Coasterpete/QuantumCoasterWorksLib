@@ -482,6 +482,36 @@ Supported camera modes:
 - Camera transforms are interop-ready through `Matrix4x4`.
 - No renderer, Unity, TrainStepLoop, or physics behavior changes were made.
 
+### Fly-View and Walk-View Cameras
+
+Status:
+Free-camera style view modes have been added.
+
+- `FlyViewCameraState` supports:
+  - `Position`
+  - `YawRadians`
+  - `PitchRadians`
+  - `RollRadians`
+
+- `WalkViewCameraState` supports:
+  - `Position`
+  - `YawRadians`
+  - `PitchRadians`
+  - `EyeHeight`
+  - `RollRadians`
+
+### Behavior
+
+- Fly-view computes a free camera transform from yaw/pitch/roll.
+- Walk-view is a thin layer over fly-view with an eye-height offset.
+- Walk-view does not implement collision, gravity, stairs, crouch, sprint, or ground snapping yet.
+
+### Notes
+
+- No renderer or Unity dependency.
+- No physics or `TrainStepLoop` behavior changes.
+- These camera modes prepare the system for editor navigation and viewer integration.
+
 ## References
 - KexEdit node graph and section concepts: <https://individualkex.github.io/KexEdit/reference/node-graph.html>
 
