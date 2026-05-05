@@ -346,6 +346,27 @@ Time-domain sampling requires:
 - Time-domain sampling is opt-in through the new sampler overloads.
 - Existing legacy sampling behavior is preserved.
 
+### ForceSection Provider Time-Domain Sampling (v7)
+
+Status:
+`SectionForceTargetProvider` now exposes explicit elapsed-time APIs for opt-in time-domain sampling.
+
+- New provider APIs:
+  - `Sample(double distance, double elapsedTime)`
+  - `TryGetForceTargets(double distance, double elapsedTime, out ForceTargets targets)`
+
+### Behavior
+
+- Existing distance-only provider APIs remain unchanged.
+- New elapsed-time APIs delegate to `ForceTargetSampler` time-domain sampling.
+- Time-domain validation behavior matches the sampler.
+
+### Notes
+
+- No `TrainStepLoop` behavior changes were made.
+- Provider-level time-domain sampling is opt-in.
+- This prepares the system for future optional runtime integration.
+
 ## References
 - KexEdit node graph and section concepts: <https://individualkex.github.io/KexEdit/reference/node-graph.html>
 
