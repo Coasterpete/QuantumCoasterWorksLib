@@ -29,8 +29,8 @@ Read `structure.md` before making changes.
 
 ## Current Backend State
 
-- Current validation: 187/187 tests passing.
-- `Quantum.Track` exists.
+- Current validation: 197/197 tests passing.
+- `Quantum.Track` supports document, segments, traversal, frame, transform, and spline-backed spatial evaluation.
 - `TrackDocument`, `TrackSegment`, `StraightSegment`, and `CurvedSegment` exist.
 - `TrackEvaluator` supports:
   - `Evaluate`
@@ -38,9 +38,8 @@ Read `structure.md` before making changes.
   - `EvaluateAtDistance`
   - `EvaluateTransform`
   - `EvaluateFrame`
-- Spline-based spatial evaluation exists.
-- `TrackFrame` sampling exists.
-- `TrainStepLoop`/physics integration remains untouched.
+- `Quantum.Physics` has `TrackPhysicsAdapter` for read-only frame/transform sampling from `TrackDocument`.
+- `TrainStepLoop` is still not integrated with `TrackDocument`.
 - `Matrix3x3` exists in `Quantum.Math` as the minimal 3x3 basis transform primitive.
 - `Transform3d` exists in `Quantum.Math` with:
   - `Matrix3x3 Rotation`
@@ -95,7 +94,7 @@ Read `structure.md` before making changes.
 ## Next Recommended Lane
 
 - Continue incremental spatial tooling on top of current track evaluation architecture.
-- Next safe milestone: add distance-based frame/transform helpers (for example `EvaluateFrameAtDistance` and `EvaluateTransformAtDistance`) without integrating into `TrainStepLoop` yet.
+- Next safe milestone: add a `TrackFrameProvider` abstraction for `TrainStepLoop` or physics consumers, but do not switch `TrainStepLoop` to use it by default.
 - Keep `TrainStepLoop` behavior untouched while expanding evaluation helpers.
 
 Preserve deterministic behavior and keep special-track expansion gated behind architecture readiness.
