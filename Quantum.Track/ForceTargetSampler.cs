@@ -49,6 +49,7 @@ namespace Quantum.Track
 
             double? targetNormalG = SampleChannel(
                 resolvedSection.Channels?.NormalGChannels,
+                resolvedSection.Channels?.NormalGBlendMode ?? ForceChannelBlendMode.Sum,
                 resolvedSection.Channels?.NormalG,
                 resolvedSection.NormalGChannel,
                 resolvedSection.InterpolationMode,
@@ -60,6 +61,7 @@ namespace Quantum.Track
 
             double? targetLateralG = SampleChannel(
                 resolvedSection.Channels?.LateralGChannels,
+                resolvedSection.Channels?.LateralGBlendMode ?? ForceChannelBlendMode.Sum,
                 resolvedSection.Channels?.LateralG,
                 resolvedSection.LateralGChannel,
                 resolvedSection.InterpolationMode,
@@ -71,6 +73,7 @@ namespace Quantum.Track
 
             double? targetRollRateDegPerSec = SampleDirectChannel(
                 resolvedSection.Channels?.RollRateChannels,
+                resolvedSection.Channels?.RollRateBlendMode ?? ForceChannelBlendMode.Sum,
                 resolvedSection.Channels?.RollRate,
                 resolvedSection.RollRateChannel,
                 snapshot.NormalizedT);
@@ -86,6 +89,7 @@ namespace Quantum.Track
 
         private static double? SampleChannel(
             IReadOnlyList<IForceChannel>? v3Channels,
+            ForceChannelBlendMode v4BlendMode,
             IForceChannel? v2Channel,
             IForceEasingFunction? legacyChannel,
             ForceInterpolationMode mode,
@@ -97,7 +101,7 @@ namespace Quantum.Track
         {
             if (HasChannels(v3Channels))
             {
-                return SumChannels(v3Channels!, normalizedT);
+                return BlendChannels(v3Channels!, normalizedT, v4BlendMode);
             }
 
             if (v2Channel != null)
@@ -166,13 +170,14 @@ namespace Quantum.Track
 
         private static double? SampleDirectChannel(
             IReadOnlyList<IForceChannel>? v3Channels,
+            ForceChannelBlendMode v4BlendMode,
             IForceChannel? v2Channel,
             IForceEasingFunction? legacyChannel,
             double normalizedT)
         {
             if (HasChannels(v3Channels))
             {
-                return SumChannels(v3Channels!, normalizedT);
+                return BlendChannels(v3Channels!, normalizedT, v4BlendMode);
             }
 
             if (v2Channel != null)
@@ -193,23 +198,74 @@ namespace Quantum.Track
             return channels != null && channels.Count > 0;
         }
 
+        private static double BlendChannels(
+            IReadOnlyList<IForceChannel> channels,
+            double normalizedT,
+            ForceChannelBlendMode blendMode)
+        {
+            switch (blendMode)
+            {
+                case ForceChannelBlendMode.Sum:
+                    return SumChannels(channels, normalizedT);
+                case ForceChannelBlendMode.Max:
+                    return MaxChannels(channels, normalizedT);
+                case ForceChannelBlendMode.Override:
+                    return OverrideChannels(channels, normalizedT);
+                default:
+                    throw new ArgumentOutOfRangeException(
+                        nameof(blendMode),
+                        blendMode,
+                        "Unsupported force channel blend mode.");
+            }
+        }
+
         private static double SumChannels(IReadOnlyList<IForceChannel> channels, double normalizedT)
         {
             double sum = 0.0;
 
             for (int i = 0; i < channels.Count; i++)
             {
-                IForceChannel? channel = channels[i];
-
-                if (channel is null)
-                {
-                    throw new InvalidOperationException("Force channel list cannot contain null entries.");
-                }
-
-                sum += channel.Evaluate(normalizedT);
+                sum += EvaluateChannel(channels, i, normalizedT);
             }
 
             return sum;
+        }
+
+        private static double MaxChannels(IReadOnlyList<IForceChannel> channels, double normalizedT)
+        {
+            double max = EvaluateChannel(channels, 0, normalizedT);
+
+            for (int i = 1; i < channels.Count; i++)
+            {
+                double value = EvaluateChannel(channels, i, normalizedT);
+
+                if (value > max)
+                {
+                    max = value;
+                }
+            }
+
+            return max;
+        }
+
+        private static double OverrideChannels(IReadOnlyList<IForceChannel> channels, double normalizedT)
+        {
+            return EvaluateChannel(channels, channels.Count - 1, normalizedT);
+        }
+
+        private static double EvaluateChannel(
+            IReadOnlyList<IForceChannel> channels,
+            int index,
+            double normalizedT)
+        {
+            IForceChannel? channel = channels[index];
+
+            if (channel is null)
+            {
+                throw new InvalidOperationException("Force channel list cannot contain null entries.");
+            }
+
+            return channel.Evaluate(normalizedT);
         }
     }
 }

@@ -33,6 +33,12 @@ namespace Quantum.Track
             set => _rollRateChannels = ValidateChannels(value, nameof(RollRateChannels));
         }
 
+        public ForceChannelBlendMode NormalGBlendMode { get; set; } = ForceChannelBlendMode.Sum;
+
+        public ForceChannelBlendMode LateralGBlendMode { get; set; } = ForceChannelBlendMode.Sum;
+
+        public ForceChannelBlendMode RollRateBlendMode { get; set; } = ForceChannelBlendMode.Sum;
+
         private static IReadOnlyList<IForceChannel>? ValidateChannels(
             IReadOnlyList<IForceChannel>? channels,
             string paramName)

@@ -5,6 +5,16 @@ namespace Quantum.Tests;
 public sealed class ForceChannelSetTests
 {
     [Fact]
+    public void ForceChannelSet_BlendModes_DefaultToSum()
+    {
+        var set = new ForceChannelSet();
+
+        Assert.Equal(ForceChannelBlendMode.Sum, set.NormalGBlendMode);
+        Assert.Equal(ForceChannelBlendMode.Sum, set.LateralGBlendMode);
+        Assert.Equal(ForceChannelBlendMode.Sum, set.RollRateBlendMode);
+    }
+
+    [Fact]
     public void ForceChannelSet_NormalGChannels_NullEntry_ThrowsArgumentException()
     {
         var channels = new List<IForceChannel>

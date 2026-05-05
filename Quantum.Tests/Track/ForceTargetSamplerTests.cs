@@ -923,6 +923,135 @@ public sealed class ForceTargetSamplerTests
     }
 
     [Fact]
+    public void ForceTargetSampler_Sample_ChannelSetNormalGChannels_MaxBlendMode_UsesLargestChannelValue()
+    {
+        var section = new ForceSection(length: 10.0)
+        {
+            Channels = new ForceChannelSet
+            {
+                NormalGBlendMode = ForceChannelBlendMode.Max,
+                NormalGChannels = new IForceChannel[]
+                {
+                    new ForceChannel(new FixedForceEasingFunction(1.5)),
+                    new ForceChannel(new FixedForceEasingFunction(-0.25)),
+                    new ForceChannel(new FixedForceEasingFunction(0.75))
+                }
+            }
+        };
+
+        IReadOnlyList<ResolvedSectionInterval<ForceSection>> intervals = ForceTargetResolver.Resolve(new[]
+        {
+            (section, 10.0)
+        });
+
+        SampledForceTarget sampled = ForceTargetSampler.Sample(intervals, 5.0);
+
+        Assert.True(sampled.TargetNormalG.HasValue);
+        Assert.Equal(1.5, sampled.TargetNormalG.Value, 10);
+    }
+
+    [Fact]
+    public void ForceTargetSampler_Sample_ChannelSetNormalGChannels_OverrideBlendMode_UsesLastChannelValue()
+    {
+        var section = new ForceSection(length: 10.0)
+        {
+            Channels = new ForceChannelSet
+            {
+                NormalGBlendMode = ForceChannelBlendMode.Override,
+                NormalGChannels = new IForceChannel[]
+                {
+                    new ForceChannel(new FixedForceEasingFunction(1.5)),
+                    new ForceChannel(new FixedForceEasingFunction(-0.25)),
+                    new ForceChannel(new FixedForceEasingFunction(0.75))
+                }
+            }
+        };
+
+        IReadOnlyList<ResolvedSectionInterval<ForceSection>> intervals = ForceTargetResolver.Resolve(new[]
+        {
+            (section, 10.0)
+        });
+
+        SampledForceTarget sampled = ForceTargetSampler.Sample(intervals, 5.0);
+
+        Assert.True(sampled.TargetNormalG.HasValue);
+        Assert.Equal(0.75, sampled.TargetNormalG.Value, 10);
+    }
+
+    [Fact]
+    public void ForceTargetSampler_Sample_ChannelSetBlendModes_AreIndependentPerForceType()
+    {
+        var section = new ForceSection(length: 10.0)
+        {
+            Channels = new ForceChannelSet
+            {
+                NormalGBlendMode = ForceChannelBlendMode.Max,
+                NormalGChannels = new IForceChannel[]
+                {
+                    new ForceChannel(new FixedForceEasingFunction(0.1)),
+                    new ForceChannel(new FixedForceEasingFunction(0.8)),
+                    new ForceChannel(new FixedForceEasingFunction(0.6))
+                },
+                LateralGBlendMode = ForceChannelBlendMode.Override,
+                LateralGChannels = new IForceChannel[]
+                {
+                    new ForceChannel(new FixedForceEasingFunction(-0.3)),
+                    new ForceChannel(new FixedForceEasingFunction(0.25)),
+                    new ForceChannel(new FixedForceEasingFunction(0.05))
+                },
+                RollRateBlendMode = ForceChannelBlendMode.Sum,
+                RollRateChannels = new IForceChannel[]
+                {
+                    new ForceChannel(new FixedForceEasingFunction(1.25)),
+                    new ForceChannel(new FixedForceEasingFunction(2.75)),
+                    new ForceChannel(new FixedForceEasingFunction(-0.5))
+                }
+            }
+        };
+
+        IReadOnlyList<ResolvedSectionInterval<ForceSection>> intervals = ForceTargetResolver.Resolve(new[]
+        {
+            (section, 10.0)
+        });
+
+        SampledForceTarget sampled = ForceTargetSampler.Sample(intervals, 5.0);
+
+        Assert.True(sampled.TargetNormalG.HasValue);
+        Assert.Equal(0.8, sampled.TargetNormalG.Value, 10);
+        Assert.True(sampled.TargetLateralG.HasValue);
+        Assert.Equal(0.05, sampled.TargetLateralG.Value, 10);
+        Assert.True(sampled.TargetRollRateDegPerSec.HasValue);
+        Assert.Equal(3.5, sampled.TargetRollRateDegPerSec.Value, 10);
+    }
+
+    [Fact]
+    public void ForceTargetSampler_Sample_ChannelSetSingleNormalGChannel_IgnoresBlendMode()
+    {
+        var section = new ForceSection(
+            length: 10.0,
+            interpolationMode: ForceInterpolationMode.Constant,
+            startNormalG: 10.0,
+            endNormalG: 20.0)
+        {
+            Channels = new ForceChannelSet
+            {
+                NormalGBlendMode = ForceChannelBlendMode.Override,
+                NormalG = new ForceChannel(new FixedForceEasingFunction(0.25))
+            }
+        };
+
+        IReadOnlyList<ResolvedSectionInterval<ForceSection>> intervals = ForceTargetResolver.Resolve(new[]
+        {
+            (section, 10.0)
+        });
+
+        SampledForceTarget sampled = ForceTargetSampler.Sample(intervals, 5.0);
+
+        Assert.True(sampled.TargetNormalG.HasValue);
+        Assert.Equal(12.5, sampled.TargetNormalG.Value, 10);
+    }
+
+    [Fact]
     public void ForceTargetSampler_Sample_ChannelSetNormalGChannels_OverrideSingleChannel()
     {
         var section = new ForceSection(
