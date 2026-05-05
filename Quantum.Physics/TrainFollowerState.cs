@@ -110,6 +110,22 @@ namespace Quantum.Physics
             double quadraticDragCoefficient,
             double rollingResistance = 0.0)
         {
+            double gravityAcceleration = GravityAccelerationAlongTrack(gravityMagnitude);
+            UpdateWithResolvedGravityAcceleration(
+                deltaTime,
+                gravityAcceleration,
+                linearDragCoefficient,
+                quadraticDragCoefficient,
+                rollingResistance);
+        }
+
+        internal void UpdateWithResolvedGravityAcceleration(
+            double deltaTime,
+            double gravityAcceleration,
+            double linearDragCoefficient,
+            double quadraticDragCoefficient,
+            double rollingResistance = 0.0)
+        {
             double previousSpeed = Speed;
 
             Guard.RequireNonNegativeFinite(
@@ -126,8 +142,6 @@ namespace Quantum.Physics
                 rollingResistance,
                 nameof(rollingResistance),
                 "Rolling resistance must be a finite, non-negative value.");
-
-            double gravityAcceleration = GravityAccelerationAlongTrack(gravityMagnitude);
 
             Acceleration =
                 gravityAcceleration

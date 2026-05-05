@@ -226,12 +226,24 @@ namespace Quantum.Physics
             double halfStepVelocityKick = 0.5 * accelerationFromTangentialProjection * DeltaTime;
             Follower.Speed += halfStepVelocityKick;
 
-            Follower.UpdateWithGravity(
-                DeltaTime,
-                GravityMagnitude,
-                LinearDragCoefficient,
-                QuadraticDragCoefficient,
-                RollingResistance);
+            if (TryGetTrackFrameGravityAcceleration(Follower.Distance, out double gravityAccelerationAlongTrack))
+            {
+                Follower.UpdateWithResolvedGravityAcceleration(
+                    DeltaTime,
+                    gravityAccelerationAlongTrack,
+                    LinearDragCoefficient,
+                    QuadraticDragCoefficient,
+                    RollingResistance);
+            }
+            else
+            {
+                Follower.UpdateWithGravity(
+                    DeltaTime,
+                    GravityMagnitude,
+                    LinearDragCoefficient,
+                    QuadraticDragCoefficient,
+                    RollingResistance);
+            }
 
             Follower.Speed += halfStepVelocityKick;
             Follower.Acceleration += accelerationFromTangentialProjection;
@@ -302,6 +314,24 @@ namespace Quantum.Physics
             sample.TangentialAcceleration = components.Tangential;
             sample.NormalAcceleration = components.Normal;
             sample.BinormalAcceleration = components.Binormal;
+        }
+
+        private bool TryGetTrackFrameGravityAcceleration(double distance, out double gravityAccelerationAlongTrack)
+        {
+            gravityAccelerationAlongTrack = 0.0;
+            if (_trackFrameProvider is null)
+            {
+                return false;
+            }
+
+            if (!_trackFrameProvider.TryGetFrameAtDistance(distance, out TrackFrame frame))
+            {
+                return false;
+            }
+
+            Vector3d gravityVector = new Vector3d(0.0, -GravityMagnitude, 0.0);
+            gravityAccelerationAlongTrack = Vector3d.Dot(gravityVector, frame.Tangent);
+            return true;
         }
 
         private bool TryGetProjectedAcceleration(double distance, TrackFrame frame, out Vector3d projectedAcceleration)
