@@ -48,6 +48,7 @@ namespace Quantum.Track
                 ?? throw new InvalidOperationException("ForceTargetSnapshot.ResolvedSection cannot be null.");
 
             double? targetNormalG = SampleChannel(
+                resolvedSection.Channels?.NormalG,
                 resolvedSection.NormalGChannel,
                 resolvedSection.InterpolationMode,
                 resolvedSection.EasingFunction,
@@ -57,6 +58,7 @@ namespace Quantum.Track
                 snapshot.NormalizedT);
 
             double? targetLateralG = SampleChannel(
+                resolvedSection.Channels?.LateralG,
                 resolvedSection.LateralGChannel,
                 resolvedSection.InterpolationMode,
                 resolvedSection.EasingFunction,
@@ -66,6 +68,7 @@ namespace Quantum.Track
                 snapshot.NormalizedT);
 
             double? targetRollRateDegPerSec = SampleDirectChannel(
+                resolvedSection.Channels?.RollRate,
                 resolvedSection.RollRateChannel,
                 snapshot.NormalizedT);
 
@@ -79,7 +82,8 @@ namespace Quantum.Track
         }
 
         private static double? SampleChannel(
-            IForceEasingFunction? channel,
+            IForceChannel? v2Channel,
+            IForceEasingFunction? legacyChannel,
             ForceInterpolationMode mode,
             IForceEasingFunction? easingFunction,
             double? constantValue,
@@ -87,7 +91,7 @@ namespace Quantum.Track
             double? endValue,
             double normalizedT)
         {
-            if (channel != null)
+            if (v2Channel != null)
             {
                 double? resolvedStart = startValue ?? constantValue;
                 double? resolvedEnd = endValue ?? constantValue;
@@ -97,7 +101,21 @@ namespace Quantum.Track
                     return null;
                 }
 
-                double adjustedT = channel.Evaluate(normalizedT);
+                double adjustedT = v2Channel.Evaluate(normalizedT);
+                return MathUtil.Lerp(resolvedStart.Value, resolvedEnd.Value, adjustedT);
+            }
+
+            if (legacyChannel != null)
+            {
+                double? resolvedStart = startValue ?? constantValue;
+                double? resolvedEnd = endValue ?? constantValue;
+
+                if (!resolvedStart.HasValue || !resolvedEnd.HasValue)
+                {
+                    return null;
+                }
+
+                double adjustedT = legacyChannel.Evaluate(normalizedT);
                 return MathUtil.Lerp(resolvedStart.Value, resolvedEnd.Value, adjustedT);
             }
 
@@ -138,15 +156,21 @@ namespace Quantum.Track
         }
 
         private static double? SampleDirectChannel(
-            IForceEasingFunction? channel,
+            IForceChannel? v2Channel,
+            IForceEasingFunction? legacyChannel,
             double normalizedT)
         {
-            if (channel is null)
+            if (v2Channel != null)
             {
-                return null;
+                return v2Channel.Evaluate(normalizedT);
             }
 
-            return channel.Evaluate(normalizedT);
+            if (legacyChannel != null)
+            {
+                return legacyChannel.Evaluate(normalizedT);
+            }
+
+            return null;
         }
     }
 }

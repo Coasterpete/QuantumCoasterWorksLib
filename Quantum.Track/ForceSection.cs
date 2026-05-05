@@ -57,5 +57,7 @@ namespace Quantum.Track
         public IForceEasingFunction? LateralGChannel { get; }
 
         public IForceEasingFunction? RollRateChannel { get; }
+
+        public ForceChannelSet? Channels { get; set; }
     }
 }
