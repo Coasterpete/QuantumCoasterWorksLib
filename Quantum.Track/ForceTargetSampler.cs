@@ -17,6 +17,15 @@ namespace Quantum.Track
         }
 
         public static SampledForceTarget Sample(
+            IEnumerable<(ForceSection Section, double Length)> sections,
+            double distance,
+            double elapsedTime)
+        {
+            ForceTargetSnapshot snapshot = ForceTargetResolver.Lookup(sections, distance);
+            return BuildFromSnapshot(snapshot, distance, elapsedTime, useTimeDomainSampling: true);
+        }
+
+        public static SampledForceTarget Sample(
             IReadOnlyList<ResolvedSectionInterval<ForceSection>> resolvedIntervals,
             double distance)
         {
@@ -24,9 +33,27 @@ namespace Quantum.Track
             return BuildFromSnapshot(snapshot, distance);
         }
 
+        public static SampledForceTarget Sample(
+            IReadOnlyList<ResolvedSectionInterval<ForceSection>> resolvedIntervals,
+            double distance,
+            double elapsedTime)
+        {
+            ForceTargetSnapshot snapshot = ForceTargetResolver.Lookup(resolvedIntervals, distance);
+            return BuildFromSnapshot(snapshot, distance, elapsedTime, useTimeDomainSampling: true);
+        }
+
         private static SampledForceTarget BuildFromSnapshot(
             ForceTargetSnapshot snapshot,
             double distance)
+        {
+            return BuildFromSnapshot(snapshot, distance, elapsedTime: 0.0, useTimeDomainSampling: false);
+        }
+
+        private static SampledForceTarget BuildFromSnapshot(
+            ForceTargetSnapshot snapshot,
+            double distance,
+            double elapsedTime,
+            bool useTimeDomainSampling)
         {
             if (double.IsNaN(distance) || double.IsInfinity(distance))
             {
@@ -48,7 +75,12 @@ namespace Quantum.Track
                 ?? throw new InvalidOperationException("ForceTargetSnapshot.ResolvedSection cannot be null.");
 
             ForceChannelDomain domain = resolvedSection.Channels?.Domain ?? resolvedSection.Domain;
-            double channelT = ResolveSamplingParameter(domain, snapshot.NormalizedT);
+            double channelT = ResolveSamplingParameter(
+                resolvedSection,
+                domain,
+                snapshot.NormalizedT,
+                elapsedTime,
+                useTimeDomainSampling);
 
             double? targetNormalG = SampleChannel(
                 resolvedSection.Channels?.NormalGChannels,
@@ -83,28 +115,74 @@ namespace Quantum.Track
 
             return new SampledForceTarget(
                 distance,
-                snapshot.NormalizedT,
+                channelT,
                 targetNormalG,
                 targetLateralG,
                 targetLongitudinalG: null,
                 targetRollRateDegPerSec: targetRollRateDegPerSec);
         }
 
-        private static double ResolveSamplingParameter(ForceChannelDomain domain, double normalizedT)
+        private static double ResolveSamplingParameter(
+            ForceSection resolvedSection,
+            ForceChannelDomain domain,
+            double distanceNormalizedT,
+            double elapsedTime,
+            bool useTimeDomainSampling)
         {
             switch (domain)
             {
                 case ForceChannelDomain.Distance:
-                    return normalizedT;
+                    return distanceNormalizedT;
                 case ForceChannelDomain.Time:
-                    // Stub behavior: time-domain channels still use normalized distance for now.
-                    return normalizedT;
+                    if (!useTimeDomainSampling)
+                    {
+                        return distanceNormalizedT;
+                    }
+
+                    return ResolveTimeNormalizedT(resolvedSection, elapsedTime);
                 default:
                     throw new ArgumentOutOfRangeException(
                         nameof(domain),
                         domain,
                         "Unsupported force channel domain.");
             }
+        }
+
+        private static double ResolveTimeNormalizedT(ForceSection resolvedSection, double elapsedTime)
+        {
+            if (double.IsNaN(elapsedTime) || double.IsInfinity(elapsedTime))
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(elapsedTime),
+                    elapsedTime,
+                    "Elapsed time must be finite.");
+            }
+
+            double? duration = resolvedSection.Duration;
+
+            if (!duration.HasValue)
+            {
+                throw new InvalidOperationException(
+                    "Time-domain force sampling requires ForceSection.Duration to be set to a positive finite value.");
+            }
+
+            double durationValue = duration.Value;
+
+            if (double.IsNaN(durationValue) || double.IsInfinity(durationValue) || durationValue <= 0.0)
+            {
+                throw new InvalidOperationException(
+                    "Time-domain force sampling requires ForceSection.Duration to be set to a positive finite value.");
+            }
+
+            if (elapsedTime < 0.0 || elapsedTime > durationValue)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(elapsedTime),
+                    elapsedTime,
+                    $"Elapsed time must be within [0, {durationValue}] for time-domain force sampling.");
+            }
+
+            return elapsedTime / durationValue;
         }
 
         private static double? SampleChannel(
