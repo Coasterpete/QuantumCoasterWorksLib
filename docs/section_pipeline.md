@@ -412,6 +412,32 @@ Status:
 
 This connects track evaluation to the `TrackFrame -> Matrix4x4` interop layer.
 
+### Train Car Transform Output
+
+Status:
+A minimal train-car transform layer has been introduced.
+
+- `TrainCarTransformProvider` computes per-car transforms using `TrackEvaluator`.
+- Each car produces:
+  - `CarIndex`
+  - `Distance`
+  - `TrackFrame`
+  - `Matrix4x4`
+
+### Behavior
+
+- Car 0 is placed at `leadDistance`
+- Car i is placed at:
+  - `leadDistance - i * carSpacing`
+- Out-of-range distances are rejected explicitly
+- Matrices are derived from `TrackFrame.ToMatrix4x4()`
+
+### Notes
+
+- No `TrainStepLoop` behavior changes were made
+- This is a geometry/representation layer only
+- This connects force evaluation → spatial frames → renderable transforms
+
 ## References
 - KexEdit node graph and section concepts: <https://individualkex.github.io/KexEdit/reference/node-graph.html>
 
