@@ -8,9 +8,15 @@ namespace Quantum.Track
     {
         private const double MinimumVectorMagnitude = 1e-9;
         private const double ParallelAxisThreshold = 0.99;
+        private readonly TrackDocument? _boundDocument;
 
         public TrackEvaluator()
         {
+        }
+
+        public TrackEvaluator(TrackDocument document)
+        {
+            _boundDocument = document ?? throw new System.ArgumentNullException(nameof(document));
         }
 
         public TrackEvaluationResult Evaluate(TrackDocument document)
@@ -80,6 +86,13 @@ namespace Quantum.Track
             return Transform3d.FromTrackFrame(frame, frame.Position);
         }
 
+        public TrackFrame EvaluateFrameAtDistance(double distance)
+        {
+            TrackDocument doc = ResolveBoundDocument();
+            SplineTrackFrame splineFrame = EvaluateFrameAtDistance(doc, distance);
+            return BuildExportFrame(splineFrame);
+        }
+
         public SplineTrackFrame EvaluateFrameAtDistance(TrackDocument doc, double distance)
         {
             TrackEvaluationPoint evaluationPoint = EvaluateAtDistance(doc, distance);
@@ -130,6 +143,17 @@ namespace Quantum.Track
             return new Transform3d(
                 Matrix3x3.Identity,
                 new Vector3d(distanceAlongTrack, 0.0, 0.0));
+        }
+
+        private static TrackFrame BuildExportFrame(SplineTrackFrame sourceFrame)
+        {
+            Vector3d tangent = NormalizeOrThrow(sourceFrame.Tangent, "tangent");
+            Vector3d projectedNormal = sourceFrame.Normal - (tangent * Vector3d.Dot(sourceFrame.Normal, tangent));
+            Vector3d normal = NormalizeOrThrow(projectedNormal, "normal");
+            Vector3d binormal = NormalizeOrThrow(Vector3d.Cross(tangent, normal), "binormal");
+            normal = NormalizeOrThrow(Vector3d.Cross(binormal, tangent), "normal");
+
+            return new TrackFrame(sourceFrame.Position, tangent, normal, binormal);
         }
 
         private static SplineTrackFrame EvaluateFallbackFrame(
@@ -239,6 +263,17 @@ namespace Quantum.Track
             }
 
             throw new System.InvalidOperationException("TrackDocument could not resolve the evaluated segment.");
+        }
+
+        private TrackDocument ResolveBoundDocument()
+        {
+            if (_boundDocument is null)
+            {
+                throw new System.InvalidOperationException(
+                    "TrackEvaluator is not bound to a TrackDocument. Use the constructor overload that accepts TrackDocument or call the overload that accepts a TrackDocument argument.");
+            }
+
+            return _boundDocument;
         }
 
         public TrackEvaluationPoint EvaluateAtDistance(TrackDocument doc, double distance)
