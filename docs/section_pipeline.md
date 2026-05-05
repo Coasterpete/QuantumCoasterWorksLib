@@ -314,6 +314,38 @@ When sampling a section:
 - No time-based integration behavior is active yet.
 - This prepares the system for future time-domain force sections.
 
+### ForceSection Time-Domain Sampling (v6)
+
+Status:
+`ForceTargetSampler` now supports opt-in time-domain sampling through explicit elapsed-time overloads.
+
+- Existing distance-only sampling overloads remain unchanged.
+- New sampling overloads accept:
+  - `distance`
+  - `elapsedTime`
+
+### Domain Behavior
+
+When using the elapsed-time overloads:
+
+1. `Distance` domain uses distance-derived normalized `t`
+2. `Time` domain uses `elapsedTime / ForceSection.Duration`
+3. `ForceChannelSet.Domain` still overrides `ForceSection.Domain`
+
+### Validation
+
+Time-domain sampling requires:
+- finite `elapsedTime`
+- non-null `ForceSection.Duration`
+- finite, positive duration
+- `elapsedTime` inside `[0, Duration]`
+
+### Notes
+
+- No `TrainStepLoop` behavior changes were made.
+- Time-domain sampling is opt-in through the new sampler overloads.
+- Existing legacy sampling behavior is preserved.
+
 ## References
 - KexEdit node graph and section concepts: <https://individualkex.github.io/KexEdit/reference/node-graph.html>
 
