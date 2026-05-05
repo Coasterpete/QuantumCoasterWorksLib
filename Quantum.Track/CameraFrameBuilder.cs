@@ -10,6 +10,7 @@ namespace Quantum.Track
     public static class CameraFrameBuilder
     {
         private const double MinimumVectorMagnitude = 1e-9;
+        private const double MaximumPitchRadians = (System.Math.PI * 0.5) - 1e-4;
 
         public static CameraTransform BuildRideCamera(TrackFrame frame, Vector3d offset)
         {
@@ -112,6 +113,52 @@ namespace Quantum.Track
             return BuildTargetCamera(cameraPosition, targetFrame.Position, upHint);
         }
 
+        public static CameraTransform BuildFlyViewCamera(FlyViewCameraState state)
+        {
+            ValidateFinite(state.Position, nameof(state.Position));
+            ValidateFinite(state.YawRadians, nameof(state.YawRadians));
+            ValidateFinite(state.PitchRadians, nameof(state.PitchRadians));
+            ValidateFinite(state.RollRadians, nameof(state.RollRadians));
+
+            double clampedPitch = MathUtil.Clamp(state.PitchRadians, -MaximumPitchRadians, MaximumPitchRadians);
+            double cosYaw = System.Math.Cos(state.YawRadians);
+            double sinYaw = System.Math.Sin(state.YawRadians);
+            double cosPitch = System.Math.Cos(clampedPitch);
+            double sinPitch = System.Math.Sin(clampedPitch);
+
+            Vector3d forward = NormalizeOrThrow(
+                new Vector3d(cosPitch * cosYaw, sinPitch, cosPitch * sinYaw),
+                nameof(state),
+                "Unable to construct a valid forward vector from fly-view angles.");
+            Vector3d right = NormalizeOrThrow(
+                Vector3d.Cross(forward, Vector3d.UnitY),
+                nameof(state.PitchRadians),
+                "Fly-view pitch is too close to straight up or down.");
+            Vector3d up = NormalizeOrThrow(
+                Vector3d.Cross(right, forward),
+                nameof(state),
+                "Unable to construct a valid up vector.");
+
+            if (state.RollRadians != 0.0)
+            {
+                up = NormalizeOrThrow(
+                    RotateAroundAxis(up, forward, state.RollRadians),
+                    nameof(state.RollRadians),
+                    "Unable to construct a valid up vector from fly-view roll.");
+                right = NormalizeOrThrow(
+                    Vector3d.Cross(forward, up),
+                    nameof(state.RollRadians),
+                    "Unable to construct a valid right vector from fly-view roll.");
+                up = NormalizeOrThrow(
+                    Vector3d.Cross(right, forward),
+                    nameof(state.RollRadians),
+                    "Unable to construct a valid up vector from fly-view roll.");
+            }
+
+            Matrix4x4 transform = TrackFrame.CreateFromFrame(state.Position, forward, up, right);
+            return new CameraTransform(transform, state.Position, forward, up, right);
+        }
+
         private static Vector3d ComputeCameraPositionFromLocalOffset(TrackFrame frame, Vector3d localOffset)
         {
             return
@@ -153,12 +200,32 @@ namespace Quantum.Track
             return Vector3d.UnitZ;
         }
 
+        private static Vector3d RotateAroundAxis(Vector3d vector, Vector3d axis, double angle)
+        {
+            Vector3d normalizedAxis = NormalizeOrThrow(axis, nameof(axis), "Rotation axis must have non-zero length.");
+            double cos = System.Math.Cos(angle);
+            double sin = System.Math.Sin(angle);
+
+            Vector3d scaledVector = vector * cos;
+            Vector3d crossTerm = Vector3d.Cross(normalizedAxis, vector) * sin;
+            Vector3d projectionTerm = normalizedAxis * (Vector3d.Dot(normalizedAxis, vector) * (1.0 - cos));
+            return scaledVector + crossTerm + projectionTerm;
+        }
+
         private static void ValidateFinite(Vector3d vector, string paramName)
         {
             if (double.IsNaN(vector.X) || double.IsNaN(vector.Y) || double.IsNaN(vector.Z) ||
                 double.IsInfinity(vector.X) || double.IsInfinity(vector.Y) || double.IsInfinity(vector.Z))
             {
                 throw new ArgumentOutOfRangeException(paramName, "Vector must contain finite components.");
+            }
+        }
+
+        private static void ValidateFinite(double value, string paramName)
+        {
+            if (double.IsNaN(value) || double.IsInfinity(value))
+            {
+                throw new ArgumentOutOfRangeException(paramName, "Value must be finite.");
             }
         }
     }

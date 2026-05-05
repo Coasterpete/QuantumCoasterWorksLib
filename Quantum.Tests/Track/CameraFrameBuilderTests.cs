@@ -251,6 +251,98 @@ public sealed class CameraFrameBuilderTests
     }
 
     [Fact]
+    public void BuildFlyViewCamera_DefaultYawAndPitch_FacesExpectedForwardDirection()
+    {
+        var state = new FlyViewCameraState(
+            position: new Vector3d(1.0, 2.0, 3.0),
+            yawRadians: 0.0,
+            pitchRadians: 0.0);
+
+        CameraTransform camera = CameraFrameBuilder.BuildFlyViewCamera(state);
+
+        AssertVectorNear(Vector3d.UnitX, camera.Forward);
+        AssertVectorNear(Vector3d.UnitY, camera.Up);
+        AssertVectorNear(Vector3d.UnitZ, camera.Right);
+    }
+
+    [Fact]
+    public void BuildFlyViewCamera_YawRotatesForward()
+    {
+        var state = new FlyViewCameraState(
+            position: Vector3d.Zero,
+            yawRadians: System.Math.PI * 0.5,
+            pitchRadians: 0.0);
+
+        CameraTransform camera = CameraFrameBuilder.BuildFlyViewCamera(state);
+
+        AssertVectorNear(Vector3d.UnitZ, camera.Forward);
+    }
+
+    [Fact]
+    public void BuildFlyViewCamera_PitchRotatesForwardUpAndDown()
+    {
+        double pitch = System.Math.PI * 0.25;
+        var upState = new FlyViewCameraState(
+            position: Vector3d.Zero,
+            yawRadians: 0.0,
+            pitchRadians: pitch);
+        var downState = new FlyViewCameraState(
+            position: Vector3d.Zero,
+            yawRadians: 0.0,
+            pitchRadians: -pitch);
+
+        CameraTransform upCamera = CameraFrameBuilder.BuildFlyViewCamera(upState);
+        CameraTransform downCamera = CameraFrameBuilder.BuildFlyViewCamera(downState);
+
+        double halfSqrtTwo = System.Math.Sqrt(0.5);
+        AssertVectorNear(new Vector3d(halfSqrtTwo, halfSqrtTwo, 0.0), upCamera.Forward);
+        AssertVectorNear(new Vector3d(halfSqrtTwo, -halfSqrtTwo, 0.0), downCamera.Forward);
+    }
+
+    [Fact]
+    public void BuildFlyViewCamera_ReturnsFiniteMatrix()
+    {
+        var state = new FlyViewCameraState(
+            position: new Vector3d(120.5, -40.25, 9.75),
+            yawRadians: 2.2,
+            pitchRadians: double.MaxValue,
+            rollRadians: -1.4);
+
+        CameraTransform camera = CameraFrameBuilder.BuildFlyViewCamera(state);
+
+        AssertFiniteMatrix(camera.Transform);
+    }
+
+    [Fact]
+    public void BuildFlyViewCamera_WithInvalidInput_Throws()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            CameraFrameBuilder.BuildFlyViewCamera(new FlyViewCameraState(
+                position: new Vector3d(double.NaN, 0.0, 0.0),
+                yawRadians: 0.0,
+                pitchRadians: 0.0)));
+
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            CameraFrameBuilder.BuildFlyViewCamera(new FlyViewCameraState(
+                position: Vector3d.Zero,
+                yawRadians: double.PositiveInfinity,
+                pitchRadians: 0.0)));
+
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            CameraFrameBuilder.BuildFlyViewCamera(new FlyViewCameraState(
+                position: Vector3d.Zero,
+                yawRadians: 0.0,
+                pitchRadians: double.NegativeInfinity)));
+
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            CameraFrameBuilder.BuildFlyViewCamera(new FlyViewCameraState(
+                position: Vector3d.Zero,
+                yawRadians: 0.0,
+                pitchRadians: 0.0,
+                rollRadians: double.NaN)));
+    }
+
+    [Fact]
     public void BuildBRollCamera_AppliesOffsetInTrackLocalSpace()
     {
         var evaluator = CreateBoundLineEvaluator(length: 20.0);
