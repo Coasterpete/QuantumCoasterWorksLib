@@ -255,6 +255,35 @@ When sampling a section (per force type):
 - Existing single-channel behavior remains unchanged
 - Multi-channel support enables layered force definitions and is a step toward full FVD-style channel composition
 
+### ForceSection Blend Modes (v4)
+
+Status:
+`ForceChannelSet` now supports deterministic blend modes for multi-channel lists.
+
+- `ForceChannelBlendMode` supports:
+  - `Sum`
+  - `Max`
+  - `Override`
+
+- Blend modes are configurable per force type:
+  - `NormalGBlendMode`
+  - `LateralGBlendMode`
+  - `RollRateBlendMode`
+
+### Blend Behavior
+
+When a multi-channel list is used:
+
+1. `Sum` combines all sampled channel values through deterministic summation
+2. `Max` uses the largest sampled channel value
+3. `Override` uses the last channel in the list
+
+### Notes
+
+- Default blend mode is `Sum`, preserving v3 behavior.
+- Blend modes only affect multi-channel lists.
+- Single-channel paths and legacy fallback behavior remain unchanged.
+
 ## References
 - KexEdit node graph and section concepts: <https://individualkex.github.io/KexEdit/reference/node-graph.html>
 
