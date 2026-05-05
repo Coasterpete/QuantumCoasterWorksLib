@@ -96,6 +96,78 @@ public sealed class CameraFrameBuilderTests
         AssertFloatNear((float)frame.Position.Z, camera.Transform.M34);
     }
 
+    [Fact]
+    public void BuildTargetCamera_ForwardPointsAtTarget()
+    {
+        Vector3d cameraPosition = new Vector3d(1.0, 2.0, 3.0);
+        Vector3d targetPosition = new Vector3d(4.0, 6.0, 3.0);
+        Vector3d upHint = new Vector3d(0.0, 1.0, 0.0);
+
+        CameraTransform camera = CameraFrameBuilder.BuildTargetCamera(cameraPosition, targetPosition, upHint);
+
+        Vector3d expectedForward = (targetPosition - cameraPosition).Normalized();
+        AssertVectorNear(expectedForward, camera.Forward);
+    }
+
+    [Fact]
+    public void BuildTargetCamera_UpAndRightAreOrthonormal()
+    {
+        CameraTransform camera = CameraFrameBuilder.BuildTargetCamera(
+            cameraPosition: new Vector3d(-3.0, 5.0, 9.0),
+            targetPosition: new Vector3d(1.0, 7.0, 10.0),
+            upHint: new Vector3d(0.25, 1.0, -0.75));
+
+        Assert.InRange(System.Math.Abs(camera.Forward.Length - 1.0), 0.0, Tolerance);
+        Assert.InRange(System.Math.Abs(camera.Up.Length - 1.0), 0.0, Tolerance);
+        Assert.InRange(System.Math.Abs(camera.Right.Length - 1.0), 0.0, Tolerance);
+        Assert.InRange(System.Math.Abs(Vector3d.Dot(camera.Forward, camera.Up)), 0.0, Tolerance);
+        Assert.InRange(System.Math.Abs(Vector3d.Dot(camera.Forward, camera.Right)), 0.0, Tolerance);
+        Assert.InRange(System.Math.Abs(Vector3d.Dot(camera.Up, camera.Right)), 0.0, Tolerance);
+        AssertVectorNear(Vector3d.Cross(camera.Forward, camera.Up), camera.Right);
+    }
+
+    [Fact]
+    public void BuildTargetCamera_ReturnsFiniteMatrix()
+    {
+        CameraTransform camera = CameraFrameBuilder.BuildTargetCamera(
+            cameraPosition: new Vector3d(250.0, -125.0, 62.5),
+            targetPosition: new Vector3d(251.5, -123.0, 61.0),
+            upHint: new Vector3d(0.0, 0.0, 1.0));
+
+        AssertFiniteMatrix(camera.Transform);
+    }
+
+    [Fact]
+    public void BuildTargetCamera_ZeroLengthTargetDirection_Throws()
+    {
+        Vector3d position = new Vector3d(2.0, 4.0, 8.0);
+
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            CameraFrameBuilder.BuildTargetCamera(position, position, Vector3d.UnitY));
+    }
+
+    [Fact]
+    public void BuildTargetCamera_WithNonFiniteInput_Throws()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            CameraFrameBuilder.BuildTargetCamera(
+                cameraPosition: new Vector3d(double.NaN, 0.0, 0.0),
+                targetPosition: new Vector3d(1.0, 0.0, 0.0),
+                upHint: Vector3d.UnitY));
+
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            CameraFrameBuilder.BuildTargetCamera(
+                cameraPosition: Vector3d.Zero,
+                targetPosition: new Vector3d(double.PositiveInfinity, 0.0, 0.0),
+                upHint: Vector3d.UnitY));
+
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            CameraFrameBuilder.BuildTargetCamera(
+                cameraPosition: Vector3d.Zero,
+                targetPosition: new Vector3d(1.0, 0.0, 0.0),
+                upHint: new Vector3d(0.0, double.NegativeInfinity, 0.0)));
+    }
+
     private static void AssertVectorNear(Vector3d expected, Vector3d actual)
     {
         Assert.InRange(System.Math.Abs(expected.X - actual.X), 0.0, Tolerance);
