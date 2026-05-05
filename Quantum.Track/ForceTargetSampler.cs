@@ -6,6 +6,8 @@ namespace Quantum.Track
 {
     public static class ForceTargetSampler
     {
+        private static readonly ForceInterpolationEvaluator InterpolationEvaluator = new ForceInterpolationEvaluator();
+
         public static SampledForceTarget Sample(
             IEnumerable<(ForceSection Section, double Length)> sections,
             double distance)
@@ -94,16 +96,7 @@ namespace Quantum.Track
                         return null;
                     }
 
-                    double adjustedT = mode switch
-                    {
-                        ForceInterpolationMode.SmoothStep => normalizedT * normalizedT * (3.0 - (2.0 * normalizedT)),
-                        ForceInterpolationMode.Quadratic => normalizedT * normalizedT,
-                        ForceInterpolationMode.Cubic => normalizedT * normalizedT * normalizedT,
-                        ForceInterpolationMode.Quartic => normalizedT * normalizedT * normalizedT * normalizedT,
-                        ForceInterpolationMode.Quintic => normalizedT * normalizedT * normalizedT * normalizedT * normalizedT,
-                        ForceInterpolationMode.Sinusoidal => 1.0 - System.Math.Cos(normalizedT * (System.Math.PI / 2.0)),
-                        _ => normalizedT
-                    };
+                    double adjustedT = InterpolationEvaluator.Evaluate(normalizedT, mode);
 
                     return MathUtil.Lerp(resolvedStart.Value, resolvedEnd.Value, adjustedT);
 
