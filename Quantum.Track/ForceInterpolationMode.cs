@@ -4,6 +4,8 @@ namespace Quantum.Track
     {
         Constant = 0,
         Linear = 1,
-        SmoothStep = 2
+        SmoothStep = 2,
+        Quadratic = 3,
+        Cubic = 4
     }
 }

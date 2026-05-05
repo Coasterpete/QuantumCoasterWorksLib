@@ -81,6 +81,8 @@ namespace Quantum.Track
 
                 case ForceInterpolationMode.Linear:
                 case ForceInterpolationMode.SmoothStep:
+                case ForceInterpolationMode.Quadratic:
+                case ForceInterpolationMode.Cubic:
                     double? resolvedStart = startValue ?? constantValue;
                     double? resolvedEnd = endValue ?? constantValue;
 
@@ -89,9 +91,13 @@ namespace Quantum.Track
                         return null;
                     }
 
-                    double adjustedT = mode == ForceInterpolationMode.SmoothStep
-                        ? normalizedT * normalizedT * (3.0 - (2.0 * normalizedT))
-                        : normalizedT;
+                    double adjustedT = mode switch
+                    {
+                        ForceInterpolationMode.SmoothStep => normalizedT * normalizedT * (3.0 - (2.0 * normalizedT)),
+                        ForceInterpolationMode.Quadratic => normalizedT * normalizedT,
+                        ForceInterpolationMode.Cubic => normalizedT * normalizedT * normalizedT,
+                        _ => normalizedT
+                    };
 
                     return MathUtil.Lerp(resolvedStart.Value, resolvedEnd.Value, adjustedT);
 
