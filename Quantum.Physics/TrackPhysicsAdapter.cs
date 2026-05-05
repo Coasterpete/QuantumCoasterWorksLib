@@ -61,6 +61,12 @@ namespace Quantum.Physics
                 return true;
             }
 
+            if (TryGetSplineCurvatureAtDistance(doc, distance, out double splineCurvature))
+            {
+                curvature = splineCurvature;
+                return true;
+            }
+
             double clampedDistance = MathUtil.Clamp(distance, 0.0, totalLength);
             double deltaS = System.Math.Max(totalLength * 1e-3, 1e-4);
             double prevS = MathUtil.Clamp(clampedDistance - deltaS, 0.0, totalLength);
@@ -97,6 +103,43 @@ namespace Quantum.Physics
                 return false;
             }
 
+            return true;
+        }
+
+        private bool TryGetSplineCurvatureAtDistance(TrackDocument doc, double distance, out double curvature)
+        {
+            curvature = 0.0;
+
+            TrackEvaluationPoint evaluationPoint;
+            try
+            {
+                evaluationPoint = _evaluator.EvaluateAtDistance(doc, distance);
+            }
+            catch (ArgumentOutOfRangeException)
+            {
+                return false;
+            }
+            catch (InvalidOperationException)
+            {
+                return false;
+            }
+
+            if (!(evaluationPoint.Segment.Spline is IParamCurveCurvature curvatureCurve))
+            {
+                return false;
+            }
+
+            if (!curvatureCurve.TryGetCurvature(evaluationPoint.LocalT, out double splineCurvature))
+            {
+                return false;
+            }
+
+            if (double.IsNaN(splineCurvature) || double.IsInfinity(splineCurvature))
+            {
+                return false;
+            }
+
+            curvature = System.Math.Abs(splineCurvature);
             return true;
         }
     }

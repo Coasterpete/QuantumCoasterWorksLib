@@ -152,6 +152,72 @@ public sealed class TrackPhysicsAdapterTests
         AssertDoubleNear(baselineLoop.ElapsedTimeSeconds, sampledLoop.ElapsedTimeSeconds);
     }
 
+    [Fact]
+    public void TrackPhysicsAdapter_TryGetCurvatureAtDistance_StraightLineSpline_IsApproximatelyZero()
+    {
+        var adapter = new TrackPhysicsAdapter();
+        var document = new TrackDocument(new TrackSegment[]
+        {
+            new StraightSegment(
+                length: 10.0,
+                spline: new LineCurve(
+                    new Vector3d(0.0, 0.0, 0.0),
+                    new Vector3d(10.0, 0.0, 0.0)))
+        });
+
+        bool success = adapter.TryGetCurvatureAtDistance(document, distance: 5.0, out double curvature);
+
+        Assert.True(success);
+        Assert.InRange(System.Math.Abs(curvature), 0.0, Tolerance);
+    }
+
+    [Fact]
+    public void TrackPhysicsAdapter_TryGetCurvatureAtDistance_CurvedSpline_IsFiniteAndStable()
+    {
+        var adapter = new TrackPhysicsAdapter();
+        var document = new TrackDocument(new TrackSegment[]
+        {
+            new CurvedSegment(
+                length: 2.0,
+                spline: new QuadraticBezierCurve(
+                    new Vector3d(0.0, 0.0, 0.0),
+                    new Vector3d(1.0, 1.0, 0.0),
+                    new Vector3d(2.0, 0.0, 0.0)))
+        });
+
+        bool successBefore = adapter.TryGetCurvatureAtDistance(document, distance: 0.9, out double curvatureBefore);
+        bool successMiddle = adapter.TryGetCurvatureAtDistance(document, distance: 1.0, out double curvatureMiddle);
+        bool successAfter = adapter.TryGetCurvatureAtDistance(document, distance: 1.1, out double curvatureAfter);
+
+        Assert.True(successBefore);
+        Assert.True(successMiddle);
+        Assert.True(successAfter);
+        Assert.InRange(curvatureMiddle, 0.8, 1.2);
+        Assert.InRange(System.Math.Abs(curvatureBefore - curvatureMiddle), 0.0, 0.05);
+        Assert.InRange(System.Math.Abs(curvatureAfter - curvatureMiddle), 0.0, 0.05);
+    }
+
+    [Fact]
+    public void TrackPhysicsAdapter_TryGetCurvatureAtDistance_FallsBackWhenExactCurvatureUnavailable()
+    {
+        const double radius = 10.0;
+        double arcLength = 0.5 * System.Math.PI * radius;
+
+        var adapter = new TrackPhysicsAdapter();
+        var document = new TrackDocument(new TrackSegment[]
+        {
+            new CurvedSegment(
+                length: arcLength,
+                spline: new QuarterCircleCurve(radius))
+        });
+
+        bool success = adapter.TryGetCurvatureAtDistance(document, distance: arcLength * 0.5, out double curvature);
+
+        Assert.True(success);
+        Assert.InRange(curvature, 0.0, double.MaxValue);
+        Assert.InRange(System.Math.Abs(curvature - (1.0 / radius)), 0.0, 0.02);
+    }
+
     private static void AssertVectorNear(Vector3d actual, Vector3d expected)
     {
         AssertDoubleNear(expected.X, actual.X);
@@ -162,5 +228,35 @@ public sealed class TrackPhysicsAdapterTests
     private static void AssertDoubleNear(double expected, double actual)
     {
         Assert.InRange(System.Math.Abs(expected - actual), 0.0, Tolerance);
+    }
+
+    private sealed class QuarterCircleCurve : IParamCurve
+    {
+        private readonly double _radius;
+
+        public QuarterCircleCurve(double radius)
+        {
+            _radius = radius;
+        }
+
+        public Vector3d Evaluate(double t)
+        {
+            double clampedT = System.Math.Clamp(t, 0.0, 1.0);
+            double angle = clampedT * (0.5 * System.Math.PI);
+            return new Vector3d(
+                _radius * System.Math.Cos(angle),
+                _radius * System.Math.Sin(angle),
+                0.0);
+        }
+
+        public Vector3d Tangent(double t)
+        {
+            double clampedT = System.Math.Clamp(t, 0.0, 1.0);
+            double angle = clampedT * (0.5 * System.Math.PI);
+            return new Vector3d(
+                -System.Math.Sin(angle),
+                System.Math.Cos(angle),
+                0.0);
+        }
     }
 }

@@ -5,7 +5,7 @@ namespace Quantum.Splines
     /// <summary>
     /// Quadratic Bezier curve: P0 - P1 - P2
     /// </summary>
-    public sealed class QuadraticBezierCurve : IParamCurve
+    public sealed class QuadraticBezierCurve : IParamCurve, IParamCurveCurvature
     {
         public Vector3d P0;
         public Vector3d P1;
@@ -39,6 +39,50 @@ namespace Quantum.Splines
                     $"Unable to compute quadratic Bezier tangent at t={t:0.######}: derivative magnitude is near zero.");
 
             return derivative.Normalized();
+        }
+
+        public bool TryGetCurvature(double t, out double curvature)
+        {
+            double clampedT = System.Math.Clamp(t, 0.0, 1.0);
+            Vector3d firstDerivative =
+                (2.0 * (1.0 - clampedT)) * (P1 - P0) +
+                (2.0 * clampedT) * (P2 - P1);
+            Vector3d secondDerivative = 2.0 * (P2 - (2.0 * P1) + P0);
+
+            return TryComputeCurvature(firstDerivative, secondDerivative, out curvature);
+        }
+
+        private static bool TryComputeCurvature(
+            Vector3d firstDerivative,
+            Vector3d secondDerivative,
+            out double curvature)
+        {
+            curvature = 0.0;
+            double firstLength = firstDerivative.Length;
+            if (firstLength <= MathUtil.Epsilon)
+            {
+                return false;
+            }
+
+            Vector3d cross = Vector3d.Cross(firstDerivative, secondDerivative);
+            double numerator = cross.Length;
+            double denominator = firstLength * firstLength * firstLength;
+
+            if (double.IsNaN(numerator) || double.IsInfinity(numerator) ||
+                double.IsNaN(denominator) || double.IsInfinity(denominator) ||
+                denominator <= MathUtil.Epsilon)
+            {
+                return false;
+            }
+
+            curvature = numerator / denominator;
+            if (double.IsNaN(curvature) || double.IsInfinity(curvature))
+            {
+                curvature = 0.0;
+                return false;
+            }
+
+            return true;
         }
     }
 }

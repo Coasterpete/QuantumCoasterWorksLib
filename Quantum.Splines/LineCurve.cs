@@ -2,7 +2,7 @@
 
 namespace Quantum.Splines
 {
-    public class LineCurve : IArcLengthCurve
+    public class LineCurve : IArcLengthCurve, IParamCurveCurvature
     {
         private readonly Vector3d _start;
         private readonly Vector3d _end;
@@ -44,6 +44,12 @@ namespace Quantum.Splines
         public Vector3d TangentByLength(double s)
         {
             return Tangent(0.0);
+        }
+
+        public bool TryGetCurvature(double t, out double curvature)
+        {
+            curvature = 0.0;
+            return _direction.Length > MathUtil.Epsilon;
         }
     }
 }

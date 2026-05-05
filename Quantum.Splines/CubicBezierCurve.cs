@@ -5,7 +5,7 @@ namespace Quantum.Splines
     /// <summary>
     /// Cubic Bezier curve: P0 - P1 - P2 - P3
     /// </summary>
-    public sealed class CubicBezierCurve : IParamCurve
+    public sealed class CubicBezierCurve : IParamCurve, IParamCurveCurvature
     {
         public Vector3d P0;
         public Vector3d P1;
@@ -51,6 +51,56 @@ namespace Quantum.Splines
                     $"Unable to compute cubic Bezier tangent at t={t:0.######}: derivative magnitude is near zero.");
 
             return derivative.Normalized();
+        }
+
+        public bool TryGetCurvature(double t, out double curvature)
+        {
+            double clampedT = System.Math.Clamp(t, 0.0, 1.0);
+            double u = 1.0 - clampedT;
+
+            Vector3d firstDerivative =
+                (3.0 * u * u) * (P1 - P0) +
+                (6.0 * u * clampedT) * (P2 - P1) +
+                (3.0 * clampedT * clampedT) * (P3 - P2);
+
+            Vector3d secondDerivative =
+                (6.0 * u) * (P2 - (2.0 * P1) + P0) +
+                (6.0 * clampedT) * (P3 - (2.0 * P2) + P1);
+
+            return TryComputeCurvature(firstDerivative, secondDerivative, out curvature);
+        }
+
+        private static bool TryComputeCurvature(
+            Vector3d firstDerivative,
+            Vector3d secondDerivative,
+            out double curvature)
+        {
+            curvature = 0.0;
+            double firstLength = firstDerivative.Length;
+            if (firstLength <= MathUtil.Epsilon)
+            {
+                return false;
+            }
+
+            Vector3d cross = Vector3d.Cross(firstDerivative, secondDerivative);
+            double numerator = cross.Length;
+            double denominator = firstLength * firstLength * firstLength;
+
+            if (double.IsNaN(numerator) || double.IsInfinity(numerator) ||
+                double.IsNaN(denominator) || double.IsInfinity(denominator) ||
+                denominator <= MathUtil.Epsilon)
+            {
+                return false;
+            }
+
+            curvature = numerator / denominator;
+            if (double.IsNaN(curvature) || double.IsInfinity(curvature))
+            {
+                curvature = 0.0;
+                return false;
+            }
+
+            return true;
         }
     }
 }
