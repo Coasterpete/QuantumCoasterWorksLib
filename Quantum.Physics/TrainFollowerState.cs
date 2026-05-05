@@ -18,16 +18,37 @@ namespace Quantum.Physics
 
         public double Acceleration { get; set; }
 
+        /// <summary>
+        /// World-space projected acceleration vector resolved from force targets.
+        /// Populated by diagnostic sampling paths.
+        /// </summary>
         public Vector3d? ProjectedAcceleration { get; set; }
 
+        /// <summary>
+        /// Tangential acceleration diagnostic along <see cref="Frame.Tangent"/>.
+        /// </summary>
         public double? TangentialAcceleration { get; set; }
 
+        /// <summary>
+        /// Normal acceleration diagnostic scalar.
+        /// In tangential-projected mode with curvature data this represents v^2 * curvature.
+        /// In projection diagnostics it represents the normal component of projected acceleration.
+        /// </summary>
         public double? NormalAcceleration { get; set; }
 
+        /// <summary>
+        /// Normal acceleration diagnostic vector, aligned with <see cref="Frame.Normal"/> when present.
+        /// </summary>
         public Vector3d? NormalAccelerationVector { get; set; }
 
+        /// <summary>
+        /// Binormal acceleration diagnostic along <see cref="Frame.Binormal"/>.
+        /// </summary>
         public double? BinormalAcceleration { get; set; }
 
+        /// <summary>
+        /// Combined world-space acceleration diagnostic built from tangential plus normal-vector terms.
+        /// </summary>
         public Vector3d? CombinedWorldAccelerationVector { get; set; }
 
         public bool LoopEnabled { get; set; }

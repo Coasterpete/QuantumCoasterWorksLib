@@ -10,6 +10,17 @@ public sealed class TrackFrameProviderFromDocumentTests
     private const double Tolerance = 1e-6;
 
     [Fact]
+    public void ITrackFrameProvider_DefaultCurvatureContract_ReturnsFalseAndZero()
+    {
+        ITrackFrameProvider provider = new FrameOnlyTrackFrameProvider();
+
+        bool hasCurvature = provider.TryGetCurvatureAtDistance(distance: 1.0, out double curvature);
+
+        Assert.False(hasCurvature);
+        AssertDoubleNear(0.0, curvature);
+    }
+
+    [Fact]
     public void TrackFrameProviderFromDocument_CanBeConstructedAndQueried()
     {
         var document = new TrackDocument(new TrackSegment[]
@@ -55,6 +66,42 @@ public sealed class TrackFrameProviderFromDocumentTests
         AssertVectorNear(expected.Tangent, actual.Tangent);
         AssertVectorNear(expected.Normal, actual.Normal);
         AssertVectorNear(expected.Binormal, actual.Binormal);
+    }
+
+    [Theory]
+    [InlineData(double.NaN)]
+    [InlineData(double.PositiveInfinity)]
+    [InlineData(double.NegativeInfinity)]
+    public void TrackFrameProviderFromDocument_TryGetFrameAtDistance_InvalidDistance_ReturnsFalse(double invalidDistance)
+    {
+        var document = new TrackDocument(new TrackSegment[]
+        {
+            new StraightSegment(length: 8.0)
+        });
+        var provider = new TrackFrameProviderFromDocument(new TrackPhysicsAdapter(), document);
+
+        bool hasFrame = provider.TryGetFrameAtDistance(invalidDistance, out TrackFrame frame);
+
+        Assert.False(hasFrame);
+        Assert.Equal(default, frame);
+    }
+
+    [Theory]
+    [InlineData(double.NaN)]
+    [InlineData(double.PositiveInfinity)]
+    [InlineData(double.NegativeInfinity)]
+    public void TrackFrameProviderFromDocument_TryGetCurvatureAtDistance_InvalidDistance_ReturnsFalseAndZero(double invalidDistance)
+    {
+        var document = new TrackDocument(new TrackSegment[]
+        {
+            new StraightSegment(length: 8.0)
+        });
+        var provider = new TrackFrameProviderFromDocument(new TrackPhysicsAdapter(), document);
+
+        bool hasCurvature = provider.TryGetCurvatureAtDistance(invalidDistance, out double curvature);
+
+        Assert.False(hasCurvature);
+        AssertDoubleNear(0.0, curvature);
     }
 
     [Fact]
@@ -130,6 +177,15 @@ public sealed class TrackFrameProviderFromDocumentTests
     private static void AssertDoubleNear(double expected, double actual)
     {
         Assert.InRange(System.Math.Abs(expected - actual), 0.0, Tolerance);
+    }
+
+    private sealed class FrameOnlyTrackFrameProvider : ITrackFrameProvider
+    {
+        public bool TryGetFrameAtDistance(double distance, out TrackFrame frame)
+        {
+            frame = default;
+            return false;
+        }
     }
 
     private sealed class RecordingTrackFrameProvider : ITrackFrameProvider
