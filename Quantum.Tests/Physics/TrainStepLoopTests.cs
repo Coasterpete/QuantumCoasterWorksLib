@@ -5,6 +5,7 @@ using Quantum.FVD;
 using Quantum.Math;
 using Quantum.Physics;
 using Quantum.Splines;
+using Quantum.Track;
 using Xunit;
 
 namespace Quantum.Tests;
@@ -350,6 +351,95 @@ public sealed class TrainStepLoopTests
 
         Assert.InRange(System.Math.Abs(follower.Speed - expectedSpeed), 0.0, ValueTolerance);
         Assert.InRange(System.Math.Abs(follower.Distance - expectedDistance), 0.0, ValueTolerance);
+    }
+
+    [Fact]
+    public void TrainStepLoop_WithSectionForceTargetProvider_NormalGConstant_ProducesExpectedKinematics()
+    {
+        IArcLengthCurve track = new LineCurve(
+            new Vector3d(0, 0, 0),
+            new Vector3d(100, 0, 0));
+
+        const double deltaTime = 0.1;
+        const int steps = 10;
+        const double normalG = 1.0;
+        const double gravityMagnitude = 0.0;
+        const double linearDrag = 0.0;
+        const double quadraticDrag = 0.0;
+        const double rollingResistance = 0.0;
+        const double expectedAcceleration = normalG * 9.81;
+        double elapsedTime = steps * deltaTime;
+        double expectedSpeed = expectedAcceleration * elapsedTime;
+        double expectedDistance = 0.5 * expectedAcceleration * elapsedTime * elapsedTime;
+
+        IReadOnlyList<ResolvedSectionInterval<ForceSection>> resolvedSections = SectionResolver.Resolve(new[]
+        {
+            (Section: new ForceSection(targetNormalG: normalG, length: 10.0), Length: 10.0)
+        });
+
+        SampledForceTarget sampled = ForceTargetSampler.Sample(resolvedSections, distance: 0.0);
+        Assert.True(sampled.TargetNormalG.HasValue);
+        Assert.Equal(normalG, sampled.TargetNormalG.Value);
+
+        var provider = new SectionForceTargetProvider(resolvedSections);
+        var follower = new TrainFollowerState(track);
+        var loop = new TrainStepLoop(
+            follower,
+            deltaTime,
+            gravityMagnitude,
+            linearDrag,
+            quadraticDrag,
+            rollingResistance,
+            provider);
+
+        loop.Step(steps);
+
+        Assert.InRange(System.Math.Abs(follower.Speed - expectedSpeed), 0.0, ValueTolerance);
+        Assert.InRange(System.Math.Abs(follower.Distance - expectedDistance), 0.0, ValueTolerance);
+    }
+
+    [Fact]
+    public void TrainStepLoop_WithoutProvider_BehavesIdenticallyToBaseline()
+    {
+        IArcLengthCurve track = new LineCurve(
+            new Vector3d(0, 0, 0),
+            new Vector3d(100, 0, 0));
+
+        const double deltaTime = 0.1;
+        const int steps = 10;
+        const double gravityMagnitude = 0.0;
+        const double linearDrag = 0.0;
+        const double quadraticDrag = 0.0;
+        const double rollingResistance = 0.0;
+
+        var baselineFollower = new TrainFollowerState(track);
+        var followerWithoutProvider = new TrainFollowerState(track);
+
+        for (int i = 0; i < steps; i++)
+        {
+            baselineFollower.UpdateWithGravity(
+                deltaTime,
+                gravityMagnitude,
+                linearDrag,
+                quadraticDrag,
+                rollingResistance);
+        }
+
+        var loop = new TrainStepLoop(
+            followerWithoutProvider,
+            deltaTime,
+            gravityMagnitude,
+            linearDrag,
+            quadraticDrag,
+            rollingResistance);
+
+        loop.Step(steps);
+
+        Assert.InRange(System.Math.Abs(followerWithoutProvider.Speed - baselineFollower.Speed), 0.0, ValueTolerance);
+        Assert.InRange(System.Math.Abs(followerWithoutProvider.Distance - baselineFollower.Distance), 0.0, ValueTolerance);
+        Assert.InRange(System.Math.Abs(followerWithoutProvider.Acceleration - baselineFollower.Acceleration), 0.0, ValueTolerance);
+        Assert.Equal(steps, loop.Tick);
+        Assert.InRange(System.Math.Abs(loop.ElapsedTimeSeconds - (steps * deltaTime)), 0.0, ValueTolerance);
     }
 
     [Fact]
