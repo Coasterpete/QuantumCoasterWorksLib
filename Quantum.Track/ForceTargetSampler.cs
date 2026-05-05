@@ -80,6 +80,7 @@ namespace Quantum.Track
                     return constantValue;
 
                 case ForceInterpolationMode.Linear:
+                case ForceInterpolationMode.SmoothStep:
                     double? resolvedStart = startValue ?? constantValue;
                     double? resolvedEnd = endValue ?? constantValue;
 
@@ -88,7 +89,11 @@ namespace Quantum.Track
                         return null;
                     }
 
-                    return MathUtil.Lerp(resolvedStart.Value, resolvedEnd.Value, normalizedT);
+                    double adjustedT = mode == ForceInterpolationMode.SmoothStep
+                        ? normalizedT * normalizedT * (3.0 - (2.0 * normalizedT))
+                        : normalizedT;
+
+                    return MathUtil.Lerp(resolvedStart.Value, resolvedEnd.Value, adjustedT);
 
                 default:
                     throw new ArgumentOutOfRangeException(
