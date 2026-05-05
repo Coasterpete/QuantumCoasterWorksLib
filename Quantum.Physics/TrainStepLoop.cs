@@ -11,6 +11,7 @@ namespace Quantum.Physics
     public sealed class TrainStepLoop
     {
         private readonly IForceTargetProvider? _forceTargetProvider;
+        private readonly ITrackFrameProvider? _trackFrameProvider;
 
         public TrainIntegrationMode IntegrationMode { get; }
 
@@ -25,6 +26,8 @@ namespace Quantum.Physics
         public double QuadraticDragCoefficient { get; }
 
         public double RollingResistance { get; }
+
+        public ITrackFrameProvider? TrackFrameProvider => _trackFrameProvider;
 
         public long Tick { get; private set; }
 
@@ -45,7 +48,8 @@ namespace Quantum.Physics
                 quadraticDragCoefficient,
                 rollingResistance,
                 forceTargetProvider: null,
-                integrationMode: TrainIntegrationMode.LegacyNormalComponent)
+                integrationMode: TrainIntegrationMode.LegacyNormalComponent,
+                trackFrameProvider: null)
         {
         }
 
@@ -65,7 +69,8 @@ namespace Quantum.Physics
                 quadraticDragCoefficient,
                 rollingResistance,
                 forceTargetProvider: null,
-                integrationMode: integrationMode)
+                integrationMode: integrationMode,
+                trackFrameProvider: null)
         {
         }
 
@@ -85,7 +90,29 @@ namespace Quantum.Physics
                 quadraticDragCoefficient,
                 rollingResistance,
                 forceTargetProvider,
-                integrationMode: TrainIntegrationMode.LegacyNormalComponent)
+                integrationMode: TrainIntegrationMode.LegacyNormalComponent,
+                trackFrameProvider: null)
+        {
+        }
+
+        public TrainStepLoop(
+            TrainFollowerState follower,
+            double deltaTime,
+            double gravityMagnitude,
+            double linearDragCoefficient,
+            double quadraticDragCoefficient,
+            double rollingResistance,
+            ITrackFrameProvider? trackFrameProvider)
+            : this(
+                follower,
+                deltaTime,
+                gravityMagnitude,
+                linearDragCoefficient,
+                quadraticDragCoefficient,
+                rollingResistance,
+                forceTargetProvider: null,
+                integrationMode: TrainIntegrationMode.LegacyNormalComponent,
+                trackFrameProvider: trackFrameProvider)
         {
         }
 
@@ -97,7 +124,30 @@ namespace Quantum.Physics
             double quadraticDragCoefficient,
             double rollingResistance,
             IForceTargetProvider? forceTargetProvider,
-            TrainIntegrationMode integrationMode)
+            ITrackFrameProvider? trackFrameProvider)
+            : this(
+                follower,
+                deltaTime,
+                gravityMagnitude,
+                linearDragCoefficient,
+                quadraticDragCoefficient,
+                rollingResistance,
+                forceTargetProvider,
+                integrationMode: TrainIntegrationMode.LegacyNormalComponent,
+                trackFrameProvider: trackFrameProvider)
+        {
+        }
+
+        public TrainStepLoop(
+            TrainFollowerState follower,
+            double deltaTime,
+            double gravityMagnitude,
+            double linearDragCoefficient,
+            double quadraticDragCoefficient,
+            double rollingResistance,
+            IForceTargetProvider? forceTargetProvider,
+            TrainIntegrationMode integrationMode,
+            ITrackFrameProvider? trackFrameProvider = null)
         {
             Follower = follower ?? throw new ArgumentNullException(nameof(follower));
             DeltaTime = deltaTime;
@@ -106,6 +156,7 @@ namespace Quantum.Physics
             QuadraticDragCoefficient = quadraticDragCoefficient;
             RollingResistance = rollingResistance;
             _forceTargetProvider = forceTargetProvider;
+            _trackFrameProvider = trackFrameProvider;
             IntegrationMode = integrationMode;
             Tick = 0;
             ElapsedTimeSeconds = 0.0;
