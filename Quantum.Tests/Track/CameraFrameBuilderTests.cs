@@ -1,0 +1,136 @@
+using System.Numerics;
+using Quantum.Math;
+using Quantum.Track;
+using ExportTrackFrame = Quantum.Track.TrackFrame;
+
+namespace Quantum.Tests;
+
+public sealed class CameraFrameBuilderTests
+{
+    private const double Tolerance = 1e-6;
+
+    [Fact]
+    public void BuildRideCamera_AppliesOffsetInTrackLocalSpace()
+    {
+        var frame = new ExportTrackFrame(
+            position: new Vector3d(10.0, 20.0, 30.0),
+            tangent: Vector3d.UnitX,
+            normal: Vector3d.UnitY,
+            binormal: Vector3d.UnitZ);
+        Vector3d offset = new Vector3d(2.0, -3.0, 4.0);
+
+        CameraTransform camera = CameraFrameBuilder.BuildRideCamera(frame, offset);
+
+        AssertVectorNear(new Vector3d(12.0, 17.0, 34.0), camera.Position);
+        AssertFloatNear(12.0f, camera.Transform.M14);
+        AssertFloatNear(17.0f, camera.Transform.M24);
+        AssertFloatNear(34.0f, camera.Transform.M34);
+    }
+
+    [Fact]
+    public void BuildRideCamera_OrientationMatchesFrameAxes()
+    {
+        Vector3d tangent = new Vector3d(0.0, 1.0, 0.0);
+        Vector3d normal = new Vector3d(0.0, 0.0, 1.0);
+        Vector3d binormal = new Vector3d(1.0, 0.0, 0.0);
+        var frame = new ExportTrackFrame(
+            position: new Vector3d(5.0, 6.0, 7.0),
+            tangent: tangent,
+            normal: normal,
+            binormal: binormal);
+
+        CameraTransform camera = CameraFrameBuilder.BuildRideCamera(frame, Vector3d.Zero);
+
+        AssertVectorNear(tangent, camera.Forward);
+        AssertVectorNear(normal, camera.Up);
+        AssertVectorNear(binormal, camera.Right);
+
+        AssertFloatNear((float)tangent.X, camera.Transform.M11);
+        AssertFloatNear((float)tangent.Y, camera.Transform.M21);
+        AssertFloatNear((float)tangent.Z, camera.Transform.M31);
+
+        AssertFloatNear((float)normal.X, camera.Transform.M12);
+        AssertFloatNear((float)normal.Y, camera.Transform.M22);
+        AssertFloatNear((float)normal.Z, camera.Transform.M32);
+
+        AssertFloatNear((float)binormal.X, camera.Transform.M13);
+        AssertFloatNear((float)binormal.Y, camera.Transform.M23);
+        AssertFloatNear((float)binormal.Z, camera.Transform.M33);
+    }
+
+    [Fact]
+    public void BuildRideCamera_ReturnsFiniteMatrix()
+    {
+        Vector3d tangent = new Vector3d(1.0, 2.0, 3.0).Normalized();
+        Vector3d normal = new Vector3d(-2.0, 0.5, 1.0).Normalized();
+        Vector3d binormal = Vector3d.Cross(tangent, normal).Normalized();
+        normal = Vector3d.Cross(binormal, tangent).Normalized();
+
+        var frame = new ExportTrackFrame(
+            position: new Vector3d(-3.5, 8.25, 1.125),
+            tangent: tangent,
+            normal: normal,
+            binormal: binormal);
+
+        CameraTransform camera = CameraFrameBuilder.BuildRideCamera(
+            frame,
+            new Vector3d(0.75, -1.5, 2.25));
+
+        AssertFiniteMatrix(camera.Transform);
+    }
+
+    [Fact]
+    public void BuildRideCamera_WithZeroOffset_MatchesFramePosition()
+    {
+        var frame = new ExportTrackFrame(
+            position: new Vector3d(-4.0, 9.0, 2.5),
+            tangent: Vector3d.UnitX,
+            normal: Vector3d.UnitY,
+            binormal: Vector3d.UnitZ);
+
+        CameraTransform camera = CameraFrameBuilder.BuildRideCamera(frame, Vector3d.Zero);
+
+        AssertVectorNear(frame.Position, camera.Position);
+        AssertFloatNear((float)frame.Position.X, camera.Transform.M14);
+        AssertFloatNear((float)frame.Position.Y, camera.Transform.M24);
+        AssertFloatNear((float)frame.Position.Z, camera.Transform.M34);
+    }
+
+    private static void AssertVectorNear(Vector3d expected, Vector3d actual)
+    {
+        Assert.InRange(System.Math.Abs(expected.X - actual.X), 0.0, Tolerance);
+        Assert.InRange(System.Math.Abs(expected.Y - actual.Y), 0.0, Tolerance);
+        Assert.InRange(System.Math.Abs(expected.Z - actual.Z), 0.0, Tolerance);
+    }
+
+    private static void AssertFloatNear(float expected, float actual)
+    {
+        Assert.InRange(System.Math.Abs(expected - actual), 0.0f, 1e-6f);
+    }
+
+    private static void AssertFiniteMatrix(Matrix4x4 matrix)
+    {
+        AssertFinite(matrix.M11);
+        AssertFinite(matrix.M12);
+        AssertFinite(matrix.M13);
+        AssertFinite(matrix.M14);
+        AssertFinite(matrix.M21);
+        AssertFinite(matrix.M22);
+        AssertFinite(matrix.M23);
+        AssertFinite(matrix.M24);
+        AssertFinite(matrix.M31);
+        AssertFinite(matrix.M32);
+        AssertFinite(matrix.M33);
+        AssertFinite(matrix.M34);
+        AssertFinite(matrix.M41);
+        AssertFinite(matrix.M42);
+        AssertFinite(matrix.M43);
+        AssertFinite(matrix.M44);
+    }
+
+    private static void AssertFinite(float value)
+    {
+        Assert.False(float.IsNaN(value));
+        Assert.False(float.IsInfinity(value));
+    }
+}
