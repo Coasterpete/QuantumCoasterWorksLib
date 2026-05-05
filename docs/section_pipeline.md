@@ -167,10 +167,20 @@ Plateau interpolation is reserved for future force-profile shapes where a channe
 - No automatic section-to-physics coupling.
 - Existing constant-section tests must remain unchanged.
 
-### Custom Easing Abstraction
+### Custom Easing Design Direction
 
 Status:
 A minimal easing abstraction (`IForceEasingFunction`) has been introduced. Built-in interpolation modes are currently wrapped through this interface, enabling future extension without modifying the enum-based system.
+
+### Multi-Point Channel Direction
+
+Future force channels should support multiple control points across a section interval, allowing complex force shaping beyond single start→end interpolation.
+
+Initial implementations may support:
+- A list of (t, value) keypoints
+- Interpolation between keypoints using existing easing functions
+
+This system should build on top of `IForceEasingFunction` rather than replacing it.
 
 ## References
 - KexEdit node graph and section concepts: <https://individualkex.github.io/KexEdit/reference/node-graph.html>
