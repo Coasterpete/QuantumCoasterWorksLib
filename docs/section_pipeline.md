@@ -135,5 +135,42 @@ Add the minimum new contracts needed to make section evaluation deterministic an
 - It avoids coupling geometry solving and motion integration in the same milestone.
 - It creates a stable base for later milestones (time-domain targets, geometric channel expansion, node-graph orchestration).
 
+## 6) Next Milestone: Force Channel Interpolation
+
+### Goal
+Allow `ForceSection` values to vary over their interval using deterministic channel interpolation.
+
+### Initial Scope
+- Keep constant force sections as the default behavior.
+- Add opt-in interpolation modes.
+- Use `NormalizedT` from `ForceTargetSnapshot`.
+- Start with simple interpolation before advanced spline/easing support.
+
+### Candidate Modes
+
+Initial modes:
+- Constant
+- Linear
+- SmoothStep
+
+Future preset modes:
+- Quadratic
+- Cubic
+- Quartic
+- Quintic
+- Sinusoidal
+- Plateau
+
+Future advanced support:
+- Custom easings
+- Keyframed channel curves
+- FVD-style channel functions
+
+### Guardrails
+- No default physics behavior changes.
+- No automatic section-to-physics coupling.
+- Existing constant-section tests must remain unchanged.
+
 ## References
 - KexEdit node graph and section concepts: <https://individualkex.github.io/KexEdit/reference/node-graph.html>
+
