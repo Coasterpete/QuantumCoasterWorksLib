@@ -438,6 +438,26 @@ A minimal train-car transform layer has been introduced.
 - This is a geometry/representation layer only
 - This connects force evaluation → spatial frames → renderable transforms
 
+### Train Car Debug Visualization
+
+Status:
+Renderer-agnostic debug geometry for train cars has been added.
+
+- `TrainCarDebugGizmoBuilder` produces wireframe boxes per car
+- Boxes are:
+  - centered on `TrackFrame.Position`
+  - oriented using T/N/B
+  - length → Tangent
+  - width → Binormal
+  - height → Normal
+
+### Notes
+
+- Each car produces 12 line segments (wire box)
+- No renderer/engine dependency
+- No TrainStepLoop or physics changes
+- This extends the debug visualization layer for spatial verification
+
 ## References
 - KexEdit node graph and section concepts: <https://individualkex.github.io/KexEdit/reference/node-graph.html>
 
