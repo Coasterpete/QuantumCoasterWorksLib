@@ -1,5 +1,6 @@
 using System.Numerics;
 using Quantum.Math;
+using Quantum.Splines;
 using Quantum.Track;
 using ExportTrackFrame = Quantum.Track.TrackFrame;
 
@@ -247,6 +248,170 @@ public sealed class CameraFrameBuilderTests
                 cameraPosition: Vector3d.Zero,
                 targetFrame: targetFrame,
                 upHint: new Vector3d(0.0, double.PositiveInfinity, 0.0)));
+    }
+
+    [Fact]
+    public void BuildBRollCamera_AppliesOffsetInTrackLocalSpace()
+    {
+        var evaluator = CreateBoundLineEvaluator(length: 20.0);
+        var frame = new ExportTrackFrame(
+            distance: 5.0,
+            position: new Vector3d(10.0, 20.0, 30.0),
+            tangent: Vector3d.UnitX,
+            normal: Vector3d.UnitY,
+            binormal: Vector3d.UnitZ);
+        Vector3d localOffset = new Vector3d(2.0, -3.0, 4.0);
+
+        CameraTransform camera = CameraFrameBuilder.BuildBRollCamera(
+            frame,
+            localOffset,
+            lookAheadDistance: 0.0,
+            evaluator,
+            upHint: Vector3d.UnitY);
+
+        AssertVectorNear(new Vector3d(12.0, 17.0, 34.0), camera.Position);
+        AssertFloatNear(12.0f, camera.Transform.M14);
+        AssertFloatNear(17.0f, camera.Transform.M24);
+        AssertFloatNear(34.0f, camera.Transform.M34);
+    }
+
+    [Fact]
+    public void BuildBRollCamera_LookAhead_ShiftsTarget()
+    {
+        var evaluator = CreateBoundLineEvaluator(length: 20.0);
+        ExportTrackFrame targetFrame = evaluator.EvaluateFrameAtDistance(5.0);
+        Vector3d localOffset = new Vector3d(0.0, 1.0, 0.0);
+        double lookAheadDistance = 3.5;
+        Vector3d upHint = Vector3d.UnitY;
+
+        CameraTransform camera = CameraFrameBuilder.BuildBRollCamera(
+            targetFrame,
+            localOffset,
+            lookAheadDistance,
+            evaluator,
+            upHint);
+
+        Vector3d expectedCameraPosition = targetFrame.Position + localOffset.Y * targetFrame.Normal;
+        Vector3d expectedTargetPosition = evaluator.EvaluateFrameAtDistance(
+            targetFrame.Distance + lookAheadDistance).Position;
+        CameraTransform expectedCamera = CameraFrameBuilder.BuildTargetCamera(
+            expectedCameraPosition,
+            expectedTargetPosition,
+            upHint);
+
+        AssertVectorNear(expectedCamera.Forward, camera.Forward);
+        AssertVectorNear(expectedCamera.Up, camera.Up);
+        AssertVectorNear(expectedCamera.Right, camera.Right);
+        AssertMatrixNear(expectedCamera.Transform, camera.Transform);
+    }
+
+    [Fact]
+    public void BuildBRollCamera_ZeroLookAhead_MatchesTargetFramePosition()
+    {
+        var evaluator = CreateBoundLineEvaluator(length: 20.0);
+        ExportTrackFrame targetFrame = evaluator.EvaluateFrameAtDistance(6.0);
+        Vector3d localOffset = new Vector3d(0.0, -2.0, 0.0);
+        Vector3d upHint = Vector3d.UnitY;
+
+        CameraTransform camera = CameraFrameBuilder.BuildBRollCamera(
+            targetFrame,
+            localOffset,
+            lookAheadDistance: 0.0,
+            evaluator,
+            upHint);
+
+        Vector3d expectedCameraPosition = targetFrame.Position + (targetFrame.Normal * localOffset.Y);
+        CameraTransform expectedCamera = CameraFrameBuilder.BuildTargetCamera(
+            expectedCameraPosition,
+            targetFrame.Position,
+            upHint);
+
+        AssertVectorNear(expectedCamera.Forward, camera.Forward);
+        AssertVectorNear(expectedCamera.Up, camera.Up);
+        AssertVectorNear(expectedCamera.Right, camera.Right);
+        AssertMatrixNear(expectedCamera.Transform, camera.Transform);
+    }
+
+    [Fact]
+    public void BuildBRollCamera_ReturnsFiniteMatrix()
+    {
+        var evaluator = CreateBoundLineEvaluator(length: 30.0);
+        ExportTrackFrame targetFrame = evaluator.EvaluateFrameAtDistance(7.0);
+
+        CameraTransform camera = CameraFrameBuilder.BuildBRollCamera(
+            targetFrame,
+            localOffset: new Vector3d(0.5, 1.25, -0.75),
+            lookAheadDistance: 4.0,
+            evaluator,
+            upHint: new Vector3d(0.0, 1.0, 0.25));
+
+        AssertFiniteMatrix(camera.Transform);
+    }
+
+    [Fact]
+    public void BuildBRollCamera_WithInvalidInput_Throws()
+    {
+        var evaluator = CreateBoundLineEvaluator(length: 10.0);
+        ExportTrackFrame targetFrame = evaluator.EvaluateFrameAtDistance(3.0);
+
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            CameraFrameBuilder.BuildBRollCamera(
+                targetFrame,
+                localOffset: new Vector3d(double.NaN, 0.0, 0.0),
+                lookAheadDistance: 0.0,
+                evaluator,
+                upHint: Vector3d.UnitY));
+
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            CameraFrameBuilder.BuildBRollCamera(
+                targetFrame,
+                localOffset: Vector3d.Zero,
+                lookAheadDistance: double.PositiveInfinity,
+                evaluator,
+                upHint: Vector3d.UnitY));
+
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            CameraFrameBuilder.BuildBRollCamera(
+                targetFrame,
+                localOffset: Vector3d.Zero,
+                lookAheadDistance: 0.0,
+                evaluator,
+                upHint: new Vector3d(0.0, double.NegativeInfinity, 0.0)));
+
+        Assert.Throws<ArgumentNullException>(() =>
+            CameraFrameBuilder.BuildBRollCamera(
+                targetFrame,
+                localOffset: Vector3d.Zero,
+                lookAheadDistance: 0.0,
+                evaluator: null!,
+                upHint: Vector3d.UnitY));
+
+        var hugeDistanceFrame = new ExportTrackFrame(
+            distance: double.MaxValue,
+            position: targetFrame.Position,
+            tangent: targetFrame.Tangent,
+            normal: targetFrame.Normal,
+            binormal: targetFrame.Binormal);
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            CameraFrameBuilder.BuildBRollCamera(
+                hugeDistanceFrame,
+                localOffset: Vector3d.Zero,
+                lookAheadDistance: double.MaxValue,
+                evaluator,
+                upHint: Vector3d.UnitY));
+    }
+
+    private static TrackEvaluator CreateBoundLineEvaluator(double length)
+    {
+        IParamCurve spline = new LineCurve(
+            new Vector3d(0.0, 0.0, 0.0),
+            new Vector3d(length, 0.0, 0.0));
+        var document = new TrackDocument(new TrackSegment[]
+        {
+            new StraightSegment(length: length, spline: spline)
+        });
+
+        return new TrackEvaluator(document);
     }
 
     private static void AssertVectorNear(Vector3d expected, Vector3d actual)

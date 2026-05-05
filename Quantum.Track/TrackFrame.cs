@@ -10,18 +10,36 @@ namespace Quantum.Track
     /// </summary>
     public readonly struct TrackFrame
     {
-        public TrackFrame(Vector3d position, Vector3d tangent, Vector3d normal, Vector3d binormal)
+        public TrackFrame(
+            double distance,
+            Vector3d position,
+            Vector3d tangent,
+            Vector3d normal,
+            Vector3d binormal)
         {
+            if (double.IsNaN(distance) || double.IsInfinity(distance))
+            {
+                throw new ArgumentOutOfRangeException(nameof(distance), "Distance must be finite.");
+            }
+
             ValidateFinite(position, nameof(position));
             ValidateFinite(tangent, nameof(tangent));
             ValidateFinite(normal, nameof(normal));
             ValidateFinite(binormal, nameof(binormal));
 
+            Distance = distance;
             Position = position;
             Tangent = tangent;
             Normal = normal;
             Binormal = binormal;
         }
+
+        public TrackFrame(Vector3d position, Vector3d tangent, Vector3d normal, Vector3d binormal)
+            : this(0.0, position, tangent, normal, binormal)
+        {
+        }
+
+        public double Distance { get; }
 
         public Vector3d Position { get; }
 

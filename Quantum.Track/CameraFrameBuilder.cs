@@ -15,11 +15,7 @@ namespace Quantum.Track
         {
             ValidateFinite(offset, nameof(offset));
 
-            Vector3d position =
-                frame.Position +
-                (frame.Tangent * offset.X) +
-                (frame.Normal * offset.Y) +
-                (frame.Binormal * offset.Z);
+            Vector3d position = ComputeCameraPositionFromLocalOffset(frame, offset);
 
             Vector3d forward = frame.Tangent;
             Vector3d up = frame.Normal;
@@ -68,12 +64,61 @@ namespace Quantum.Track
             return new CameraTransform(transform, cameraPosition, forward, up, right);
         }
 
+        public static CameraTransform BuildBRollCamera(
+            TrackFrame targetFrame,
+            Vector3d localOffset,
+            double lookAheadDistance,
+            TrackEvaluator evaluator,
+            Vector3d upHint)
+        {
+            ValidateFinite(localOffset, nameof(localOffset));
+            ValidateFinite(upHint, nameof(upHint));
+
+            if (double.IsNaN(lookAheadDistance) || double.IsInfinity(lookAheadDistance))
+            {
+                throw new ArgumentOutOfRangeException(nameof(lookAheadDistance), "Look-ahead distance must be finite.");
+            }
+
+            if (evaluator is null)
+            {
+                throw new ArgumentNullException(nameof(evaluator));
+            }
+
+            Vector3d cameraPosition = ComputeCameraPositionFromLocalOffset(targetFrame, localOffset);
+
+            Vector3d targetPosition = targetFrame.Position;
+            if (lookAheadDistance != 0.0)
+            {
+                double lookAheadSampleDistance = targetFrame.Distance + lookAheadDistance;
+                if (double.IsNaN(lookAheadSampleDistance) || double.IsInfinity(lookAheadSampleDistance))
+                {
+                    throw new ArgumentOutOfRangeException(
+                        nameof(lookAheadDistance),
+                        "Target look-ahead sample distance must be finite.");
+                }
+
+                TrackFrame lookAheadFrame = evaluator.EvaluateFrameAtDistance(lookAheadSampleDistance);
+                targetPosition = lookAheadFrame.Position;
+            }
+
+            return BuildTargetCamera(cameraPosition, targetPosition, upHint);
+        }
+
         public static CameraTransform BuildFlyByCamera(
             Vector3d cameraPosition,
             TrackFrame targetFrame,
             Vector3d upHint)
         {
             return BuildTargetCamera(cameraPosition, targetFrame.Position, upHint);
+        }
+
+        private static Vector3d ComputeCameraPositionFromLocalOffset(TrackFrame frame, Vector3d localOffset)
+        {
+            return
+                frame.Position +
+                (frame.Tangent * localOffset.X) +
+                (frame.Normal * localOffset.Y) +
+                (frame.Binormal * localOffset.Z);
         }
 
         private static Vector3d NormalizeOrThrow(Vector3d vector, string paramName, string message)

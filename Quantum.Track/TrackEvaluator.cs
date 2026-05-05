@@ -159,7 +159,7 @@ namespace Quantum.Track
             Vector3d binormal = NormalizeOrThrow(Vector3d.Cross(tangent, normal), "binormal");
             normal = NormalizeOrThrow(Vector3d.Cross(binormal, tangent), "normal");
 
-            return new TrackFrame(sourceFrame.Position, tangent, normal, binormal);
+            return new TrackFrame(sourceFrame.S, sourceFrame.Position, tangent, normal, binormal);
         }
 
         private static SplineTrackFrame EvaluateFallbackFrame(
