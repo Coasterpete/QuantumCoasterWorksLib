@@ -12,6 +12,7 @@ public sealed class ForceChannelSetTests
         Assert.Equal(ForceChannelBlendMode.Sum, set.NormalGBlendMode);
         Assert.Equal(ForceChannelBlendMode.Sum, set.LateralGBlendMode);
         Assert.Equal(ForceChannelBlendMode.Sum, set.RollRateBlendMode);
+        Assert.Null(set.Domain);
     }
 
     [Fact]

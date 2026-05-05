@@ -47,6 +47,9 @@ namespace Quantum.Track
             ForceSection resolvedSection = snapshot.ResolvedSection
                 ?? throw new InvalidOperationException("ForceTargetSnapshot.ResolvedSection cannot be null.");
 
+            ForceChannelDomain domain = resolvedSection.Channels?.Domain ?? resolvedSection.Domain;
+            double channelT = ResolveSamplingParameter(domain, snapshot.NormalizedT);
+
             double? targetNormalG = SampleChannel(
                 resolvedSection.Channels?.NormalGChannels,
                 resolvedSection.Channels?.NormalGBlendMode ?? ForceChannelBlendMode.Sum,
@@ -57,7 +60,7 @@ namespace Quantum.Track
                 resolvedSection.TargetNormalG,
                 resolvedSection.StartNormalG,
                 resolvedSection.EndNormalG,
-                snapshot.NormalizedT);
+                channelT);
 
             double? targetLateralG = SampleChannel(
                 resolvedSection.Channels?.LateralGChannels,
@@ -69,14 +72,14 @@ namespace Quantum.Track
                 resolvedSection.TargetLateralG,
                 resolvedSection.StartLateralG,
                 resolvedSection.EndLateralG,
-                snapshot.NormalizedT);
+                channelT);
 
             double? targetRollRateDegPerSec = SampleDirectChannel(
                 resolvedSection.Channels?.RollRateChannels,
                 resolvedSection.Channels?.RollRateBlendMode ?? ForceChannelBlendMode.Sum,
                 resolvedSection.Channels?.RollRate,
                 resolvedSection.RollRateChannel,
-                snapshot.NormalizedT);
+                channelT);
 
             return new SampledForceTarget(
                 distance,
@@ -85,6 +88,23 @@ namespace Quantum.Track
                 targetLateralG,
                 targetLongitudinalG: null,
                 targetRollRateDegPerSec: targetRollRateDegPerSec);
+        }
+
+        private static double ResolveSamplingParameter(ForceChannelDomain domain, double normalizedT)
+        {
+            switch (domain)
+            {
+                case ForceChannelDomain.Distance:
+                    return normalizedT;
+                case ForceChannelDomain.Time:
+                    // Stub behavior: time-domain channels still use normalized distance for now.
+                    return normalizedT;
+                default:
+                    throw new ArgumentOutOfRangeException(
+                        nameof(domain),
+                        domain,
+                        "Unsupported force channel domain.");
+            }
         }
 
         private static double? SampleChannel(

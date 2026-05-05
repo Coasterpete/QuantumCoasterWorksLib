@@ -15,6 +15,8 @@ namespace Quantum.Track
 
         public IForceChannel? RollRate { get; set; }
 
+        public ForceChannelDomain? Domain { get; set; }
+
         public IReadOnlyList<IForceChannel>? NormalGChannels
         {
             get => _normalGChannels;

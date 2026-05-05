@@ -15,7 +15,8 @@ namespace Quantum.Track
             IForceEasingFunction? easingFunction = null,
             IForceEasingFunction? normalGChannel = null,
             IForceEasingFunction? lateralGChannel = null,
-            IForceEasingFunction? rollRateChannel = null)
+            IForceEasingFunction? rollRateChannel = null,
+            ForceChannelDomain domain = ForceChannelDomain.Distance)
         {
             TargetNormalG = targetNormalG;
             TargetLateralG = targetLateralG;
@@ -30,6 +31,7 @@ namespace Quantum.Track
             NormalGChannel = normalGChannel;
             LateralGChannel = lateralGChannel;
             RollRateChannel = rollRateChannel;
+            Domain = domain;
         }
 
         public double? TargetNormalG { get; }
@@ -57,6 +59,8 @@ namespace Quantum.Track
         public IForceEasingFunction? LateralGChannel { get; }
 
         public IForceEasingFunction? RollRateChannel { get; }
+
+        public ForceChannelDomain Domain { get; }
 
         public ForceChannelSet? Channels { get; set; }
     }
