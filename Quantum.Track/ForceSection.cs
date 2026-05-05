@@ -12,7 +12,9 @@ namespace Quantum.Track
             double? endNormalG = null,
             double? startLateralG = null,
             double? endLateralG = null,
-            IForceEasingFunction? easingFunction = null)
+            IForceEasingFunction? easingFunction = null,
+            IForceEasingFunction? normalGChannel = null,
+            IForceEasingFunction? lateralGChannel = null)
         {
             TargetNormalG = targetNormalG;
             TargetLateralG = targetLateralG;
@@ -24,6 +26,8 @@ namespace Quantum.Track
             StartLateralG = startLateralG;
             EndLateralG = endLateralG;
             EasingFunction = easingFunction;
+            NormalGChannel = normalGChannel;
+            LateralGChannel = lateralGChannel;
         }
 
         public double? TargetNormalG { get; }
@@ -45,5 +49,9 @@ namespace Quantum.Track
         public double? EndLateralG { get; }
 
         public IForceEasingFunction? EasingFunction { get; }
+
+        public IForceEasingFunction? NormalGChannel { get; }
+
+        public IForceEasingFunction? LateralGChannel { get; }
     }
 }

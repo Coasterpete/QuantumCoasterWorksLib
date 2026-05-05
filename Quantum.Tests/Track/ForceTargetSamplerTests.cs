@@ -558,6 +558,120 @@ public sealed class ForceTargetSamplerTests
         Assert.Equal(2.3125, sampled.TargetNormalG.Value, 10);
     }
 
+    [Fact]
+    public void ForceTargetSampler_Sample_NormalGChannel_OverridesInterpolationMode()
+    {
+        var section = new ForceSection(
+            length: 10.0,
+            interpolationMode: ForceInterpolationMode.Cubic,
+            startNormalG: 10.0,
+            endNormalG: 20.0,
+            normalGChannel: new FixedForceEasingFunction(0.75));
+
+        IReadOnlyList<ResolvedSectionInterval<ForceSection>> intervals = ForceTargetResolver.Resolve(new[]
+        {
+            (section, 10.0)
+        });
+
+        SampledForceTarget sampled = ForceTargetSampler.Sample(intervals, 5.0);
+
+        Assert.True(sampled.TargetNormalG.HasValue);
+        Assert.Equal(17.5, sampled.TargetNormalG.Value, 10);
+        Assert.NotEqual(11.25, sampled.TargetNormalG.Value);
+    }
+
+    [Fact]
+    public void ForceTargetSampler_Sample_LateralGChannel_OverridesInterpolationMode()
+    {
+        var section = new ForceSection(
+            length: 10.0,
+            interpolationMode: ForceInterpolationMode.Quintic,
+            startLateralG: -1.0,
+            endLateralG: 1.0,
+            lateralGChannel: new FixedForceEasingFunction(0.25));
+
+        IReadOnlyList<ResolvedSectionInterval<ForceSection>> intervals = ForceTargetResolver.Resolve(new[]
+        {
+            (section, 10.0)
+        });
+
+        SampledForceTarget sampled = ForceTargetSampler.Sample(intervals, 5.0);
+
+        Assert.True(sampled.TargetLateralG.HasValue);
+        Assert.Equal(-0.5, sampled.TargetLateralG.Value, 10);
+        Assert.NotEqual(-0.9375, sampled.TargetLateralG.Value);
+    }
+
+    [Fact]
+    public void ForceTargetSampler_Sample_NullNormalGChannel_FallsBackToExistingInterpolation()
+    {
+        var section = new ForceSection(
+            length: 10.0,
+            interpolationMode: ForceInterpolationMode.Constant,
+            startNormalG: 10.0,
+            endNormalG: 20.0,
+            easingFunction: new FixedForceEasingFunction(0.75),
+            normalGChannel: null);
+
+        IReadOnlyList<ResolvedSectionInterval<ForceSection>> intervals = ForceTargetResolver.Resolve(new[]
+        {
+            (section, 10.0)
+        });
+
+        SampledForceTarget sampled = ForceTargetSampler.Sample(intervals, 5.0);
+
+        Assert.True(sampled.TargetNormalG.HasValue);
+        Assert.Equal(17.5, sampled.TargetNormalG.Value, 10);
+    }
+
+    [Fact]
+    public void ForceTargetSampler_Sample_KeyframedForceEasingFunction_WorksAsNormalGChannel()
+    {
+        var section = new ForceSection(
+            length: 10.0,
+            interpolationMode: ForceInterpolationMode.Constant,
+            startNormalG: 10.0,
+            endNormalG: 30.0,
+            normalGChannel: new KeyframedForceEasingFunction(new System.Collections.Generic.List<(double t, double value)>
+            {
+                (0.0, 0.0),
+                (0.5, 1.0),
+                (1.0, 0.2)
+            }));
+
+        IReadOnlyList<ResolvedSectionInterval<ForceSection>> intervals = ForceTargetResolver.Resolve(new[]
+        {
+            (section, 10.0)
+        });
+
+        SampledForceTarget sampled = ForceTargetSampler.Sample(intervals, 7.5);
+
+        Assert.True(sampled.TargetNormalG.HasValue);
+        Assert.Equal(22.0, sampled.TargetNormalG.Value, 10);
+    }
+
+    [Fact]
+    public void ForceTargetSampler_Sample_BuiltInForceEasingFunction_WorksAsLateralGChannel()
+    {
+        var section = new ForceSection(
+            length: 10.0,
+            interpolationMode: ForceInterpolationMode.Linear,
+            startLateralG: -2.0,
+            endLateralG: 2.0,
+            lateralGChannel: new BuiltInForceEasingFunction(ForceInterpolationMode.Quadratic));
+
+        IReadOnlyList<ResolvedSectionInterval<ForceSection>> intervals = ForceTargetResolver.Resolve(new[]
+        {
+            (section, 10.0)
+        });
+
+        SampledForceTarget sampled = ForceTargetSampler.Sample(intervals, 5.0);
+
+        Assert.True(sampled.TargetLateralG.HasValue);
+        Assert.Equal(-1.0, sampled.TargetLateralG.Value, 10);
+        Assert.NotEqual(0.0, sampled.TargetLateralG.Value);
+    }
+
     [Theory]
     [InlineData(-0.0001)]
     [InlineData(5.0001)]

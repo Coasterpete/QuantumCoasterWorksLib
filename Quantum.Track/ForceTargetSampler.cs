@@ -48,6 +48,7 @@ namespace Quantum.Track
                 ?? throw new InvalidOperationException("ForceTargetSnapshot.ResolvedSection cannot be null.");
 
             double? targetNormalG = SampleChannel(
+                resolvedSection.NormalGChannel,
                 resolvedSection.InterpolationMode,
                 resolvedSection.EasingFunction,
                 resolvedSection.TargetNormalG,
@@ -56,6 +57,7 @@ namespace Quantum.Track
                 snapshot.NormalizedT);
 
             double? targetLateralG = SampleChannel(
+                resolvedSection.LateralGChannel,
                 resolvedSection.InterpolationMode,
                 resolvedSection.EasingFunction,
                 resolvedSection.TargetLateralG,
@@ -72,6 +74,7 @@ namespace Quantum.Track
         }
 
         private static double? SampleChannel(
+            IForceEasingFunction? channel,
             ForceInterpolationMode mode,
             IForceEasingFunction? easingFunction,
             double? constantValue,
@@ -79,6 +82,20 @@ namespace Quantum.Track
             double? endValue,
             double normalizedT)
         {
+            if (channel != null)
+            {
+                double? resolvedStart = startValue ?? constantValue;
+                double? resolvedEnd = endValue ?? constantValue;
+
+                if (!resolvedStart.HasValue || !resolvedEnd.HasValue)
+                {
+                    return null;
+                }
+
+                double adjustedT = channel.Evaluate(normalizedT);
+                return MathUtil.Lerp(resolvedStart.Value, resolvedEnd.Value, adjustedT);
+            }
+
             if (easingFunction is null && mode == ForceInterpolationMode.Constant)
             {
                 return constantValue;
