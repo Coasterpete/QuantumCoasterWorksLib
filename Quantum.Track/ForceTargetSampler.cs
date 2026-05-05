@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Quantum.Math;
 
 namespace Quantum.Track
 {
@@ -44,12 +45,57 @@ namespace Quantum.Track
             ForceSection resolvedSection = snapshot.ResolvedSection
                 ?? throw new InvalidOperationException("ForceTargetSnapshot.ResolvedSection cannot be null.");
 
+            double? targetNormalG = SampleChannel(
+                resolvedSection.InterpolationMode,
+                resolvedSection.TargetNormalG,
+                resolvedSection.StartNormalG,
+                resolvedSection.EndNormalG,
+                snapshot.NormalizedT);
+
+            double? targetLateralG = SampleChannel(
+                resolvedSection.InterpolationMode,
+                resolvedSection.TargetLateralG,
+                resolvedSection.StartLateralG,
+                resolvedSection.EndLateralG,
+                snapshot.NormalizedT);
+
             return new SampledForceTarget(
                 distance,
                 snapshot.NormalizedT,
-                resolvedSection.TargetNormalG,
-                resolvedSection.TargetLateralG,
+                targetNormalG,
+                targetLateralG,
                 targetLongitudinalG: null);
+        }
+
+        private static double? SampleChannel(
+            ForceInterpolationMode mode,
+            double? constantValue,
+            double? startValue,
+            double? endValue,
+            double normalizedT)
+        {
+            switch (mode)
+            {
+                case ForceInterpolationMode.Constant:
+                    return constantValue;
+
+                case ForceInterpolationMode.Linear:
+                    double? resolvedStart = startValue ?? constantValue;
+                    double? resolvedEnd = endValue ?? constantValue;
+
+                    if (!resolvedStart.HasValue || !resolvedEnd.HasValue)
+                    {
+                        return null;
+                    }
+
+                    return MathUtil.Lerp(resolvedStart.Value, resolvedEnd.Value, normalizedT);
+
+                default:
+                    throw new ArgumentOutOfRangeException(
+                        nameof(mode),
+                        mode,
+                        "Unsupported force interpolation mode.");
+            }
         }
     }
 }

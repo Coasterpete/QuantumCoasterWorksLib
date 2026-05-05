@@ -77,6 +77,87 @@ public sealed class ForceTargetSamplerTests
         Assert.Equal(1.25 / 3.0, sampled.NormalizedT, 10);
     }
 
+    [Fact]
+    public void ForceTargetSampler_Sample_LinearNormalG_AtStart_UsesStartValue()
+    {
+        var section = new ForceSection(
+            length: 10.0,
+            interpolationMode: ForceInterpolationMode.Linear,
+            startNormalG: 2.0,
+            endNormalG: 4.0);
+
+        IReadOnlyList<ResolvedSectionInterval<ForceSection>> intervals = ForceTargetResolver.Resolve(new[]
+        {
+            (section, 10.0)
+        });
+
+        SampledForceTarget sampled = ForceTargetSampler.Sample(intervals, 0.0);
+
+        Assert.Equal(2.0, sampled.TargetNormalG);
+    }
+
+    [Fact]
+    public void ForceTargetSampler_Sample_LinearNormalG_AtMidpoint_UsesInterpolatedValue()
+    {
+        var section = new ForceSection(
+            length: 10.0,
+            interpolationMode: ForceInterpolationMode.Linear,
+            startNormalG: 2.0,
+            endNormalG: 4.0);
+
+        IReadOnlyList<ResolvedSectionInterval<ForceSection>> intervals = ForceTargetResolver.Resolve(new[]
+        {
+            (section, 10.0)
+        });
+
+        SampledForceTarget sampled = ForceTargetSampler.Sample(intervals, 5.0);
+
+        Assert.True(sampled.TargetNormalG.HasValue);
+        Assert.Equal(3.0, sampled.TargetNormalG.Value, 10);
+    }
+
+    [Fact]
+    public void ForceTargetSampler_Sample_LinearNormalG_AtFinalEndpoint_UsesEndValue()
+    {
+        var section = new ForceSection(
+            length: 10.0,
+            interpolationMode: ForceInterpolationMode.Linear,
+            startNormalG: 2.0,
+            endNormalG: 4.0);
+
+        IReadOnlyList<ResolvedSectionInterval<ForceSection>> intervals = ForceTargetResolver.Resolve(new[]
+        {
+            (section, 10.0)
+        });
+
+        SampledForceTarget sampled = ForceTargetSampler.Sample(intervals, 10.0);
+
+        Assert.True(sampled.TargetNormalG.HasValue);
+        Assert.Equal(4.0, sampled.TargetNormalG.Value, 10);
+        Assert.Equal(1.0, sampled.NormalizedT);
+    }
+
+    [Fact]
+    public void ForceTargetSampler_Sample_LinearLateralG_UsesInterpolatedValue()
+    {
+        var section = new ForceSection(
+            targetNormalG: 3.0,
+            length: 10.0,
+            interpolationMode: ForceInterpolationMode.Linear,
+            startLateralG: 0.2,
+            endLateralG: -0.2);
+
+        IReadOnlyList<ResolvedSectionInterval<ForceSection>> intervals = ForceTargetResolver.Resolve(new[]
+        {
+            (section, 10.0)
+        });
+
+        SampledForceTarget sampled = ForceTargetSampler.Sample(intervals, 2.5);
+
+        Assert.True(sampled.TargetLateralG.HasValue);
+        Assert.Equal(0.1, sampled.TargetLateralG.Value, 10);
+    }
+
     [Theory]
     [InlineData(-0.0001)]
     [InlineData(5.0001)]
