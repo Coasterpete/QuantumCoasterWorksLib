@@ -47,6 +47,11 @@ namespace Quantum.Physics
         public double? BinormalAcceleration { get; set; }
 
         /// <summary>
+        /// Binormal acceleration diagnostic vector, aligned with <see cref="Frame.Binormal"/> when present.
+        /// </summary>
+        public Vector3d? BinormalAccelerationVector { get; set; }
+
+        /// <summary>
         /// Combined world-space acceleration diagnostic built from tangential plus normal-vector terms.
         /// </summary>
         public Vector3d? CombinedWorldAccelerationVector { get; set; }

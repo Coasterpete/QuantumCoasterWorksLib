@@ -205,6 +205,7 @@ namespace Quantum.Physics
             Follower.NormalAcceleration = null;
             Follower.NormalAccelerationVector = null;
             Follower.BinormalAcceleration = null;
+            Follower.BinormalAccelerationVector = null;
             Follower.CombinedWorldAccelerationVector = null;
 
             if (TryGetProjectedAcceleration(Follower.Distance, Follower.Frame, out Vector3d projectedAcceleration))
@@ -247,20 +248,37 @@ namespace Quantum.Physics
             Follower.TangentialAcceleration = tangentialProjectedAcceleration;
             Follower.NormalAcceleration = null;
             Follower.NormalAccelerationVector = null;
+            Follower.BinormalAcceleration = null;
+            Follower.BinormalAccelerationVector = null;
             double curvatureSpeedInfluenceAcceleration = 0.0;
 
-            if (TryGetCurvatureNormalAccelerationVector(
-                Follower.Distance,
-                Follower.Speed,
-                Follower.Frame,
-                out double normalAcceleration,
-                out Vector3d normalAccelerationVector))
+            if (TryGetCurvatureFromTrackFrameProvider(Follower.Distance, out double curvature))
             {
-                Follower.NormalAcceleration = normalAcceleration;
-                Follower.NormalAccelerationVector = normalAccelerationVector;
-                curvatureSpeedInfluenceAcceleration = ComputeCurvatureSpeedInfluenceAcceleration(
-                    normalAccelerationVector,
-                    Follower.Speed);
+                if (TryGetCurvatureNormalAccelerationVector(
+                    curvature,
+                    Follower.Speed,
+                    Follower.Frame,
+                    out double normalAcceleration,
+                    out Vector3d normalAccelerationVector))
+                {
+                    Follower.NormalAcceleration = normalAcceleration;
+                    Follower.NormalAccelerationVector = normalAccelerationVector;
+                    curvatureSpeedInfluenceAcceleration = ComputeCurvatureSpeedInfluenceAcceleration(
+                        normalAccelerationVector,
+                        Follower.Speed);
+                }
+
+                if (TryGetCurvatureBinormalAccelerationVector(
+                    Follower.Distance,
+                    curvature,
+                    Follower.Speed,
+                    Follower.Frame,
+                    out double binormalAcceleration,
+                    out Vector3d binormalAccelerationVector))
+                {
+                    Follower.BinormalAcceleration = binormalAcceleration;
+                    Follower.BinormalAccelerationVector = binormalAccelerationVector;
+                }
             }
 
             UpdateCombinedWorldAccelerationDiagnostic(Follower);
@@ -323,10 +341,13 @@ namespace Quantum.Physics
                     bool preserveCurvatureNormalDiagnostic =
                         IntegrationMode == TrainIntegrationMode.TangentialProjected &&
                         snapshot.NormalAcceleration.HasValue;
+                    bool preserveCurvatureBinormalDiagnostic =
+                        IntegrationMode == TrainIntegrationMode.TangentialProjected;
                     ApplyProjectedAccelerationDiagnostics(
                         snapshot,
                         projectedAcceleration,
-                        preserveCurvatureNormalDiagnostic);
+                        preserveCurvatureNormalDiagnostic,
+                        preserveCurvatureBinormalDiagnostic);
                 }
 
                 if (IntegrationMode == TrainIntegrationMode.TangentialProjected)
@@ -360,6 +381,7 @@ namespace Quantum.Physics
             clone.NormalAcceleration = source.NormalAcceleration;
             clone.NormalAccelerationVector = source.NormalAccelerationVector;
             clone.BinormalAcceleration = source.BinormalAcceleration;
+            clone.BinormalAccelerationVector = source.BinormalAccelerationVector;
             clone.CombinedWorldAccelerationVector = source.CombinedWorldAccelerationVector;
             return clone;
         }
@@ -367,7 +389,8 @@ namespace Quantum.Physics
         private static void ApplyProjectedAccelerationDiagnostics(
             TrainFollowerState sample,
             Vector3d projectedAcceleration,
-            bool preserveNormalAcceleration = false)
+            bool preserveNormalAcceleration = false,
+            bool preserveBinormalAcceleration = false)
         {
             AccelerationComponents components = AccelerationDecomposer.Decompose(projectedAcceleration, sample.Frame);
             sample.ProjectedAcceleration = projectedAcceleration;
@@ -377,7 +400,11 @@ namespace Quantum.Physics
                 sample.NormalAcceleration = components.Normal;
             }
 
-            sample.BinormalAcceleration = components.Binormal;
+            if (!preserveBinormalAcceleration)
+            {
+                sample.BinormalAcceleration = components.Binormal;
+                sample.BinormalAccelerationVector = components.Binormal * sample.Frame.Binormal;
+            }
         }
 
         private static void UpdateCombinedWorldAccelerationDiagnostic(TrainFollowerState state)
@@ -429,7 +456,7 @@ namespace Quantum.Physics
         }
 
         private bool TryGetCurvatureNormalAccelerationVector(
-            double distance,
+            double curvature,
             double speed,
             TrackFrame frame,
             out double normalAcceleration,
@@ -437,11 +464,6 @@ namespace Quantum.Physics
         {
             normalAcceleration = 0.0;
             normalAccelerationVector = default;
-
-            if (!TryGetCurvatureFromTrackFrameProvider(distance, out double curvature))
-            {
-                return false;
-            }
 
             if (!Numeric.IsFinite(curvature) || !Numeric.IsFinite(speed))
             {
@@ -466,6 +488,63 @@ namespace Quantum.Physics
             {
                 normalAcceleration = 0.0;
                 normalAccelerationVector = default;
+                return false;
+            }
+
+            return true;
+        }
+
+        private bool TryGetCurvatureBinormalAccelerationVector(
+            double distance,
+            double curvature,
+            double speed,
+            TrackFrame frame,
+            out double binormalAcceleration,
+            out Vector3d binormalAccelerationVector)
+        {
+            binormalAcceleration = 0.0;
+            binormalAccelerationVector = default;
+
+            if (!Numeric.IsFinite(curvature) || !Numeric.IsFinite(speed))
+            {
+                return false;
+            }
+
+            double speedSquared = speed * speed;
+            if (!Numeric.IsFinite(speedSquared))
+            {
+                return false;
+            }
+
+            double curvatureAccelerationMagnitude = speedSquared * curvature;
+            if (!Numeric.IsFinite(curvatureAccelerationMagnitude))
+            {
+                return false;
+            }
+
+            double orientationBinormalScale = 0.0;
+            if (_trackFrameProvider != null &&
+                _trackFrameProvider.TryGetFrameAtDistance(distance, out TrackFrame curvatureFrame))
+            {
+                orientationBinormalScale = Vector3d.Dot(curvatureFrame.Normal, frame.Binormal);
+                if (!Numeric.IsFinite(orientationBinormalScale))
+                {
+                    return false;
+                }
+            }
+
+            binormalAcceleration = curvatureAccelerationMagnitude * orientationBinormalScale;
+            if (!Numeric.IsFinite(binormalAcceleration))
+            {
+                binormalAcceleration = 0.0;
+                return false;
+            }
+
+            binormalAccelerationVector = binormalAcceleration * frame.Binormal;
+            if (!IsFiniteVector(binormalAccelerationVector))
+            {
+                binormalAcceleration = 0.0;
+                binormalAccelerationVector = default;
                 return false;
             }
 

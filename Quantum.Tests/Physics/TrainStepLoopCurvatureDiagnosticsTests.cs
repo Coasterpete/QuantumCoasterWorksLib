@@ -36,6 +36,8 @@ public sealed class TrainStepLoopCurvatureDiagnosticsTests
 
         Assert.True(follower.NormalAcceleration.HasValue);
         Assert.True(follower.NormalAccelerationVector.HasValue);
+        Assert.True(follower.BinormalAcceleration.HasValue);
+        Assert.True(follower.BinormalAccelerationVector.HasValue);
         Assert.True(follower.CombinedWorldAccelerationVector.HasValue);
         Assert.InRange(
             System.Math.Abs(follower.NormalAcceleration.Value - expectedNormalAcceleration),
@@ -49,6 +51,8 @@ public sealed class TrainStepLoopCurvatureDiagnosticsTests
         Assert.InRange(System.Math.Abs(vectorMagnitude - expectedNormalAcceleration), 0.0, Tolerance);
         Assert.InRange(System.Math.Abs(vectorMagnitude - follower.NormalAcceleration.Value), 0.0, Tolerance);
         Assert.InRange(System.Math.Abs(alignment - 1.0), 0.0, Tolerance);
+        Assert.InRange(System.Math.Abs(follower.BinormalAcceleration.Value), 0.0, Tolerance);
+        Assert.InRange(System.Math.Abs(follower.BinormalAccelerationVector.Value.Length), 0.0, Tolerance);
 
         Assert.True(follower.TangentialAcceleration.HasValue);
         Vector3d expectedCombinedAcceleration =
@@ -83,6 +87,8 @@ public sealed class TrainStepLoopCurvatureDiagnosticsTests
 
         Assert.Null(follower.NormalAcceleration);
         Assert.Null(follower.NormalAccelerationVector);
+        Assert.Null(follower.BinormalAcceleration);
+        Assert.Null(follower.BinormalAccelerationVector);
         Assert.True(follower.TangentialAcceleration.HasValue);
         Assert.True(follower.CombinedWorldAccelerationVector.HasValue);
         Vector3d expectedCombinedAcceleration = follower.TangentialAcceleration.Value * follower.Frame.Tangent;
@@ -140,9 +146,13 @@ public sealed class TrainStepLoopCurvatureDiagnosticsTests
         double expectedNormalAcceleration = (initialSpeed * initialSpeed) / radius;
         Assert.Null(baselineFollower.NormalAcceleration);
         Assert.Null(baselineFollower.NormalAccelerationVector);
+        Assert.Null(baselineFollower.BinormalAcceleration);
+        Assert.Null(baselineFollower.BinormalAccelerationVector);
         Assert.True(baselineFollower.CombinedWorldAccelerationVector.HasValue);
         Assert.True(curvatureFollower.NormalAcceleration.HasValue);
         Assert.True(curvatureFollower.NormalAccelerationVector.HasValue);
+        Assert.True(curvatureFollower.BinormalAcceleration.HasValue);
+        Assert.True(curvatureFollower.BinormalAccelerationVector.HasValue);
         Assert.True(curvatureFollower.CombinedWorldAccelerationVector.HasValue);
         Assert.InRange(
             System.Math.Abs(curvatureFollower.NormalAcceleration.Value - expectedNormalAcceleration),
@@ -152,6 +162,8 @@ public sealed class TrainStepLoopCurvatureDiagnosticsTests
             System.Math.Abs(curvatureFollower.NormalAccelerationVector.Value.Length - expectedNormalAcceleration),
             0.0,
             Tolerance);
+        Assert.InRange(System.Math.Abs(curvatureFollower.BinormalAcceleration.Value), 0.0, Tolerance);
+        Assert.InRange(System.Math.Abs(curvatureFollower.BinormalAccelerationVector.Value.Length), 0.0, Tolerance);
 
         Assert.True(baselineFollower.TangentialAcceleration.HasValue);
         Assert.True(curvatureFollower.TangentialAcceleration.HasValue);
@@ -421,6 +433,152 @@ public sealed class TrainStepLoopCurvatureDiagnosticsTests
     }
 
     [Fact]
+    public void TangentialProjectedMode_WithCurvatureFrameContext_ComputesBinormalAccelerationVectorAlignedWithFrameBinormal()
+    {
+        const double curvature = 1.0 / 15.0;
+        const double initialSpeed = 9.0;
+
+        IArcLengthCurve track = new LineCurve(
+            new Vector3d(0.0, 0.0, 0.0),
+            new Vector3d(100.0, 0.0, 0.0));
+
+        var follower = new TrainFollowerState(track, speed: initialSpeed);
+        Vector3d providerNormal = (follower.Frame.Normal + follower.Frame.Binormal).Normalized();
+        Vector3d providerBinormal = Vector3d.Cross(follower.Frame.Tangent, providerNormal).Normalized();
+        TrackFrame providerFrame = new TrackFrame(
+            0.0,
+            follower.Frame.Position,
+            follower.Frame.Tangent,
+            providerNormal,
+            providerBinormal);
+
+        var loop = new TrainStepLoop(
+            follower,
+            deltaTime: 0.1,
+            gravityMagnitude: 0.0,
+            linearDragCoefficient: 0.0,
+            quadraticDragCoefficient: 0.0,
+            rollingResistance: 0.0,
+            new ZeroForceTargetProvider(),
+            TrainIntegrationMode.TangentialProjected,
+            new CurvatureAndFrameTrackFrameProvider(curvature, providerFrame));
+
+        loop.Step();
+
+        Assert.True(follower.BinormalAcceleration.HasValue);
+        Assert.True(follower.BinormalAccelerationVector.HasValue);
+
+        double expectedCurvatureMagnitude = initialSpeed * initialSpeed * curvature;
+        double expectedBinormalAcceleration =
+            expectedCurvatureMagnitude * Vector3d.Dot(providerFrame.Normal, follower.Frame.Binormal);
+        Assert.True(
+            expectedBinormalAcceleration > Tolerance,
+            "Expected frame-orientation context to produce non-zero lateral diagnostics.");
+
+        Vector3d expectedBinormalVector = expectedBinormalAcceleration * follower.Frame.Binormal;
+        Vector3d actualBinormalVector = follower.BinormalAccelerationVector.Value;
+
+        Assert.InRange(
+            System.Math.Abs(follower.BinormalAcceleration.Value - expectedBinormalAcceleration),
+            0.0,
+            Tolerance);
+        Assert.InRange(System.Math.Abs(actualBinormalVector.X - expectedBinormalVector.X), 0.0, Tolerance);
+        Assert.InRange(System.Math.Abs(actualBinormalVector.Y - expectedBinormalVector.Y), 0.0, Tolerance);
+        Assert.InRange(System.Math.Abs(actualBinormalVector.Z - expectedBinormalVector.Z), 0.0, Tolerance);
+
+        double alignment = Vector3d.Dot(actualBinormalVector.Normalized(), follower.Frame.Binormal);
+        Assert.InRange(System.Math.Abs(alignment - 1.0), 0.0, Tolerance);
+    }
+
+    [Fact]
+    public void TangentialProjectedMode_BinormalDiagnostics_DoNotChangeMotion()
+    {
+        const double curvature = 1.0 / 20.0;
+        const double deltaTime = 0.05;
+        const int steps = 100;
+        const double initialSpeed = 8.5;
+
+        IArcLengthCurve track = new LineCurve(
+            new Vector3d(0.0, 0.0, 0.0),
+            new Vector3d(500.0, 0.0, 0.0));
+
+        var baselineFollower = new TrainFollowerState(track, speed: initialSpeed);
+        var lateralFollower = new TrainFollowerState(track, speed: initialSpeed);
+
+        Vector3d providerNormal = (lateralFollower.Frame.Normal + lateralFollower.Frame.Binormal).Normalized();
+        Vector3d providerBinormal = Vector3d.Cross(lateralFollower.Frame.Tangent, providerNormal).Normalized();
+        TrackFrame providerFrame = new TrackFrame(
+            0.0,
+            lateralFollower.Frame.Position,
+            lateralFollower.Frame.Tangent,
+            providerNormal,
+            providerBinormal);
+
+        var baselineLoop = new TrainStepLoop(
+            baselineFollower,
+            deltaTime,
+            gravityMagnitude: 0.0,
+            linearDragCoefficient: 0.0,
+            quadraticDragCoefficient: 0.0,
+            rollingResistance: 0.0,
+            new ZeroForceTargetProvider(),
+            TrainIntegrationMode.TangentialProjected,
+            new ConstantCurvatureTrackFrameProvider(curvature));
+
+        var lateralLoop = new TrainStepLoop(
+            lateralFollower,
+            deltaTime,
+            gravityMagnitude: 0.0,
+            linearDragCoefficient: 0.0,
+            quadraticDragCoefficient: 0.0,
+            rollingResistance: 0.0,
+            new ZeroForceTargetProvider(),
+            TrainIntegrationMode.TangentialProjected,
+            new CurvatureAndFrameTrackFrameProvider(curvature, providerFrame));
+
+        baselineLoop.Step(steps);
+        lateralLoop.Step(steps);
+
+        Assert.InRange(System.Math.Abs(lateralFollower.Distance - baselineFollower.Distance), 0.0, Tolerance);
+        Assert.InRange(System.Math.Abs(lateralFollower.Speed - baselineFollower.Speed), 0.0, Tolerance);
+        Assert.InRange(System.Math.Abs(lateralFollower.Acceleration - baselineFollower.Acceleration), 0.0, Tolerance);
+        Assert.True(baselineFollower.BinormalAcceleration.HasValue);
+        Assert.True(lateralFollower.BinormalAcceleration.HasValue);
+        Assert.InRange(System.Math.Abs(baselineFollower.BinormalAcceleration.Value), 0.0, Tolerance);
+        Assert.True(
+            System.Math.Abs(lateralFollower.BinormalAcceleration.Value) > Tolerance,
+            "Expected oriented curvature diagnostics to produce a non-zero binormal scalar.");
+    }
+
+    [Fact]
+    public void TangentialProjectedMode_WithoutTrackFrameProvider_ClearsBinormalDiagnosticsFromPreviousState()
+    {
+        IArcLengthCurve track = new LineCurve(
+            new Vector3d(0.0, 0.0, 0.0),
+            new Vector3d(100.0, 0.0, 0.0));
+
+        var follower = new TrainFollowerState(track, speed: 5.0);
+        follower.BinormalAcceleration = 2.0;
+        follower.BinormalAccelerationVector = 2.0 * follower.Frame.Binormal;
+
+        var loop = new TrainStepLoop(
+            follower,
+            deltaTime: 0.1,
+            gravityMagnitude: 0.0,
+            linearDragCoefficient: 0.0,
+            quadraticDragCoefficient: 0.0,
+            rollingResistance: 0.0,
+            new ZeroForceTargetProvider(),
+            TrainIntegrationMode.TangentialProjected,
+            trackFrameProvider: null);
+
+        loop.Step();
+
+        Assert.Null(follower.BinormalAcceleration);
+        Assert.Null(follower.BinormalAccelerationVector);
+    }
+
+    [Fact]
     public void LegacyNormalComponentMode_ClearsCurvatureAndCombinedDiagnosticsFromPreviousState()
     {
         IArcLengthCurve track = new LineCurve(
@@ -432,6 +590,7 @@ public sealed class TrainStepLoopCurvatureDiagnosticsTests
         follower.NormalAcceleration = 7.0;
         follower.NormalAccelerationVector = new Vector3d(0.0, 7.0, 0.0);
         follower.BinormalAcceleration = 3.0;
+        follower.BinormalAccelerationVector = new Vector3d(0.0, 0.0, 3.0);
         follower.CombinedWorldAccelerationVector = new Vector3d(4.0, 5.0, 6.0);
 
         var loop = new TrainStepLoop(
@@ -449,6 +608,7 @@ public sealed class TrainStepLoopCurvatureDiagnosticsTests
         Assert.Null(follower.NormalAcceleration);
         Assert.Null(follower.NormalAccelerationVector);
         Assert.Null(follower.BinormalAcceleration);
+        Assert.Null(follower.BinormalAccelerationVector);
         Assert.Null(follower.CombinedWorldAccelerationVector);
     }
 
@@ -474,6 +634,30 @@ public sealed class TrainStepLoopCurvatureDiagnosticsTests
         {
             frame = default;
             return false;
+        }
+
+        public bool TryGetCurvatureAtDistance(double distance, out double curvature)
+        {
+            curvature = _curvature;
+            return true;
+        }
+    }
+
+    private sealed class CurvatureAndFrameTrackFrameProvider : ITrackFrameProvider
+    {
+        private readonly double _curvature;
+        private readonly TrackFrame _frame;
+
+        public CurvatureAndFrameTrackFrameProvider(double curvature, TrackFrame frame)
+        {
+            _curvature = curvature;
+            _frame = frame;
+        }
+
+        public bool TryGetFrameAtDistance(double distance, out TrackFrame frame)
+        {
+            frame = _frame;
+            return true;
         }
 
         public bool TryGetCurvatureAtDistance(double distance, out double curvature)
