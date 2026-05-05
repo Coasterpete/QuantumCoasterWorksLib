@@ -367,6 +367,35 @@ Status:
 - Provider-level time-domain sampling is opt-in.
 - This prepares the system for future optional runtime integration.
 
+### TrainStepLoop Elapsed-Time Force Sampling (v8)
+
+Status:
+`TrainStepLoop` now supports opt-in elapsed-time force sampling.
+
+- New provider capability interface:
+  - `IElapsedTimeForceTargetProvider`
+
+- `SectionForceTargetProvider` implements elapsed-time force sampling.
+
+- `TrainStepLoop` now exposes:
+  - `UseElapsedTimeForceSampling`
+
+### Behavior
+
+When `UseElapsedTimeForceSampling` is `false`:
+1. `TrainStepLoop` uses the legacy distance-only provider path.
+2. Existing behavior is preserved.
+
+When `UseElapsedTimeForceSampling` is `true`:
+1. If the provider supports `IElapsedTimeForceTargetProvider`, elapsed-time sampling is used.
+2. If not, the loop falls back to the legacy provider path.
+
+### Notes
+
+- Default behavior remains distance-based.
+- Elapsed-time force sampling is explicitly opt-in.
+- No existing TrainStepLoop behavior changes unless the opt-in flag is enabled.
+
 ## References
 - KexEdit node graph and section concepts: <https://individualkex.github.io/KexEdit/reference/node-graph.html>
 
