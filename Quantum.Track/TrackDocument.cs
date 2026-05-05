@@ -4,14 +4,22 @@ namespace Quantum.Track
 {
     public class TrackDocument
     {
-        public TrackDocument(IEnumerable<TrackSegment>? segments = null)
+        public TrackDocument(
+            IEnumerable<TrackSegment>? segments = null,
+            IEnumerable<TrackSection>? sections = null)
         {
             Segments = segments is null
                 ? new List<TrackSegment>()
                 : new List<TrackSegment>(segments);
+
+            Sections = sections is null
+                ? new List<TrackSection>()
+                : new List<TrackSection>(sections);
         }
 
         public IList<TrackSegment> Segments { get; }
+
+        public IList<TrackSection> Sections { get; }
 
         public double TotalLength
         {
