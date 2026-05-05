@@ -83,6 +83,8 @@ namespace Quantum.Track
                 case ForceInterpolationMode.SmoothStep:
                 case ForceInterpolationMode.Quadratic:
                 case ForceInterpolationMode.Cubic:
+                case ForceInterpolationMode.Quartic:
+                case ForceInterpolationMode.Quintic:
                     double? resolvedStart = startValue ?? constantValue;
                     double? resolvedEnd = endValue ?? constantValue;
 
@@ -96,6 +98,8 @@ namespace Quantum.Track
                         ForceInterpolationMode.SmoothStep => normalizedT * normalizedT * (3.0 - (2.0 * normalizedT)),
                         ForceInterpolationMode.Quadratic => normalizedT * normalizedT,
                         ForceInterpolationMode.Cubic => normalizedT * normalizedT * normalizedT,
+                        ForceInterpolationMode.Quartic => normalizedT * normalizedT * normalizedT * normalizedT,
+                        ForceInterpolationMode.Quintic => normalizedT * normalizedT * normalizedT * normalizedT * normalizedT,
                         _ => normalizedT
                     };
 

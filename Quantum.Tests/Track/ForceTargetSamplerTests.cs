@@ -322,6 +322,94 @@ public sealed class ForceTargetSamplerTests
     }
 
     [Fact]
+    public void ForceTargetSampler_Sample_QuarticNormalG_AtEndpoints_UsesStartAndEndValues()
+    {
+        var section = new ForceSection(
+            length: 10.0,
+            interpolationMode: ForceInterpolationMode.Quartic,
+            startNormalG: 2.0,
+            endNormalG: 4.0);
+
+        IReadOnlyList<ResolvedSectionInterval<ForceSection>> intervals = ForceTargetResolver.Resolve(new[]
+        {
+            (section, 10.0)
+        });
+
+        SampledForceTarget atStart = ForceTargetSampler.Sample(intervals, 0.0);
+        SampledForceTarget atEnd = ForceTargetSampler.Sample(intervals, 10.0);
+
+        Assert.True(atStart.TargetNormalG.HasValue);
+        Assert.Equal(2.0, atStart.TargetNormalG.Value, 10);
+        Assert.True(atEnd.TargetNormalG.HasValue);
+        Assert.Equal(4.0, atEnd.TargetNormalG.Value, 10);
+    }
+
+    [Fact]
+    public void ForceTargetSampler_Sample_QuarticNormalG_AtMidpoint_IsBelowCubicMidpoint()
+    {
+        var section = new ForceSection(
+            length: 10.0,
+            interpolationMode: ForceInterpolationMode.Quartic,
+            startNormalG: 2.0,
+            endNormalG: 4.0);
+
+        IReadOnlyList<ResolvedSectionInterval<ForceSection>> intervals = ForceTargetResolver.Resolve(new[]
+        {
+            (section, 10.0)
+        });
+
+        SampledForceTarget sampled = ForceTargetSampler.Sample(intervals, 5.0);
+
+        Assert.True(sampled.TargetNormalG.HasValue);
+        Assert.Equal(2.125, sampled.TargetNormalG.Value, 10);
+        Assert.True(sampled.TargetNormalG.Value < 2.25);
+    }
+
+    [Fact]
+    public void ForceTargetSampler_Sample_QuinticNormalG_AtEndpoints_UsesStartAndEndValues()
+    {
+        var section = new ForceSection(
+            length: 10.0,
+            interpolationMode: ForceInterpolationMode.Quintic,
+            startNormalG: 2.0,
+            endNormalG: 4.0);
+
+        IReadOnlyList<ResolvedSectionInterval<ForceSection>> intervals = ForceTargetResolver.Resolve(new[]
+        {
+            (section, 10.0)
+        });
+
+        SampledForceTarget atStart = ForceTargetSampler.Sample(intervals, 0.0);
+        SampledForceTarget atEnd = ForceTargetSampler.Sample(intervals, 10.0);
+
+        Assert.True(atStart.TargetNormalG.HasValue);
+        Assert.Equal(2.0, atStart.TargetNormalG.Value, 10);
+        Assert.True(atEnd.TargetNormalG.HasValue);
+        Assert.Equal(4.0, atEnd.TargetNormalG.Value, 10);
+    }
+
+    [Fact]
+    public void ForceTargetSampler_Sample_QuinticNormalG_AtMidpoint_IsBelowQuarticMidpoint()
+    {
+        var section = new ForceSection(
+            length: 10.0,
+            interpolationMode: ForceInterpolationMode.Quintic,
+            startNormalG: 2.0,
+            endNormalG: 4.0);
+
+        IReadOnlyList<ResolvedSectionInterval<ForceSection>> intervals = ForceTargetResolver.Resolve(new[]
+        {
+            (section, 10.0)
+        });
+
+        SampledForceTarget sampled = ForceTargetSampler.Sample(intervals, 5.0);
+
+        Assert.True(sampled.TargetNormalG.HasValue);
+        Assert.Equal(2.0625, sampled.TargetNormalG.Value, 10);
+        Assert.True(sampled.TargetNormalG.Value < 2.125);
+    }
+
+    [Fact]
     public void ForceTargetSampler_Sample_LinearLateralG_UsesInterpolatedValue()
     {
         var section = new ForceSection(
