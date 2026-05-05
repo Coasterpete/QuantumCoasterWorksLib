@@ -12,6 +12,18 @@ Define the future FVD-style section architecture for Quantum without changing ru
   - Channel evaluation for force targets (strict and permissive).
 - `Quantum.Physics` consumes force targets through `IForceTargetProvider` and `ForceTargets`.
 
+## Current Implementation Status
+
+✔ `SectionResolver` provides deterministic interval resolution.  
+✔ `SectionCurveAssembler` maps `GeometricSection` data into `CompositeSectionCurve`.  
+✔ `ForceTargetResolver` resolves `ForceSection` intervals.  
+✔ `ForceTargetSampler` converts force intervals into sampled force targets.  
+✔ `SectionForceTargetProvider` adapts section-based targets to `IForceTargetProvider`.  
+✔ `TrainStepLoop` can consume section force targets through explicit opt-in provider injection.
+
+Default physics behavior remains unchanged.  
+Section-driven physics is currently opt-in only.
+
 ## 1) How `ForceSection` and `GeometricSection` Should Evolve
 
 ### Design Direction
