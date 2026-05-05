@@ -1,6 +1,7 @@
 using System;
 using Quantum.Splines;
 using Quantum.Track;
+using TrackFrame = Quantum.Splines.TrackFrame;
 
 namespace Quantum.Physics
 {

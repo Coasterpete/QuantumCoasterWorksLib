@@ -1,5 +1,6 @@
 using Quantum.Math;
 using Quantum.Splines;
+using SplineTrackFrame = Quantum.Splines.TrackFrame;
 
 namespace Quantum.Track
 {
@@ -75,11 +76,11 @@ namespace Quantum.Track
 
         public Transform3d EvaluateTransform(TrackDocument doc, TrackPosition position)
         {
-            TrackFrame frame = EvaluateFrame(doc, position);
+            SplineTrackFrame frame = EvaluateFrame(doc, position);
             return Transform3d.FromTrackFrame(frame, frame.Position);
         }
 
-        public TrackFrame EvaluateFrameAtDistance(TrackDocument doc, double distance)
+        public SplineTrackFrame EvaluateFrameAtDistance(TrackDocument doc, double distance)
         {
             TrackEvaluationPoint evaluationPoint = EvaluateAtDistance(doc, distance);
             TrackPosition position = ResolveTrackPosition(doc, evaluationPoint);
@@ -93,7 +94,7 @@ namespace Quantum.Track
             return EvaluateTransform(doc, position);
         }
 
-        public TrackFrame EvaluateFrame(TrackDocument doc, TrackPosition position)
+        public SplineTrackFrame EvaluateFrame(TrackDocument doc, TrackPosition position)
         {
             TrackEvaluationPoint evaluationPoint = EvaluateAt(doc, position);
             double rollRadians = ResolveRollRadians(evaluationPoint);
@@ -131,7 +132,7 @@ namespace Quantum.Track
                 new Vector3d(distanceAlongTrack, 0.0, 0.0));
         }
 
-        private static TrackFrame EvaluateFallbackFrame(
+        private static SplineTrackFrame EvaluateFallbackFrame(
             TrackDocument doc,
             TrackPosition position,
             TrackEvaluationPoint evaluationPoint,
@@ -141,7 +142,7 @@ namespace Quantum.Track
             return BuildTrackFrame(evaluationPoint, fallbackTransform.Position, Vector3d.UnitX, rollRadians);
         }
 
-        private static TrackFrame BuildTrackFrame(
+        private static SplineTrackFrame BuildTrackFrame(
             TrackEvaluationPoint evaluationPoint,
             Vector3d position,
             Vector3d tangent,
@@ -160,7 +161,7 @@ namespace Quantum.Track
 
             double s = evaluationPoint.LocalT * evaluationPoint.Segment.Length;
 
-            return new TrackFrame(s, position, normalizedTangent, normal, binormal);
+            return new SplineTrackFrame(s, position, normalizedTangent, normal, binormal);
         }
 
         private static double ResolveRollRadians(TrackEvaluationPoint evaluationPoint)
