@@ -48,6 +48,7 @@ namespace Quantum.Track
                 ?? throw new InvalidOperationException("ForceTargetSnapshot.ResolvedSection cannot be null.");
 
             double? targetNormalG = SampleChannel(
+                resolvedSection.Channels?.NormalGChannels,
                 resolvedSection.Channels?.NormalG,
                 resolvedSection.NormalGChannel,
                 resolvedSection.InterpolationMode,
@@ -58,6 +59,7 @@ namespace Quantum.Track
                 snapshot.NormalizedT);
 
             double? targetLateralG = SampleChannel(
+                resolvedSection.Channels?.LateralGChannels,
                 resolvedSection.Channels?.LateralG,
                 resolvedSection.LateralGChannel,
                 resolvedSection.InterpolationMode,
@@ -68,6 +70,7 @@ namespace Quantum.Track
                 snapshot.NormalizedT);
 
             double? targetRollRateDegPerSec = SampleDirectChannel(
+                resolvedSection.Channels?.RollRateChannels,
                 resolvedSection.Channels?.RollRate,
                 resolvedSection.RollRateChannel,
                 snapshot.NormalizedT);
@@ -82,6 +85,7 @@ namespace Quantum.Track
         }
 
         private static double? SampleChannel(
+            IReadOnlyList<IForceChannel>? v3Channels,
             IForceChannel? v2Channel,
             IForceEasingFunction? legacyChannel,
             ForceInterpolationMode mode,
@@ -91,6 +95,11 @@ namespace Quantum.Track
             double? endValue,
             double normalizedT)
         {
+            if (HasChannels(v3Channels))
+            {
+                return SumChannels(v3Channels!, normalizedT);
+            }
+
             if (v2Channel != null)
             {
                 double? resolvedStart = startValue ?? constantValue;
@@ -156,10 +165,16 @@ namespace Quantum.Track
         }
 
         private static double? SampleDirectChannel(
+            IReadOnlyList<IForceChannel>? v3Channels,
             IForceChannel? v2Channel,
             IForceEasingFunction? legacyChannel,
             double normalizedT)
         {
+            if (HasChannels(v3Channels))
+            {
+                return SumChannels(v3Channels!, normalizedT);
+            }
+
             if (v2Channel != null)
             {
                 return v2Channel.Evaluate(normalizedT);
@@ -171,6 +186,30 @@ namespace Quantum.Track
             }
 
             return null;
+        }
+
+        private static bool HasChannels(IReadOnlyList<IForceChannel>? channels)
+        {
+            return channels != null && channels.Count > 0;
+        }
+
+        private static double SumChannels(IReadOnlyList<IForceChannel> channels, double normalizedT)
+        {
+            double sum = 0.0;
+
+            for (int i = 0; i < channels.Count; i++)
+            {
+                IForceChannel? channel = channels[i];
+
+                if (channel is null)
+                {
+                    throw new InvalidOperationException("Force channel list cannot contain null entries.");
+                }
+
+                sum += channel.Evaluate(normalizedT);
+            }
+
+            return sum;
         }
     }
 }
