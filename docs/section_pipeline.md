@@ -195,6 +195,35 @@ Status:
 
 Channels override interpolation when present. When null, existing start/end + interpolation behavior is preserved.
 
+### ForceSection Channel Container (v2)
+
+Status:
+A minimal channel container abstraction has been introduced via `ForceChannelSet`.
+
+- `ForceSection` now optionally exposes:
+  - `Channels : ForceChannelSet?`
+
+- `ForceChannelSet` groups channel definitions:
+  - `NormalG : IForceChannel?`
+  - `LateralG : IForceChannel?`
+  - `RollRate : IForceChannel?`
+
+- `ForceChannel` is a lightweight adapter over `IForceEasingFunction`.
+
+### Resolution Priority
+
+When sampling a section:
+
+1. `ForceSection.Channels` (v2 container) is used when a matching channel is present
+2. Individual channel properties (`NormalGChannel`, etc.) are used if present
+3. Fallback to existing start/end + interpolation behavior (v1)
+
+### Notes
+
+- This change is fully backward compatible.
+- Existing `ForceSection` scalar and interpolation behavior remains unchanged.
+- The container enables future expansion toward multi-channel, domain-aware section definitions.
+
 ## References
 - KexEdit node graph and section concepts: <https://individualkex.github.io/KexEdit/reference/node-graph.html>
 
