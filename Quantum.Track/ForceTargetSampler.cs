@@ -85,6 +85,7 @@ namespace Quantum.Track
                 case ForceInterpolationMode.Cubic:
                 case ForceInterpolationMode.Quartic:
                 case ForceInterpolationMode.Quintic:
+                case ForceInterpolationMode.Sinusoidal:
                     double? resolvedStart = startValue ?? constantValue;
                     double? resolvedEnd = endValue ?? constantValue;
 
@@ -100,6 +101,7 @@ namespace Quantum.Track
                         ForceInterpolationMode.Cubic => normalizedT * normalizedT * normalizedT,
                         ForceInterpolationMode.Quartic => normalizedT * normalizedT * normalizedT * normalizedT,
                         ForceInterpolationMode.Quintic => normalizedT * normalizedT * normalizedT * normalizedT * normalizedT,
+                        ForceInterpolationMode.Sinusoidal => 1.0 - System.Math.Cos(normalizedT * (System.Math.PI / 2.0)),
                         _ => normalizedT
                     };
 

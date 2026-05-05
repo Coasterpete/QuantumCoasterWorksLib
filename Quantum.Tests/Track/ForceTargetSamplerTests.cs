@@ -410,6 +410,90 @@ public sealed class ForceTargetSamplerTests
     }
 
     [Fact]
+    public void ForceTargetSampler_Sample_SinusoidalNormalG_AtStart_UsesStartValue()
+    {
+        var section = new ForceSection(
+            length: 10.0,
+            interpolationMode: ForceInterpolationMode.Sinusoidal,
+            startNormalG: 2.0,
+            endNormalG: 4.0);
+
+        IReadOnlyList<ResolvedSectionInterval<ForceSection>> intervals = ForceTargetResolver.Resolve(new[]
+        {
+            (section, 10.0)
+        });
+
+        SampledForceTarget sampled = ForceTargetSampler.Sample(intervals, 0.0);
+
+        Assert.True(sampled.TargetNormalG.HasValue);
+        Assert.Equal(2.0, sampled.TargetNormalG.Value, 10);
+    }
+
+    [Fact]
+    public void ForceTargetSampler_Sample_SinusoidalNormalG_AtFinalEndpoint_UsesEndValue()
+    {
+        var section = new ForceSection(
+            length: 10.0,
+            interpolationMode: ForceInterpolationMode.Sinusoidal,
+            startNormalG: 2.0,
+            endNormalG: 4.0);
+
+        IReadOnlyList<ResolvedSectionInterval<ForceSection>> intervals = ForceTargetResolver.Resolve(new[]
+        {
+            (section, 10.0)
+        });
+
+        SampledForceTarget sampled = ForceTargetSampler.Sample(intervals, 10.0);
+
+        Assert.True(sampled.TargetNormalG.HasValue);
+        Assert.Equal(4.0, sampled.TargetNormalG.Value, 10);
+    }
+
+    [Fact]
+    public void ForceTargetSampler_Sample_SinusoidalNormalG_AtMidpoint_IsEasedAndNotLinearMidpoint()
+    {
+        var section = new ForceSection(
+            length: 10.0,
+            interpolationMode: ForceInterpolationMode.Sinusoidal,
+            startNormalG: 2.0,
+            endNormalG: 4.0);
+
+        IReadOnlyList<ResolvedSectionInterval<ForceSection>> intervals = ForceTargetResolver.Resolve(new[]
+        {
+            (section, 10.0)
+        });
+
+        SampledForceTarget sampled = ForceTargetSampler.Sample(intervals, 5.0);
+        double linearMidpoint = 3.0;
+        double expectedSinusoidalMidpoint = 2.0 + (2.0 * (1.0 - System.Math.Cos(System.Math.PI / 4.0)));
+
+        Assert.True(sampled.TargetNormalG.HasValue);
+        Assert.Equal(expectedSinusoidalMidpoint, sampled.TargetNormalG.Value, 10);
+        Assert.True(System.Math.Abs(sampled.TargetNormalG.Value - linearMidpoint) > 1e-10);
+    }
+
+    [Fact]
+    public void ForceTargetSampler_Sample_SinusoidalNormalG_AtMidpoint_IsAboveQuadraticMidpoint()
+    {
+        var section = new ForceSection(
+            length: 10.0,
+            interpolationMode: ForceInterpolationMode.Sinusoidal,
+            startNormalG: 2.0,
+            endNormalG: 4.0);
+
+        IReadOnlyList<ResolvedSectionInterval<ForceSection>> intervals = ForceTargetResolver.Resolve(new[]
+        {
+            (section, 10.0)
+        });
+
+        SampledForceTarget sampled = ForceTargetSampler.Sample(intervals, 5.0);
+        double quadraticMidpoint = 2.5;
+
+        Assert.True(sampled.TargetNormalG.HasValue);
+        Assert.True(sampled.TargetNormalG.Value > quadraticMidpoint);
+    }
+
+    [Fact]
     public void ForceTargetSampler_Sample_LinearLateralG_UsesInterpolatedValue()
     {
         var section = new ForceSection(

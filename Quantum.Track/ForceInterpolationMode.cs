@@ -8,6 +8,7 @@ namespace Quantum.Track
         Quadratic = 3,
         Cubic = 4,
         Quartic = 5,
-        Quintic = 6
+        Quintic = 6,
+        Sinusoidal = 7
     }
 }
