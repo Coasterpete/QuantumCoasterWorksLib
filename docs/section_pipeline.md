@@ -185,6 +185,15 @@ Initial implementations may support:
 
 This system should build on top of `IForceEasingFunction` rather than replacing it.
 
+### ForceSection Channel Support (v1)
+
+Status:
+`ForceSection` now supports optional channel-based definitions:
+- `NormalGChannel : IForceEasingFunction?`
+- `LateralGChannel : IForceEasingFunction?`
+
+Channels override interpolation when present. When null, existing start/end + interpolation behavior is preserved.
+
 ## References
 - KexEdit node graph and section concepts: <https://individualkex.github.io/KexEdit/reference/node-graph.html>
 
