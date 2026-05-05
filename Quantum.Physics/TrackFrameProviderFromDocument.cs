@@ -47,5 +47,16 @@ namespace Quantum.Physics
                 return false;
             }
         }
+
+        public bool TryGetCurvatureAtDistance(double distance, out double curvature)
+        {
+            if (double.IsNaN(distance) || double.IsInfinity(distance))
+            {
+                curvature = 0.0;
+                return false;
+            }
+
+            return _adapter.TryGetCurvatureAtDistance(_document, distance, out curvature);
+        }
     }
 }

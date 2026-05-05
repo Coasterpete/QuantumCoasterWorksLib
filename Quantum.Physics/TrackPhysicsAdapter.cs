@@ -31,5 +31,73 @@ namespace Quantum.Physics
         {
             return _evaluator.EvaluateTransformAtDistance(doc, distance);
         }
+
+        public bool TryGetCurvatureAtDistance(TrackDocument doc, double distance, out double curvature)
+        {
+            curvature = 0.0;
+
+            if (doc is null)
+            {
+                return false;
+            }
+
+            if (double.IsNaN(distance) || double.IsInfinity(distance))
+            {
+                return false;
+            }
+
+            double totalLength;
+            try
+            {
+                totalLength = doc.TotalLength;
+            }
+            catch (InvalidOperationException)
+            {
+                return false;
+            }
+
+            if (totalLength <= MathUtil.Epsilon)
+            {
+                return true;
+            }
+
+            double clampedDistance = MathUtil.Clamp(distance, 0.0, totalLength);
+            double deltaS = System.Math.Max(totalLength * 1e-3, 1e-4);
+            double prevS = MathUtil.Clamp(clampedDistance - deltaS, 0.0, totalLength);
+            double nextS = MathUtil.Clamp(clampedDistance + deltaS, 0.0, totalLength);
+            double spanS = nextS - prevS;
+
+            if (spanS <= MathUtil.Epsilon)
+            {
+                return true;
+            }
+
+            TrackFrame prevFrame;
+            TrackFrame nextFrame;
+            try
+            {
+                prevFrame = _evaluator.EvaluateFrameAtDistance(doc, prevS);
+                nextFrame = _evaluator.EvaluateFrameAtDistance(doc, nextS);
+            }
+            catch (ArgumentOutOfRangeException)
+            {
+                return false;
+            }
+            catch (InvalidOperationException)
+            {
+                return false;
+            }
+
+            Vector3d deltaTangent = nextFrame.Tangent - prevFrame.Tangent;
+            curvature = deltaTangent.Length / spanS;
+
+            if (double.IsNaN(curvature) || double.IsInfinity(curvature))
+            {
+                curvature = 0.0;
+                return false;
+            }
+
+            return true;
+        }
     }
 }

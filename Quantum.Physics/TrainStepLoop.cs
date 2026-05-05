@@ -222,6 +222,13 @@ namespace Quantum.Physics
             AccelerationComponents components = AccelerationDecomposer.Decompose(projectedAcceleration, Follower.Frame);
             double accelerationFromTangentialProjection = components.Tangential;
             Follower.TangentialAcceleration = accelerationFromTangentialProjection;
+            Follower.NormalAcceleration = null;
+
+            if (TryGetTrackCurvature(Follower.Distance, out double curvature))
+            {
+                double speed = Follower.Speed;
+                Follower.NormalAcceleration = speed * speed * curvature;
+            }
 
             double halfStepVelocityKick = 0.5 * accelerationFromTangentialProjection * DeltaTime;
             Follower.Speed += halfStepVelocityKick;
@@ -276,7 +283,13 @@ namespace Quantum.Physics
                 TrainFollowerState snapshot = CloneFollowerState(Follower);
                 if (TryGetProjectedAcceleration(snapshot.Distance, snapshot.Frame, out Vector3d projectedAcceleration))
                 {
-                    ApplyProjectedAccelerationDiagnostics(snapshot, projectedAcceleration);
+                    bool preserveCurvatureNormalDiagnostic =
+                        IntegrationMode == TrainIntegrationMode.TangentialProjected &&
+                        snapshot.NormalAcceleration.HasValue;
+                    ApplyProjectedAccelerationDiagnostics(
+                        snapshot,
+                        projectedAcceleration,
+                        preserveCurvatureNormalDiagnostic);
                 }
 
                 snapshots.Add(snapshot);
@@ -307,12 +320,19 @@ namespace Quantum.Physics
             return clone;
         }
 
-        private static void ApplyProjectedAccelerationDiagnostics(TrainFollowerState sample, Vector3d projectedAcceleration)
+        private static void ApplyProjectedAccelerationDiagnostics(
+            TrainFollowerState sample,
+            Vector3d projectedAcceleration,
+            bool preserveNormalAcceleration = false)
         {
             AccelerationComponents components = AccelerationDecomposer.Decompose(projectedAcceleration, sample.Frame);
             sample.ProjectedAcceleration = projectedAcceleration;
             sample.TangentialAcceleration = components.Tangential;
-            sample.NormalAcceleration = components.Normal;
+            if (!preserveNormalAcceleration)
+            {
+                sample.NormalAcceleration = components.Normal;
+            }
+
             sample.BinormalAcceleration = components.Binormal;
         }
 
@@ -332,6 +352,17 @@ namespace Quantum.Physics
             Vector3d gravityVector = new Vector3d(0.0, -GravityMagnitude, 0.0);
             gravityAccelerationAlongTrack = Vector3d.Dot(gravityVector, frame.Tangent);
             return true;
+        }
+
+        private bool TryGetTrackCurvature(double distance, out double curvature)
+        {
+            curvature = 0.0;
+            if (_trackFrameProvider is null)
+            {
+                return false;
+            }
+
+            return _trackFrameProvider.TryGetCurvatureAtDistance(distance, out curvature);
         }
 
         private bool TryGetProjectedAcceleration(double distance, TrackFrame frame, out Vector3d projectedAcceleration)
