@@ -175,7 +175,7 @@ A minimal easing abstraction (`IForceEasingFunction`) has been introduced. Built
 ### Multi-Point Channel Direction
 
 Status:
-A minimal `KeyframedForceEasingFunction` has been introduced. It supports sorted keypoints, clamped evaluation, and piecewise-linear interpolation between points.
+A minimal `KeyframedForceEasingFunction` has been introduced. It supports sorted keypoints, clamped evaluation, duplicate-t validation, piecewise-linear interpolation, and optional per-segment easing through `IForceEasingFunction`.
 
 Future force channels should support multiple control points across a section interval, allowing complex force shaping beyond single start→end interpolation.
 
