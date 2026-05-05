@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Quantum.Core;
 using Quantum.Math;
 using Quantum.Splines;
 
@@ -28,6 +29,12 @@ namespace Quantum.Physics
         public double RollingResistance { get; }
 
         public ITrackFrameProvider? TrackFrameProvider => _trackFrameProvider;
+
+        /// <summary>
+        /// Optional scalar controlling how much curvature-normal acceleration magnitude influences 1D speed in
+        /// <see cref="TrainIntegrationMode.TangentialProjected"/> mode. Default is 0.0 (disabled).
+        /// </summary>
+        public double CurvatureNormalSpeedInfluenceMultiplier { get; }
 
         public long Tick { get; private set; }
 
@@ -147,8 +154,14 @@ namespace Quantum.Physics
             double rollingResistance,
             IForceTargetProvider? forceTargetProvider,
             TrainIntegrationMode integrationMode,
-            ITrackFrameProvider? trackFrameProvider = null)
+            ITrackFrameProvider? trackFrameProvider = null,
+            double curvatureNormalSpeedInfluenceMultiplier = 0.0)
         {
+            Guard.RequireNonNegativeFinite(
+                curvatureNormalSpeedInfluenceMultiplier,
+                nameof(curvatureNormalSpeedInfluenceMultiplier),
+                "Curvature normal speed influence multiplier must be a finite, non-negative value.");
+
             Follower = follower ?? throw new ArgumentNullException(nameof(follower));
             DeltaTime = deltaTime;
             GravityMagnitude = gravityMagnitude;
@@ -158,6 +171,7 @@ namespace Quantum.Physics
             _forceTargetProvider = forceTargetProvider;
             _trackFrameProvider = trackFrameProvider;
             IntegrationMode = integrationMode;
+            CurvatureNormalSpeedInfluenceMultiplier = curvatureNormalSpeedInfluenceMultiplier;
             Tick = 0;
             ElapsedTimeSeconds = 0.0;
         }
@@ -182,20 +196,28 @@ namespace Quantum.Physics
 
         private void StepLegacyNormalComponent()
         {
-            double accelerationFromNormalG = 0.0;
+            double normalComponentAcceleration = 0.0;
             double? tangentialAcceleration = null;
+
+            // Legacy mode does not publish normal/binormal/world diagnostics on the follower state.
+            // Clear these fields each step so stale values cannot leak across mode transitions.
+            Follower.ProjectedAcceleration = null;
+            Follower.NormalAcceleration = null;
+            Follower.NormalAccelerationVector = null;
+            Follower.BinormalAcceleration = null;
+            Follower.CombinedWorldAccelerationVector = null;
+
             if (TryGetProjectedAcceleration(Follower.Distance, Follower.Frame, out Vector3d projectedAcceleration))
             {
                 AccelerationComponents components = AccelerationDecomposer.Decompose(projectedAcceleration, Follower.Frame);
                 double a_t = components.Tangential;
                 tangentialAcceleration = a_t;
-                accelerationFromNormalG = components.Normal;
+                normalComponentAcceleration = components.Normal;
             }
 
             Follower.TangentialAcceleration = tangentialAcceleration;
-            Follower.CombinedWorldAccelerationVector = null;
 
-            double halfStepVelocityKick = 0.5 * accelerationFromNormalG * DeltaTime;
+            double halfStepVelocityKick = 0.5 * normalComponentAcceleration * DeltaTime;
             Follower.Speed += halfStepVelocityKick;
 
             Follower.UpdateWithGravity(
@@ -206,7 +228,7 @@ namespace Quantum.Physics
                 RollingResistance);
 
             Follower.Speed += halfStepVelocityKick;
-            Follower.Acceleration += accelerationFromNormalG;
+            Follower.Acceleration += normalComponentAcceleration;
 
             Tick++;
             ElapsedTimeSeconds += DeltaTime;
@@ -221,25 +243,34 @@ namespace Quantum.Physics
             }
 
             AccelerationComponents components = AccelerationDecomposer.Decompose(projectedAcceleration, Follower.Frame);
-            double accelerationFromTangentialProjection = components.Tangential;
-            Follower.TangentialAcceleration = accelerationFromTangentialProjection;
+            double tangentialProjectedAcceleration = components.Tangential;
+            Follower.TangentialAcceleration = tangentialProjectedAcceleration;
             Follower.NormalAcceleration = null;
             Follower.NormalAccelerationVector = null;
+            double curvatureSpeedInfluenceAcceleration = 0.0;
 
-            if (TryGetTrackCurvature(Follower.Distance, out double curvature))
+            if (TryGetCurvatureNormalAccelerationVector(
+                Follower.Distance,
+                Follower.Speed,
+                Follower.Frame,
+                out double normalAcceleration,
+                out Vector3d normalAccelerationVector))
             {
-                double speed = Follower.Speed;
-                double normalAcceleration = speed * speed * curvature;
                 Follower.NormalAcceleration = normalAcceleration;
-                Follower.NormalAccelerationVector = normalAcceleration * Follower.Frame.Normal;
+                Follower.NormalAccelerationVector = normalAccelerationVector;
+                curvatureSpeedInfluenceAcceleration = ComputeCurvatureSpeedInfluenceAcceleration(
+                    normalAccelerationVector,
+                    Follower.Speed);
             }
 
             UpdateCombinedWorldAccelerationDiagnostic(Follower);
 
-            double halfStepVelocityKick = 0.5 * accelerationFromTangentialProjection * DeltaTime;
+            double integratedTangentialAcceleration =
+                tangentialProjectedAcceleration + curvatureSpeedInfluenceAcceleration;
+            double halfStepVelocityKick = 0.5 * integratedTangentialAcceleration * DeltaTime;
             Follower.Speed += halfStepVelocityKick;
 
-            if (TryGetTrackFrameGravityAcceleration(Follower.Distance, out double gravityAccelerationAlongTrack))
+            if (TryGetGravityAccelerationFromTrackFrameProvider(Follower.Distance, out double gravityAccelerationAlongTrack))
             {
                 Follower.UpdateWithResolvedGravityAcceleration(
                     DeltaTime,
@@ -259,7 +290,7 @@ namespace Quantum.Physics
             }
 
             Follower.Speed += halfStepVelocityKick;
-            Follower.Acceleration += accelerationFromTangentialProjection;
+            Follower.Acceleration += integratedTangentialAcceleration;
 
             Tick++;
             ElapsedTimeSeconds += DeltaTime;
@@ -368,7 +399,7 @@ namespace Quantum.Physics
             state.CombinedWorldAccelerationVector = combinedWorldAcceleration;
         }
 
-        private bool TryGetTrackFrameGravityAcceleration(double distance, out double gravityAccelerationAlongTrack)
+        private bool TryGetGravityAccelerationFromTrackFrameProvider(double distance, out double gravityAccelerationAlongTrack)
         {
             gravityAccelerationAlongTrack = 0.0;
             if (_trackFrameProvider is null)
@@ -386,7 +417,7 @@ namespace Quantum.Physics
             return true;
         }
 
-        private bool TryGetTrackCurvature(double distance, out double curvature)
+        private bool TryGetCurvatureFromTrackFrameProvider(double distance, out double curvature)
         {
             curvature = 0.0;
             if (_trackFrameProvider is null)
@@ -395,6 +426,88 @@ namespace Quantum.Physics
             }
 
             return _trackFrameProvider.TryGetCurvatureAtDistance(distance, out curvature);
+        }
+
+        private bool TryGetCurvatureNormalAccelerationVector(
+            double distance,
+            double speed,
+            TrackFrame frame,
+            out double normalAcceleration,
+            out Vector3d normalAccelerationVector)
+        {
+            normalAcceleration = 0.0;
+            normalAccelerationVector = default;
+
+            if (!TryGetCurvatureFromTrackFrameProvider(distance, out double curvature))
+            {
+                return false;
+            }
+
+            if (!Numeric.IsFinite(curvature) || !Numeric.IsFinite(speed))
+            {
+                return false;
+            }
+
+            double speedSquared = speed * speed;
+            if (!Numeric.IsFinite(speedSquared))
+            {
+                return false;
+            }
+
+            normalAcceleration = speedSquared * curvature;
+            if (!Numeric.IsFinite(normalAcceleration))
+            {
+                normalAcceleration = 0.0;
+                return false;
+            }
+
+            normalAccelerationVector = normalAcceleration * frame.Normal;
+            if (!IsFiniteVector(normalAccelerationVector))
+            {
+                normalAcceleration = 0.0;
+                normalAccelerationVector = default;
+                return false;
+            }
+
+            return true;
+        }
+
+        private double ComputeCurvatureSpeedInfluenceAcceleration(
+            Vector3d normalAccelerationVector,
+            double speed)
+        {
+            if (CurvatureNormalSpeedInfluenceMultiplier <= 0.0)
+            {
+                return 0.0;
+            }
+
+            double speedDirection = System.Math.Sign(speed);
+            if (speedDirection == 0.0)
+            {
+                return 0.0;
+            }
+
+            double normalAccelerationMagnitude = normalAccelerationVector.Length;
+            if (!Numeric.IsFinite(normalAccelerationMagnitude))
+            {
+                return 0.0;
+            }
+
+            double speedInfluenceAcceleration =
+                CurvatureNormalSpeedInfluenceMultiplier * normalAccelerationMagnitude * speedDirection;
+            if (!Numeric.IsFinite(speedInfluenceAcceleration))
+            {
+                return 0.0;
+            }
+
+            return speedInfluenceAcceleration;
+        }
+
+        private static bool IsFiniteVector(Vector3d value)
+        {
+            return Numeric.IsFinite(value.X) &&
+                   Numeric.IsFinite(value.Y) &&
+                   Numeric.IsFinite(value.Z);
         }
 
         private bool TryGetProjectedAcceleration(double distance, TrackFrame frame, out Vector3d projectedAcceleration)
