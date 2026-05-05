@@ -159,6 +159,28 @@ namespace Quantum.Track
             return new CameraTransform(transform, state.Position, forward, up, right);
         }
 
+        public static CameraTransform BuildWalkViewCamera(WalkViewCameraState state)
+        {
+            ValidateFinite(state.Position, nameof(state.Position));
+            ValidateFinite(state.YawRadians, nameof(state.YawRadians));
+            ValidateFinite(state.PitchRadians, nameof(state.PitchRadians));
+            ValidateFinite(state.RollRadians, nameof(state.RollRadians));
+            ValidateFinite(state.EyeHeight, nameof(state.EyeHeight));
+
+            if (state.EyeHeight < 0.0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(state.EyeHeight), "Eye height must be non-negative.");
+            }
+
+            Vector3d cameraPosition = state.Position + (Vector3d.UnitY * state.EyeHeight);
+            return BuildFlyViewCamera(
+                new FlyViewCameraState(
+                    position: cameraPosition,
+                    yawRadians: state.YawRadians,
+                    pitchRadians: state.PitchRadians,
+                    rollRadians: state.RollRadians));
+        }
+
         private static Vector3d ComputeCameraPositionFromLocalOffset(TrackFrame frame, Vector3d localOffset)
         {
             return

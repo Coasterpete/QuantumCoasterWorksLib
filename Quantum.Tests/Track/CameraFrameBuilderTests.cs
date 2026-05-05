@@ -343,6 +343,106 @@ public sealed class CameraFrameBuilderTests
     }
 
     [Fact]
+    public void BuildWalkViewCamera_EyeHeightOffsetsPositionUpward()
+    {
+        var state = new WalkViewCameraState(
+            position: new Vector3d(10.0, 20.0, 30.0),
+            yawRadians: 0.0,
+            pitchRadians: 0.0,
+            eyeHeight: 1.75);
+
+        CameraTransform camera = CameraFrameBuilder.BuildWalkViewCamera(state);
+
+        AssertVectorNear(new Vector3d(10.0, 21.75, 30.0), camera.Position);
+        AssertFloatNear(10.0f, camera.Transform.M14);
+        AssertFloatNear(21.75f, camera.Transform.M24);
+        AssertFloatNear(30.0f, camera.Transform.M34);
+    }
+
+    [Fact]
+    public void BuildWalkViewCamera_OrientationMatchesFlyViewBehavior()
+    {
+        Vector3d basePosition = new Vector3d(4.0, -2.0, 7.5);
+        double eyeHeight = 1.2;
+        double yawRadians = 1.1;
+        double pitchRadians = -0.4;
+        double rollRadians = 0.35;
+        var walkState = new WalkViewCameraState(
+            position: basePosition,
+            yawRadians: yawRadians,
+            pitchRadians: pitchRadians,
+            eyeHeight: eyeHeight,
+            rollRadians: rollRadians);
+
+        CameraTransform walkCamera = CameraFrameBuilder.BuildWalkViewCamera(walkState);
+        CameraTransform flyCamera = CameraFrameBuilder.BuildFlyViewCamera(new FlyViewCameraState(
+            position: basePosition + (Vector3d.UnitY * eyeHeight),
+            yawRadians: yawRadians,
+            pitchRadians: pitchRadians,
+            rollRadians: rollRadians));
+
+        AssertVectorNear(flyCamera.Forward, walkCamera.Forward);
+        AssertVectorNear(flyCamera.Up, walkCamera.Up);
+        AssertVectorNear(flyCamera.Right, walkCamera.Right);
+        AssertMatrixNear(flyCamera.Transform, walkCamera.Transform);
+    }
+
+    [Fact]
+    public void BuildWalkViewCamera_ZeroEyeHeight_IsAllowed()
+    {
+        Vector3d position = new Vector3d(-3.0, 6.0, 9.0);
+        var state = new WalkViewCameraState(
+            position: position,
+            yawRadians: 0.25,
+            pitchRadians: -0.1,
+            eyeHeight: 0.0);
+
+        CameraTransform camera = CameraFrameBuilder.BuildWalkViewCamera(state);
+
+        AssertVectorNear(position, camera.Position);
+    }
+
+    [Fact]
+    public void BuildWalkViewCamera_InvalidEyeHeight_Throws()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            CameraFrameBuilder.BuildWalkViewCamera(new WalkViewCameraState(
+                position: Vector3d.Zero,
+                yawRadians: 0.0,
+                pitchRadians: 0.0,
+                eyeHeight: double.NaN)));
+
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            CameraFrameBuilder.BuildWalkViewCamera(new WalkViewCameraState(
+                position: Vector3d.Zero,
+                yawRadians: 0.0,
+                pitchRadians: 0.0,
+                eyeHeight: double.PositiveInfinity)));
+
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            CameraFrameBuilder.BuildWalkViewCamera(new WalkViewCameraState(
+                position: Vector3d.Zero,
+                yawRadians: 0.0,
+                pitchRadians: 0.0,
+                eyeHeight: -0.01)));
+    }
+
+    [Fact]
+    public void BuildWalkViewCamera_ReturnsFiniteMatrix()
+    {
+        var state = new WalkViewCameraState(
+            position: new Vector3d(120.5, -40.25, 9.75),
+            yawRadians: 2.2,
+            pitchRadians: double.MaxValue,
+            eyeHeight: 1.8,
+            rollRadians: -1.4);
+
+        CameraTransform camera = CameraFrameBuilder.BuildWalkViewCamera(state);
+
+        AssertFiniteMatrix(camera.Transform);
+    }
+
+    [Fact]
     public void BuildBRollCamera_AppliesOffsetInTrackLocalSpace()
     {
         var evaluator = CreateBoundLineEvaluator(length: 20.0);
