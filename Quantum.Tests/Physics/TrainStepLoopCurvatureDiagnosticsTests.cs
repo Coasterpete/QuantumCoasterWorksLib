@@ -99,6 +99,122 @@ public sealed class TrainStepLoopCurvatureDiagnosticsTests
     }
 
     [Fact]
+    public void TangentialProjectedMode_Step_ClearsProjectedAccelerationDiagnosticFromPreviousState()
+    {
+        IArcLengthCurve track = new LineCurve(
+            new Vector3d(0.0, 0.0, 0.0),
+            new Vector3d(100.0, 0.0, 0.0));
+
+        var follower = new TrainFollowerState(track, speed: 6.0);
+        follower.ProjectedAcceleration = new Vector3d(2.0, 3.0, 4.0);
+
+        var loop = new TrainStepLoop(
+            follower,
+            deltaTime: 0.1,
+            gravityMagnitude: 0.0,
+            linearDragCoefficient: 0.0,
+            quadraticDragCoefficient: 0.0,
+            rollingResistance: 0.0,
+            new ZeroForceTargetProvider(),
+            TrainIntegrationMode.TangentialProjected,
+            trackFrameProvider: null);
+
+        loop.Step();
+
+        Assert.Null(follower.ProjectedAcceleration);
+    }
+
+    [Fact]
+    public void TangentialProjectedMode_Sample_WithoutCurvatureProvider_UsesProjectedNormalScalarButKeepsBinormalDiagnosticsNull()
+    {
+        const double normalG = 1.25;
+
+        IArcLengthCurve track = new LineCurve(
+            new Vector3d(0.0, 0.0, 0.0),
+            new Vector3d(100.0, 0.0, 0.0));
+
+        var follower = new TrainFollowerState(track, speed: 4.0);
+        var loop = new TrainStepLoop(
+            follower,
+            deltaTime: 0.1,
+            gravityMagnitude: 0.0,
+            linearDragCoefficient: 0.0,
+            quadraticDragCoefficient: 0.0,
+            rollingResistance: 0.0,
+            new ConstantForceTargetProvider(normalG, lateralG: 0.0, rollRateDegPerSec: 0.0),
+            TrainIntegrationMode.TangentialProjected,
+            trackFrameProvider: null);
+
+        IReadOnlyList<TrainFollowerState> samples = loop.Sample(1);
+        TrainFollowerState sample = Assert.Single(samples);
+
+        Assert.True(sample.ProjectedAcceleration.HasValue);
+        Assert.True(sample.NormalAcceleration.HasValue);
+        Assert.Null(sample.NormalAccelerationVector);
+        Assert.Null(sample.BinormalAcceleration);
+        Assert.Null(sample.BinormalAccelerationVector);
+
+        double expectedProjectedNormal = Vector3d.Dot(sample.ProjectedAcceleration.Value, sample.Frame.Normal);
+        Assert.InRange(System.Math.Abs(sample.NormalAcceleration.Value - expectedProjectedNormal), 0.0, Tolerance);
+        Assert.InRange(System.Math.Abs(expectedProjectedNormal - (normalG * 9.81)), 0.0, Tolerance);
+    }
+
+    [Fact]
+    public void TangentialProjectedMode_Sample_WithCurvatureDiagnostics_PreservesCurvatureScalars_WhenProjectedLateralComponentExists()
+    {
+        const double curvature = 1.0 / 15.0;
+        const double initialSpeed = 9.0;
+        const double lateralG = 2.5;
+
+        IArcLengthCurve track = new LineCurve(
+            new Vector3d(0.0, 0.0, 0.0),
+            new Vector3d(100.0, 0.0, 0.0));
+
+        var follower = new TrainFollowerState(track, speed: initialSpeed);
+        Vector3d providerNormal = (follower.Frame.Normal + follower.Frame.Binormal).Normalized();
+        Vector3d providerBinormal = Vector3d.Cross(follower.Frame.Tangent, providerNormal).Normalized();
+        TrackFrame providerFrame = new TrackFrame(
+            0.0,
+            follower.Frame.Position,
+            follower.Frame.Tangent,
+            providerNormal,
+            providerBinormal);
+
+        var loop = new TrainStepLoop(
+            follower,
+            deltaTime: 0.1,
+            gravityMagnitude: 0.0,
+            linearDragCoefficient: 0.0,
+            quadraticDragCoefficient: 0.0,
+            rollingResistance: 0.0,
+            new ConstantForceTargetProvider(normalG: 0.0, lateralG: lateralG, rollRateDegPerSec: 0.0),
+            TrainIntegrationMode.TangentialProjected,
+            new CurvatureAndFrameTrackFrameProvider(curvature, providerFrame));
+
+        IReadOnlyList<TrainFollowerState> samples = loop.Sample(1);
+        TrainFollowerState sample = Assert.Single(samples);
+
+        Assert.True(sample.ProjectedAcceleration.HasValue);
+        double projectedBinormal = Vector3d.Dot(sample.ProjectedAcceleration.Value, sample.Frame.Binormal);
+        Assert.True(System.Math.Abs(projectedBinormal) > Tolerance);
+
+        double expectedCurvatureNormal = sample.Speed * sample.Speed * curvature;
+        double expectedCurvatureBinormal =
+            expectedCurvatureNormal * Vector3d.Dot(providerFrame.Normal, sample.Frame.Binormal);
+
+        Assert.True(sample.NormalAcceleration.HasValue);
+        Assert.True(sample.NormalAccelerationVector.HasValue);
+        Assert.True(sample.BinormalAcceleration.HasValue);
+        Assert.True(sample.BinormalAccelerationVector.HasValue);
+        Assert.InRange(System.Math.Abs(sample.NormalAcceleration.Value - expectedCurvatureNormal), 0.0, Tolerance);
+        Assert.InRange(System.Math.Abs(sample.BinormalAcceleration.Value - expectedCurvatureBinormal), 0.0, Tolerance);
+        Assert.InRange(
+            System.Math.Abs(sample.BinormalAcceleration.Value - projectedBinormal),
+            Tolerance,
+            double.MaxValue);
+    }
+
+    [Fact]
     public void TangentialProjectedMode_CurvatureDiagnostics_DoNotChangeMotion()
     {
         const double radius = 50.0;
@@ -617,6 +733,26 @@ public sealed class TrainStepLoopCurvatureDiagnosticsTests
         public bool TryGetForceTargets(double x, out ForceTargets targets)
         {
             targets = new ForceTargets(normalG: 0.0, lateralG: 0.0, rollRateDegPerSec: 0.0);
+            return true;
+        }
+    }
+
+    private sealed class ConstantForceTargetProvider : IForceTargetProvider
+    {
+        private readonly double _normalG;
+        private readonly double _lateralG;
+        private readonly double _rollRateDegPerSec;
+
+        public ConstantForceTargetProvider(double normalG, double lateralG, double rollRateDegPerSec)
+        {
+            _normalG = normalG;
+            _lateralG = lateralG;
+            _rollRateDegPerSec = rollRateDegPerSec;
+        }
+
+        public bool TryGetForceTargets(double x, out ForceTargets targets)
+        {
+            targets = new ForceTargets(_normalG, _lateralG, _rollRateDegPerSec);
             return true;
         }
     }

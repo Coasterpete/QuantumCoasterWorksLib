@@ -246,6 +246,7 @@ namespace Quantum.Physics
             AccelerationComponents components = AccelerationDecomposer.Decompose(projectedAcceleration, Follower.Frame);
             double tangentialProjectedAcceleration = components.Tangential;
             Follower.TangentialAcceleration = tangentialProjectedAcceleration;
+            Follower.ProjectedAcceleration = null;
             Follower.NormalAcceleration = null;
             Follower.NormalAccelerationVector = null;
             Follower.BinormalAcceleration = null;
@@ -338,6 +339,8 @@ namespace Quantum.Physics
                 TrainFollowerState snapshot = CloneFollowerState(Follower);
                 if (TryGetProjectedAcceleration(snapshot.Distance, snapshot.Frame, out Vector3d projectedAcceleration))
                 {
+                    // In tangential-projected mode, normal/binormal diagnostics are curvature contracts when present.
+                    // Keep those scalar/vector values and only refresh projected/tangential diagnostics from sampled force targets.
                     bool preserveCurvatureNormalDiagnostic =
                         IntegrationMode == TrainIntegrationMode.TangentialProjected &&
                         snapshot.NormalAcceleration.HasValue;
@@ -465,19 +468,7 @@ namespace Quantum.Physics
             normalAcceleration = 0.0;
             normalAccelerationVector = default;
 
-            if (!Numeric.IsFinite(curvature) || !Numeric.IsFinite(speed))
-            {
-                return false;
-            }
-
-            double speedSquared = speed * speed;
-            if (!Numeric.IsFinite(speedSquared))
-            {
-                return false;
-            }
-
-            normalAcceleration = speedSquared * curvature;
-            if (!Numeric.IsFinite(normalAcceleration))
+            if (!TryComputeCurvatureAccelerationMagnitude(curvature, speed, out normalAcceleration))
             {
                 normalAcceleration = 0.0;
                 return false;
@@ -505,19 +496,10 @@ namespace Quantum.Physics
             binormalAcceleration = 0.0;
             binormalAccelerationVector = default;
 
-            if (!Numeric.IsFinite(curvature) || !Numeric.IsFinite(speed))
-            {
-                return false;
-            }
-
-            double speedSquared = speed * speed;
-            if (!Numeric.IsFinite(speedSquared))
-            {
-                return false;
-            }
-
-            double curvatureAccelerationMagnitude = speedSquared * curvature;
-            if (!Numeric.IsFinite(curvatureAccelerationMagnitude))
+            if (!TryComputeCurvatureAccelerationMagnitude(
+                curvature,
+                speed,
+                out double curvatureAccelerationMagnitude))
             {
                 return false;
             }
@@ -587,6 +569,27 @@ namespace Quantum.Physics
             return Numeric.IsFinite(value.X) &&
                    Numeric.IsFinite(value.Y) &&
                    Numeric.IsFinite(value.Z);
+        }
+
+        private static bool TryComputeCurvatureAccelerationMagnitude(
+            double curvature,
+            double speed,
+            out double curvatureAccelerationMagnitude)
+        {
+            curvatureAccelerationMagnitude = 0.0;
+            if (!Numeric.IsFinite(curvature) || !Numeric.IsFinite(speed))
+            {
+                return false;
+            }
+
+            double speedSquared = speed * speed;
+            if (!Numeric.IsFinite(speedSquared))
+            {
+                return false;
+            }
+
+            curvatureAccelerationMagnitude = speedSquared * curvature;
+            return Numeric.IsFinite(curvatureAccelerationMagnitude);
         }
 
         private bool TryGetProjectedAcceleration(double distance, TrackFrame frame, out Vector3d projectedAcceleration)

@@ -33,6 +33,8 @@ namespace Quantum.Physics
         /// Normal acceleration diagnostic scalar.
         /// In tangential-projected mode with curvature data this represents v^2 * curvature.
         /// In projection diagnostics it represents the normal component of projected acceleration.
+        /// When tangential-projected samples include both curvature and projected diagnostics,
+        /// curvature-derived values take precedence.
         /// </summary>
         public double? NormalAcceleration { get; set; }
 
@@ -53,6 +55,7 @@ namespace Quantum.Physics
 
         /// <summary>
         /// Combined world-space acceleration diagnostic built from tangential plus normal-vector terms.
+        /// Binormal terms are intentionally excluded to preserve existing consumer expectations.
         /// </summary>
         public Vector3d? CombinedWorldAccelerationVector { get; set; }
 
