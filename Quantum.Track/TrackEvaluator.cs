@@ -93,6 +93,12 @@ namespace Quantum.Track
             return BuildExportFrame(splineFrame);
         }
 
+        public double GetBoundTrackTotalLength()
+        {
+            TrackDocument doc = ResolveBoundDocument();
+            return doc.TotalLength;
+        }
+
         public SplineTrackFrame EvaluateFrameAtDistance(TrackDocument doc, double distance)
         {
             TrackEvaluationPoint evaluationPoint = EvaluateAtDistance(doc, distance);
