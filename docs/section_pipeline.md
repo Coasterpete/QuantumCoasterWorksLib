@@ -401,6 +401,17 @@ When `UseElapsedTimeForceSampling` is `true`:
 Status:
 `TrackFrame` keeps T/N/B + position as the source of truth, while `Matrix4x4` is used as an output/interop representation only.
 
+### TrackEvaluator Frame Output
+
+Status:
+`TrackEvaluator` can now produce document-bound `TrackFrame` output through `EvaluateFrameAtDistance(double distance)`.
+
+- Position matches existing distance evaluation.
+- T/N/B basis vectors are explicitly orthonormalized.
+- Existing `EvaluateAtDistance` behavior remains unchanged.
+
+This connects track evaluation to the `TrackFrame -> Matrix4x4` interop layer.
+
 ## References
 - KexEdit node graph and section concepts: <https://individualkex.github.io/KexEdit/reference/node-graph.html>
 
