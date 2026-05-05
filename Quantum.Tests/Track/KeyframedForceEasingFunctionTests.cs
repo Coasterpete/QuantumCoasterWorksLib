@@ -69,4 +69,100 @@ public sealed class KeyframedForceEasingFunctionTests
             (1.0, 1.0)
         }));
     }
+
+    [Fact]
+    public void Constructor_NonFiniteValue_Throws()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() => new KeyframedForceEasingFunction(new List<(double t, double value)>
+        {
+            (0.0, double.NaN),
+            (1.0, 1.0)
+        }));
+    }
+
+    [Theory]
+    [InlineData(0.125)]
+    [InlineData(0.5)]
+    [InlineData(0.875)]
+    public void Evaluate_WithNullSegmentEasings_FallsBackToLinearAndMatchesDefaultBehavior(double t)
+    {
+        List<(double t, double value)> points = new()
+        {
+            (0.0, 0.0),
+            (0.4, 1.0),
+            (1.0, 0.0)
+        };
+
+        IForceEasingFunction baseline = new KeyframedForceEasingFunction(points);
+        IForceEasingFunction withFallback = new KeyframedForceEasingFunction(points, segmentEasings: null);
+
+        Assert.Equal(baseline.Evaluate(t), withFallback.Evaluate(t), 10);
+    }
+
+    [Fact]
+    public void Evaluate_WithSmoothStepSegmentEasing_ChangesMidpointSampleWithinSegment()
+    {
+        IForceEasingFunction easing = new KeyframedForceEasingFunction(
+            new List<(double t, double value)>
+            {
+                (0.0, 0.0),
+                (0.75, 1.0),
+                (1.0, 1.0)
+            },
+            new IForceEasingFunction?[]
+            {
+                new BuiltInForceEasingFunction(ForceInterpolationMode.SmoothStep),
+                null
+            });
+
+        double actual = easing.Evaluate(0.5);
+
+        Assert.Equal(20.0 / 27.0, actual, 10);
+    }
+
+    [Fact]
+    public void Evaluate_BuiltInForceEasingFunction_CanBeUsedAsSegmentEasing()
+    {
+        IForceEasingFunction easing = new KeyframedForceEasingFunction(
+            new List<(double t, double value)>
+            {
+                (0.0, 0.0),
+                (1.0, 1.0)
+            },
+            new IForceEasingFunction?[]
+            {
+                new BuiltInForceEasingFunction(ForceInterpolationMode.Quadratic)
+            });
+
+        double actual = easing.Evaluate(0.5);
+
+        Assert.Equal(0.25, actual, 10);
+    }
+
+    [Fact]
+    public void Constructor_DuplicateTValues_Throws()
+    {
+        Assert.Throws<ArgumentException>(() => new KeyframedForceEasingFunction(new List<(double t, double value)>
+        {
+            (0.0, 0.0),
+            (0.5, 1.0),
+            (0.5, 0.4)
+        }));
+    }
+
+    [Fact]
+    public void Constructor_InvalidSegmentEasingCount_Throws()
+    {
+        Assert.Throws<ArgumentException>(() => new KeyframedForceEasingFunction(
+            new List<(double t, double value)>
+            {
+                (0.0, 0.0),
+                (0.5, 1.0),
+                (1.0, 0.0)
+            },
+            new IForceEasingFunction?[]
+            {
+                new BuiltInForceEasingFunction(ForceInterpolationMode.Linear)
+            }));
+    }
 }
