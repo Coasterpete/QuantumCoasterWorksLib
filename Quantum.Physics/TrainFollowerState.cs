@@ -28,6 +28,8 @@ namespace Quantum.Physics
 
         public double? BinormalAcceleration { get; set; }
 
+        public Vector3d? CombinedWorldAccelerationVector { get; set; }
+
         public bool LoopEnabled { get; set; }
 
         public Vector3d Position { get; private set; }

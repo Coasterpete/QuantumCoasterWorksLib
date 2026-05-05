@@ -36,6 +36,7 @@ public sealed class TrainStepLoopCurvatureDiagnosticsTests
 
         Assert.True(follower.NormalAcceleration.HasValue);
         Assert.True(follower.NormalAccelerationVector.HasValue);
+        Assert.True(follower.CombinedWorldAccelerationVector.HasValue);
         Assert.InRange(
             System.Math.Abs(follower.NormalAcceleration.Value - expectedNormalAcceleration),
             0.0,
@@ -48,6 +49,15 @@ public sealed class TrainStepLoopCurvatureDiagnosticsTests
         Assert.InRange(System.Math.Abs(vectorMagnitude - expectedNormalAcceleration), 0.0, Tolerance);
         Assert.InRange(System.Math.Abs(vectorMagnitude - follower.NormalAcceleration.Value), 0.0, Tolerance);
         Assert.InRange(System.Math.Abs(alignment - 1.0), 0.0, Tolerance);
+
+        Assert.True(follower.TangentialAcceleration.HasValue);
+        Vector3d expectedCombinedAcceleration =
+            (follower.TangentialAcceleration.Value * follower.Frame.Tangent) +
+            normalAccelerationVector;
+        Vector3d combinedWorldAcceleration = follower.CombinedWorldAccelerationVector.Value;
+        Assert.InRange(System.Math.Abs(combinedWorldAcceleration.X - expectedCombinedAcceleration.X), 0.0, Tolerance);
+        Assert.InRange(System.Math.Abs(combinedWorldAcceleration.Y - expectedCombinedAcceleration.Y), 0.0, Tolerance);
+        Assert.InRange(System.Math.Abs(combinedWorldAcceleration.Z - expectedCombinedAcceleration.Z), 0.0, Tolerance);
     }
 
     [Fact]
@@ -73,6 +83,13 @@ public sealed class TrainStepLoopCurvatureDiagnosticsTests
 
         Assert.Null(follower.NormalAcceleration);
         Assert.Null(follower.NormalAccelerationVector);
+        Assert.True(follower.TangentialAcceleration.HasValue);
+        Assert.True(follower.CombinedWorldAccelerationVector.HasValue);
+        Vector3d expectedCombinedAcceleration = follower.TangentialAcceleration.Value * follower.Frame.Tangent;
+        Vector3d combinedWorldAcceleration = follower.CombinedWorldAccelerationVector.Value;
+        Assert.InRange(System.Math.Abs(combinedWorldAcceleration.X - expectedCombinedAcceleration.X), 0.0, Tolerance);
+        Assert.InRange(System.Math.Abs(combinedWorldAcceleration.Y - expectedCombinedAcceleration.Y), 0.0, Tolerance);
+        Assert.InRange(System.Math.Abs(combinedWorldAcceleration.Z - expectedCombinedAcceleration.Z), 0.0, Tolerance);
     }
 
     [Fact]
@@ -123,8 +140,10 @@ public sealed class TrainStepLoopCurvatureDiagnosticsTests
         double expectedNormalAcceleration = (initialSpeed * initialSpeed) / radius;
         Assert.Null(baselineFollower.NormalAcceleration);
         Assert.Null(baselineFollower.NormalAccelerationVector);
+        Assert.True(baselineFollower.CombinedWorldAccelerationVector.HasValue);
         Assert.True(curvatureFollower.NormalAcceleration.HasValue);
         Assert.True(curvatureFollower.NormalAccelerationVector.HasValue);
+        Assert.True(curvatureFollower.CombinedWorldAccelerationVector.HasValue);
         Assert.InRange(
             System.Math.Abs(curvatureFollower.NormalAcceleration.Value - expectedNormalAcceleration),
             0.0,
@@ -133,6 +152,24 @@ public sealed class TrainStepLoopCurvatureDiagnosticsTests
             System.Math.Abs(curvatureFollower.NormalAccelerationVector.Value.Length - expectedNormalAcceleration),
             0.0,
             Tolerance);
+
+        Assert.True(baselineFollower.TangentialAcceleration.HasValue);
+        Assert.True(curvatureFollower.TangentialAcceleration.HasValue);
+
+        Vector3d expectedBaselineCombined =
+            baselineFollower.TangentialAcceleration.Value * baselineFollower.Frame.Tangent;
+        Vector3d baselineCombined = baselineFollower.CombinedWorldAccelerationVector.Value;
+        Assert.InRange(System.Math.Abs(baselineCombined.X - expectedBaselineCombined.X), 0.0, Tolerance);
+        Assert.InRange(System.Math.Abs(baselineCombined.Y - expectedBaselineCombined.Y), 0.0, Tolerance);
+        Assert.InRange(System.Math.Abs(baselineCombined.Z - expectedBaselineCombined.Z), 0.0, Tolerance);
+
+        Vector3d expectedCurvatureCombined =
+            (curvatureFollower.TangentialAcceleration.Value * curvatureFollower.Frame.Tangent) +
+            curvatureFollower.NormalAccelerationVector.Value;
+        Vector3d curvatureCombined = curvatureFollower.CombinedWorldAccelerationVector.Value;
+        Assert.InRange(System.Math.Abs(curvatureCombined.X - expectedCurvatureCombined.X), 0.0, Tolerance);
+        Assert.InRange(System.Math.Abs(curvatureCombined.Y - expectedCurvatureCombined.Y), 0.0, Tolerance);
+        Assert.InRange(System.Math.Abs(curvatureCombined.Z - expectedCurvatureCombined.Z), 0.0, Tolerance);
     }
 
     private sealed class ZeroForceTargetProvider : IForceTargetProvider

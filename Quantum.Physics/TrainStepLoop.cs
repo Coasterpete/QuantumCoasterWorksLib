@@ -193,6 +193,7 @@ namespace Quantum.Physics
             }
 
             Follower.TangentialAcceleration = tangentialAcceleration;
+            Follower.CombinedWorldAccelerationVector = null;
 
             double halfStepVelocityKick = 0.5 * accelerationFromNormalG * DeltaTime;
             Follower.Speed += halfStepVelocityKick;
@@ -232,6 +233,8 @@ namespace Quantum.Physics
                 Follower.NormalAcceleration = normalAcceleration;
                 Follower.NormalAccelerationVector = normalAcceleration * Follower.Frame.Normal;
             }
+
+            UpdateCombinedWorldAccelerationDiagnostic(Follower);
 
             double halfStepVelocityKick = 0.5 * accelerationFromTangentialProjection * DeltaTime;
             Follower.Speed += halfStepVelocityKick;
@@ -295,6 +298,11 @@ namespace Quantum.Physics
                         preserveCurvatureNormalDiagnostic);
                 }
 
+                if (IntegrationMode == TrainIntegrationMode.TangentialProjected)
+                {
+                    UpdateCombinedWorldAccelerationDiagnostic(snapshot);
+                }
+
                 snapshots.Add(snapshot);
             }
 
@@ -321,6 +329,7 @@ namespace Quantum.Physics
             clone.NormalAcceleration = source.NormalAcceleration;
             clone.NormalAccelerationVector = source.NormalAccelerationVector;
             clone.BinormalAcceleration = source.BinormalAcceleration;
+            clone.CombinedWorldAccelerationVector = source.CombinedWorldAccelerationVector;
             return clone;
         }
 
@@ -338,6 +347,25 @@ namespace Quantum.Physics
             }
 
             sample.BinormalAcceleration = components.Binormal;
+        }
+
+        private static void UpdateCombinedWorldAccelerationDiagnostic(TrainFollowerState state)
+        {
+            if (!state.TangentialAcceleration.HasValue)
+            {
+                state.CombinedWorldAccelerationVector = null;
+                return;
+            }
+
+            Vector3d combinedWorldAcceleration =
+                state.TangentialAcceleration.Value * state.Frame.Tangent;
+
+            if (state.NormalAccelerationVector.HasValue)
+            {
+                combinedWorldAcceleration += state.NormalAccelerationVector.Value;
+            }
+
+            state.CombinedWorldAccelerationVector = combinedWorldAcceleration;
         }
 
         private bool TryGetTrackFrameGravityAcceleration(double distance, out double gravityAccelerationAlongTrack)
