@@ -68,6 +68,14 @@ namespace Quantum.Track
             return new CameraTransform(transform, cameraPosition, forward, up, right);
         }
 
+        public static CameraTransform BuildFlyByCamera(
+            Vector3d cameraPosition,
+            TrackFrame targetFrame,
+            Vector3d upHint)
+        {
+            return BuildTargetCamera(cameraPosition, targetFrame.Position, upHint);
+        }
+
         private static Vector3d NormalizeOrThrow(Vector3d vector, string paramName, string message)
         {
             ValidateFinite(vector, paramName);

@@ -168,6 +168,87 @@ public sealed class CameraFrameBuilderTests
                 upHint: new Vector3d(0.0, double.NegativeInfinity, 0.0)));
     }
 
+    [Fact]
+    public void BuildFlyByCamera_ForwardPointsAtTargetFramePosition()
+    {
+        Vector3d cameraPosition = new Vector3d(-7.0, 3.0, 2.0);
+        var targetFrame = new ExportTrackFrame(
+            position: new Vector3d(5.0, 8.0, -1.0),
+            tangent: Vector3d.UnitX,
+            normal: Vector3d.UnitY,
+            binormal: Vector3d.UnitZ);
+        Vector3d upHint = new Vector3d(0.0, 1.0, 0.0);
+
+        CameraTransform camera = CameraFrameBuilder.BuildFlyByCamera(cameraPosition, targetFrame, upHint);
+
+        Vector3d expectedForward = (targetFrame.Position - cameraPosition).Normalized();
+        AssertVectorNear(expectedForward, camera.Forward);
+    }
+
+    [Fact]
+    public void BuildFlyByCamera_ReturnsFiniteMatrix()
+    {
+        CameraTransform camera = CameraFrameBuilder.BuildFlyByCamera(
+            cameraPosition: new Vector3d(75.0, -12.5, 6.25),
+            targetFrame: new ExportTrackFrame(
+                position: new Vector3d(77.0, -10.0, 5.0),
+                tangent: Vector3d.UnitY,
+                normal: Vector3d.UnitZ,
+                binormal: Vector3d.UnitX),
+            upHint: new Vector3d(0.0, 0.0, 1.0));
+
+        AssertFiniteMatrix(camera.Transform);
+    }
+
+    [Fact]
+    public void BuildFlyByCamera_MatchesBuildTargetCameraForSameInputs()
+    {
+        Vector3d cameraPosition = new Vector3d(-2.0, 4.5, 7.25);
+        var targetFrame = new ExportTrackFrame(
+            position: new Vector3d(3.0, 1.5, -0.25),
+            tangent: Vector3d.UnitZ,
+            normal: Vector3d.UnitX,
+            binormal: Vector3d.UnitY);
+        Vector3d upHint = new Vector3d(0.1, 1.0, -0.2);
+
+        CameraTransform targetCamera = CameraFrameBuilder.BuildTargetCamera(
+            cameraPosition,
+            targetFrame.Position,
+            upHint);
+        CameraTransform flyByCamera = CameraFrameBuilder.BuildFlyByCamera(
+            cameraPosition,
+            targetFrame,
+            upHint);
+
+        AssertVectorNear(targetCamera.Position, flyByCamera.Position);
+        AssertVectorNear(targetCamera.Forward, flyByCamera.Forward);
+        AssertVectorNear(targetCamera.Up, flyByCamera.Up);
+        AssertVectorNear(targetCamera.Right, flyByCamera.Right);
+        AssertMatrixNear(targetCamera.Transform, flyByCamera.Transform);
+    }
+
+    [Fact]
+    public void BuildFlyByCamera_WithNonFiniteInput_Throws()
+    {
+        var targetFrame = new ExportTrackFrame(
+            position: new Vector3d(1.0, 2.0, 3.0),
+            tangent: Vector3d.UnitX,
+            normal: Vector3d.UnitY,
+            binormal: Vector3d.UnitZ);
+
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            CameraFrameBuilder.BuildFlyByCamera(
+                cameraPosition: new Vector3d(double.NaN, 0.0, 0.0),
+                targetFrame: targetFrame,
+                upHint: Vector3d.UnitY));
+
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            CameraFrameBuilder.BuildFlyByCamera(
+                cameraPosition: Vector3d.Zero,
+                targetFrame: targetFrame,
+                upHint: new Vector3d(0.0, double.PositiveInfinity, 0.0)));
+    }
+
     private static void AssertVectorNear(Vector3d expected, Vector3d actual)
     {
         Assert.InRange(System.Math.Abs(expected.X - actual.X), 0.0, Tolerance);
@@ -178,6 +259,26 @@ public sealed class CameraFrameBuilderTests
     private static void AssertFloatNear(float expected, float actual)
     {
         Assert.InRange(System.Math.Abs(expected - actual), 0.0f, 1e-6f);
+    }
+
+    private static void AssertMatrixNear(Matrix4x4 expected, Matrix4x4 actual)
+    {
+        AssertFloatNear(expected.M11, actual.M11);
+        AssertFloatNear(expected.M12, actual.M12);
+        AssertFloatNear(expected.M13, actual.M13);
+        AssertFloatNear(expected.M14, actual.M14);
+        AssertFloatNear(expected.M21, actual.M21);
+        AssertFloatNear(expected.M22, actual.M22);
+        AssertFloatNear(expected.M23, actual.M23);
+        AssertFloatNear(expected.M24, actual.M24);
+        AssertFloatNear(expected.M31, actual.M31);
+        AssertFloatNear(expected.M32, actual.M32);
+        AssertFloatNear(expected.M33, actual.M33);
+        AssertFloatNear(expected.M34, actual.M34);
+        AssertFloatNear(expected.M41, actual.M41);
+        AssertFloatNear(expected.M42, actual.M42);
+        AssertFloatNear(expected.M43, actual.M43);
+        AssertFloatNear(expected.M44, actual.M44);
     }
 
     private static void AssertFiniteMatrix(Matrix4x4 matrix)
