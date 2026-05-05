@@ -947,6 +947,183 @@ public sealed class TrainStepLoopTests
     }
 
     [Fact]
+    public void TrainStepLoop_DefaultUseElapsedTimeForceSampling_IsDisabled_AndUsesLegacyProviderPath()
+    {
+        IArcLengthCurve track = new LineCurve(
+            new Vector3d(0, 0, 0),
+            new Vector3d(100, 0, 0));
+
+        const double deltaTime = 0.1;
+        const int steps = 4;
+
+        var follower = new TrainFollowerState(track);
+        var provider = new DualPathRecordingForceTargetProvider(
+            legacyNormalG: 0.0,
+            elapsedTimeNormalG: 2.0);
+
+        var loop = new TrainStepLoop(
+            follower,
+            deltaTime,
+            gravityMagnitude: 0.0,
+            linearDragCoefficient: 0.0,
+            quadraticDragCoefficient: 0.0,
+            rollingResistance: 0.0,
+            provider);
+
+        loop.Step(steps);
+
+        Assert.False(loop.UseElapsedTimeForceSampling);
+        Assert.Equal(steps, provider.LegacyCallCount);
+        Assert.Equal(0, provider.ElapsedTimeCallCount);
+        Assert.InRange(System.Math.Abs(follower.Speed), 0.0, ValueTolerance);
+        Assert.InRange(System.Math.Abs(follower.Distance), 0.0, ValueTolerance);
+    }
+
+    [Fact]
+    public void TrainStepLoop_UseElapsedTimeForceSampling_False_UsesLegacyProviderPath()
+    {
+        IArcLengthCurve track = new LineCurve(
+            new Vector3d(0, 0, 0),
+            new Vector3d(100, 0, 0));
+
+        const double deltaTime = 0.1;
+        const int steps = 5;
+
+        var follower = new TrainFollowerState(track);
+        var provider = new DualPathRecordingForceTargetProvider(
+            legacyNormalG: 0.0,
+            elapsedTimeNormalG: 2.0);
+
+        var loop = new TrainStepLoop(
+            follower,
+            deltaTime,
+            gravityMagnitude: 0.0,
+            linearDragCoefficient: 0.0,
+            quadraticDragCoefficient: 0.0,
+            rollingResistance: 0.0,
+            provider,
+            TrainIntegrationMode.LegacyNormalComponent,
+            trackFrameProvider: null,
+            curvatureNormalSpeedInfluenceMultiplier: 0.0,
+            useElapsedTimeForceSampling: false);
+
+        loop.Step(steps);
+
+        Assert.False(loop.UseElapsedTimeForceSampling);
+        Assert.Equal(steps, provider.LegacyCallCount);
+        Assert.Equal(0, provider.ElapsedTimeCallCount);
+        Assert.InRange(System.Math.Abs(follower.Speed), 0.0, ValueTolerance);
+        Assert.InRange(System.Math.Abs(follower.Distance), 0.0, ValueTolerance);
+    }
+
+    [Fact]
+    public void TrainStepLoop_UseElapsedTimeForceSampling_True_UsesElapsedTimeProviderPath()
+    {
+        IArcLengthCurve track = new LineCurve(
+            new Vector3d(0, 0, 0),
+            new Vector3d(100, 0, 0));
+
+        const double deltaTime = 0.1;
+        const int steps = 4;
+
+        var follower = new TrainFollowerState(track);
+        var provider = new DualPathRecordingForceTargetProvider(
+            legacyNormalG: 0.0,
+            elapsedTimeNormalG: 1.0);
+
+        var loop = new TrainStepLoop(
+            follower,
+            deltaTime,
+            gravityMagnitude: 0.0,
+            linearDragCoefficient: 0.0,
+            quadraticDragCoefficient: 0.0,
+            rollingResistance: 0.0,
+            provider,
+            TrainIntegrationMode.LegacyNormalComponent,
+            trackFrameProvider: null,
+            curvatureNormalSpeedInfluenceMultiplier: 0.0,
+            useElapsedTimeForceSampling: true);
+
+        loop.Step(steps);
+
+        Assert.True(loop.UseElapsedTimeForceSampling);
+        Assert.Equal(0, provider.LegacyCallCount);
+        Assert.Equal(steps, provider.ElapsedTimeCallCount);
+        Assert.InRange(System.Math.Abs(provider.SampledElapsedTimes[0]), 0.0, ValueTolerance);
+        Assert.True(
+            provider.SampledElapsedTimes[1] > provider.SampledElapsedTimes[0] + ValueTolerance,
+            "Expected elapsed-time sampling to advance per step.");
+        Assert.True(follower.Speed > ValueTolerance);
+        Assert.True(follower.Distance > ValueTolerance);
+    }
+
+    [Fact]
+    public void TrainStepLoop_TimeDomainForceSection_AffectsMotionOnlyWithElapsedTimeSamplingOptIn()
+    {
+        IArcLengthCurve track = new LineCurve(
+            new Vector3d(0, 0, 0),
+            new Vector3d(100, 0, 0));
+
+        const double deltaTime = 1.0;
+        const int steps = 4;
+
+        var section = new ForceSection(
+            length: 100.0,
+            duration: 4.0,
+            interpolationMode: ForceInterpolationMode.Linear,
+            startNormalG: 0.0,
+            endNormalG: 4.0,
+            domain: ForceChannelDomain.Time);
+
+        IReadOnlyList<ResolvedSectionInterval<ForceSection>> resolvedSections = SectionResolver.Resolve(new[]
+        {
+            (section, 100.0)
+        });
+
+        var disabledFollower = new TrainFollowerState(track);
+        var enabledFollower = new TrainFollowerState(track);
+
+        var disabledLoop = new TrainStepLoop(
+            disabledFollower,
+            deltaTime,
+            gravityMagnitude: 0.0,
+            linearDragCoefficient: 0.0,
+            quadraticDragCoefficient: 0.0,
+            rollingResistance: 0.0,
+            new SectionForceTargetProvider(resolvedSections),
+            TrainIntegrationMode.LegacyNormalComponent,
+            trackFrameProvider: null,
+            curvatureNormalSpeedInfluenceMultiplier: 0.0,
+            useElapsedTimeForceSampling: false);
+
+        var enabledLoop = new TrainStepLoop(
+            enabledFollower,
+            deltaTime,
+            gravityMagnitude: 0.0,
+            linearDragCoefficient: 0.0,
+            quadraticDragCoefficient: 0.0,
+            rollingResistance: 0.0,
+            new SectionForceTargetProvider(resolvedSections),
+            TrainIntegrationMode.LegacyNormalComponent,
+            trackFrameProvider: null,
+            curvatureNormalSpeedInfluenceMultiplier: 0.0,
+            useElapsedTimeForceSampling: true);
+
+        disabledLoop.Step(steps);
+        enabledLoop.Step(steps);
+
+        Assert.InRange(System.Math.Abs(disabledFollower.Speed), 0.0, ValueTolerance);
+        Assert.InRange(System.Math.Abs(disabledFollower.Distance), 0.0, ValueTolerance);
+
+        Assert.True(
+            enabledFollower.Speed > disabledFollower.Speed + ValueTolerance,
+            "Expected time-domain section to affect motion only when elapsed-time sampling opt-in is enabled.");
+        Assert.True(
+            enabledFollower.Distance > disabledFollower.Distance + ValueTolerance,
+            "Expected time-domain section to affect displacement only through the opt-in elapsed-time path.");
+    }
+
+    [Fact]
     public void TrainStepLoop_SampleForDuration_UsesFloorStepsAndMatchesSample()
     {
         IArcLengthCurve track = new LineCurve(
@@ -1620,6 +1797,39 @@ public sealed class TrainStepLoopTests
             SampledDistances.Add(x);
             targets = default;
             return false;
+        }
+    }
+
+    private sealed class DualPathRecordingForceTargetProvider : IElapsedTimeForceTargetProvider
+    {
+        private readonly double _legacyNormalG;
+        private readonly double _elapsedTimeNormalG;
+
+        public int LegacyCallCount { get; private set; }
+
+        public int ElapsedTimeCallCount { get; private set; }
+
+        public List<double> SampledElapsedTimes { get; } = new();
+
+        public DualPathRecordingForceTargetProvider(double legacyNormalG, double elapsedTimeNormalG)
+        {
+            _legacyNormalG = legacyNormalG;
+            _elapsedTimeNormalG = elapsedTimeNormalG;
+        }
+
+        public bool TryGetForceTargets(double x, out ForceTargets targets)
+        {
+            LegacyCallCount++;
+            targets = new ForceTargets(_legacyNormalG, lateralG: 0.0, rollRateDegPerSec: 0.0);
+            return true;
+        }
+
+        public bool TryGetForceTargets(double distance, double elapsedTime, out ForceTargets targets)
+        {
+            ElapsedTimeCallCount++;
+            SampledElapsedTimes.Add(elapsedTime);
+            targets = new ForceTargets(_elapsedTimeNormalG, lateralG: 0.0, rollRateDegPerSec: 0.0);
+            return true;
         }
     }
 

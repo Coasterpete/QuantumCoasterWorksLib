@@ -36,6 +36,12 @@ namespace Quantum.Physics
         /// </summary>
         public double CurvatureNormalSpeedInfluenceMultiplier { get; }
 
+        /// <summary>
+        /// Optional opt-in flag that enables elapsed-time-aware force target sampling when the configured provider
+        /// supports <see cref="IElapsedTimeForceTargetProvider"/>.
+        /// </summary>
+        public bool UseElapsedTimeForceSampling { get; }
+
         public long Tick { get; private set; }
 
         public double ElapsedTimeSeconds { get; private set; }
@@ -155,7 +161,8 @@ namespace Quantum.Physics
             IForceTargetProvider? forceTargetProvider,
             TrainIntegrationMode integrationMode,
             ITrackFrameProvider? trackFrameProvider = null,
-            double curvatureNormalSpeedInfluenceMultiplier = 0.0)
+            double curvatureNormalSpeedInfluenceMultiplier = 0.0,
+            bool useElapsedTimeForceSampling = false)
         {
             Guard.RequireNonNegativeFinite(
                 curvatureNormalSpeedInfluenceMultiplier,
@@ -172,6 +179,7 @@ namespace Quantum.Physics
             _trackFrameProvider = trackFrameProvider;
             IntegrationMode = integrationMode;
             CurvatureNormalSpeedInfluenceMultiplier = curvatureNormalSpeedInfluenceMultiplier;
+            UseElapsedTimeForceSampling = useElapsedTimeForceSampling;
             Tick = 0;
             ElapsedTimeSeconds = 0.0;
         }
@@ -594,11 +602,26 @@ namespace Quantum.Physics
 
         private bool TryGetProjectedAcceleration(double distance, TrackFrame frame, out Vector3d projectedAcceleration)
         {
-            if (_forceTargetProvider != null &&
-                _forceTargetProvider.TryGetForceTargets(distance, out ForceTargets targets))
+            if (_forceTargetProvider != null)
             {
-                projectedAcceleration = ForceTargetProjection.ComputeForceVector(targets, frame);
-                return true;
+                bool hasTargets = false;
+                ForceTargets targets = default;
+
+                if (UseElapsedTimeForceSampling &&
+                    _forceTargetProvider is IElapsedTimeForceTargetProvider elapsedTimeProvider)
+                {
+                    hasTargets = elapsedTimeProvider.TryGetForceTargets(distance, ElapsedTimeSeconds, out targets);
+                }
+                else
+                {
+                    hasTargets = _forceTargetProvider.TryGetForceTargets(distance, out targets);
+                }
+
+                if (hasTargets)
+                {
+                    projectedAcceleration = ForceTargetProjection.ComputeForceVector(targets, frame);
+                    return true;
+                }
             }
 
             projectedAcceleration = default;

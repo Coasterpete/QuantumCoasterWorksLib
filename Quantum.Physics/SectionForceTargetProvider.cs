@@ -7,7 +7,7 @@ namespace Quantum.Physics
     /// <summary>
     /// Adapter that exposes resolved force sections through physics force target provider contracts.
     /// </summary>
-    public sealed class SectionForceTargetProvider : IForceTargetProvider
+    public sealed class SectionForceTargetProvider : IElapsedTimeForceTargetProvider
     {
         private readonly IReadOnlyList<ResolvedSectionInterval<ForceSection>> _resolvedIntervals;
 
