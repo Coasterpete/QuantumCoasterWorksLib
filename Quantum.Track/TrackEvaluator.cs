@@ -96,15 +96,16 @@ namespace Quantum.Track
         public TrackFrame EvaluateFrame(TrackDocument doc, TrackPosition position)
         {
             TrackEvaluationPoint evaluationPoint = EvaluateAt(doc, position);
+            double rollRadians = ResolveRollRadians(evaluationPoint);
 
             if (evaluationPoint.Segment.Spline is IParamCurve spline)
             {
                 Vector3d splinePosition = spline.Evaluate(evaluationPoint.LocalT);
                 Vector3d splineTangent = NormalizeOrThrow(spline.Tangent(evaluationPoint.LocalT), "tangent");
-                return BuildTrackFrame(evaluationPoint, splinePosition, splineTangent);
+                return BuildTrackFrame(evaluationPoint, splinePosition, splineTangent, rollRadians);
             }
 
-            return EvaluateFallbackFrame(doc, position, evaluationPoint);
+            return EvaluateFallbackFrame(doc, position, evaluationPoint, rollRadians);
         }
 
         private static Transform3d EvaluateFallbackTransform(TrackDocument doc, TrackPosition position, TrackEvaluationPoint evaluationPoint)
@@ -130,21 +131,59 @@ namespace Quantum.Track
                 new Vector3d(distanceAlongTrack, 0.0, 0.0));
         }
 
-        private static TrackFrame EvaluateFallbackFrame(TrackDocument doc, TrackPosition position, TrackEvaluationPoint evaluationPoint)
+        private static TrackFrame EvaluateFallbackFrame(
+            TrackDocument doc,
+            TrackPosition position,
+            TrackEvaluationPoint evaluationPoint,
+            double rollRadians)
         {
             Transform3d fallbackTransform = EvaluateFallbackTransform(doc, position, evaluationPoint);
-            return BuildTrackFrame(evaluationPoint, fallbackTransform.Position, Vector3d.UnitX);
+            return BuildTrackFrame(evaluationPoint, fallbackTransform.Position, Vector3d.UnitX, rollRadians);
         }
 
-        private static TrackFrame BuildTrackFrame(TrackEvaluationPoint evaluationPoint, Vector3d position, Vector3d tangent)
+        private static TrackFrame BuildTrackFrame(
+            TrackEvaluationPoint evaluationPoint,
+            Vector3d position,
+            Vector3d tangent,
+            double rollRadians)
         {
             Vector3d normalizedTangent = NormalizeOrThrow(tangent, "tangent");
             Vector3d referenceUp = SelectReferenceUp(normalizedTangent);
             Vector3d binormal = NormalizeOrThrow(Vector3d.Cross(normalizedTangent, referenceUp), "binormal");
             Vector3d normal = NormalizeOrThrow(Vector3d.Cross(binormal, normalizedTangent), "normal");
+
+            if (rollRadians != 0.0)
+            {
+                normal = NormalizeOrThrow(RotateAroundAxis(normal, normalizedTangent, rollRadians), "normal");
+                binormal = NormalizeOrThrow(RotateAroundAxis(binormal, normalizedTangent, rollRadians), "binormal");
+            }
+
             double s = evaluationPoint.LocalT * evaluationPoint.Segment.Length;
 
             return new TrackFrame(s, position, normalizedTangent, normal, binormal);
+        }
+
+        private static double ResolveRollRadians(TrackEvaluationPoint evaluationPoint)
+        {
+            double rollRadians = evaluationPoint.Segment.RollRadians;
+            if (double.IsNaN(rollRadians) || double.IsInfinity(rollRadians))
+            {
+                throw new System.InvalidOperationException("Track segment roll must be finite.");
+            }
+
+            return rollRadians;
+        }
+
+        private static Vector3d RotateAroundAxis(Vector3d vector, Vector3d axis, double angle)
+        {
+            Vector3d normalizedAxis = NormalizeOrThrow(axis, "rotation axis");
+            double cos = System.Math.Cos(angle);
+            double sin = System.Math.Sin(angle);
+
+            Vector3d scaledVector = vector * cos;
+            Vector3d crossTerm = Vector3d.Cross(normalizedAxis, vector) * sin;
+            Vector3d projectionTerm = normalizedAxis * (Vector3d.Dot(normalizedAxis, vector) * (1.0 - cos));
+            return scaledVector + crossTerm + projectionTerm;
         }
 
         private static Vector3d SelectReferenceUp(Vector3d tangent)

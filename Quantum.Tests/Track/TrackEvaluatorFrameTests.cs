@@ -55,6 +55,49 @@ public sealed class TrackEvaluatorFrameTests
     }
 
     [Fact]
+    public void TrackEvaluator_EvaluateFrame_WithZeroRoll_LeavesFrameUnchanged()
+    {
+        var evaluator = new TrackEvaluator();
+        IParamCurve spline = new CubicBezierCurve(
+            new Vector3d(0.0, 0.0, 0.0),
+            new Vector3d(3.0, 2.0, 1.0),
+            new Vector3d(6.0, 4.0, 2.0),
+            new Vector3d(9.0, 6.0, 3.0));
+        var withoutRoll = new TrackDocument(new TrackSegment[]
+        {
+            new CurvedSegment(length: 9.0, spline: spline)
+        });
+        var withZeroRoll = new TrackDocument(new TrackSegment[]
+        {
+            new CurvedSegment(length: 9.0, spline: spline, rollRadians: 0.0)
+        });
+        var position = new TrackPosition(segmentIndex: 0, localT: 0.45);
+
+        TrackFrame unrolledFrame = evaluator.EvaluateFrame(withoutRoll, position);
+        TrackFrame zeroRollFrame = evaluator.EvaluateFrame(withZeroRoll, position);
+
+        AssertVectorNear(unrolledFrame.Tangent, zeroRollFrame.Tangent);
+        AssertVectorNear(unrolledFrame.Normal, zeroRollFrame.Normal);
+        AssertVectorNear(unrolledFrame.Binormal, zeroRollFrame.Binormal);
+    }
+
+    [Fact]
+    public void TrackEvaluator_EvaluateFrame_WithQuarterTurnRoll_RotatesNormalAndBinormal()
+    {
+        var evaluator = new TrackEvaluator();
+        var document = new TrackDocument(new TrackSegment[]
+        {
+            new StraightSegment(length: 10.0, rollRadians: System.Math.PI * 0.5)
+        });
+
+        TrackFrame frame = evaluator.EvaluateFrame(document, new TrackPosition(segmentIndex: 0, localT: 0.4));
+
+        AssertVectorNear(frame.Tangent, Vector3d.UnitX);
+        AssertVectorNear(frame.Normal, Vector3d.UnitZ);
+        AssertVectorNear(frame.Binormal, new Vector3d(0.0, -1.0, 0.0));
+    }
+
+    [Fact]
     public void TrackEvaluator_EvaluateFrame_WithCurvedSpline_FrameChangesAlongCurve()
     {
         var evaluator = new TrackEvaluator();
@@ -142,6 +185,59 @@ public sealed class TrackEvaluatorFrameTests
 
         Assert.True(tangentDot < -0.5);
         Assert.True(end.Position.Y > start.Position.Y);
+    }
+
+    [Fact]
+    public void TrackEvaluator_EvaluateFrame_WithRoll_RemainsOrthonormal()
+    {
+        var evaluator = new TrackEvaluator();
+        IParamCurve spline = new CubicBezierCurve(
+            new Vector3d(0.0, 0.0, 0.0),
+            new Vector3d(4.0, 1.0, 0.0),
+            new Vector3d(7.0, 5.0, 1.0),
+            new Vector3d(10.0, 8.0, 3.0));
+        var document = new TrackDocument(new TrackSegment[]
+        {
+            new CurvedSegment(length: 12.0, spline: spline, rollRadians: 0.7)
+        });
+
+        TrackFrame frame = evaluator.EvaluateFrame(document, new TrackPosition(segmentIndex: 0, localT: 0.4));
+
+        AssertUnit(frame.Tangent);
+        AssertUnit(frame.Normal);
+        AssertUnit(frame.Binormal);
+
+        Assert.InRange(System.Math.Abs(Vector3d.Dot(frame.Tangent, frame.Normal)), 0.0, Tolerance);
+        Assert.InRange(System.Math.Abs(Vector3d.Dot(frame.Tangent, frame.Binormal)), 0.0, Tolerance);
+        Assert.InRange(System.Math.Abs(Vector3d.Dot(frame.Normal, frame.Binormal)), 0.0, Tolerance);
+
+        Vector3d cross = Vector3d.Cross(frame.Tangent, frame.Normal);
+        AssertVectorNear(cross, frame.Binormal);
+    }
+
+    [Fact]
+    public void TrackEvaluator_EvaluateFrame_WithRoll_LeavesTangentUnchanged()
+    {
+        var evaluator = new TrackEvaluator();
+        IParamCurve spline = new CubicBezierCurve(
+            new Vector3d(0.0, 0.0, 0.0),
+            new Vector3d(6.0, 1.0, 0.5),
+            new Vector3d(7.0, 4.0, 2.0),
+            new Vector3d(10.0, 6.0, 4.0));
+        var withoutRoll = new TrackDocument(new TrackSegment[]
+        {
+            new CurvedSegment(length: 10.0, spline: spline)
+        });
+        var withRoll = new TrackDocument(new TrackSegment[]
+        {
+            new CurvedSegment(length: 10.0, spline: spline, rollRadians: 1.1)
+        });
+        var position = new TrackPosition(segmentIndex: 0, localT: 0.62);
+
+        TrackFrame unrolledFrame = evaluator.EvaluateFrame(withoutRoll, position);
+        TrackFrame rolledFrame = evaluator.EvaluateFrame(withRoll, position);
+
+        AssertVectorNear(unrolledFrame.Tangent, rolledFrame.Tangent);
     }
 
     [Fact]
