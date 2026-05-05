@@ -29,7 +29,7 @@ Read `structure.md` before making changes.
 
 ## Current Backend State
 
-- Current validation: 210/210 tests passing.
+- Current validation: 223/223 tests passing.
 - `Quantum.Track` supports document, segments, traversal, frame, transform, and spline-backed spatial evaluation.
 - `TrackDocument`, `TrackSegment`, `StraightSegment`, and `CurvedSegment` exist.
 - `TrackEvaluator` supports:
@@ -58,14 +58,14 @@ Read `structure.md` before making changes.
   - tangential
   - normal
   - binormal
-- Curvature diagnostics include scalar curvature acceleration and normal-vector curvature acceleration.
 - `TrainStepLoop` now supports integration modes, including `TangentialProjected`.
-- `LegacyNormalComponent` remains the default mode and behavior-preserved.
-- `TangentialProjected` integration mode is implemented and validated with:
-  - inclined-track gravity projection
-  - energy sanity/no-drag
-  - constant-force kinematics
-  - divergence from legacy mode when `NormalG` exists
+- `TangentialProjected` integration mode now supports:
+  - track-frame gravity projection
+  - spline-derived curvature
+  - curvature normal diagnostics (scalar + vector)
+  - combined world acceleration diagnostics
+  - controlled curvature speed influence (default OFF via multiplier)
+- `LegacyNormalComponent` remains unchanged and behavior-preserved.
 - Sampled `TrainFollowerState` includes:
   - `ProjectedAcceleration`
   - `TangentialAcceleration`
@@ -73,7 +73,8 @@ Read `structure.md` before making changes.
   - `BinormalAcceleration`
 - Normal forces remain diagnostics-only and are not applied to motion integration.
 - `LateralG` and `RollRate` are currently diagnostics/data-path only and do not affect 1D motion.
-- Physics loop behavior is unchanged; `TrainStepLoop` behavior remains preserved.
+- All new physics behavior is opt-in and guarded.
+- `TrainStepLoop` remains deterministic and stable.
 
 ## Locked Contracts
 
@@ -98,7 +99,7 @@ Read `structure.md` before making changes.
 ## Next Recommended Lane
 
 - Continue incremental spatial tooling on top of current track evaluation architecture.
-- Next safe milestone: add combined acceleration diagnostics by summing tangential gravity/projection and the curvature normal vector into a diagnostics-only world acceleration vector.
+- Next safe milestone: introduce lateral acceleration diagnostics (binormal direction) derived from `TrackFrame` and curvature/roll context, diagnostics-only.
 - Keep `TrainStepLoop` behavior untouched while expanding evaluation helpers.
 
 Preserve deterministic behavior and keep special-track expansion gated behind architecture readiness.
