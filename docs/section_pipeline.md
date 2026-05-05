@@ -166,6 +166,11 @@ Plateau interpolation is reserved for future force-profile shapes where a channe
 - No automatic section-to-physics coupling.
 - Existing constant-section tests must remain unchanged.
 
+### Custom Easing Design Direction
+Custom easings should not be added directly to `ForceInterpolationMode` as enum values. Instead, they should be represented as reusable channel/easing definitions that can be referenced by force channels later.
+
+Initial custom easing support should remain data-layer only and should not change default physics behavior.
+
 ## References
 - KexEdit node graph and section concepts: <https://individualkex.github.io/KexEdit/reference/node-graph.html>
 
