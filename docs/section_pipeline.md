@@ -191,6 +191,7 @@ Status:
 `ForceSection` now supports optional channel-based definitions:
 - `NormalGChannel : IForceEasingFunction?`
 - `LateralGChannel : IForceEasingFunction?`
+- `RollRateChannel : IForceEasingFunction?`
 
 Channels override interpolation when present. When null, existing start/end + interpolation behavior is preserved.
 
