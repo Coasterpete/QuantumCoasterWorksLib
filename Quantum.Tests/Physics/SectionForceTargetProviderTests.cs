@@ -24,6 +24,7 @@ public sealed class SectionForceTargetProviderTests
         Assert.Equal(expected.TargetNormalG, actual.TargetNormalG);
         Assert.Equal(expected.TargetLateralG, actual.TargetLateralG);
         Assert.Equal(expected.TargetLongitudinalG, actual.TargetLongitudinalG);
+        Assert.Equal(expected.TargetRollRateDegPerSec, actual.TargetRollRateDegPerSec);
     }
 
     [Fact]
@@ -97,5 +98,33 @@ public sealed class SectionForceTargetProviderTests
         Assert.Equal(2.0, targets.NormalG);
         Assert.Equal(-0.25, targets.LateralG);
         Assert.Equal(0.0, targets.RollRateDegPerSec);
+    }
+
+    [Fact]
+    public void SectionForceTargetProvider_TryGetForceTargets_UsesRollRateChannelWhenPresent()
+    {
+        IReadOnlyList<ResolvedSectionInterval<ForceSection>> intervals = ForceTargetResolver.Resolve(new[]
+        {
+            (
+                new ForceSection(
+                    targetNormalG: 2.0,
+                    targetLateralG: -0.25,
+                    length: 3.0,
+                    rollRateChannel: new KeyframedForceEasingFunction(new System.Collections.Generic.List<(double t, double value)>
+                    {
+                        (0.0, 6.0),
+                        (1.0, 6.0)
+                    })),
+                3.0)
+        });
+
+        var provider = new SectionForceTargetProvider(intervals);
+
+        bool returned = provider.TryGetForceTargets(1.25, out ForceTargets targets);
+
+        Assert.True(returned);
+        Assert.Equal(2.0, targets.NormalG);
+        Assert.Equal(-0.25, targets.LateralG);
+        Assert.Equal(6.0, targets.RollRateDegPerSec);
     }
 }

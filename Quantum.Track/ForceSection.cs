@@ -14,7 +14,8 @@ namespace Quantum.Track
             double? endLateralG = null,
             IForceEasingFunction? easingFunction = null,
             IForceEasingFunction? normalGChannel = null,
-            IForceEasingFunction? lateralGChannel = null)
+            IForceEasingFunction? lateralGChannel = null,
+            IForceEasingFunction? rollRateChannel = null)
         {
             TargetNormalG = targetNormalG;
             TargetLateralG = targetLateralG;
@@ -28,6 +29,7 @@ namespace Quantum.Track
             EasingFunction = easingFunction;
             NormalGChannel = normalGChannel;
             LateralGChannel = lateralGChannel;
+            RollRateChannel = rollRateChannel;
         }
 
         public double? TargetNormalG { get; }
@@ -53,5 +55,7 @@ namespace Quantum.Track
         public IForceEasingFunction? NormalGChannel { get; }
 
         public IForceEasingFunction? LateralGChannel { get; }
+
+        public IForceEasingFunction? RollRateChannel { get; }
     }
 }

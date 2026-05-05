@@ -34,7 +34,7 @@ namespace Quantum.Physics
             targets = new ForceTargets(
                 sampled.TargetNormalG.Value,
                 sampled.TargetLateralG ?? 0.0,
-                rollRateDegPerSec: 0.0);
+                rollRateDegPerSec: sampled.TargetRollRateDegPerSec ?? 0.0);
             return true;
         }
     }

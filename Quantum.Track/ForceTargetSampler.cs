@@ -65,12 +65,17 @@ namespace Quantum.Track
                 resolvedSection.EndLateralG,
                 snapshot.NormalizedT);
 
+            double? targetRollRateDegPerSec = SampleDirectChannel(
+                resolvedSection.RollRateChannel,
+                snapshot.NormalizedT);
+
             return new SampledForceTarget(
                 distance,
                 snapshot.NormalizedT,
                 targetNormalG,
                 targetLateralG,
-                targetLongitudinalG: null);
+                targetLongitudinalG: null,
+                targetRollRateDegPerSec: targetRollRateDegPerSec);
         }
 
         private static double? SampleChannel(
@@ -130,6 +135,18 @@ namespace Quantum.Track
                         mode,
                         "Unsupported force interpolation mode.");
             }
+        }
+
+        private static double? SampleDirectChannel(
+            IForceEasingFunction? channel,
+            double normalizedT)
+        {
+            if (channel is null)
+            {
+                return null;
+            }
+
+            return channel.Evaluate(normalizedT);
         }
     }
 }

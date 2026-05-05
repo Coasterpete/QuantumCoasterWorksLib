@@ -9,7 +9,8 @@ namespace Quantum.Track
             double normalizedT,
             double? targetNormalG,
             double? targetLateralG,
-            double? targetLongitudinalG = null)
+            double? targetLongitudinalG = null,
+            double? targetRollRateDegPerSec = null)
         {
             if (double.IsNaN(distance) || double.IsInfinity(distance))
             {
@@ -32,6 +33,7 @@ namespace Quantum.Track
             TargetNormalG = targetNormalG;
             TargetLateralG = targetLateralG;
             TargetLongitudinalG = targetLongitudinalG;
+            TargetRollRateDegPerSec = targetRollRateDegPerSec;
         }
 
         public double Distance { get; }
@@ -43,5 +45,7 @@ namespace Quantum.Track
         public double? TargetLateralG { get; }
 
         public double? TargetLongitudinalG { get; }
+
+        public double? TargetRollRateDegPerSec { get; }
     }
 }
