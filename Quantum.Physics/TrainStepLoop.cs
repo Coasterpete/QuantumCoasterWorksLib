@@ -223,11 +223,14 @@ namespace Quantum.Physics
             double accelerationFromTangentialProjection = components.Tangential;
             Follower.TangentialAcceleration = accelerationFromTangentialProjection;
             Follower.NormalAcceleration = null;
+            Follower.NormalAccelerationVector = null;
 
             if (TryGetTrackCurvature(Follower.Distance, out double curvature))
             {
                 double speed = Follower.Speed;
-                Follower.NormalAcceleration = speed * speed * curvature;
+                double normalAcceleration = speed * speed * curvature;
+                Follower.NormalAcceleration = normalAcceleration;
+                Follower.NormalAccelerationVector = normalAcceleration * Follower.Frame.Normal;
             }
 
             double halfStepVelocityKick = 0.5 * accelerationFromTangentialProjection * DeltaTime;
@@ -316,6 +319,7 @@ namespace Quantum.Physics
             clone.ProjectedAcceleration = source.ProjectedAcceleration;
             clone.TangentialAcceleration = source.TangentialAcceleration;
             clone.NormalAcceleration = source.NormalAcceleration;
+            clone.NormalAccelerationVector = source.NormalAccelerationVector;
             clone.BinormalAcceleration = source.BinormalAcceleration;
             return clone;
         }

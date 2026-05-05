@@ -24,6 +24,8 @@ namespace Quantum.Physics
 
         public double? NormalAcceleration { get; set; }
 
+        public Vector3d? NormalAccelerationVector { get; set; }
+
         public double? BinormalAcceleration { get; set; }
 
         public bool LoopEnabled { get; set; }

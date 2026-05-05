@@ -9,7 +9,7 @@ public sealed class TrainStepLoopCurvatureDiagnosticsTests
     private const double Tolerance = 1e-6;
 
     [Fact]
-    public void TangentialProjectedMode_WithCurvatureProvider_ComputesExpectedNormalAccelerationDiagnostic()
+    public void TangentialProjectedMode_WithCurvatureProvider_ComputesExpectedNormalAccelerationDiagnostics()
     {
         const double radius = 20.0;
         const double curvature = 1.0 / radius;
@@ -35,10 +35,19 @@ public sealed class TrainStepLoopCurvatureDiagnosticsTests
         loop.Step();
 
         Assert.True(follower.NormalAcceleration.HasValue);
+        Assert.True(follower.NormalAccelerationVector.HasValue);
         Assert.InRange(
             System.Math.Abs(follower.NormalAcceleration.Value - expectedNormalAcceleration),
             0.0,
             Tolerance);
+
+        Vector3d normalAccelerationVector = follower.NormalAccelerationVector.Value;
+        double vectorMagnitude = normalAccelerationVector.Length;
+        double alignment = Vector3d.Dot(normalAccelerationVector.Normalized(), follower.Frame.Normal);
+
+        Assert.InRange(System.Math.Abs(vectorMagnitude - expectedNormalAcceleration), 0.0, Tolerance);
+        Assert.InRange(System.Math.Abs(vectorMagnitude - follower.NormalAcceleration.Value), 0.0, Tolerance);
+        Assert.InRange(System.Math.Abs(alignment - 1.0), 0.0, Tolerance);
     }
 
     [Fact]
@@ -63,6 +72,7 @@ public sealed class TrainStepLoopCurvatureDiagnosticsTests
         loop.Step();
 
         Assert.Null(follower.NormalAcceleration);
+        Assert.Null(follower.NormalAccelerationVector);
     }
 
     [Fact]
@@ -112,9 +122,15 @@ public sealed class TrainStepLoopCurvatureDiagnosticsTests
 
         double expectedNormalAcceleration = (initialSpeed * initialSpeed) / radius;
         Assert.Null(baselineFollower.NormalAcceleration);
+        Assert.Null(baselineFollower.NormalAccelerationVector);
         Assert.True(curvatureFollower.NormalAcceleration.HasValue);
+        Assert.True(curvatureFollower.NormalAccelerationVector.HasValue);
         Assert.InRange(
             System.Math.Abs(curvatureFollower.NormalAcceleration.Value - expectedNormalAcceleration),
+            0.0,
+            Tolerance);
+        Assert.InRange(
+            System.Math.Abs(curvatureFollower.NormalAccelerationVector.Value.Length - expectedNormalAcceleration),
             0.0,
             Tolerance);
     }
