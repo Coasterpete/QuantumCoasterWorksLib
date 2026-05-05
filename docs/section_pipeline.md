@@ -396,7 +396,10 @@ When `UseElapsedTimeForceSampling` is `true`:
 - Elapsed-time force sampling is explicitly opt-in.
 - No existing TrainStepLoop behavior changes unless the opt-in flag is enabled.
 
-v9: TrackFrame remains T/N/B + position source of truth; Matrix4x4 is output/interop representation only.
+### TrackFrame Matrix Conversion (v9)
+
+Status:
+`TrackFrame` keeps T/N/B + position as the source of truth, while `Matrix4x4` is used as an output/interop representation only.
 
 ## References
 - KexEdit node graph and section concepts: <https://individualkex.github.io/KexEdit/reference/node-graph.html>
