@@ -31,12 +31,12 @@ namespace Quantum.Track
             double bogieSpacing,
             TrainWheelLayout? wheelLayout)
         {
-            ValidateCarCount(carCount);
-            ValidatePositiveFinite(carSpacing, nameof(carSpacing), "Car spacing must be finite and greater than zero.");
-            ValidatePositiveFinite(carLength, nameof(carLength), "Car length must be finite and greater than zero.");
-            ValidatePositiveFinite(carWidth, nameof(carWidth), "Car width must be finite and greater than zero.");
-            ValidatePositiveFinite(carHeight, nameof(carHeight), "Car height must be finite and greater than zero.");
-            ValidatePositiveFinite(bogieSpacing, nameof(bogieSpacing), "Bogie spacing must be finite and greater than zero.");
+            TrainValidation.ValidatePositiveInt(carCount, nameof(carCount), "Car count must be greater than zero.");
+            TrainValidation.ValidatePositiveDouble(carSpacing, nameof(carSpacing), "Car spacing must be finite and greater than zero.");
+            TrainValidation.ValidatePositiveDouble(carLength, nameof(carLength), "Car length must be finite and greater than zero.");
+            TrainValidation.ValidatePositiveDouble(carWidth, nameof(carWidth), "Car width must be finite and greater than zero.");
+            TrainValidation.ValidatePositiveDouble(carHeight, nameof(carHeight), "Car height must be finite and greater than zero.");
+            TrainValidation.ValidatePositiveDouble(bogieSpacing, nameof(bogieSpacing), "Bogie spacing must be finite and greater than zero.");
 
             if (bogieSpacing > carLength)
             {
@@ -84,8 +84,8 @@ namespace Quantum.Track
                 throw new ArgumentNullException(nameof(bogieLayout));
             }
 
-            ValidateCarCount(carCount);
-            ValidatePositiveFinite(carSpacing, nameof(carSpacing), "Car spacing must be finite and greater than zero.");
+            TrainValidation.ValidatePositiveInt(carCount, nameof(carCount), "Car count must be greater than zero.");
+            TrainValidation.ValidatePositiveDouble(carSpacing, nameof(carSpacing), "Car spacing must be finite and greater than zero.");
 
             if (bogieLayout.BogieSpacing > carGeometry.Length)
             {
@@ -119,24 +119,5 @@ namespace Quantum.Track
         public double CarHeight => CarGeometry.Height;
 
         public double BogieSpacing => BogieLayout.BogieSpacing;
-
-        private static void ValidateCarCount(int carCount)
-        {
-            if (carCount <= 0)
-            {
-                throw new ArgumentOutOfRangeException(
-                    nameof(carCount),
-                    carCount,
-                    "Car count must be greater than zero.");
-            }
-        }
-
-        private static void ValidatePositiveFinite(double value, string parameterName, string message)
-        {
-            if (double.IsNaN(value) || double.IsInfinity(value) || value <= 0.0)
-            {
-                throw new ArgumentOutOfRangeException(parameterName, value, message);
-            }
-        }
     }
 }

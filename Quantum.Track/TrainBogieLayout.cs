@@ -6,7 +6,7 @@ namespace Quantum.Track
     {
         public TrainBogieLayout(double bogieSpacing)
         {
-            ValidatePositiveFinite(
+            TrainValidation.ValidatePositiveDouble(
                 bogieSpacing,
                 nameof(bogieSpacing),
                 "Bogie spacing must be finite and greater than zero.");
@@ -15,13 +15,5 @@ namespace Quantum.Track
         }
 
         public double BogieSpacing { get; }
-
-        private static void ValidatePositiveFinite(double value, string parameterName, string message)
-        {
-            if (double.IsNaN(value) || double.IsInfinity(value) || value <= 0.0)
-            {
-                throw new ArgumentOutOfRangeException(parameterName, value, message);
-            }
-        }
     }
 }

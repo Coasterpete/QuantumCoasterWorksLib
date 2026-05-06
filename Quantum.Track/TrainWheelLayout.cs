@@ -10,16 +10,19 @@ namespace Quantum.Track
             double wheelWidth,
             double axleSpacing)
         {
-            ValidateWheelCountPerBogie(wheelCountPerBogie);
-            ValidatePositiveFinite(
+            TrainValidation.ValidatePositiveInt(
+                wheelCountPerBogie,
+                nameof(wheelCountPerBogie),
+                "Wheel count per bogie must be greater than zero.");
+            TrainValidation.ValidatePositiveDouble(
                 wheelRadius,
                 nameof(wheelRadius),
                 "Wheel radius must be finite and greater than zero.");
-            ValidatePositiveFinite(
+            TrainValidation.ValidatePositiveDouble(
                 wheelWidth,
                 nameof(wheelWidth),
                 "Wheel width must be finite and greater than zero.");
-            ValidateNonNegativeFinite(
+            TrainValidation.ValidateNonNegativeDouble(
                 axleSpacing,
                 nameof(axleSpacing),
                 "Axle spacing must be finite and greater than or equal to zero.");
@@ -37,32 +40,5 @@ namespace Quantum.Track
         public double WheelWidth { get; }
 
         public double AxleSpacing { get; }
-
-        private static void ValidateWheelCountPerBogie(int wheelCountPerBogie)
-        {
-            if (wheelCountPerBogie <= 0)
-            {
-                throw new ArgumentOutOfRangeException(
-                    nameof(wheelCountPerBogie),
-                    wheelCountPerBogie,
-                    "Wheel count per bogie must be greater than zero.");
-            }
-        }
-
-        private static void ValidatePositiveFinite(double value, string parameterName, string message)
-        {
-            if (double.IsNaN(value) || double.IsInfinity(value) || value <= 0.0)
-            {
-                throw new ArgumentOutOfRangeException(parameterName, value, message);
-            }
-        }
-
-        private static void ValidateNonNegativeFinite(double value, string parameterName, string message)
-        {
-            if (double.IsNaN(value) || double.IsInfinity(value) || value < 0.0)
-            {
-                throw new ArgumentOutOfRangeException(parameterName, value, message);
-            }
-        }
     }
 }
