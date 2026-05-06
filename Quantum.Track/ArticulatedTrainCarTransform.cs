@@ -2,6 +2,9 @@ using Quantum.Math;
 
 namespace Quantum.Track
 {
+    /// <summary>
+    /// Articulated body transform derived from a car body and its paired bogies.
+    /// </summary>
     public readonly struct ArticulatedTrainCarTransform
     {
         public ArticulatedTrainCarTransform(
@@ -28,8 +31,15 @@ namespace Quantum.Track
 
         public TrackFrame ArticulatedFrame { get; }
 
+        /// <summary>
+        /// Articulated body matrix stored as <see cref="Matrix4x4d"/> (double precision).
+        /// </summary>
         public Matrix4x4d ArticulatedMatrix { get; }
 
+        /// <summary>
+        /// Distance used for the articulated center sample.
+        /// Currently mirrors <see cref="OriginalBody"/>.<see cref="TrainCarTransform.Distance"/>.
+        /// </summary>
         public double CenterDistance { get; }
     }
 }

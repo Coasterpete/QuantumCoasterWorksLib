@@ -27,6 +27,33 @@ public sealed class TrainCarTransformProviderTests
     }
 
     [Fact]
+    public void EvaluateCarTransforms_MatchesGetCarTransforms()
+    {
+        TrackDocument document = BuildSplineTrack(length: 28.0);
+        var evaluator = new TrackEvaluator(document);
+        var provider = new TrainCarTransformProvider(evaluator);
+        const double leadDistance = 16.5;
+        const double carSpacing = 2.25;
+        const int carCount = 5;
+
+        IReadOnlyList<TrainCarTransform> expected = provider.GetCarTransforms(
+            leadDistance: leadDistance,
+            carSpacing: carSpacing,
+            carCount: carCount);
+        IReadOnlyList<TrainCarTransform> actual = provider.EvaluateCarTransforms(
+            leadDistance: leadDistance,
+            carSpacing: carSpacing,
+            carCount: carCount);
+
+        Assert.Equal(expected.Count, actual.Count);
+
+        for (int i = 0; i < expected.Count; i++)
+        {
+            AssertTrainCarTransformNear(expected[i], actual[i]);
+        }
+    }
+
+    [Fact]
     public void GetCarTransforms_UsesExpectedSpacingDistances()
     {
         TrackDocument document = BuildStraightTrack(length: 20.0);

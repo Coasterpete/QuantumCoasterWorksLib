@@ -2,6 +2,9 @@ using Quantum.Math;
 
 namespace Quantum.Track
 {
+    /// <summary>
+    /// Transform data for a bogie attached to a train car body.
+    /// </summary>
     public readonly struct BogieTransform
     {
         public BogieTransform(int carIndex, int bogieIndex, double distance, TrackFrame frame, Matrix4x4d matrix)
@@ -21,6 +24,9 @@ namespace Quantum.Track
 
         public TrackFrame Frame { get; }
 
+        /// <summary>
+        /// Bogie matrix stored as <see cref="Matrix4x4d"/> (double precision).
+        /// </summary>
         public Matrix4x4d Matrix { get; }
     }
 }

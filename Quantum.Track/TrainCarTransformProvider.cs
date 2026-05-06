@@ -16,6 +16,9 @@ namespace Quantum.Track
             _evaluator = evaluator ?? throw new ArgumentNullException(nameof(evaluator));
         }
 
+        /// <summary>
+        /// Computes per-car frames and body transform matrices from a lead-car distance.
+        /// </summary>
         public IReadOnlyList<TrainCarTransform> GetCarTransforms(
             double leadDistance,
             double carSpacing,
@@ -63,6 +66,18 @@ namespace Quantum.Track
             }
 
             return transforms;
+        }
+
+        /// <summary>
+        /// Alias for <see cref="GetCarTransforms(double, double, int)"/> to align naming with other
+        /// <c>Evaluate*</c> provider APIs.
+        /// </summary>
+        public IReadOnlyList<TrainCarTransform> EvaluateCarTransforms(
+            double leadDistance,
+            double carSpacing,
+            int carCount)
+        {
+            return GetCarTransforms(leadDistance, carSpacing, carCount);
         }
 
         public IReadOnlyList<TrainCarWithBogiesTransform> EvaluateTrainWithBogies(
