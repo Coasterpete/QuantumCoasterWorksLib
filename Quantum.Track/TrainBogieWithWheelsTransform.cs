@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 namespace Quantum.Track
 {
     public readonly struct TrainBogieWithWheelsTransform
@@ -11,5 +13,7 @@ namespace Quantum.Track
         public BogieTransform Bogie { get; }
 
         public WheelTransform[] Wheels { get; }
+
+        public IReadOnlyList<WheelTransform> WheelsReadOnly => Wheels;
     }
 }

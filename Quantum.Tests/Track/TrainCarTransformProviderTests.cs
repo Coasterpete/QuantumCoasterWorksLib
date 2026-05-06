@@ -880,6 +880,40 @@ public sealed class TrainCarTransformProviderTests
     }
 
     [Fact]
+    public void EvaluateArticulatedTrainWithWheels_WheelsReadOnlyMatchesWheelsArray()
+    {
+        TrackDocument document = BuildSplineTrack(length: 44.0);
+        var evaluator = new TrackEvaluator(document);
+        var provider = new TrainCarTransformProvider(evaluator);
+        TrainConsistDefinition definition = BuildConsistDefinitionWithWheels(
+            carCount: 3,
+            wheelCountPerBogie: 4);
+
+        IReadOnlyList<ArticulatedTrainCarWithWheelsTransform> cars = provider.EvaluateArticulatedTrainWithWheels(
+            leadDistance: 21.0,
+            definition: definition);
+
+        for (int carIndex = 0; carIndex < cars.Count; carIndex++)
+        {
+            TrainBogieWithWheelsTransform frontBogie = cars[carIndex].FrontBogie;
+            TrainBogieWithWheelsTransform rearBogie = cars[carIndex].RearBogie;
+
+            Assert.Equal(frontBogie.Wheels.Length, frontBogie.WheelsReadOnly.Count);
+            Assert.Equal(rearBogie.Wheels.Length, rearBogie.WheelsReadOnly.Count);
+
+            for (int wheelIndex = 0; wheelIndex < frontBogie.Wheels.Length; wheelIndex++)
+            {
+                Assert.Equal(frontBogie.Wheels[wheelIndex], frontBogie.WheelsReadOnly[wheelIndex]);
+            }
+
+            for (int wheelIndex = 0; wheelIndex < rearBogie.Wheels.Length; wheelIndex++)
+            {
+                Assert.Equal(rearBogie.Wheels[wheelIndex], rearBogie.WheelsReadOnly[wheelIndex]);
+            }
+        }
+    }
+
+    [Fact]
     public void EvaluateTrainPose_StoresLeadDistanceAndDefinitionReference()
     {
         TrackDocument document = BuildStraightTrack(length: 40.0);
@@ -921,6 +955,29 @@ public sealed class TrainCarTransformProviderTests
         for (int i = 0; i < expectedCars.Count; i++)
         {
             AssertArticulatedTrainCarWithWheelsTransformNear(expectedCars[i], result.Cars[i]);
+        }
+    }
+
+    [Fact]
+    public void EvaluateTrainPose_CarsReadOnlyMatchesCarsArray()
+    {
+        TrackDocument document = BuildSplineTrack(length: 52.0);
+        var evaluator = new TrackEvaluator(document);
+        var provider = new TrainCarTransformProvider(evaluator);
+        TrainConsistDefinition definition = BuildConsistDefinitionWithWheels(
+            carCount: 4,
+            wheelCountPerBogie: 6);
+        const double leadDistance = 26.5;
+
+        TrainPoseResult result = provider.EvaluateTrainPose(
+            leadDistance: leadDistance,
+            definition: definition);
+
+        Assert.Equal(result.Cars.Length, result.CarsReadOnly.Count);
+
+        for (int i = 0; i < result.Cars.Length; i++)
+        {
+            AssertArticulatedTrainCarWithWheelsTransformNear(result.Cars[i], result.CarsReadOnly[i]);
         }
     }
 

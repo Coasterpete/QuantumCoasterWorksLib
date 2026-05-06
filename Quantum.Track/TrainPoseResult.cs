@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 namespace Quantum.Track
 {
     public sealed class TrainPoseResult
@@ -17,5 +19,7 @@ namespace Quantum.Track
         public TrainConsistDefinition Definition { get; }
 
         public ArticulatedTrainCarWithWheelsTransform[] Cars { get; }
+
+        public IReadOnlyList<ArticulatedTrainCarWithWheelsTransform> CarsReadOnly => Cars;
     }
 }
