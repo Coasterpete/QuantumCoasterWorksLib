@@ -115,12 +115,13 @@ namespace Quantum.Track
                 throw new InvalidOperationException("Wheel layout is required to evaluate wheel transforms.");
             }
 
-            IReadOnlyList<ArticulatedTrainCarTransform> articulatedCars = EvaluateArticulatedTrain(
+            IReadOnlyList<TrainCarWithBogiesTransform> carsWithBogies = EvaluateTrainWithBogies(
                 leadDistance,
                 definition);
-            IReadOnlyList<TrainCarWithBogiesAndWheelsTransform> carsWithWheels = EvaluateTrainWithBogiesAndWheels(
-                leadDistance,
-                definition);
+            IReadOnlyList<ArticulatedTrainCarTransform> articulatedCars = _articulationSolver.SolveArticulatedBodies(carsWithBogies);
+            IReadOnlyList<TrainCarWithBogiesAndWheelsTransform> carsWithWheels = _wheelLayoutSolver.AttachWheels(
+                carsWithBogies,
+                definition.WheelLayout);
             return _poseAssembler.AssembleArticulatedWithWheels(articulatedCars, carsWithWheels);
         }
 
