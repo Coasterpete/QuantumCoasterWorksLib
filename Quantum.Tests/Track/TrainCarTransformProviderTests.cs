@@ -914,6 +914,56 @@ public sealed class TrainCarTransformProviderTests
     }
 
     [Fact]
+    public void TrainBogieWithWheelsTransform_MutatingSourceWheelsArrayDoesNotAffectStoredSnapshot()
+    {
+        TrackDocument document = BuildSplineTrack(length: 44.0);
+        var evaluator = new TrackEvaluator(document);
+        var provider = new TrainCarTransformProvider(evaluator);
+        TrainConsistDefinition definition = BuildConsistDefinitionWithWheels(
+            carCount: 3,
+            wheelCountPerBogie: 4);
+
+        IReadOnlyList<ArticulatedTrainCarWithWheelsTransform> cars = provider.EvaluateArticulatedTrainWithWheels(
+            leadDistance: 21.0,
+            definition: definition);
+
+        TrainBogieWithWheelsTransform sourceBogie = cars[0].FrontBogie;
+        WheelTransform[] sourceWheels = sourceBogie.Wheels;
+        WheelTransform expectedFirstWheel = sourceWheels[0];
+        var snapshotBogie = new TrainBogieWithWheelsTransform(sourceBogie.Bogie, sourceWheels);
+
+        sourceWheels[0] = sourceWheels[1];
+
+        AssertWheelTransformNear(expectedFirstWheel, snapshotBogie.Wheels[0]);
+        AssertWheelTransformNear(expectedFirstWheel, snapshotBogie.WheelsReadOnly[0]);
+    }
+
+    [Fact]
+    public void TrainBogieWithWheelsTransform_MutatingReturnedWheelsArrayDoesNotAffectStoredSnapshot()
+    {
+        TrackDocument document = BuildSplineTrack(length: 44.0);
+        var evaluator = new TrackEvaluator(document);
+        var provider = new TrainCarTransformProvider(evaluator);
+        TrainConsistDefinition definition = BuildConsistDefinitionWithWheels(
+            carCount: 3,
+            wheelCountPerBogie: 4);
+
+        IReadOnlyList<ArticulatedTrainCarWithWheelsTransform> cars = provider.EvaluateArticulatedTrainWithWheels(
+            leadDistance: 21.0,
+            definition: definition);
+
+        TrainBogieWithWheelsTransform bogie = cars[0].FrontBogie;
+        WheelTransform expectedFirstWheel = bogie.WheelsReadOnly[0];
+        WheelTransform[] exposedWheels = bogie.Wheels;
+
+        exposedWheels[0] = exposedWheels[1];
+
+        Assert.Equal(bogie.Wheels.Length, bogie.WheelsReadOnly.Count);
+        AssertWheelTransformNear(expectedFirstWheel, bogie.Wheels[0]);
+        AssertWheelTransformNear(expectedFirstWheel, bogie.WheelsReadOnly[0]);
+    }
+
+    [Fact]
     public void EvaluateTrainPose_StoresLeadDistanceAndDefinitionReference()
     {
         TrackDocument document = BuildStraightTrack(length: 40.0);
@@ -978,6 +1028,66 @@ public sealed class TrainCarTransformProviderTests
         for (int i = 0; i < result.Cars.Length; i++)
         {
             AssertArticulatedTrainCarWithWheelsTransformNear(result.Cars[i], result.CarsReadOnly[i]);
+        }
+    }
+
+    [Fact]
+    public void TrainPoseResult_MutatingSourceCarsArrayDoesNotAffectStoredSnapshot()
+    {
+        TrackDocument document = BuildSplineTrack(length: 52.0);
+        var evaluator = new TrackEvaluator(document);
+        var provider = new TrainCarTransformProvider(evaluator);
+        TrainConsistDefinition definition = BuildConsistDefinitionWithWheels(
+            carCount: 4,
+            wheelCountPerBogie: 6);
+        const double leadDistance = 26.5;
+
+        IReadOnlyList<ArticulatedTrainCarWithWheelsTransform> evaluatedCars = provider.EvaluateArticulatedTrainWithWheels(
+            leadDistance: leadDistance,
+            definition: definition);
+        var sourceCars = new ArticulatedTrainCarWithWheelsTransform[evaluatedCars.Count];
+
+        for (int i = 0; i < evaluatedCars.Count; i++)
+        {
+            sourceCars[i] = evaluatedCars[i];
+        }
+
+        ArticulatedTrainCarWithWheelsTransform expectedFirstCar = sourceCars[0];
+        var result = new TrainPoseResult(leadDistance, definition, sourceCars);
+
+        sourceCars[0] = sourceCars[1];
+
+        AssertArticulatedTrainCarWithWheelsTransformNear(expectedFirstCar, result.Cars[0]);
+        AssertArticulatedTrainCarWithWheelsTransformNear(expectedFirstCar, result.CarsReadOnly[0]);
+    }
+
+    [Fact]
+    public void EvaluateTrainPose_MutatingReturnedCarsArrayDoesNotAffectStoredSnapshot()
+    {
+        TrackDocument document = BuildSplineTrack(length: 52.0);
+        var evaluator = new TrackEvaluator(document);
+        var provider = new TrainCarTransformProvider(evaluator);
+        TrainConsistDefinition definition = BuildConsistDefinitionWithWheels(
+            carCount: 4,
+            wheelCountPerBogie: 6);
+        const double leadDistance = 26.5;
+
+        TrainPoseResult result = provider.EvaluateTrainPose(
+            leadDistance: leadDistance,
+            definition: definition);
+
+        ArticulatedTrainCarWithWheelsTransform expectedFirstCar = result.CarsReadOnly[0];
+        ArticulatedTrainCarWithWheelsTransform[] exposedCars = result.Cars;
+        exposedCars[0] = exposedCars[1];
+
+        ArticulatedTrainCarWithWheelsTransform[] currentCars = result.Cars;
+        Assert.Equal(currentCars.Length, result.CarsReadOnly.Count);
+        AssertArticulatedTrainCarWithWheelsTransformNear(expectedFirstCar, currentCars[0]);
+        AssertArticulatedTrainCarWithWheelsTransformNear(expectedFirstCar, result.CarsReadOnly[0]);
+
+        for (int i = 0; i < currentCars.Length; i++)
+        {
+            AssertArticulatedTrainCarWithWheelsTransformNear(currentCars[i], result.CarsReadOnly[i]);
         }
     }
 
@@ -1156,17 +1266,7 @@ public sealed class TrainCarTransformProviderTests
 
         for (int i = 0; i < expected.Wheels.Length; i++)
         {
-            WheelTransform expectedWheel = expected.Wheels[i];
-            WheelTransform actualWheel = actual.Wheels[i];
-
-            Assert.Equal(expectedWheel.CarIndex, actualWheel.CarIndex);
-            Assert.Equal(expectedWheel.BogieIndex, actualWheel.BogieIndex);
-            Assert.Equal(expectedWheel.WheelIndex, actualWheel.WheelIndex);
-            AssertDoubleNear(expectedWheel.LocalOffsetX, actualWheel.LocalOffsetX);
-            AssertDoubleNear(expectedWheel.LocalOffsetY, actualWheel.LocalOffsetY);
-            AssertDoubleNear(expectedWheel.LocalOffsetZ, actualWheel.LocalOffsetZ);
-            AssertTrackFrameNear(expectedWheel.Frame, actualWheel.Frame);
-            AssertMatrixNear(expectedWheel.Matrix, actualWheel.Matrix);
+            AssertWheelTransformNear(expected.Wheels[i], actual.Wheels[i]);
         }
     }
 
@@ -1177,6 +1277,18 @@ public sealed class TrainCarTransformProviderTests
         AssertArticulatedTrainCarTransformNear(expected.Body, actual.Body);
         AssertTrainBogieWithWheelsTransformNear(expected.FrontBogie, actual.FrontBogie);
         AssertTrainBogieWithWheelsTransformNear(expected.RearBogie, actual.RearBogie);
+    }
+
+    private static void AssertWheelTransformNear(WheelTransform expected, WheelTransform actual)
+    {
+        Assert.Equal(expected.CarIndex, actual.CarIndex);
+        Assert.Equal(expected.BogieIndex, actual.BogieIndex);
+        Assert.Equal(expected.WheelIndex, actual.WheelIndex);
+        AssertDoubleNear(expected.LocalOffsetX, actual.LocalOffsetX);
+        AssertDoubleNear(expected.LocalOffsetY, actual.LocalOffsetY);
+        AssertDoubleNear(expected.LocalOffsetZ, actual.LocalOffsetZ);
+        AssertTrackFrameNear(expected.Frame, actual.Frame);
+        AssertMatrixNear(expected.Matrix, actual.Matrix);
     }
 
     private static void AssertWheelIndicesMatchBogie(TrainBogieWithWheelsTransform bogieWithWheels)
