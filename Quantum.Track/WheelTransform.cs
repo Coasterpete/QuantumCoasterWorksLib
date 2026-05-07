@@ -4,6 +4,7 @@ namespace Quantum.Track
 {
     /// <summary>
     /// Transform data for a wheel sampled from a bogie frame.
+    /// <see cref="Frame"/> is currently inherited from the sampled bogie frame.
     /// </summary>
     public readonly struct WheelTransform
     {
@@ -43,6 +44,7 @@ namespace Quantum.Track
 
         /// <summary>
         /// Wheel matrix stored as <see cref="Matrix4x4d"/> (double precision).
+        /// Current policy keeps this equal to the sampled bogie matrix.
         /// </summary>
         public Matrix4x4d Matrix { get; }
     }

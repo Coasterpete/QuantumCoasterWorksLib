@@ -112,6 +112,25 @@ public sealed class TrainCarTransformProviderTests
     }
 
     [Fact]
+    public void GetCarTransforms_BodyMatrixMatchesFrameMatrixPolicy()
+    {
+        TrackDocument document = BuildSplineTrack(length: 20.0);
+        var evaluator = new TrackEvaluator(document);
+        var provider = new TrainCarTransformProvider(evaluator);
+
+        IReadOnlyList<TrainCarTransform> cars = provider.GetCarTransforms(
+            leadDistance: 10.0,
+            carSpacing: 2.0,
+            carCount: 4);
+
+        for (int i = 0; i < cars.Count; i++)
+        {
+            Matrix4x4 expectedMatrix = cars[i].Frame.ToMatrix4x4();
+            AssertMatrixNear(expectedMatrix, cars[i].Matrix);
+        }
+    }
+
+    [Fact]
     public void GetCarTransforms_WhenAnyCarDistanceIsOutOfRange_ThrowsWithClearMessage()
     {
         TrackDocument document = BuildStraightTrack(length: 6.0);
@@ -269,10 +288,8 @@ public sealed class TrainCarTransformProviderTests
         {
             TrainCarWithBogiesTransform car = cars[i];
 
-            Matrix4x4d expectedFrontMatrix = Matrix4x4d.FromMatrix4x4(
-                evaluator.EvaluateFrameAtDistance(car.FrontBogie.Distance).ToMatrix4x4());
-            Matrix4x4d expectedRearMatrix = Matrix4x4d.FromMatrix4x4(
-                evaluator.EvaluateFrameAtDistance(car.RearBogie.Distance).ToMatrix4x4());
+            Matrix4x4d expectedFrontMatrix = Matrix4x4d.FromMatrix4x4(car.FrontBogie.Frame.ToMatrix4x4());
+            Matrix4x4d expectedRearMatrix = Matrix4x4d.FromMatrix4x4(car.RearBogie.Frame.ToMatrix4x4());
 
             AssertMatrixNear(expectedFrontMatrix, car.FrontBogie.Matrix);
             AssertMatrixNear(expectedRearMatrix, car.RearBogie.Matrix);

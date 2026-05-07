@@ -4,6 +4,7 @@ namespace Quantum.Track
 {
     /// <summary>
     /// Articulated body transform derived from a car body and its paired bogies.
+    /// <see cref="ArticulatedFrame"/> is the authoritative articulated pose basis.
     /// </summary>
     public readonly struct ArticulatedTrainCarTransform
     {
@@ -33,6 +34,8 @@ namespace Quantum.Track
 
         /// <summary>
         /// Articulated body matrix stored as <see cref="Matrix4x4d"/> (double precision).
+        /// Current policy derives this from
+        /// <c>Matrix4x4d.FromMatrix4x4(ArticulatedFrame.ToMatrix4x4())</c>.
         /// </summary>
         public Matrix4x4d ArticulatedMatrix { get; }
 

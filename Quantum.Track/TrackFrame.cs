@@ -5,8 +5,9 @@ using Quantum.Math;
 namespace Quantum.Track
 {
     /// <summary>
-    /// Geometry frame representation for exporting track basis/position data.
-    /// Tangent/Normal/Binormal are expected to already be unit-length and orthogonal.
+    /// Authoritative train pose basis for track-space transforms.
+    /// Position plus Tangent/Normal/Binormal define the current frame contract,
+    /// and Tangent/Normal/Binormal are expected to already be unit-length and orthogonal.
     /// </summary>
     public readonly struct TrackFrame
     {
@@ -50,6 +51,7 @@ namespace Quantum.Track
         public Vector3d Binormal { get; }
 
         /// <summary>
+        /// Canonical conversion from <see cref="TrackFrame"/> to <see cref="Matrix4x4"/>.
         /// Builds a matrix whose first three columns are Tangent/Normal/Binormal
         /// and whose fourth column is Position (column-vector convention).
         /// </summary>
