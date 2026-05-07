@@ -14,6 +14,7 @@ namespace Quantum.Track
         private readonly TrainBogieTransformSolver _bogieSolver;
         private readonly TrainArticulationFrameSolver _articulationSolver;
         private readonly TrainWheelTransformLayoutSolver _wheelLayoutSolver;
+        private readonly TrainPoseAssembler _poseAssembler;
 
         public TrainCarTransformProvider(TrackEvaluator evaluator)
         {
@@ -22,6 +23,7 @@ namespace Quantum.Track
             _bogieSolver = new TrainBogieTransformSolver(_evaluator);
             _articulationSolver = new TrainArticulationFrameSolver();
             _wheelLayoutSolver = new TrainWheelTransformLayoutSolver();
+            _poseAssembler = new TrainPoseAssembler();
         }
 
         /// <summary>
@@ -119,23 +121,7 @@ namespace Quantum.Track
             IReadOnlyList<TrainCarWithBogiesAndWheelsTransform> carsWithWheels = EvaluateTrainWithBogiesAndWheels(
                 leadDistance,
                 definition);
-
-            if (articulatedCars.Count != carsWithWheels.Count)
-            {
-                throw new InvalidOperationException("Articulated and wheel evaluations returned mismatched car counts.");
-            }
-
-            var transforms = new List<ArticulatedTrainCarWithWheelsTransform>(articulatedCars.Count);
-
-            for (int i = 0; i < articulatedCars.Count; i++)
-            {
-                transforms.Add(new ArticulatedTrainCarWithWheelsTransform(
-                    articulatedCars[i],
-                    carsWithWheels[i].FrontBogie,
-                    carsWithWheels[i].RearBogie));
-            }
-
-            return transforms;
+            return _poseAssembler.AssembleArticulatedWithWheels(articulatedCars, carsWithWheels);
         }
 
         public TrainPoseResult EvaluateTrainPose(
@@ -150,14 +136,7 @@ namespace Quantum.Track
             IReadOnlyList<ArticulatedTrainCarWithWheelsTransform> evaluatedCars = EvaluateArticulatedTrainWithWheels(
                 leadDistance,
                 definition);
-            var cars = new ArticulatedTrainCarWithWheelsTransform[evaluatedCars.Count];
-
-            for (int i = 0; i < evaluatedCars.Count; i++)
-            {
-                cars[i] = evaluatedCars[i];
-            }
-
-            return new TrainPoseResult(leadDistance, definition, cars);
+            return _poseAssembler.BuildPoseResult(leadDistance, definition, evaluatedCars);
         }
 
         public IReadOnlyList<TrainCarWithBogiesTransform> EvaluateTrainWithBogies(
