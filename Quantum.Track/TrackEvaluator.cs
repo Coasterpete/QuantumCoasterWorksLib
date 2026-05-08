@@ -1,6 +1,7 @@
 using Quantum.Math;
 using Quantum.Splines;
 using Quantum.Track.Internal;
+using System.Collections.Generic;
 using SplineTrackFrame = Quantum.Splines.TrackFrame;
 
 namespace Quantum.Track
@@ -105,6 +106,81 @@ namespace Quantum.Track
             TrackEvaluationPoint evaluationPoint = EvaluateAtDistance(doc, distance);
             TrackPosition position = ResolveTrackPosition(doc, evaluationPoint);
             return EvaluateFrame(doc, position);
+        }
+
+        public TrackEvaluationPoint[] EvaluateAtDistances(
+            TrackDocument doc,
+            IReadOnlyList<double> distances)
+        {
+            if (doc is null)
+            {
+                throw new System.ArgumentNullException(nameof(doc));
+            }
+
+            if (distances is null)
+            {
+                throw new System.ArgumentNullException(nameof(distances));
+            }
+
+            int distanceCount = distances.Count;
+            if (distanceCount == 0)
+            {
+                return System.Array.Empty<TrackEvaluationPoint>();
+            }
+
+            for (int i = 0; i < distanceCount; i++)
+            {
+                ThrowIfDistanceNonFinite(distances[i]);
+            }
+
+            if (doc.Segments.Count == 0)
+            {
+                throw new System.ArgumentOutOfRangeException(
+                    "distance",
+                    distances[0],
+                    "Distance cannot be evaluated for an empty track document.");
+            }
+
+            CompiledTrackSamplingContext samplingContext = CompiledTrackSamplingContext.Compile(doc);
+            var points = new TrackEvaluationPoint[distanceCount];
+
+            for (int i = 0; i < distanceCount; i++)
+            {
+                ResolvedTrackDistance resolvedDistance = samplingContext.Resolve(distances[i]);
+                points[i] = new TrackEvaluationPoint(resolvedDistance.Segment, resolvedDistance.LocalT);
+            }
+
+            return points;
+        }
+
+        public SplineTrackFrame[] EvaluateFramesAtDistances(
+            TrackDocument doc,
+            IReadOnlyList<double> distances)
+        {
+            TrackEvaluationPoint[] points = EvaluateAtDistances(doc, distances);
+            var frames = new SplineTrackFrame[points.Length];
+
+            for (int i = 0; i < points.Length; i++)
+            {
+                TrackPosition position = ResolveTrackPosition(doc, points[i]);
+                frames[i] = EvaluateFrame(doc, position);
+            }
+
+            return frames;
+        }
+
+        public TrackFrame[] EvaluateFramesAtDistances(IReadOnlyList<double> distances)
+        {
+            TrackDocument doc = ResolveBoundDocument();
+            SplineTrackFrame[] splineFrames = EvaluateFramesAtDistances(doc, distances);
+            var exportFrames = new TrackFrame[splineFrames.Length];
+
+            for (int i = 0; i < splineFrames.Length; i++)
+            {
+                exportFrames[i] = BuildExportFrame(splineFrames[i]);
+            }
+
+            return exportFrames;
         }
 
         public Transform3d EvaluateTransformAtDistance(TrackDocument doc, double distance)
@@ -309,6 +385,17 @@ namespace Quantum.Track
             CompiledTrackSamplingContext samplingContext = CompiledTrackSamplingContext.Compile(doc);
             ResolvedTrackDistance resolvedDistance = samplingContext.Resolve(distance);
             return new TrackEvaluationPoint(resolvedDistance.Segment, resolvedDistance.LocalT);
+        }
+
+        private static void ThrowIfDistanceNonFinite(double distance)
+        {
+            if (double.IsNaN(distance) || double.IsInfinity(distance))
+            {
+                throw new System.ArgumentOutOfRangeException(
+                    nameof(distance),
+                    distance,
+                    "Distance must be finite.");
+            }
         }
     }
 }
