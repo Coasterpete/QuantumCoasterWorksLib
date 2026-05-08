@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Numerics;
 using System.Text.Json;
 using Quantum.IO.TrainPose.V1;
@@ -126,6 +127,50 @@ public sealed class TrainPoseExportV1Tests
     }
 
     [Fact]
+    public void Serialize_Indented_MatchesGoldenFixture()
+    {
+        TrainPoseExportV1Dto dto = TrainPoseExportV1Mapper.Export(CreateGoldenFixtureSourcePoseResult());
+
+        string actual = NormalizeLineEndings(TrainPoseExportV1Json.Serialize(dto, indented: true)).TrimEnd();
+        string expected = NormalizeLineEndings(LoadGoldenFixtureJson()).TrimEnd();
+
+        Assert.Equal(expected, actual);
+    }
+
+    [Fact]
+    public void Deserialize_GoldenFixture_PreservesContractVersionAndRepresentativeValues()
+    {
+        TrainPoseExportV1Dto dto = TrainPoseExportV1Json.Deserialize(LoadGoldenFixtureJson());
+
+        Assert.Equal(TrainPoseExportV1Dto.ContractName, dto.Contract);
+        Assert.Equal(TrainPoseExportV1Dto.ContractVersion, dto.Version);
+        Assert.Equal(21.5, dto.LeadDistance);
+        Assert.Equal(1, dto.Definition.CarCount);
+        ArticulatedTrainCarWithWheelsV1Dto car = Assert.Single(dto.Cars);
+        Assert.Equal(0, car.Body.OriginalBody.CarIndex);
+        Assert.Equal(20.0, car.Body.OriginalBody.Distance);
+        Assert.Equal(20.5, car.Body.ArticulatedFrame.Distance);
+        Assert.Equal(4.0, car.Body.ArticulatedFrame.Position.X);
+        Assert.Equal(12.0, car.Body.OriginalBody.Matrix.M12);
+        Assert.Equal(516.0, car.Body.ArticulatedMatrix.M44);
+
+        Assert.Equal(0, car.FrontBogie.Bogie.BogieIndex);
+        Assert.Equal(21.25, car.FrontBogie.Bogie.Frame.Distance);
+        Assert.Equal(102.0, car.FrontBogie.Bogie.Matrix.M12);
+
+        Assert.Equal(2, car.FrontBogie.Wheels.Length);
+        WheelTransformV1Dto frontWheel = car.FrontBogie.Wheels[0];
+        Assert.Equal(0, frontWheel.WheelIndex);
+        Assert.Equal(-0.35, frontWheel.LocalOffsetX);
+        Assert.Equal(21.25, frontWheel.Frame.Distance);
+        Assert.Equal(102.1, frontWheel.Matrix.M12);
+
+        Assert.Equal(1, car.RearBogie.Bogie.BogieIndex);
+        Assert.Equal(18.75, car.RearBogie.Bogie.Frame.Distance);
+        Assert.Equal(216.0, car.RearBogie.Bogie.Matrix.M44);
+    }
+
+    [Fact]
     public void SerializeDeserialize_RoundtripPreservesRepresentativeValues()
     {
         TrainPoseExportV1Dto expected = TrainPoseExportV1Mapper.Export(CreateSourcePoseResult());
@@ -215,6 +260,27 @@ public sealed class TrainPoseExportV1Tests
         return new TrainPoseResult(leadDistance: 21.5, definition: definition, cars: cars);
     }
 
+    private static TrainPoseResult CreateGoldenFixtureSourcePoseResult()
+    {
+        var definition = new TrainConsistDefinition(
+            carCount: 1,
+            carSpacing: 3.25,
+            carGeometry: new TrainCarGeometry(length: 4.5, width: 1.8, height: 2.1),
+            bogieLayout: new TrainBogieLayout(bogieSpacing: 2.75),
+            wheelLayout: new TrainWheelLayout(
+                wheelCountPerBogie: 2,
+                wheelRadius: 0.45,
+                wheelWidth: 0.25,
+                axleSpacing: 1.1));
+
+        var cars = new[]
+        {
+            CreateCar(carIndex: 0, distance: 20.0)
+        };
+
+        return new TrainPoseResult(leadDistance: 21.5, definition: definition, cars: cars);
+    }
+
     private static TrainPoseResult CreateSourcePoseResultWithoutWheelLayout()
     {
         var definition = new TrainConsistDefinition(
@@ -254,6 +320,18 @@ public sealed class TrainPoseExportV1Tests
   }},
   ""cars"": []
 }}";
+    }
+
+    private static string LoadGoldenFixtureJson()
+    {
+        string fixturePath = Path.Combine(AppContext.BaseDirectory, "IO", "Fixtures", "TrainPoseExportV1.golden.json");
+        Assert.True(File.Exists(fixturePath), $"Golden fixture file was not found at '{fixturePath}'.");
+        return File.ReadAllText(fixturePath);
+    }
+
+    private static string NormalizeLineEndings(string value)
+    {
+        return value.ReplaceLineEndings("\n");
     }
 
     private static ArticulatedTrainCarWithWheelsTransform CreateCar(int carIndex, double distance)
