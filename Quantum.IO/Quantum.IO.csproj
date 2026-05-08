@@ -6,6 +6,10 @@
 </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="System.Text.Json" Version="8.0.5" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Quantum.Math\Quantum.Math.csproj" />
     <ProjectReference Include="..\Quantum.Track\Quantum.Track.csproj" />
   </ItemGroup>

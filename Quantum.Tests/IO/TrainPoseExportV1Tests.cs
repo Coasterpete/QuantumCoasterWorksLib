@@ -1,5 +1,6 @@
 using System;
 using System.Numerics;
+using System.Text.Json;
 using Quantum.IO.TrainPose.V1;
 using Quantum.Math;
 using Quantum.Track;
@@ -107,6 +108,91 @@ public sealed class TrainPoseExportV1Tests
         Assert.Equal(sourceCar.FrontBogie.Wheels[0].Matrix.M44, exportedCar.FrontBogie.Wheels[0].Matrix.M44);
     }
 
+    [Fact]
+    public void Serialize_IncludesExpectedCamelCaseTopLevelFields()
+    {
+        TrainPoseExportV1Dto dto = TrainPoseExportV1Mapper.Export(CreateSourcePoseResult());
+
+        string json = TrainPoseExportV1Json.Serialize(dto);
+
+        Assert.Contains("\"contract\":", json);
+        Assert.Contains("\"version\":", json);
+        Assert.Contains("\"leadDistance\":", json);
+        Assert.Contains("\"definition\":", json);
+        Assert.Contains("\"cars\":", json);
+
+        Assert.DoesNotContain("\"Contract\":", json);
+        Assert.DoesNotContain("\"Version\":", json);
+    }
+
+    [Fact]
+    public void SerializeDeserialize_RoundtripPreservesRepresentativeValues()
+    {
+        TrainPoseExportV1Dto expected = TrainPoseExportV1Mapper.Export(CreateSourcePoseResult());
+
+        string json = TrainPoseExportV1Json.Serialize(expected);
+        TrainPoseExportV1Dto actual = TrainPoseExportV1Json.Deserialize(json);
+
+        Assert.Equal(expected.Contract, actual.Contract);
+        Assert.Equal(expected.Version, actual.Version);
+        Assert.Equal(expected.LeadDistance, actual.LeadDistance);
+        Assert.Equal(expected.Definition.CarCount, actual.Definition.CarCount);
+        Assert.Equal(expected.Definition.CarSpacing, actual.Definition.CarSpacing);
+        Assert.Equal(expected.Definition.CarGeometry.Length, actual.Definition.CarGeometry.Length);
+        Assert.Equal(expected.Definition.BogieLayout.BogieSpacing, actual.Definition.BogieLayout.BogieSpacing);
+
+        Assert.NotNull(actual.Definition.WheelLayout);
+        Assert.Equal(expected.Definition.WheelLayout!.WheelCountPerBogie, actual.Definition.WheelLayout!.WheelCountPerBogie);
+        Assert.Equal(expected.Definition.WheelLayout.WheelRadius, actual.Definition.WheelLayout.WheelRadius);
+
+        Assert.Equal(expected.Cars.Length, actual.Cars.Length);
+        Assert.Equal(expected.Cars[0].Body.OriginalBody.CarIndex, actual.Cars[0].Body.OriginalBody.CarIndex);
+        Assert.Equal(expected.Cars[0].FrontBogie.Wheels[0].WheelIndex, actual.Cars[0].FrontBogie.Wheels[0].WheelIndex);
+        Assert.Equal(expected.Cars[0].RearBogie.Bogie.Matrix.M44, actual.Cars[0].RearBogie.Bogie.Matrix.M44);
+    }
+
+    [Fact]
+    public void SerializeDeserialize_RoundtripPreservesNullWheelLayout()
+    {
+        TrainPoseExportV1Dto dto = TrainPoseExportV1Mapper.Export(CreateSourcePoseResultWithoutWheelLayout());
+        Assert.Null(dto.Definition.WheelLayout);
+
+        string json = TrainPoseExportV1Json.Serialize(dto);
+        TrainPoseExportV1Dto roundtrip = TrainPoseExportV1Json.Deserialize(json);
+
+        Assert.Null(roundtrip.Definition.WheelLayout);
+    }
+
+    [Fact]
+    public void Deserialize_RejectsWrongContract()
+    {
+        string json = CreateMinimalJson(contract: "wrong.contract", version: TrainPoseExportV1Dto.ContractVersion);
+
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() => TrainPoseExportV1Json.Deserialize(json));
+
+        Assert.Contains("contract", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Deserialize_RejectsWrongVersion()
+    {
+        string json = CreateMinimalJson(contract: TrainPoseExportV1Dto.ContractName, version: 999);
+
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() => TrainPoseExportV1Json.Deserialize(json));
+
+        Assert.Contains("version", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Deserialize_RejectsMalformedJson()
+    {
+        const string malformedJson = "{ \"contract\": \"quantum.train_pose\", \"version\": 1, ";
+
+        JsonException ex = Assert.Throws<JsonException>(() => TrainPoseExportV1Json.Deserialize(malformedJson));
+
+        Assert.Contains("malformed", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
     private static TrainPoseResult CreateSourcePoseResult()
     {
         var definition = new TrainConsistDefinition(
@@ -127,6 +213,47 @@ public sealed class TrainPoseExportV1Tests
         };
 
         return new TrainPoseResult(leadDistance: 21.5, definition: definition, cars: cars);
+    }
+
+    private static TrainPoseResult CreateSourcePoseResultWithoutWheelLayout()
+    {
+        var definition = new TrainConsistDefinition(
+            carCount: 2,
+            carSpacing: 3.25,
+            carGeometry: new TrainCarGeometry(length: 4.5, width: 1.8, height: 2.1),
+            bogieLayout: new TrainBogieLayout(bogieSpacing: 2.75),
+            wheelLayout: null);
+
+        var cars = new[]
+        {
+            CreateCar(carIndex: 0, distance: 20.0),
+            CreateCar(carIndex: 1, distance: 16.75)
+        };
+
+        return new TrainPoseResult(leadDistance: 21.5, definition: definition, cars: cars);
+    }
+
+    private static string CreateMinimalJson(string contract, int version)
+    {
+        return $@"{{
+  ""contract"": ""{contract}"",
+  ""version"": {version},
+  ""leadDistance"": 0.0,
+  ""definition"": {{
+    ""carCount"": 0,
+    ""carSpacing"": 0.0,
+    ""carGeometry"": {{
+      ""length"": 0.0,
+      ""width"": 0.0,
+      ""height"": 0.0
+    }},
+    ""bogieLayout"": {{
+      ""bogieSpacing"": 0.0
+    }},
+    ""wheelLayout"": null
+  }},
+  ""cars"": []
+}}";
     }
 
     private static ArticulatedTrainCarWithWheelsTransform CreateCar(int carIndex, double distance)
