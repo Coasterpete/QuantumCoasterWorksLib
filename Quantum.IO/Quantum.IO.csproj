@@ -3,6 +3,11 @@
   <PropertyGroup>
     <TargetFramework>netstandard2.1</TargetFramework>
     <Nullable>enable</Nullable>
-  </PropertyGroup>
+</PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Quantum.Math\Quantum.Math.csproj" />
+    <ProjectReference Include="..\Quantum.Track\Quantum.Track.csproj" />
+  </ItemGroup>
 
 </Project>
