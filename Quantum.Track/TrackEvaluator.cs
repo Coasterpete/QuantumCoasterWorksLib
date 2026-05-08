@@ -1,5 +1,6 @@
 using Quantum.Math;
 using Quantum.Splines;
+using Quantum.Track.Internal;
 using SplineTrackFrame = Quantum.Splines.TrackFrame;
 
 namespace Quantum.Track
@@ -305,38 +306,9 @@ namespace Quantum.Track
                     "Distance cannot be evaluated for an empty track document.");
             }
 
-            double totalLength = doc.TotalLength;
-            double clampedDistance = System.Math.Max(0.0, System.Math.Min(distance, totalLength));
-            double segmentStart = 0.0;
-
-            for (int i = 0; i < doc.Segments.Count; i++)
-            {
-                TrackSegment segment = doc.Segments[i];
-
-                if (segment is null)
-                {
-                    throw new System.InvalidOperationException("TrackDocument contains a null segment entry.");
-                }
-
-                double segmentEnd = segmentStart + segment.Length;
-                bool isLastSegment = i == doc.Segments.Count - 1;
-
-                if (clampedDistance < segmentEnd || isLastSegment)
-                {
-                    if (segment.Length <= 0.0)
-                    {
-                        return new TrackEvaluationPoint(segment, 0.0);
-                    }
-
-                    double localT = (clampedDistance - segmentStart) / segment.Length;
-                    localT = System.Math.Max(0.0, System.Math.Min(localT, 1.0));
-                    return new TrackEvaluationPoint(segment, localT);
-                }
-
-                segmentStart = segmentEnd;
-            }
-
-            throw new System.InvalidOperationException("TrackDocument could not be evaluated at the specified distance.");
+            CompiledTrackSamplingContext samplingContext = CompiledTrackSamplingContext.Compile(doc);
+            ResolvedTrackDistance resolvedDistance = samplingContext.Resolve(distance);
+            return new TrackEvaluationPoint(resolvedDistance.Segment, resolvedDistance.LocalT);
         }
     }
 }
