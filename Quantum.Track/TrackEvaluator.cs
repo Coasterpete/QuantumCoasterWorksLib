@@ -2,6 +2,7 @@ using Quantum.Math;
 using Quantum.Splines;
 using Quantum.Track.Internal;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using SplineTrackFrame = Quantum.Splines.TrackFrame;
 
 namespace Quantum.Track
@@ -157,12 +158,43 @@ namespace Quantum.Track
             TrackDocument doc,
             IReadOnlyList<double> distances)
         {
-            TrackEvaluationPoint[] points = EvaluateAtDistances(doc, distances);
-            var frames = new SplineTrackFrame[points.Length];
-
-            for (int i = 0; i < points.Length; i++)
+            if (doc is null)
             {
-                TrackPosition position = ResolveTrackPosition(doc, points[i]);
+                throw new System.ArgumentNullException(nameof(doc));
+            }
+
+            if (distances is null)
+            {
+                throw new System.ArgumentNullException(nameof(distances));
+            }
+
+            int distanceCount = distances.Count;
+            if (distanceCount == 0)
+            {
+                return System.Array.Empty<SplineTrackFrame>();
+            }
+
+            for (int i = 0; i < distanceCount; i++)
+            {
+                ThrowIfDistanceNonFinite(distances[i]);
+            }
+
+            if (doc.Segments.Count == 0)
+            {
+                throw new System.ArgumentOutOfRangeException(
+                    "distance",
+                    distances[0],
+                    "Distance cannot be evaluated for an empty track document.");
+            }
+
+            CompiledTrackSamplingContext samplingContext = CompiledTrackSamplingContext.Compile(doc);
+            Dictionary<TrackSegment, int> firstSegmentIndicesByReference = BuildFirstSegmentIndicesByReference(doc);
+            var frames = new SplineTrackFrame[distanceCount];
+
+            for (int i = 0; i < distanceCount; i++)
+            {
+                ResolvedTrackDistance resolvedDistance = samplingContext.Resolve(distances[i]);
+                TrackPosition position = ResolveTrackPosition(firstSegmentIndicesByReference, resolvedDistance);
                 frames[i] = EvaluateFrame(doc, position);
             }
 
@@ -348,6 +380,37 @@ namespace Quantum.Track
             throw new System.InvalidOperationException("TrackDocument could not resolve the evaluated segment.");
         }
 
+        private static TrackPosition ResolveTrackPosition(
+            IReadOnlyDictionary<TrackSegment, int> firstSegmentIndicesByReference,
+            ResolvedTrackDistance resolvedDistance)
+        {
+            if (!firstSegmentIndicesByReference.TryGetValue(resolvedDistance.Segment, out int segmentIndex))
+            {
+                throw new System.InvalidOperationException("TrackDocument could not resolve the evaluated segment.");
+            }
+
+            return new TrackPosition(segmentIndex, resolvedDistance.LocalT);
+        }
+
+        private static Dictionary<TrackSegment, int> BuildFirstSegmentIndicesByReference(TrackDocument doc)
+        {
+            var firstSegmentIndicesByReference = new Dictionary<TrackSegment, int>(
+                doc.Segments.Count,
+                ReferenceIdentityComparer<TrackSegment>.Instance);
+
+            for (int i = 0; i < doc.Segments.Count; i++)
+            {
+                TrackSegment segment = doc.Segments[i];
+
+                if (!firstSegmentIndicesByReference.ContainsKey(segment))
+                {
+                    firstSegmentIndicesByReference.Add(segment, i);
+                }
+            }
+
+            return firstSegmentIndicesByReference;
+        }
+
         private TrackDocument ResolveBoundDocument()
         {
             if (_boundDocument is null)
@@ -395,6 +458,23 @@ namespace Quantum.Track
                     nameof(distance),
                     distance,
                     "Distance must be finite.");
+            }
+        }
+
+        private sealed class ReferenceIdentityComparer<TReference> : IEqualityComparer<TReference>
+            where TReference : class
+        {
+            public static ReferenceIdentityComparer<TReference> Instance { get; } =
+                new ReferenceIdentityComparer<TReference>();
+
+            public bool Equals(TReference? x, TReference? y)
+            {
+                return object.ReferenceEquals(x, y);
+            }
+
+            public int GetHashCode(TReference obj)
+            {
+                return RuntimeHelpers.GetHashCode(obj);
             }
         }
     }
