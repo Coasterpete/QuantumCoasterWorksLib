@@ -23,4 +23,26 @@ public sealed class SamplingPerfTimingStatsTests
 
         Assert.Equal(40000.0, throughput);
     }
+
+    [Fact]
+    public void ComputeRelativeSpeedupAgainst_ReturnsFactorGreaterThanOneWhenFasterThanBaseline()
+    {
+        SamplingPerfTimingStats benchmark = SamplingPerfTimingStats.Compute(new[] { 2.0, 2.0 });
+        SamplingPerfTimingStats baseline = SamplingPerfTimingStats.Compute(new[] { 4.0, 4.0 });
+
+        double factor = benchmark.ComputeRelativeSpeedupAgainst(baseline);
+
+        Assert.Equal(2.0, factor);
+    }
+
+    [Fact]
+    public void ComputeRelativeSpeedupAgainst_ReturnsFactorLessThanOneWhenSlowerThanBaseline()
+    {
+        SamplingPerfTimingStats benchmark = SamplingPerfTimingStats.Compute(new[] { 6.0, 6.0 });
+        SamplingPerfTimingStats baseline = SamplingPerfTimingStats.Compute(new[] { 3.0, 3.0 });
+
+        double factor = benchmark.ComputeRelativeSpeedupAgainst(baseline);
+
+        Assert.Equal(0.5, factor);
+    }
 }

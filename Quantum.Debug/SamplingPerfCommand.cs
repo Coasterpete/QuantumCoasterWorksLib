@@ -10,6 +10,9 @@ namespace Quantum.Debug
     {
         private const int WarmupIterations = 6;
         private const int TimedIterations = 20;
+        private const string SmokeScenarioName = "smoke";
+        private const string TrackScalarBenchmarkName = "track_scalar";
+        private const string TrackBatchBenchmarkName = "track_batch";
 
         public static void Run()
         {
@@ -44,25 +47,29 @@ namespace Quantum.Debug
             return new[]
             {
                 RunBenchmark(
-                    name: "track_scalar",
+                    name: TrackScalarBenchmarkName,
+                    scenario: SmokeScenarioName,
                     warmupIterations,
                     timedIterations,
                     operationsPerIteration: scenario.Distances.Length,
                     execute: () => EvaluateTrackScalar(scenario)),
                 RunBenchmark(
-                    name: "track_batch",
+                    name: TrackBatchBenchmarkName,
+                    scenario: SmokeScenarioName,
                     warmupIterations,
                     timedIterations,
                     operationsPerIteration: scenario.Distances.Length,
                     execute: () => EvaluateTrackBatch(scenario)),
                 RunBenchmark(
                     name: "body_batch",
+                    scenario: SmokeScenarioName,
                     warmupIterations,
                     timedIterations,
                     operationsPerIteration: scenario.CarCount,
                     execute: () => EvaluateBodyBatch(scenario)),
                 RunBenchmark(
                     name: "bogie_batch",
+                    scenario: SmokeScenarioName,
                     warmupIterations,
                     timedIterations,
                     operationsPerIteration: scenario.CarCount * 3,
@@ -72,6 +79,7 @@ namespace Quantum.Debug
 
         private static SamplingPerfBenchmarkResult RunBenchmark(
             string name,
+            string scenario,
             int warmupIterations,
             int timedIterations,
             int operationsPerIteration,
@@ -100,6 +108,7 @@ namespace Quantum.Debug
 
             return new SamplingPerfBenchmarkResult(
                 name,
+                scenario,
                 warmupIterations,
                 timedIterations,
                 operationsPerIteration,
@@ -180,15 +189,21 @@ namespace Quantum.Debug
             string[] headers =
             {
                 "benchmark",
-                "warmup",
-                "iterations",
-                "ops/iter",
+                "scenario",
                 "mean_ms",
                 "min_ms",
                 "max_ms",
-                "throughput_ops_s",
-                "checksum"
+                "throughput",
+                "checksum",
+                "relative_speedup"
             };
+
+            var resultsByBenchmark = new Dictionary<string, SamplingPerfBenchmarkResult>(StringComparer.Ordinal);
+            for (int i = 0; i < results.Count; i++)
+            {
+                SamplingPerfBenchmarkResult result = results[i];
+                resultsByBenchmark[result.Name] = result;
+            }
 
             var rows = new string[results.Count][];
             for (int i = 0; i < results.Count; i++)
@@ -197,14 +212,13 @@ namespace Quantum.Debug
                 rows[i] = new[]
                 {
                     result.Name,
-                    result.WarmupIterations.ToString(CultureInfo.InvariantCulture),
-                    result.TimedIterations.ToString(CultureInfo.InvariantCulture),
-                    result.OperationsPerIteration.ToString(CultureInfo.InvariantCulture),
+                    result.Scenario,
                     result.Timing.MeanMilliseconds.ToString("0.000", CultureInfo.InvariantCulture),
                     result.Timing.MinMilliseconds.ToString("0.000", CultureInfo.InvariantCulture),
                     result.Timing.MaxMilliseconds.ToString("0.000", CultureInfo.InvariantCulture),
                     result.ThroughputOperationsPerSecond.ToString("0.0", CultureInfo.InvariantCulture),
-                    result.Checksum.ToString("G17", CultureInfo.InvariantCulture)
+                    result.Checksum.ToString("G17", CultureInfo.InvariantCulture),
+                    FormatRelativeSpeedup(result, resultsByBenchmark)
                 };
             }
 
@@ -237,6 +251,51 @@ namespace Quantum.Debug
             Console.WriteLine(border);
         }
 
+        private static string FormatRelativeSpeedup(
+            SamplingPerfBenchmarkResult result,
+            IReadOnlyDictionary<string, SamplingPerfBenchmarkResult> resultsByBenchmark)
+        {
+            if (string.Equals(result.Name, TrackScalarBenchmarkName, StringComparison.Ordinal))
+            {
+                return "baseline";
+            }
+
+            if (string.Equals(result.Name, TrackBatchBenchmarkName, StringComparison.Ordinal) &&
+                resultsByBenchmark.TryGetValue(TrackScalarBenchmarkName, out SamplingPerfBenchmarkResult baseline))
+            {
+                double factor = result.Timing.ComputeRelativeSpeedupAgainst(baseline.Timing);
+                return FormatRelativeSpeedupFactor(factor);
+            }
+
+            return "-";
+        }
+
+        private static string FormatRelativeSpeedupFactor(double factor)
+        {
+            if (double.IsNaN(factor) || factor < 0.0)
+            {
+                return "n/a";
+            }
+
+            if (double.IsPositiveInfinity(factor))
+            {
+                return "infx faster";
+            }
+
+            if (factor == 0.0)
+            {
+                return "infx slower";
+            }
+
+            if (factor >= 1.0)
+            {
+                return factor.ToString("0.###", CultureInfo.InvariantCulture) + "x faster";
+            }
+
+            double slowdownFactor = 1.0 / factor;
+            return slowdownFactor.ToString("0.###", CultureInfo.InvariantCulture) + "x slower";
+        }
+
         private static string BuildBorder(IReadOnlyList<int> widths)
         {
             var parts = new string[widths.Count];
@@ -264,6 +323,7 @@ namespace Quantum.Debug
     {
         public SamplingPerfBenchmarkResult(
             string name,
+            string scenario,
             int warmupIterations,
             int timedIterations,
             int operationsPerIteration,
@@ -272,6 +332,7 @@ namespace Quantum.Debug
             double checksum)
         {
             Name = name;
+            Scenario = scenario;
             WarmupIterations = warmupIterations;
             TimedIterations = timedIterations;
             OperationsPerIteration = operationsPerIteration;
@@ -281,6 +342,8 @@ namespace Quantum.Debug
         }
 
         public string Name { get; }
+
+        public string Scenario { get; }
 
         public int WarmupIterations { get; }
 

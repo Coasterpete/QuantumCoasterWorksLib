@@ -76,5 +76,33 @@ namespace Quantum.Debug
 
             return operationsPerIteration / (MeanMilliseconds / 1000.0);
         }
+
+        public double ComputeRelativeSpeedupAgainst(SamplingPerfTimingStats baseline)
+        {
+            return ComputeRelativeSpeedupAgainst(baseline.MeanMilliseconds);
+        }
+
+        public double ComputeRelativeSpeedupAgainst(double baselineMeanMilliseconds)
+        {
+            if (double.IsNaN(baselineMeanMilliseconds) || double.IsInfinity(baselineMeanMilliseconds) || baselineMeanMilliseconds < 0.0)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(baselineMeanMilliseconds),
+                    baselineMeanMilliseconds,
+                    "Baseline mean milliseconds must be finite and non-negative.");
+            }
+
+            if (MeanMilliseconds <= 0.0)
+            {
+                return baselineMeanMilliseconds <= 0.0 ? 1.0 : double.PositiveInfinity;
+            }
+
+            if (baselineMeanMilliseconds <= 0.0)
+            {
+                return 0.0;
+            }
+
+            return baselineMeanMilliseconds / MeanMilliseconds;
+        }
     }
 }
