@@ -278,6 +278,110 @@ public sealed class TrainPoseExportV1Tests
         Assert.False(IsValidAgainstSchema(json.ToJsonString()));
     }
 
+    [Fact]
+    public void Validation_GoldenFixture_Passes()
+    {
+        TrainPoseExportV1Dto dto = TrainPoseExportV1Json.Deserialize(LoadGoldenFixtureJson());
+
+        IReadOnlyList<TrainPoseExportV1ValidationDiagnostic> diagnostics = TrainPoseExportV1Validator.Validate(dto);
+        bool isValid = TrainPoseExportV1Validator.TryValidate(dto, out IReadOnlyList<TrainPoseExportV1ValidationDiagnostic> tryDiagnostics);
+
+        Assert.True(isValid);
+        Assert.Empty(diagnostics);
+        Assert.Empty(tryDiagnostics);
+    }
+
+    [Fact]
+    public void Validation_RuntimeGeneratedExport_Passes()
+    {
+        TrainPoseExportV1Dto dto = TrainPoseExportV1Mapper.Export(CreateSourcePoseResult());
+
+        bool isValid = TrainPoseExportV1Validator.TryValidate(dto, out IReadOnlyList<TrainPoseExportV1ValidationDiagnostic> diagnostics);
+
+        Assert.True(isValid);
+        Assert.Empty(diagnostics);
+    }
+
+    [Fact]
+    public void Validation_MalformedNumericPayload_ProducesExpectedDiagnostics()
+    {
+        TrainPoseExportV1Dto dto = TrainPoseExportV1Mapper.Export(CreateSourcePoseResult());
+
+        dto.LeadDistance = double.PositiveInfinity;
+        dto.Definition.CarGeometry.Length = -0.25;
+        dto.Definition.WheelLayout!.WheelRadius = -0.1;
+        dto.Definition.WheelLayout.WheelWidth = -0.2;
+
+        dto.Cars[0].Body.ArticulatedFrame.Tangent = new Vector3dV1Dto();
+
+        dto.Cars[0].Body.OriginalBody.Frame.Tangent = new Vector3dV1Dto { X = 1.0, Y = 0.0, Z = 0.0 };
+        dto.Cars[0].Body.OriginalBody.Frame.Normal = new Vector3dV1Dto { X = 1.0, Y = 0.0, Z = 0.0 };
+        dto.Cars[0].Body.OriginalBody.Frame.Binormal = new Vector3dV1Dto { X = 0.0, Y = 0.0, Z = 1.0 };
+
+        bool isValid = TrainPoseExportV1Validator.TryValidate(dto, out IReadOnlyList<TrainPoseExportV1ValidationDiagnostic> diagnostics);
+
+        Assert.False(isValid);
+        Assert.Contains(diagnostics, d => d.Code == TrainPoseExportV1ValidationCode.NonFiniteNumber && d.Path == "leadDistance");
+        Assert.Contains(diagnostics, d => d.Code == TrainPoseExportV1ValidationCode.NegativeGeometryDimension && d.Path == "definition.carGeometry.length");
+        Assert.Contains(diagnostics, d => d.Code == TrainPoseExportV1ValidationCode.NegativeWheelRadius && d.Path == "definition.wheelLayout.wheelRadius");
+        Assert.Contains(diagnostics, d => d.Code == TrainPoseExportV1ValidationCode.NegativeWheelWidth && d.Path == "definition.wheelLayout.wheelWidth");
+        Assert.Contains(diagnostics, d => d.Code == TrainPoseExportV1ValidationCode.ZeroLengthBasisVector && d.Path == "cars[0].body.articulatedFrame.tangent");
+        Assert.Contains(diagnostics, d => d.Code == TrainPoseExportV1ValidationCode.NonOrthonormalBasis && d.Path == "cars[0].body.originalBody.frame.tangentNormalDot");
+    }
+
+    [Fact]
+    public void Validation_OrthonormalTolerance_AllowsSmallDeviationAndFlagsLargerDeviation()
+    {
+        TrainPoseExportV1Dto dto = TrainPoseExportV1Mapper.Export(CreateSourcePoseResult());
+
+        dto.Cars[0].Body.ArticulatedFrame.Normal = new Vector3dV1Dto
+        {
+            X = 5e-4,
+            Y = 1.0,
+            Z = 0.0
+        };
+
+        var looseOptions = new TrainPoseExportV1ValidationOptions
+        {
+            UnitVectorLengthTolerance = 1e-3,
+            OrthogonalityTolerance = 1e-3
+        };
+
+        var strictOptions = new TrainPoseExportV1ValidationOptions
+        {
+            UnitVectorLengthTolerance = 1e-6,
+            OrthogonalityTolerance = 1e-6
+        };
+
+        IReadOnlyList<TrainPoseExportV1ValidationDiagnostic> looseDiagnostics = TrainPoseExportV1Validator.Validate(dto, looseOptions);
+        IReadOnlyList<TrainPoseExportV1ValidationDiagnostic> strictDiagnostics = TrainPoseExportV1Validator.Validate(dto, strictOptions);
+
+        Assert.DoesNotContain(looseDiagnostics, d => d.Code == TrainPoseExportV1ValidationCode.NonOrthonormalBasis);
+        Assert.Contains(strictDiagnostics, d => d.Code == TrainPoseExportV1ValidationCode.NonOrthonormalBasis);
+    }
+
+    [Fact]
+    public void Validation_MatrixBottomRow_WhenEnabled_ProducesDiagnostic()
+    {
+        TrainPoseExportV1Dto dto = TrainPoseExportV1Mapper.Export(CreateSourcePoseResult());
+
+        SetAllMatrixBottomRowsCanonical(dto);
+        dto.Cars[0].Body.OriginalBody.Matrix.M41 = 0.125;
+
+        var options = new TrainPoseExportV1ValidationOptions
+        {
+            ValidateMatrixBottomRow = true,
+            MatrixBottomRowTolerance = 1e-6
+        };
+
+        IReadOnlyList<TrainPoseExportV1ValidationDiagnostic> diagnostics = TrainPoseExportV1Validator.Validate(dto, options);
+
+        Assert.Contains(
+            diagnostics,
+            d => d.Code == TrainPoseExportV1ValidationCode.InvalidMatrixBottomRow &&
+                 d.Path == "cars[0].body.originalBody.matrix.m41");
+    }
+
     private static TrainPoseResult CreateSourcePoseResult()
     {
         var definition = new TrainConsistDefinition(
@@ -507,5 +611,38 @@ public sealed class TrainPoseExportV1Tests
             seed + 5.0, seed + 6.0, seed + 7.0, seed + 8.0,
             seed + 9.0, seed + 10.0, seed + 11.0, seed + 12.0,
             seed + 13.0, seed + 14.0, seed + 15.0, seed + 16.0);
+    }
+
+    private static void SetAllMatrixBottomRowsCanonical(TrainPoseExportV1Dto dto)
+    {
+        for (int i = 0; i < dto.Cars.Length; i++)
+        {
+            ArticulatedTrainCarWithWheelsV1Dto car = dto.Cars[i];
+
+            SetMatrixBottomRowCanonical(car.Body.OriginalBody.Matrix);
+            SetMatrixBottomRowCanonical(car.Body.FrontBogie.Matrix);
+            SetMatrixBottomRowCanonical(car.Body.RearBogie.Matrix);
+            SetMatrixBottomRowCanonical(car.Body.ArticulatedMatrix);
+            SetMatrixBottomRowCanonical(car.FrontBogie.Bogie.Matrix);
+            SetMatrixBottomRowCanonical(car.RearBogie.Bogie.Matrix);
+
+            for (int frontWheelIndex = 0; frontWheelIndex < car.FrontBogie.Wheels.Length; frontWheelIndex++)
+            {
+                SetMatrixBottomRowCanonical(car.FrontBogie.Wheels[frontWheelIndex].Matrix);
+            }
+
+            for (int rearWheelIndex = 0; rearWheelIndex < car.RearBogie.Wheels.Length; rearWheelIndex++)
+            {
+                SetMatrixBottomRowCanonical(car.RearBogie.Wheels[rearWheelIndex].Matrix);
+            }
+        }
+    }
+
+    private static void SetMatrixBottomRowCanonical(Matrix4x4V1Dto matrix)
+    {
+        matrix.M41 = 0.0;
+        matrix.M42 = 0.0;
+        matrix.M43 = 0.0;
+        matrix.M44 = 1.0;
     }
 }
