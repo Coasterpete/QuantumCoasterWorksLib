@@ -367,6 +367,23 @@ public sealed class TrainCarTransformProviderTests
     }
 
     [Fact]
+    public void EvaluateTrainWithBogies_WhenFrontAndRearBogieDistancesAreOutOfRange_ThrowsFrontBogieFirst()
+    {
+        TrackDocument document = BuildStraightTrack(length: 1.0);
+        var evaluator = new TrackEvaluator(document);
+        var provider = new TrainCarTransformProvider(evaluator);
+
+        ArgumentOutOfRangeException exception = Assert.Throws<ArgumentOutOfRangeException>(() => provider.EvaluateTrainWithBogies(
+            leadDistance: 0.5,
+            carCount: 1,
+            carSpacing: 1.0,
+            bogieSpacing: 3.0));
+
+        Assert.Contains("front bogie", exception.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("rear bogie", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void EvaluateTrainWithBogies_WhenRearBogieDistanceIsOutOfRange_ThrowsWithClearMessage()
     {
         TrackDocument document = BuildStraightTrack(length: 6.0);
