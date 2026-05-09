@@ -3,6 +3,7 @@
 - Contract name: `quantum.train_pose`
 - Version: `1`
 - Serialization naming: camelCase JSON properties
+- Machine-readable schema: `Quantum.Tests/IO/Fixtures/TrainPoseExportV1.schema.json` (Draft 2020-12)
 
 ## Top-Level Fields
 - `contract` (string, required): must equal `quantum.train_pose`.

@@ -2,6 +2,8 @@ using System;
 using System.IO;
 using System.Numerics;
 using System.Text.Json;
+using System.Text.Json.Nodes;
+using Json.Schema;
 using Quantum.IO.TrainPose.V1;
 using Quantum.Math;
 using Quantum.Track;
@@ -11,6 +13,8 @@ namespace Quantum.Tests;
 
 public sealed class TrainPoseExportV1Tests
 {
+    private static readonly Lazy<JsonSchema> TrainPoseExportSchema = new(CreateTrainPoseExportSchema);
+
     [Fact]
     public void Export_SetsContractAndVersion()
     {
@@ -238,6 +242,42 @@ public sealed class TrainPoseExportV1Tests
         Assert.Contains("malformed", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public void SchemaValidation_GoldenFixture_IsValid()
+    {
+        string json = LoadGoldenFixtureJson();
+
+        Assert.True(IsValidAgainstSchema(json));
+    }
+
+    [Fact]
+    public void SchemaValidation_RuntimeGeneratedExport_IsValid()
+    {
+        TrainPoseExportV1Dto dto = TrainPoseExportV1Mapper.Export(CreateSourcePoseResult());
+
+        string json = TrainPoseExportV1Json.Serialize(dto);
+
+        Assert.True(IsValidAgainstSchema(json));
+    }
+
+    [Fact]
+    public void SchemaValidation_RejectsMissingRequiredField()
+    {
+        JsonObject json = ParseJsonObject(LoadGoldenFixtureJson());
+        Assert.True(json.Remove("leadDistance"));
+
+        Assert.False(IsValidAgainstSchema(json.ToJsonString()));
+    }
+
+    [Fact]
+    public void SchemaValidation_RejectsWrongTypedRequiredField()
+    {
+        JsonObject json = ParseJsonObject(LoadGoldenFixtureJson());
+        json["version"] = "1";
+
+        Assert.False(IsValidAgainstSchema(json.ToJsonString()));
+    }
+
     private static TrainPoseResult CreateSourcePoseResult()
     {
         var definition = new TrainConsistDefinition(
@@ -327,6 +367,39 @@ public sealed class TrainPoseExportV1Tests
         string fixturePath = Path.Combine(AppContext.BaseDirectory, "IO", "Fixtures", "TrainPoseExportV1.golden.json");
         Assert.True(File.Exists(fixturePath), $"Golden fixture file was not found at '{fixturePath}'.");
         return File.ReadAllText(fixturePath);
+    }
+
+    private static bool IsValidAgainstSchema(string instanceJson)
+    {
+        using JsonDocument instanceDocument = JsonDocument.Parse(instanceJson);
+
+        EvaluationResults results = TrainPoseExportSchema.Value.Evaluate(
+            instanceDocument.RootElement,
+            new EvaluationOptions
+            {
+                OutputFormat = OutputFormat.List
+            });
+
+        return results.IsValid;
+    }
+
+    private static JsonSchema CreateTrainPoseExportSchema()
+    {
+        string schemaPath = Path.Combine(AppContext.BaseDirectory, "IO", "Fixtures", "TrainPoseExportV1.schema.json");
+        if (!File.Exists(schemaPath))
+        {
+            throw new FileNotFoundException($"Schema file was not found at '{schemaPath}'.", schemaPath);
+        }
+
+        string schemaJson = File.ReadAllText(schemaPath);
+        return JsonSchema.FromText(schemaJson);
+    }
+
+    private static JsonObject ParseJsonObject(string json)
+    {
+        JsonNode? node = JsonNode.Parse(json);
+        Assert.NotNull(node);
+        return Assert.IsType<JsonObject>(node);
     }
 
     private static string NormalizeLineEndings(string value)
