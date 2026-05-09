@@ -6,7 +6,8 @@ namespace Quantum.Debug
     public enum DebugCommandKind
     {
         Validate,
-        SamplingPerf
+        SamplingPerf,
+        TrainPoseExportV1
     }
 
     public static class DebugCommandParser
@@ -29,6 +30,12 @@ namespace Quantum.Debug
             if (string.Equals(args[0], "sampling-perf", StringComparison.OrdinalIgnoreCase))
             {
                 command = DebugCommandKind.SamplingPerf;
+                return true;
+            }
+
+            if (string.Equals(args[0], "train-pose-export-v1", StringComparison.OrdinalIgnoreCase))
+            {
+                command = DebugCommandKind.TrainPoseExportV1;
                 return true;
             }
 

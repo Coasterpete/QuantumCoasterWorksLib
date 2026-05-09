@@ -23,6 +23,15 @@ public sealed class DebugCommandParserTests
     }
 
     [Fact]
+    public void TryParse_TrainPoseExportV1Command_ParsesCaseInsensitive()
+    {
+        bool parsed = DebugCommandParser.TryParse(new[] { "TrAiN-PoSe-ExPoRt-V1" }, out DebugCommandKind command);
+
+        Assert.True(parsed);
+        Assert.Equal(DebugCommandKind.TrainPoseExportV1, command);
+    }
+
+    [Fact]
     public void TryParse_UnknownCommand_ReturnsFalse()
     {
         bool parsed = DebugCommandParser.TryParse(new[] { "unknown-command" }, out DebugCommandKind command);

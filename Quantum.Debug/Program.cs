@@ -18,6 +18,7 @@ namespace Quantum.Debug
                 Console.WriteLine("Unknown command.");
                 Console.WriteLine("Supported commands:");
                 Console.WriteLine("  sampling-perf");
+                Console.WriteLine("  train-pose-export-v1 [outputPath]");
                 return 1;
             }
 
@@ -25,6 +26,18 @@ namespace Quantum.Debug
             {
                 SamplingPerfCommand.Run();
                 return 0;
+            }
+
+            if (command == DebugCommandKind.TrainPoseExportV1)
+            {
+                if (args.Length > 2)
+                {
+                    Console.WriteLine("Usage: train-pose-export-v1 [outputPath]");
+                    return 1;
+                }
+
+                string? outputPath = args.Length == 2 ? args[1] : null;
+                return TrainPoseExportV1Command.Run(outputPath);
             }
 
             RunValidation();
