@@ -44,6 +44,7 @@ namespace Quantum.Track.Internal
             double totalLength = _evaluator.GetBoundTrackTotalLength();
             ValidateDistanceInRange(leadDistance, totalLength, "Lead car distance is out of range.");
 
+            var distances = new double[carCount];
             var transforms = new List<TrainCarTransform>(carCount);
 
             for (int i = 0; i < carCount; i++)
@@ -54,8 +55,15 @@ namespace Quantum.Track.Internal
                     totalLength,
                     $"Computed distance for car {i} is out of range.");
 
-                TrackFrame frame = _evaluator.EvaluateFrameAtDistance(distance);
-                transforms.Add(new TrainCarTransform(i, distance, frame, frame.ToMatrix4x4()));
+                distances[i] = distance;
+            }
+
+            TrackFrame[] frames = _evaluator.EvaluateFramesAtDistances(distances);
+
+            for (int i = 0; i < carCount; i++)
+            {
+                TrackFrame frame = frames[i];
+                transforms.Add(new TrainCarTransform(i, distances[i], frame, frame.ToMatrix4x4()));
             }
 
             return transforms;
