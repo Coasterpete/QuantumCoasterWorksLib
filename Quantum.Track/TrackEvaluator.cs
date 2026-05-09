@@ -188,12 +188,28 @@ namespace Quantum.Track
             }
 
             CompiledTrackSamplingContext samplingContext = CompiledTrackSamplingContext.Compile(doc);
-            Dictionary<TrackSegment, int> firstSegmentIndicesByReference = BuildFirstSegmentIndicesByReference(doc);
+            Dictionary<TrackSegment, int>? firstSegmentIndicesByReference = null;
             var frames = new SplineTrackFrame[distanceCount];
 
             for (int i = 0; i < distanceCount; i++)
             {
                 ResolvedTrackDistance resolvedDistance = samplingContext.Resolve(distances[i]);
+
+                if (resolvedDistance.Segment.Spline is IParamCurve spline)
+                {
+                    ThrowIfFrameLocalTInvalid(resolvedDistance.LocalT);
+
+                    var evaluationPoint = new TrackEvaluationPoint(
+                        resolvedDistance.Segment,
+                        resolvedDistance.LocalT);
+                    double rollRadians = ResolveRollRadians(evaluationPoint);
+                    Vector3d splinePosition = spline.Evaluate(resolvedDistance.LocalT);
+                    Vector3d splineTangent = NormalizeOrThrow(spline.Tangent(resolvedDistance.LocalT), "tangent");
+                    frames[i] = BuildTrackFrame(evaluationPoint, splinePosition, splineTangent, rollRadians);
+                    continue;
+                }
+
+                firstSegmentIndicesByReference ??= BuildFirstSegmentIndicesByReference(doc);
                 TrackPosition position = ResolveTrackPosition(firstSegmentIndicesByReference, resolvedDistance);
                 frames[i] = EvaluateFrame(doc, position);
             }
@@ -458,6 +474,17 @@ namespace Quantum.Track
                     nameof(distance),
                     distance,
                     "Distance must be finite.");
+            }
+        }
+
+        private static void ThrowIfFrameLocalTInvalid(double localT)
+        {
+            if (double.IsNaN(localT) || double.IsInfinity(localT) || localT < 0.0 || localT > 1.0)
+            {
+                throw new System.ArgumentOutOfRangeException(
+                    nameof(TrackPosition.LocalT),
+                    localT,
+                    "LocalT must be finite and within [0.0, 1.0].");
             }
         }
 

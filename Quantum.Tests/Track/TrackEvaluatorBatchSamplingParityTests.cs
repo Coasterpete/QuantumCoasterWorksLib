@@ -86,6 +86,36 @@ public sealed class TrackEvaluatorBatchSamplingParityTests
     }
 
     [Fact]
+    public void TrackEvaluator_EvaluateFramesAtDistances_DocumentOverload_DuplicateSplineSegmentReferences_MatchesScalarBehavior()
+    {
+        TrackSegment repeated = new StraightSegment(
+            length: 5.0,
+            id: "shared-spline",
+            spline: new LineCurve(
+                new Vector3d(0.0, 0.0, 0.0),
+                new Vector3d(5.0, 1.0, 0.0)));
+        TrackSegment middle = new StraightSegment(
+            length: 3.0,
+            id: "middle-spline",
+            spline: new LineCurve(
+                new Vector3d(100.0, -5.0, 2.0),
+                new Vector3d(103.0, -3.0, 2.0)));
+        var document = new TrackDocument(new[] { repeated, middle, repeated });
+        var evaluator = new TrackEvaluator();
+        double[] distances = { 0.0, 4.0, 5.0, 6.5, 9.0, 12.5 };
+
+        SplineTrackFrame[] frames = evaluator.EvaluateFramesAtDistances(document, distances);
+
+        Assert.Equal(distances.Length, frames.Length);
+
+        for (int i = 0; i < distances.Length; i++)
+        {
+            SplineTrackFrame expected = evaluator.EvaluateFrameAtDistance(document, distances[i]);
+            AssertSplineFrameNear(expected, frames[i]);
+        }
+    }
+
+    [Fact]
     public void TrackEvaluator_EvaluateAtDistances_DuplicateDistances_PreservesDuplicateOutputsAndOrder()
     {
         var evaluator = new TrackEvaluator();
