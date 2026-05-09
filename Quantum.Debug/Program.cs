@@ -11,7 +11,27 @@ namespace Quantum.Debug
         private static readonly double[] SampleTValues = { 0.0, 0.25, 0.5, 0.75, 1.0 };
         private const double NormalizedTolerance = 1e-3;
 
-        static void Main()
+        static int Main(string[] args)
+        {
+            if (!DebugCommandParser.TryParse(args, out DebugCommandKind command))
+            {
+                Console.WriteLine("Unknown command.");
+                Console.WriteLine("Supported commands:");
+                Console.WriteLine("  sampling-perf");
+                return 1;
+            }
+
+            if (command == DebugCommandKind.SamplingPerf)
+            {
+                SamplingPerfCommand.Run();
+                return 0;
+            }
+
+            RunValidation();
+            return 0;
+        }
+
+        private static void RunValidation()
         {
             Console.WriteLine("=== Quantum Debug ===");
 
