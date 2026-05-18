@@ -1,6 +1,6 @@
 # Spline Backend Migration Status
 
-As of 2026-05-12, the spline backend is in a mixed state: runtime arc-length sampling in FVD is already using the G-Shark adapter, while legacy `NurbsCurve` is still kept for compatibility and parity.
+As of 2026-05-18, the spline backend is in an adapter-first transition state: runtime arc-length sampling in FVD consumes runtime interface surfaces backed by the G-Shark adapter, while legacy `NurbsCurve` and `ArcCurve` surfaces are still kept for compatibility and parity.
 
 ## Current Active Backend Paths
 
@@ -13,8 +13,9 @@ As of 2026-05-12, the spline backend is in a mixed state: runtime arc-length sam
 2. FVD NURBS build path:
    - `Quantum.FVD/FvdGraph.cs:145` builds a legacy `NurbsCurve` (`ParamCurve` compatibility surface).
    - `Quantum.FVD/FvdGraph.cs:146` builds `GSharkNurbsCurveAdapter`.
-   - `Quantum.FVD/FvdGraph.cs:147` wraps the G-Shark curve in `ArcLengthCurveAdapter` for distance sampling.
-   - `Quantum.FVD/Fvd2dNormalGSolver.cs:275` consumes `BuildNurbsCurve(...).ArcCurve`.
+   - `Quantum.FVD/FvdGraph.cs:147` wraps the G-Shark curve in `ArcLengthCurveAdapter`.
+   - `Quantum.FVD/FvdNurbsBuildResult.cs` exposes both compatibility properties (`ParamCurve`, `ArcCurve`) and runtime consumer surfaces (`RuntimeParamCurve`, `RuntimeArcLengthCurve`).
+   - `Quantum.FVD/Fvd2dNormalGSolver.cs` consumes `BuildNurbsCurve(...).RuntimeArcLengthCurve`.
 
 3. Section-generated geometric fallback path (non-NURBS):
    - `Quantum.Track/GeometricSection.cs:24` generates section curves (`LineCurve` or constant-curvature arc).
@@ -24,8 +25,10 @@ As of 2026-05-12, the spline backend is in a mixed state: runtime arc-length sam
 ## Legacy Reference Classes
 
 - `Quantum.Splines/Curves/NurbsCurve.cs` remains the legacy in-house NURBS evaluator.
-- `Quantum.FVD/FvdNurbsBuildResult.cs:8` still exposes `ParamCurve` as concrete `NurbsCurve`.
-- `Quantum.FVD/FvdNurbsBuildResult.cs:12` constructor still requires `NurbsCurve`.
+- `Quantum.FVD/FvdNurbsBuildResult.cs` still exposes `ParamCurve` as concrete `NurbsCurve`.
+- `Quantum.FVD/FvdNurbsBuildResult.cs` still exposes `ArcCurve` as a compatibility property.
+- `RuntimeParamCurve` and `RuntimeArcLengthCurve` are the runtime consumer surfaces; `RuntimeArcLengthCurve` is the FVD solver arc-length sampling surface.
+- `Quantum.FVD/FvdNurbsBuildResult.cs` constructor still requires the legacy compatibility inputs.
 - Contract/parity tests still reference legacy behavior and type presence:
   - `Quantum.Tests/FVD/FvdFoundationTests.cs:187`
   - `Quantum.Tests/Splines/GSharkNurbsCurveAdapterTests.cs:33`
@@ -37,7 +40,7 @@ As of 2026-05-12, the spline backend is in a mixed state: runtime arc-length sam
 - Package dependency is active: `Quantum.Splines/Quantum.Splines.csproj:13` (`GShark` 2.3.1).
 - Adapter implementation is present: `Quantum.Splines/Curves/GSharkNurbsCurveAdapter.cs`.
 - Conversion bridge is present: `Quantum.Splines/GSharkVector3dConversions.cs`.
-- Production usage is active in FVD arc-length sampling path (`FvdGraph -> ArcLengthCurveAdapter -> Fvd2dNormalGSolver`).
+- Production usage is active in the FVD arc-length sampling path (`FvdGraph -> FvdNurbsBuildResult.RuntimeArcLengthCurve -> Fvd2dNormalGSolver`).
 - Parity coverage exists (legacy-vs-adapter value checks and train spacing/frame checks):
   - `Quantum.Tests/Splines/GSharkNurbsCurveAdapterTests.cs`
   - `Quantum.Tests/Track/GSharkTrainCarSpacingParityTests.cs`
@@ -46,8 +49,9 @@ As of 2026-05-12, the spline backend is in a mixed state: runtime arc-length sam
 
 Production legacy-touching call sites:
 - `Quantum.FVD/FvdGraph.cs:145` (`new NurbsCurve(...)`)
-- `Quantum.FVD/FvdNurbsBuildResult.cs:8` (`ParamCurve` concrete type)
-- `Quantum.FVD/FvdNurbsBuildResult.cs:12` (constructor signature requires `NurbsCurve`)
+- `Quantum.FVD/FvdNurbsBuildResult.cs` (`ParamCurve` concrete compatibility type)
+- `Quantum.FVD/FvdNurbsBuildResult.cs` (`ArcCurve` compatibility property)
+- `Quantum.FVD/FvdNurbsBuildResult.cs` (constructor signature requires compatibility inputs)
 
 Test/reference legacy call sites:
 - `Quantum.Tests/Splines/GSharkNurbsCurveAdapterTests.cs:33`
@@ -58,6 +62,8 @@ Test/reference legacy call sites:
 Production G-Shark call sites:
 - `Quantum.FVD/FvdGraph.cs:146`
 - `Quantum.FVD/FvdGraph.cs:147`
+- `Quantum.FVD/FvdNurbsBuildResult.cs` (`RuntimeParamCurve`, `RuntimeArcLengthCurve`)
+- `Quantum.FVD/Fvd2dNormalGSolver.cs` (`RuntimeArcLengthCurve`)
 
 ## Migration Rules
 
@@ -71,7 +77,7 @@ Production G-Shark call sites:
 ## What Should Not Be Deleted Yet
 
 - `Quantum.Splines/Curves/NurbsCurve.cs` (legacy parity baseline and compatibility surface).
-- `Quantum.FVD/FvdNurbsBuildResult.cs` (current contract surface still exposes `ParamCurve`).
+- `Quantum.FVD/FvdNurbsBuildResult.cs` (contract surface still exposes compatibility `ParamCurve` and `ArcCurve`, plus runtime `RuntimeParamCurve` and `RuntimeArcLengthCurve`).
 - `Quantum.FVD/FvdGraph.cs::BuildNurbsCurve(int)` public API shape.
 - `Quantum.Splines/Curves/GSharkNurbsCurveAdapter.cs` and `Quantum.Splines/GSharkVector3dConversions.cs`.
 - Migration/parity tests:

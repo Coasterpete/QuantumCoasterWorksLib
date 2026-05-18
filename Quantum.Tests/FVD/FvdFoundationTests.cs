@@ -284,7 +284,7 @@ public class FvdFoundationTests
     }
 
     [Fact]
-    public void FvdGraph_BuildNurbsCurve_UsesGSharkAdapterForArcLengthSamplingPath()
+    public void FvdGraph_BuildNurbsCurve_UsesGSharkAdapterForRuntimeArcLengthSamplingPath()
     {
         Type graphType = RequireFvdGraphType();
         Type nodeType = RequireFvdControlNodeType();
@@ -299,21 +299,21 @@ public class FvdFoundationTests
             CreateNodeOrFail(nodeType, 1.00, new Vector3d(12, 0, 0), 1.0));
 
         object buildResult = BuildNurbsCurveOrFail(graph, arcLengthSamples: 200);
-        IArcLengthCurve arcCurve = GetArcCurveOrFail(buildResult);
+        IArcLengthCurve runtimeArcLengthCurve = GetRuntimeArcLengthCurveOrFail(buildResult);
 
-        FieldInfo? curveField = arcCurve.GetType().GetField(
+        FieldInfo? curveField = runtimeArcLengthCurve.GetType().GetField(
             "_curve",
             BindingFlags.NonPublic | BindingFlags.Instance);
 
         Assert.True(curveField is not null, "Expected ArcLengthCurveAdapter to keep an internal _curve field.");
 
-        object? sourceCurve = curveField!.GetValue(arcCurve);
+        object? sourceCurve = curveField!.GetValue(runtimeArcLengthCurve);
         Assert.True(sourceCurve is not null, "Expected ArcLengthCurveAdapter internal source curve to be non-null.");
         Assert.Equal("GSharkNurbsCurveAdapter", sourceCurve!.GetType().Name);
     }
 
     [Fact]
-    public void FvdGraph_BuiltArcLengthCurve_ClampsEndpointsSafely()
+    public void FvdGraph_BuiltRuntimeArcLengthCurve_ClampsEndpointsSafely()
     {
         Type graphType = RequireFvdGraphType();
         Type nodeType = RequireFvdControlNodeType();
@@ -328,18 +328,18 @@ public class FvdFoundationTests
             CreateNodeOrFail(nodeType, 1.00, new Vector3d(12, 0, 0), 1.0));
 
         object buildResult = BuildNurbsCurveOrFail(graph, arcLengthSamples: 200);
-        IArcLengthCurve arcCurve = GetArcCurveOrFail(buildResult);
+        IArcLengthCurve runtimeArcLengthCurve = GetRuntimeArcLengthCurveOrFail(buildResult);
 
-        Vector3d start = arcCurve.EvaluateByLength(0.0);
-        Vector3d end = arcCurve.EvaluateByLength(arcCurve.Length);
-        Vector3d beforeStart = arcCurve.EvaluateByLength(-1.0);
-        Vector3d afterEnd = arcCurve.EvaluateByLength(arcCurve.Length + 1.0);
+        Vector3d start = runtimeArcLengthCurve.EvaluateByLength(0.0);
+        Vector3d end = runtimeArcLengthCurve.EvaluateByLength(runtimeArcLengthCurve.Length);
+        Vector3d beforeStart = runtimeArcLengthCurve.EvaluateByLength(-1.0);
+        Vector3d afterEnd = runtimeArcLengthCurve.EvaluateByLength(runtimeArcLengthCurve.Length + 1.0);
 
         AssertVectorNear(start, beforeStart, ValueTolerance);
         AssertVectorNear(end, afterEnd, ValueTolerance);
 
-        Vector3d tanBeforeStart = arcCurve.TangentByLength(-1.0);
-        Vector3d tanAfterEnd = arcCurve.TangentByLength(arcCurve.Length + 1.0);
+        Vector3d tanBeforeStart = runtimeArcLengthCurve.TangentByLength(-1.0);
+        Vector3d tanAfterEnd = runtimeArcLengthCurve.TangentByLength(runtimeArcLengthCurve.Length + 1.0);
 
         AssertFinite(tanBeforeStart);
         AssertFinite(tanAfterEnd);

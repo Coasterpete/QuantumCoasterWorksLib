@@ -50,7 +50,7 @@ public class FvdSolverPrototypeTests
     }
 
     [Fact]
-    public void Fvd2dNormalGSolver_Step_RuntimeArcLengthCurvePath_PreservesLegacyArcCurveErrorProxy()
+    public void Fvd2dNormalGSolver_Step_RuntimeArcLengthCurvePath_ReportsExpectedErrorProxy()
     {
         const double midpointX = 50.0;
         const double speedMps = 20.0;
@@ -66,7 +66,7 @@ public class FvdSolverPrototypeTests
             FvdSectionChannel.NormalG,
             midpointX);
         double expectedBeforeError = System.Math.Abs(
-            EvaluateRealizedNormalGProxyUsingLegacyArcCurve(
+            EvaluateRealizedNormalGProxyUsingRuntimeArcLengthCurve(
                 graph,
                 FvdFunctionDomain.Distance,
                 midpointX,
@@ -81,7 +81,7 @@ public class FvdSolverPrototypeTests
             arcLengthSamples: arcLengthSamples);
         FvdGraph afterGraph = ReadGraphPropertyOrFail(result, "Graph");
         double expectedAfterError = System.Math.Abs(
-            EvaluateRealizedNormalGProxyUsingLegacyArcCurve(
+            EvaluateRealizedNormalGProxyUsingRuntimeArcLengthCurve(
                 afterGraph,
                 FvdFunctionDomain.Distance,
                 midpointX,
@@ -387,9 +387,9 @@ public class FvdSolverPrototypeTests
 
                 FvdNurbsBuildResult buildResult = afterGraph.BuildNurbsCurve(64);
                 Assert.NotNull(buildResult);
-                Assert.False(double.IsNaN(buildResult.ArcCurve.Length));
-                Assert.False(double.IsInfinity(buildResult.ArcCurve.Length));
-                Assert.True(buildResult.ArcCurve.Length >= 0.0);
+                Assert.False(double.IsNaN(buildResult.RuntimeArcLengthCurve.Length));
+                Assert.False(double.IsInfinity(buildResult.RuntimeArcLengthCurve.Length));
+                Assert.True(buildResult.RuntimeArcLengthCurve.Length >= 0.0);
             }
         }
     }
@@ -820,7 +820,7 @@ public class FvdSolverPrototypeTests
         return result!;
     }
 
-    private static double EvaluateRealizedNormalGProxyUsingLegacyArcCurve(
+    private static double EvaluateRealizedNormalGProxyUsingRuntimeArcLengthCurve(
         FvdGraph graph,
         FvdFunctionDomain domain,
         double evaluationX,
@@ -828,7 +828,7 @@ public class FvdSolverPrototypeTests
         int arcLengthSamples)
     {
         FvdNurbsBuildResult buildResult = graph.BuildNurbsCurve(arcLengthSamples);
-        IArcLengthCurve arcCurve = buildResult.ArcCurve;
+        IArcLengthCurve arcCurve = buildResult.RuntimeArcLengthCurve;
 
         double sampledS = MapEvaluationXToCurveDistanceForTest(graph, domain, evaluationX, arcCurve.Length);
         double curvature = EstimateCurvatureMagnitudeForTest(arcCurve, sampledS);
