@@ -198,6 +198,92 @@ public class FvdFoundationTests
     }
 
     [Fact]
+    public void FvdNurbsBuildResult_KeepsLegacyConcreteProperties_AndAddsRuntimeInterfaceProperties()
+    {
+        Type graphType = RequireFvdGraphType();
+        Type nodeType = RequireFvdControlNodeType();
+
+        object graph = CreateGraphOrFail(
+            graphType,
+            nodeType,
+            degree: 3,
+            CreateNodeOrFail(nodeType, 0.00, new Vector3d(0, 0, 0), 1.0),
+            CreateNodeOrFail(nodeType, 0.33, new Vector3d(4, 5, 0), 0.9),
+            CreateNodeOrFail(nodeType, 0.66, new Vector3d(8, -3, 0), 1.2),
+            CreateNodeOrFail(nodeType, 1.00, new Vector3d(12, 0, 0), 1.0));
+
+        object buildResult = BuildNurbsCurveOrFail(graph, arcLengthSamples: 200);
+        Type resultType = buildResult.GetType();
+
+        PropertyInfo? paramCurveProperty = resultType.GetProperty(
+            "ParamCurve",
+            BindingFlags.Public | BindingFlags.Instance);
+        PropertyInfo? arcCurveProperty = resultType.GetProperty(
+            "ArcCurve",
+            BindingFlags.Public | BindingFlags.Instance);
+        PropertyInfo? runtimeParamCurveProperty = resultType.GetProperty(
+            "RuntimeParamCurve",
+            BindingFlags.Public | BindingFlags.Instance);
+        PropertyInfo? runtimeArcLengthCurveProperty = resultType.GetProperty(
+            "RuntimeArcLengthCurve",
+            BindingFlags.Public | BindingFlags.Instance);
+
+        Assert.True(paramCurveProperty is not null, "Expected FvdNurbsBuildResult.ParamCurve property.");
+        Assert.True(arcCurveProperty is not null, "Expected FvdNurbsBuildResult.ArcCurve property.");
+        Assert.True(runtimeParamCurveProperty is not null, "Expected FvdNurbsBuildResult.RuntimeParamCurve property.");
+        Assert.True(runtimeArcLengthCurveProperty is not null, "Expected FvdNurbsBuildResult.RuntimeArcLengthCurve property.");
+
+        Assert.Equal(typeof(NurbsCurve), paramCurveProperty!.PropertyType);
+        Assert.Equal(typeof(ArcLengthCurveAdapter), arcCurveProperty!.PropertyType);
+        Assert.Equal(typeof(IParamCurve), runtimeParamCurveProperty!.PropertyType);
+        Assert.Equal(typeof(IArcLengthCurve), runtimeArcLengthCurveProperty!.PropertyType);
+
+        Assert.NotNull(paramCurveProperty.GetValue(buildResult));
+        Assert.NotNull(arcCurveProperty.GetValue(buildResult));
+        Assert.NotNull(runtimeParamCurveProperty.GetValue(buildResult));
+        Assert.NotNull(runtimeArcLengthCurveProperty.GetValue(buildResult));
+    }
+
+    [Fact]
+    public void FvdNurbsBuildResult_RuntimeArcLengthCurve_MatchesLegacyArcCurveSampledPositions()
+    {
+        Type graphType = RequireFvdGraphType();
+        Type nodeType = RequireFvdControlNodeType();
+
+        object graph = CreateGraphOrFail(
+            graphType,
+            nodeType,
+            degree: 3,
+            CreateNodeOrFail(nodeType, 0.00, new Vector3d(0, 0, 0), 1.0),
+            CreateNodeOrFail(nodeType, 0.33, new Vector3d(4, 5, 0), 0.9),
+            CreateNodeOrFail(nodeType, 0.66, new Vector3d(8, -3, 0), 1.2),
+            CreateNodeOrFail(nodeType, 1.00, new Vector3d(12, 0, 0), 1.0));
+
+        object buildResult = BuildNurbsCurveOrFail(graph, arcLengthSamples: 200);
+        IArcLengthCurve arcCurve = GetArcCurveOrFail(buildResult);
+        IArcLengthCurve runtimeArcLengthCurve = GetRuntimeArcLengthCurveOrFail(buildResult);
+
+        Assert.InRange(System.Math.Abs(arcCurve.Length - runtimeArcLengthCurve.Length), 0.0, LengthTolerance);
+
+        double length = arcCurve.Length;
+        double[] distances =
+        {
+            0.0,
+            length * 0.125,
+            length * 0.5,
+            length * 0.875,
+            length
+        };
+
+        for (int i = 0; i < distances.Length; i++)
+        {
+            Vector3d expected = arcCurve.EvaluateByLength(distances[i]);
+            Vector3d actual = runtimeArcLengthCurve.EvaluateByLength(distances[i]);
+            AssertVectorNear(expected, actual, ValueTolerance);
+        }
+    }
+
+    [Fact]
     public void FvdGraph_BuildNurbsCurve_UsesGSharkAdapterForArcLengthSamplingPath()
     {
         Type graphType = RequireFvdGraphType();
@@ -313,6 +399,19 @@ public class FvdFoundationTests
         Assert.True(
             prop is not null,
             "Expected FvdNurbsBuildResult.ArcCurve property.");
+
+        object? value = prop!.GetValue(buildResult);
+        return Assert.IsAssignableFrom<IArcLengthCurve>(value);
+    }
+
+    private static IArcLengthCurve GetRuntimeArcLengthCurveOrFail(object buildResult)
+    {
+        Type resultType = buildResult.GetType();
+        PropertyInfo? prop = resultType.GetProperty("RuntimeArcLengthCurve", BindingFlags.Public | BindingFlags.Instance);
+
+        Assert.True(
+            prop is not null,
+            "Expected FvdNurbsBuildResult.RuntimeArcLengthCurve property.");
 
         object? value = prop!.GetValue(buildResult);
         return Assert.IsAssignableFrom<IArcLengthCurve>(value);

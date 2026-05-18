@@ -146,7 +146,7 @@ namespace Quantum.FVD
             var gSharkCurve = new GSharkNurbsCurveAdapter(controlPoints, weights, Degree);
             var arcCurve = new ArcLengthCurveAdapter(gSharkCurve, arcLengthSamples);
 
-            return new FvdNurbsBuildResult(paramCurve, arcCurve);
+            return new FvdNurbsBuildResult(paramCurve, arcCurve, gSharkCurve, arcCurve);
         }
 
         public double EvaluateSectionChannelAt(
