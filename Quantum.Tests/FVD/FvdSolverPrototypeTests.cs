@@ -3,12 +3,14 @@ using System.Collections.Generic;
 using System.Reflection;
 using Quantum.FVD;
 using Quantum.Math;
+using Quantum.Splines;
 using Xunit;
 
 namespace Quantum.Tests;
 
 public class FvdSolverPrototypeTests
 {
+    private const double GravityMps2 = 9.81;
     private const double EqualityTolerance = 1e-12;
 
     [Fact]
@@ -45,6 +47,55 @@ public class FvdSolverPrototypeTests
 
         Assert.Equal("Success", statusName);
         Assert.InRange(afterError, 0.0, beforeError + 1e-9);
+    }
+
+    [Fact]
+    public void Fvd2dNormalGSolver_Step_RuntimeArcLengthCurvePath_PreservesLegacyArcCurveErrorProxy()
+    {
+        const double midpointX = 50.0;
+        const double speedMps = 20.0;
+        const int arcLengthSamples = 256;
+
+        FvdGraph graph = BuildSimple2dGraphWithForceDistanceSection(
+            includeNormalTarget: true,
+            midpointNormalGTarget: 1.80);
+
+        double targetNormalG = graph.EvaluateSectionChannelAt(
+            FvdSectionKind.Force,
+            FvdFunctionDomain.Distance,
+            FvdSectionChannel.NormalG,
+            midpointX);
+        double expectedBeforeError = System.Math.Abs(
+            EvaluateRealizedNormalGProxyUsingLegacyArcCurve(
+                graph,
+                FvdFunctionDomain.Distance,
+                midpointX,
+                speedMps,
+                arcLengthSamples)
+            - targetNormalG);
+
+        object result = StepGraphOnceOrFail(
+            graph,
+            midpointX,
+            speedMps: speedMps,
+            arcLengthSamples: arcLengthSamples);
+        FvdGraph afterGraph = ReadGraphPropertyOrFail(result, "Graph");
+        double expectedAfterError = System.Math.Abs(
+            EvaluateRealizedNormalGProxyUsingLegacyArcCurve(
+                afterGraph,
+                FvdFunctionDomain.Distance,
+                midpointX,
+                speedMps,
+                arcLengthSamples)
+            - targetNormalG);
+
+        string statusName = ReadEnumNamePropertyOrFail(result, "Status");
+        double beforeError = ReadDoublePropertyOrFail(result, "BeforeAbsoluteNormalGError");
+        double afterError = ReadDoublePropertyOrFail(result, "AfterAbsoluteNormalGError");
+
+        Assert.Equal("Success", statusName);
+        Assert.InRange(System.Math.Abs(beforeError - expectedBeforeError), 0.0, EqualityTolerance);
+        Assert.InRange(System.Math.Abs(afterError - expectedAfterError), 0.0, EqualityTolerance);
     }
 
     [Fact]
@@ -727,6 +778,7 @@ public class FvdSolverPrototypeTests
         double? derivativeEpsilon = null,
         bool? enableDeterministicInteriorNodeSweep = null,
         int? interiorNodeSweepStartIndex = null,
+        int? arcLengthSamples = null,
         FvdFunctionDomain? domain = null)
     {
         Type solverType = RequireFvdType("Quantum.FVD.Fvd2dNormalGSolver");
@@ -744,6 +796,8 @@ public class FvdSolverPrototypeTests
         SetPropertyIfPresent(options, "MaxDeltaYStep", maxDeltaYStep);
         if (derivativeEpsilon.HasValue)
             SetPropertyIfPresent(options, "DerivativeEpsilon", derivativeEpsilon.Value);
+        if (arcLengthSamples.HasValue)
+            SetPropertyIfPresent(options, "ArcLengthSamples", arcLengthSamples.Value);
         if (enableDeterministicInteriorNodeSweep.HasValue)
             SetPropertyIfPresent(options, "EnableDeterministicInteriorNodeSweep", enableDeterministicInteriorNodeSweep.Value);
         if (interiorNodeSweepStartIndex.HasValue)
@@ -764,6 +818,111 @@ public class FvdSolverPrototypeTests
         Assert.True(result is not null, "Expected solver Step(...) to return a non-null result.");
 
         return result!;
+    }
+
+    private static double EvaluateRealizedNormalGProxyUsingLegacyArcCurve(
+        FvdGraph graph,
+        FvdFunctionDomain domain,
+        double evaluationX,
+        double speedMps,
+        int arcLengthSamples)
+    {
+        FvdNurbsBuildResult buildResult = graph.BuildNurbsCurve(arcLengthSamples);
+        IArcLengthCurve arcCurve = buildResult.ArcCurve;
+
+        double sampledS = MapEvaluationXToCurveDistanceForTest(graph, domain, evaluationX, arcCurve.Length);
+        double curvature = EstimateCurvatureMagnitudeForTest(arcCurve, sampledS);
+        double speedSquared = speedMps * speedMps;
+
+        return (speedSquared * curvature) / GravityMps2;
+    }
+
+    private static double MapEvaluationXToCurveDistanceForTest(
+        FvdGraph graph,
+        FvdFunctionDomain domain,
+        double evaluationX,
+        double curveLength)
+    {
+        if (curveLength <= MathUtil.Epsilon)
+            return 0.0;
+
+        if (domain == FvdFunctionDomain.Distance
+            && TryResolveForceSectionRangeForTest(graph, domain, evaluationX, out double startX, out double endX))
+        {
+            double span = endX - startX;
+            if (span > MathUtil.Epsilon)
+            {
+                double normalized = (evaluationX - startX) / span;
+                return MathUtil.Clamp(normalized, 0.0, 1.0) * curveLength;
+            }
+        }
+
+        return MathUtil.Clamp(evaluationX, 0.0, curveLength);
+    }
+
+    private static bool TryResolveForceSectionRangeForTest(
+        FvdGraph graph,
+        FvdFunctionDomain domain,
+        double x,
+        out double startX,
+        out double endX)
+    {
+        FvdSectionDefinition? finalSection = null;
+
+        IReadOnlyList<FvdSectionDefinition> sections = graph.Sections;
+        for (int i = 0; i < sections.Count; i++)
+        {
+            FvdSectionDefinition section = sections[i];
+
+            if (section.Kind != FvdSectionKind.Force || section.Domain != domain)
+                continue;
+
+            if (finalSection == null || section.EndX > finalSection.EndX)
+                finalSection = section;
+
+            if (x >= section.StartX && x < section.EndX)
+            {
+                startX = section.StartX;
+                endX = section.EndX;
+                return true;
+            }
+        }
+
+        if (finalSection != null && x == finalSection.EndX && x >= finalSection.StartX)
+        {
+            startX = finalSection.StartX;
+            endX = finalSection.EndX;
+            return true;
+        }
+
+        startX = 0.0;
+        endX = 0.0;
+        return false;
+    }
+
+    private static double EstimateCurvatureMagnitudeForTest(IArcLengthCurve curve, double s)
+    {
+        double length = curve.Length;
+        if (length <= MathUtil.Epsilon)
+            return 0.0;
+
+        double clampedS = MathUtil.Clamp(s, 0.0, length);
+        double h = System.Math.Max(length * 1e-3, 1e-4);
+        double leftS = MathUtil.Clamp(clampedS - h, 0.0, length);
+        double rightS = MathUtil.Clamp(clampedS + h, 0.0, length);
+        double span = rightS - leftS;
+
+        if (span <= MathUtil.Epsilon)
+            return 0.0;
+
+        Vector3d leftTangent = curve.TangentByLength(leftS);
+        Vector3d rightTangent = curve.TangentByLength(rightS);
+        Vector3d dTds = (rightTangent - leftTangent) / span;
+
+        if (!IsFinite(dTds))
+            return 0.0;
+
+        return dTds.Length;
     }
 
     private static FvdGraph ReadGraphPropertyOrFail(object instance, string propertyName)
@@ -839,6 +998,16 @@ public class FvdSolverPrototypeTests
         Type? type = Assembly.Load("Quantum.FVD").GetType(fullName);
         Assert.True(type is not null, $"Expected {fullName} to exist.");
         return type!;
+    }
+
+    private static bool IsFinite(Vector3d value)
+    {
+        return !(double.IsNaN(value.X)
+                 || double.IsInfinity(value.X)
+                 || double.IsNaN(value.Y)
+                 || double.IsInfinity(value.Y)
+                 || double.IsNaN(value.Z)
+                 || double.IsInfinity(value.Z));
     }
 
     private static List<NodeSnapshot> SnapshotNodes(IReadOnlyList<FvdControlNode> nodes)

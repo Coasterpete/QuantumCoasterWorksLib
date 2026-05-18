@@ -273,7 +273,7 @@ namespace Quantum.FVD
             int arcLengthSamples)
         {
             FvdNurbsBuildResult buildResult = graph.BuildNurbsCurve(arcLengthSamples);
-            IArcLengthCurve arcCurve = buildResult.ArcCurve;
+            IArcLengthCurve arcCurve = buildResult.RuntimeArcLengthCurve;
 
             double sampledS = MapEvaluationXToCurveDistance(graph, domain, evaluationX, arcCurve.Length);
             double curvature = EstimateCurvatureMagnitude(arcCurve, sampledS);
