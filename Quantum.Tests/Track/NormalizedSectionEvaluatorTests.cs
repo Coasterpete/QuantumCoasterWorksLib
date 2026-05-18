@@ -209,6 +209,130 @@ public sealed class NormalizedSectionEvaluatorTests
             expected.TargetRollRateDegPerSec);
     }
 
+    [Fact]
+    public void NormalizedSectionEvaluator_NormalizedGeometrySections_EvaluateCurvatureAndRoll()
+    {
+        var source = new GeometricSection(
+            length: 12.0,
+            curvature: 0.08,
+            roll: -0.05);
+        var interval = new ResolvedSectionInterval<GeometricSection>(
+            source,
+            startDistance: 4.0,
+            endDistance: 16.0);
+        SectionDefinition normalized = SectionNormalizer.Normalize(interval);
+        var evaluator = new NormalizedSectionEvaluator(new[] { normalized });
+
+        Assert.Equal(SectionKind.Geometry, normalized.Kind);
+        Assert.Equal(SectionDomain.Distance, normalized.Domain);
+        Assert.Equal(4.0, normalized.StartX);
+        Assert.Equal(16.0, normalized.EndX);
+        Assert.Equal(
+            new[] { SectionChannel.Curvature, SectionChannel.Roll },
+            Channels(normalized));
+        AssertGeometryChannelMatches(
+            evaluator,
+            SectionChannel.Curvature,
+            distance: 9.0,
+            expectedValue: 0.08);
+        AssertGeometryChannelMatches(
+            evaluator,
+            SectionChannel.Roll,
+            distance: 9.0,
+            expectedValue: -0.05);
+    }
+
+    [Fact]
+    public void NormalizedSectionEvaluator_TouchingGeometrySections_AndRightHandWinsAtBoundary()
+    {
+        SectionDefinition left = GeometrySectionDefinition(
+            startX: 0.0,
+            endX: 10.0,
+            curvature: 0.05,
+            rollRadians: 0.1);
+        SectionDefinition right = GeometrySectionDefinition(
+            startX: 10.0,
+            endX: 20.0,
+            curvature: -0.12,
+            rollRadians: -0.2);
+        var evaluator = new NormalizedSectionEvaluator(new[] { left, right });
+
+        AssertGeometryChannelMatches(
+            evaluator,
+            SectionChannel.Curvature,
+            distance: 10.0,
+            expectedValue: -0.12);
+        AssertGeometryChannelMatches(
+            evaluator,
+            SectionChannel.Roll,
+            distance: 10.0,
+            expectedValue: -0.2);
+        Assert.Same(right, evaluator.ResolveDistanceSection(SectionKind.Geometry, 10.0));
+    }
+
+    [Fact]
+    public void NormalizedSectionEvaluator_FinalEndpoint_IsInclusiveForLastGeometrySection()
+    {
+        SectionDefinition left = GeometrySectionDefinition(
+            startX: 0.0,
+            endX: 10.0,
+            curvature: 0.05,
+            rollRadians: 0.1);
+        SectionDefinition right = GeometrySectionDefinition(
+            startX: 10.0,
+            endX: 20.0,
+            curvature: -0.12,
+            rollRadians: -0.2);
+        var evaluator = new NormalizedSectionEvaluator(new[] { left, right });
+
+        bool curvatureEvaluated = evaluator.TryEvaluateDistanceChannelAt(
+            SectionKind.Geometry,
+            SectionChannel.Curvature,
+            distance: 20.0,
+            out double curvature,
+            out SectionEvaluationDiagnostic curvatureDiagnostic);
+        bool rollEvaluated = evaluator.TryEvaluateDistanceChannelAt(
+            SectionKind.Geometry,
+            SectionChannel.Roll,
+            distance: 20.0,
+            out double roll,
+            out SectionEvaluationDiagnostic rollDiagnostic);
+
+        Assert.True(curvatureEvaluated);
+        Assert.Equal(SectionEvaluationDiagnostic.None, curvatureDiagnostic);
+        Assert.Equal(-0.12, curvature);
+        Assert.True(rollEvaluated);
+        Assert.Equal(SectionEvaluationDiagnostic.None, rollDiagnostic);
+        Assert.Equal(-0.2, roll);
+    }
+
+    [Fact]
+    public void NormalizedSectionEvaluator_NoGeometryDistanceCoverage_ReturnsFalseAndDiagnostic()
+    {
+        SectionDefinition first = GeometrySectionDefinition(
+            startX: 0.0,
+            endX: 5.0,
+            curvature: 0.05,
+            rollRadians: 0.1);
+        SectionDefinition second = GeometrySectionDefinition(
+            startX: 7.0,
+            endX: 10.0,
+            curvature: -0.12,
+            rollRadians: -0.2);
+        var evaluator = new NormalizedSectionEvaluator(new[] { first, second });
+
+        bool evaluated = evaluator.TryEvaluateDistanceChannelAt(
+            SectionKind.Geometry,
+            SectionChannel.Roll,
+            distance: 6.0,
+            out double value,
+            out SectionEvaluationDiagnostic diagnostic);
+
+        Assert.False(evaluated);
+        Assert.Equal(0.0, value);
+        Assert.Equal(SectionEvaluationDiagnostic.OutsideSectionCoverage, diagnostic);
+    }
+
     private static void AssertChannelMatches(
         NormalizedSectionEvaluator evaluator,
         SectionChannel channel,
@@ -226,6 +350,51 @@ public sealed class NormalizedSectionEvaluatorTests
         Assert.Equal(SectionEvaluationDiagnostic.None, diagnostic);
         Assert.True(expectedValue.HasValue);
         Assert.Equal(expectedValue.Value, actualValue, 10);
+    }
+
+    private static void AssertGeometryChannelMatches(
+        NormalizedSectionEvaluator evaluator,
+        SectionChannel channel,
+        double distance,
+        double expectedValue)
+    {
+        bool evaluated = evaluator.TryEvaluateDistanceChannelAt(
+            SectionKind.Geometry,
+            channel,
+            distance,
+            out double actualValue,
+            out SectionEvaluationDiagnostic diagnostic);
+
+        Assert.True(evaluated);
+        Assert.Equal(SectionEvaluationDiagnostic.None, diagnostic);
+        Assert.Equal(expectedValue, actualValue, 10);
+    }
+
+    private static SectionDefinition GeometrySectionDefinition(
+        double startX,
+        double endX,
+        double curvature,
+        double rollRadians)
+    {
+        return SectionNormalizer.Normalize(
+            new ResolvedSectionInterval<GeometricSection>(
+                new GeometricSection(
+                    length: endX - startX,
+                    curvature: curvature,
+                    roll: rollRadians),
+                startX,
+                endX));
+    }
+
+    private static SectionChannel[] Channels(SectionDefinition definition)
+    {
+        var channels = new SectionChannel[definition.Functions.Count];
+        for (int i = 0; i < definition.Functions.Count; i++)
+        {
+            channels[i] = definition.Functions[i].Channel;
+        }
+
+        return channels;
     }
 
     private static SectionDefinition ForceSectionDefinition(
