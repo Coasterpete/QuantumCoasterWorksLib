@@ -5,8 +5,14 @@ using Quantum.Track;
 
 namespace Quantum.IO.TrainPose.V1
 {
+    /// <summary>
+    /// Maps in-memory coaster train pose snapshots into TrainPoseExportV1 DTOs.
+    /// </summary>
     public static class TrainPoseExportV1Mapper
     {
+        /// <summary>
+        /// Exports a complete train pose snapshot into the versioned JSON DTO boundary.
+        /// </summary>
         public static TrainPoseExportV1Dto Export(TrainPoseResult source)
         {
             if (source == null)

@@ -3,11 +3,17 @@ using System.Text.Json;
 
 namespace Quantum.IO.TrainPose.V1
 {
+    /// <summary>
+    /// JSON reader/writer for the TrainPoseExportV1 contract.
+    /// </summary>
     public static class TrainPoseExportV1Json
     {
         private static readonly JsonSerializerOptions CompactOptions = CreateOptions(indented: false);
         private static readonly JsonSerializerOptions IndentedOptions = CreateOptions(indented: true);
 
+        /// <summary>
+        /// Serializes a TrainPoseExportV1 DTO using camelCase JSON properties.
+        /// </summary>
         public static string Serialize(TrainPoseExportV1Dto dto, bool indented = false)
         {
             if (dto == null)
@@ -18,6 +24,9 @@ namespace Quantum.IO.TrainPose.V1
             return JsonSerializer.Serialize(dto, indented ? IndentedOptions : CompactOptions);
         }
 
+        /// <summary>
+        /// Deserializes a TrainPoseExportV1 DTO and enforces contract identity/version.
+        /// </summary>
         public static TrainPoseExportV1Dto Deserialize(string json)
         {
             if (json == null)

@@ -1,0 +1,94 @@
+# Public Coaster API Boundary
+
+Milestone 1 freezes the consumer-facing backend lanes that make Quantum read as a
+coaster-domain library. This does not change runtime math, spline evaluation, or
+train placement behavior.
+
+## Stable Boundary Lanes
+
+### 1) `Quantum.Track.TrackFrame`
+
+`TrackFrame` is the public pose basis for sampled coaster track and train
+transforms.
+
+- `Distance`: station distance associated with the frame.
+- `Position`: centerline position.
+- `Tangent`: forward axis.
+- `Normal`: up axis.
+- `Binormal`: right/lateral axis.
+- `ToMatrix4x4()`: canonical frame-to-matrix conversion for interop.
+
+Consumers should treat `Quantum.Track.TrackFrame` as authoritative. The similarly
+named `Quantum.Splines.TrackFrame` is a support-layer implementation type.
+
+### 2) `TrackEvaluator` Station-Distance Sampling
+
+The public station-distance lane is:
+
+- `new TrackEvaluator(trackDocument)`
+- `EvaluateFrameAtDistance(double distance)`
+- `EvaluateFramesAtDistances(IReadOnlyList<double> distances)`
+- `GetBoundTrackTotalLength()`
+
+`EvaluateAtDistance(TrackDocument, double)` remains the stable resolver for
+station distance to `TrackEvaluationPoint` (`TrackSegment` + local `t`).
+
+Current distance behavior is preserved:
+
+- finite out-of-range distances clamp to the track extents
+- non-finite distances are rejected
+- empty documents are rejected for sampling
+
+Document overloads that return `Quantum.Splines.TrackFrame` are compatibility
+support-layer APIs, not the preferred consumer boundary.
+
+### 3) `TrackDocument` / `TrackSegment` Centerline Evaluation
+
+`TrackDocument` owns the ordered coaster track content. Its segment order and
+segment lengths define the station-distance coordinate consumed by
+`TrackEvaluator`.
+
+`TrackSegment` exposes coaster-domain identity and sampling inputs:
+
+- `Length`
+- `Id`
+- `ForceSegmentReference`
+- `RollRadians`
+
+The current `Spline` property is a support-layer centerline carrier. Consumers
+should enter through `TrackEvaluator` instead of depending on spline internals.
+
+### 4) `TrainCarTransformProvider.EvaluateTrainPose`
+
+`EvaluateTrainPose(double leadDistance, TrainConsistDefinition definition)` is
+the public train-pose entrypoint. It evaluates the existing distance-based body,
+bogie, wheel, and articulation hierarchy and returns a `TrainPoseResult`.
+
+This lane owns coaster train placement semantics:
+
+- car 0 is evaluated at `leadDistance`
+- following cars are placed by station-distance spacing
+- bogie, wheel, and articulated transforms preserve the existing hierarchy
+
+### 5) `TrainPoseExportV1`
+
+`TrainPoseExportV1` is the public JSON snapshot contract:
+
+- `TrainPoseExportV1Dto.ContractName == "quantum.train_pose"`
+- `TrainPoseExportV1Dto.ContractVersion == 1`
+- `TrainPoseExportV1Mapper.Export(TrainPoseResult)`
+- `TrainPoseExportV1Json.Serialize(...)`
+- `TrainPoseExportV1Json.Deserialize(...)`
+
+Schema and field semantics remain documented in
+`docs/train_pose_export_v1_contract.md`.
+
+## Support-Layer Rule
+
+`Quantum.Splines` and `Quantum.Math` remain implementation/support layers. They
+can exist behind track evaluation and value storage, but new consumer-facing
+coaster APIs should be described in `Quantum.Track` or versioned `Quantum.IO`
+contracts.
+
+Do not introduce new generic spline/math entrypoints as the primary way to move
+trains, sample a centerline, or export poses.

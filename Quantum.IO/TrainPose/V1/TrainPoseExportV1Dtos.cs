@@ -2,9 +2,24 @@ using System;
 
 namespace Quantum.IO.TrainPose.V1
 {
+    /// <summary>
+    /// Versioned JSON DTO for exporting a complete coaster train pose snapshot.
+    /// </summary>
+    /// <remarks>
+    /// This DTO is the public serialization boundary for train-pose handoff.
+    /// Runtime spline and math internals are intentionally not part of the contract
+    /// identity; fields describe coaster-domain pose data and matrices.
+    /// </remarks>
     public sealed class TrainPoseExportV1Dto
     {
+        /// <summary>
+        /// Required contract identity for TrainPoseExportV1 JSON payloads.
+        /// </summary>
         public const string ContractName = "quantum.train_pose";
+
+        /// <summary>
+        /// Required contract version for TrainPoseExportV1 JSON payloads.
+        /// </summary>
         public const int ContractVersion = 1;
 
         public string Contract { get; set; } = ContractName;

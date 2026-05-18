@@ -125,6 +125,15 @@ namespace Quantum.Track
             return _poseAssembler.AssembleArticulatedWithWheels(articulatedCars, carsWithWheels);
         }
 
+        /// <summary>
+        /// Public train-pose entrypoint for distance-based coaster train placement.
+        /// </summary>
+        /// <remarks>
+        /// This method is the stable backend boundary for consumers that need a
+        /// complete train pose snapshot. It samples the bound <see cref="TrackEvaluator"/>
+        /// using the lead-car station distance and preserves the existing body, bogie,
+        /// wheel, and articulated pose semantics.
+        /// </remarks>
         public TrainPoseResult EvaluateTrainPose(
             double leadDistance,
             TrainConsistDefinition definition)

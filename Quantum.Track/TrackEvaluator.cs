@@ -7,16 +7,31 @@ using SplineTrackFrame = Quantum.Splines.TrackFrame;
 
 namespace Quantum.Track
 {
+    /// <summary>
+    /// Evaluates coaster track documents at segment-local positions or station distances.
+    /// </summary>
+    /// <remarks>
+    /// The public coaster-domain lane is station-distance sampling from a
+    /// <see cref="TrackDocument"/> into <see cref="TrackFrame"/> values.
+    /// Spline-backed overloads remain implementation/support-layer compatibility
+    /// points and should not be treated as the consumer-facing API boundary.
+    /// </remarks>
     public class TrackEvaluator
     {
         private const double MinimumVectorMagnitude = 1e-9;
         private const double ParallelAxisThreshold = 0.99;
         private readonly TrackDocument? _boundDocument;
 
+        /// <summary>
+        /// Creates an evaluator for explicit-document evaluation calls.
+        /// </summary>
         public TrackEvaluator()
         {
         }
 
+        /// <summary>
+        /// Creates an evaluator bound to one track document for station-distance frame sampling.
+        /// </summary>
         public TrackEvaluator(TrackDocument document)
         {
             _boundDocument = document ?? throw new System.ArgumentNullException(nameof(document));
@@ -89,6 +104,12 @@ namespace Quantum.Track
             return Transform3d.FromTrackFrame(frame, frame.Position);
         }
 
+        /// <summary>
+        /// Samples the bound track document at a station distance and returns the
+        /// public coaster-domain frame contract.
+        /// </summary>
+        /// <param name="distance">Station distance along the bound track document. Current behavior clamps finite out-of-range values to the track extents.</param>
+        /// <returns>A <see cref="TrackFrame"/> with finite, orthonormalized axes.</returns>
         public TrackFrame EvaluateFrameAtDistance(double distance)
         {
             TrackDocument doc = ResolveBoundDocument();
@@ -96,12 +117,20 @@ namespace Quantum.Track
             return BuildExportFrame(splineFrame);
         }
 
+        /// <summary>
+        /// Returns the total station length of the bound track document.
+        /// </summary>
         public double GetBoundTrackTotalLength()
         {
             TrackDocument doc = ResolveBoundDocument();
             return doc.TotalLength;
         }
 
+        /// <summary>
+        /// Support-layer frame sampling overload retained for existing spline-backed callers.
+        /// Prefer the bound <see cref="EvaluateFrameAtDistance(double)"/> overload for the
+        /// public coaster-domain frame contract.
+        /// </summary>
         public SplineTrackFrame EvaluateFrameAtDistance(TrackDocument doc, double distance)
         {
             TrackEvaluationPoint evaluationPoint = EvaluateAtDistance(doc, distance);
@@ -109,6 +138,11 @@ namespace Quantum.Track
             return EvaluateFrame(doc, position);
         }
 
+        /// <summary>
+        /// Resolves station distances to segment/local samples in a track document.
+        /// </summary>
+        /// <param name="doc">Track document whose ordered segments define the station coordinate.</param>
+        /// <param name="distances">Finite station distances. Current behavior clamps finite out-of-range values to the track extents.</param>
         public TrackEvaluationPoint[] EvaluateAtDistances(
             TrackDocument doc,
             IReadOnlyList<double> distances)
@@ -154,6 +188,10 @@ namespace Quantum.Track
             return points;
         }
 
+        /// <summary>
+        /// Support-layer batch frame sampling overload retained for existing spline-backed callers.
+        /// Prefer the bound batch overload for the public coaster-domain frame contract.
+        /// </summary>
         public SplineTrackFrame[] EvaluateFramesAtDistances(
             TrackDocument doc,
             IReadOnlyList<double> distances)
@@ -217,6 +255,11 @@ namespace Quantum.Track
             return frames;
         }
 
+        /// <summary>
+        /// Samples the bound track document at station distances and returns public
+        /// coaster-domain frame contracts.
+        /// </summary>
+        /// <param name="distances">Finite station distances. Current behavior clamps finite out-of-range values to the track extents.</param>
         public TrackFrame[] EvaluateFramesAtDistances(IReadOnlyList<double> distances)
         {
             TrackDocument doc = ResolveBoundDocument();
@@ -438,6 +481,15 @@ namespace Quantum.Track
             return _boundDocument;
         }
 
+        /// <summary>
+        /// Resolves a station distance into the segment and local parameter used for
+        /// centerline evaluation.
+        /// </summary>
+        /// <remarks>
+        /// This is the stable station-distance sampling contract. Finite distances
+        /// outside the document range are clamped; non-finite distances and empty
+        /// documents are rejected.
+        /// </remarks>
         public TrackEvaluationPoint EvaluateAtDistance(TrackDocument doc, double distance)
         {
             if (doc is null)

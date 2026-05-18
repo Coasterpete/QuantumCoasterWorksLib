@@ -5,12 +5,24 @@ using Quantum.Math;
 namespace Quantum.Track
 {
     /// <summary>
-    /// Authoritative train pose basis for track-space transforms.
-    /// Position plus Tangent/Normal/Binormal define the current frame contract,
-    /// and Tangent/Normal/Binormal are expected to already be unit-length and orthogonal.
+    /// Public coaster-domain pose basis sampled from a track centerline.
     /// </summary>
+    /// <remarks>
+    /// <see cref="TrackFrame"/> is the stable backend contract for track-space
+    /// orientation. It is intentionally defined in <c>Quantum.Track</c> so
+    /// downstream train, export, Unity, and debug code can depend on coaster
+    /// concepts instead of spline implementation types.
+    /// </remarks>
     public readonly struct TrackFrame
     {
+        /// <summary>
+        /// Creates a track frame at the provided station distance.
+        /// </summary>
+        /// <param name="distance">Station distance associated with this frame.</param>
+        /// <param name="position">Centerline position at the sampled station.</param>
+        /// <param name="tangent">Forward axis. Producer output is expected to be unit length.</param>
+        /// <param name="normal">Up axis. Producer output is expected to be unit length and orthogonal to <paramref name="tangent"/>.</param>
+        /// <param name="binormal">Right/lateral axis. Producer output is expected to complete the orthonormal basis.</param>
         public TrackFrame(
             double distance,
             Vector3d position,
@@ -40,14 +52,29 @@ namespace Quantum.Track
         {
         }
 
+        /// <summary>
+        /// Station distance associated with this frame.
+        /// </summary>
         public double Distance { get; }
 
+        /// <summary>
+        /// Centerline position in backend track-space coordinates.
+        /// </summary>
         public Vector3d Position { get; }
 
+        /// <summary>
+        /// Forward axis of the sampled track frame.
+        /// </summary>
         public Vector3d Tangent { get; }
 
+        /// <summary>
+        /// Up axis of the sampled track frame.
+        /// </summary>
         public Vector3d Normal { get; }
 
+        /// <summary>
+        /// Right/lateral axis of the sampled track frame.
+        /// </summary>
         public Vector3d Binormal { get; }
 
         /// <summary>

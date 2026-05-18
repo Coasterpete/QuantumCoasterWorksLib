@@ -2,8 +2,20 @@ using System.Collections.Generic;
 
 namespace Quantum.Track
 {
+    /// <summary>
+    /// Coaster track document used as the source of truth for centerline sampling.
+    /// </summary>
+    /// <remarks>
+    /// Segment order defines the station-distance coordinate consumed by
+    /// <see cref="TrackEvaluator"/>. Sections carry coaster-domain metadata and force
+    /// inputs; spline/math details are support-layer implementation choices behind
+    /// segment evaluation.
+    /// </remarks>
     public class TrackDocument
     {
+        /// <summary>
+        /// Creates a track document from ordered segments and optional sections.
+        /// </summary>
         public TrackDocument(
             IEnumerable<TrackSegment>? segments = null,
             IEnumerable<TrackSection>? sections = null)
@@ -17,10 +29,19 @@ namespace Quantum.Track
                 : new List<TrackSection>(sections);
         }
 
+        /// <summary>
+        /// Ordered centerline segments. Their lengths define station-distance sampling.
+        /// </summary>
         public IList<TrackSegment> Segments { get; }
 
+        /// <summary>
+        /// Coaster-domain sections associated with the document.
+        /// </summary>
         public IList<TrackSection> Sections { get; }
 
+        /// <summary>
+        /// Sum of segment lengths in station-distance units.
+        /// </summary>
         public double TotalLength
         {
             get
