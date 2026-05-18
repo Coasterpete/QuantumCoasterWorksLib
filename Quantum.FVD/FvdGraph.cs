@@ -143,7 +143,8 @@ namespace Quantum.FVD
             }
 
             var paramCurve = new NurbsCurve(controlPoints, weights, Degree);
-            var arcCurve = new ArcLengthCurveAdapter(paramCurve, arcLengthSamples);
+            var gSharkCurve = new GSharkNurbsCurveAdapter(controlPoints, weights, Degree);
+            var arcCurve = new ArcLengthCurveAdapter(gSharkCurve, arcLengthSamples);
 
             return new FvdNurbsBuildResult(paramCurve, arcCurve);
         }

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Globalization;
 using Quantum.Math;
 using Quantum.Physics;
 using Quantum.Splines;
@@ -19,6 +20,10 @@ namespace Quantum.Debug
                 Console.WriteLine("Supported commands:");
                 Console.WriteLine("  sampling-perf");
                 Console.WriteLine("  train-pose-export-v1 [outputPath]");
+                Console.WriteLine("  longitudinal-force-preview [preset] [outputPath]");
+                Console.WriteLine("    presets: soft | balanced | punchy");
+                Console.WriteLine("  longitudinal-speed-preview [preset] [outputPath] [initialSpeedMps]");
+                Console.WriteLine("    presets: soft | balanced | punchy");
                 return 1;
             }
 
@@ -38,6 +43,42 @@ namespace Quantum.Debug
 
                 string? outputPath = args.Length == 2 ? args[1] : null;
                 return TrainPoseExportV1Command.Run(outputPath);
+            }
+
+            if (command == DebugCommandKind.LongitudinalForcePreview)
+            {
+                if (!TryParseLongitudinalForcePreviewArgs(args, out LongitudinalForcePreviewPreset preset, out string? outputPath))
+                {
+                    Console.WriteLine("Usage: longitudinal-force-preview [preset] [outputPath]");
+                    Console.WriteLine("  - no args after command: uses balanced preset and default output path");
+                    Console.WriteLine("  - one arg: preset name OR output path");
+                    Console.WriteLine("  - two args: preset name then output path");
+                    Console.WriteLine("  - presets: soft | balanced | punchy");
+                    return 1;
+                }
+
+                return LongitudinalForcePreviewCommand.Run(outputPath, preset);
+            }
+
+            if (command == DebugCommandKind.LongitudinalSpeedPreview)
+            {
+                if (!TryParseLongitudinalSpeedPreviewArgs(
+                        args,
+                        out LongitudinalForcePreviewPreset preset,
+                        out string? outputPath,
+                        out double initialSpeedMps))
+                {
+                    Console.WriteLine("Usage: longitudinal-speed-preview [preset] [outputPath] [initialSpeedMps]");
+                    Console.WriteLine("  - no args after command: uses balanced preset, default output path, and initialSpeedMps=0");
+                    Console.WriteLine("  - one arg: preset name OR output path");
+                    Console.WriteLine("  - two args: [preset outputPath] OR [preset initialSpeedMps] OR [outputPath initialSpeedMps]");
+                    Console.WriteLine("  - three args: preset name, output path, then initialSpeedMps");
+                    Console.WriteLine("  - presets: soft | balanced | punchy");
+                    Console.WriteLine("  - initialSpeedMps must be finite and >= 0");
+                    return 1;
+                }
+
+                return LongitudinalSpeedPreviewCommand.Run(outputPath, preset, initialSpeedMps);
             }
 
             RunValidation();
@@ -215,6 +256,130 @@ namespace Quantum.Debug
                     0.5,
                     8)
             };
+        }
+
+        private static bool TryParseLongitudinalForcePreviewArgs(
+            IReadOnlyList<string> args,
+            out LongitudinalForcePreviewPreset preset,
+            out string? outputPath)
+        {
+            preset = LongitudinalForcePreviewPreset.Balanced;
+            outputPath = null;
+
+            if (args.Count <= 1)
+            {
+                return true;
+            }
+
+            if (args.Count == 2)
+            {
+                if (LongitudinalForcePreviewCommand.TryParsePreset(args[1], out LongitudinalForcePreviewPreset parsedPreset))
+                {
+                    preset = parsedPreset;
+                    return true;
+                }
+
+                outputPath = args[1];
+                return true;
+            }
+
+            if (args.Count == 3)
+            {
+                if (!LongitudinalForcePreviewCommand.TryParsePreset(args[1], out LongitudinalForcePreviewPreset parsedPreset))
+                {
+                    return false;
+                }
+
+                preset = parsedPreset;
+                outputPath = args[2];
+                return true;
+            }
+
+            return false;
+        }
+
+        private static bool TryParseLongitudinalSpeedPreviewArgs(
+            IReadOnlyList<string> args,
+            out LongitudinalForcePreviewPreset preset,
+            out string? outputPath,
+            out double initialSpeedMps)
+        {
+            preset = LongitudinalForcePreviewPreset.Balanced;
+            outputPath = null;
+            initialSpeedMps = 0.0;
+
+            if (args.Count <= 1)
+            {
+                return true;
+            }
+
+            if (args.Count == 2)
+            {
+                if (LongitudinalForcePreviewCommand.TryParsePreset(args[1], out LongitudinalForcePreviewPreset parsedPreset))
+                {
+                    preset = parsedPreset;
+                    return true;
+                }
+
+                outputPath = args[1];
+                return true;
+            }
+
+            if (args.Count == 3)
+            {
+                if (LongitudinalForcePreviewCommand.TryParsePreset(args[1], out LongitudinalForcePreviewPreset parsedPreset))
+                {
+                    preset = parsedPreset;
+
+                    if (TryParseNonNegativeFiniteDouble(args[2], out double parsedInitialSpeed))
+                    {
+                        initialSpeedMps = parsedInitialSpeed;
+                        return true;
+                    }
+
+                    outputPath = args[2];
+                    return true;
+                }
+
+                outputPath = args[1];
+                return TryParseNonNegativeFiniteDouble(args[2], out initialSpeedMps);
+            }
+
+            if (args.Count == 4)
+            {
+                if (!LongitudinalForcePreviewCommand.TryParsePreset(args[1], out LongitudinalForcePreviewPreset parsedPreset))
+                {
+                    return false;
+                }
+
+                preset = parsedPreset;
+                outputPath = args[2];
+                return TryParseNonNegativeFiniteDouble(args[3], out initialSpeedMps);
+            }
+
+            return false;
+        }
+
+        private static bool TryParseNonNegativeFiniteDouble(string value, out double parsed)
+        {
+            parsed = 0.0;
+
+            if (!TryParseDouble(value, CultureInfo.InvariantCulture, out parsed) &&
+                !TryParseDouble(value, CultureInfo.CurrentCulture, out parsed))
+            {
+                return false;
+            }
+
+            return !double.IsNaN(parsed) && !double.IsInfinity(parsed) && parsed >= 0.0;
+        }
+
+        private static bool TryParseDouble(string value, CultureInfo culture, out double parsed)
+        {
+            return double.TryParse(
+                value,
+                NumberStyles.Float | NumberStyles.AllowThousands,
+                culture,
+                out parsed);
         }
 
         private static int PrintFollowerSample(string followerName, string sampleLabel, TrainFollowerState follower)

@@ -16,10 +16,15 @@ namespace Quantum.Track
             IForceEasingFunction? normalGChannel = null,
             IForceEasingFunction? lateralGChannel = null,
             IForceEasingFunction? rollRateChannel = null,
-            ForceChannelDomain domain = ForceChannelDomain.Distance)
+            ForceChannelDomain domain = ForceChannelDomain.Distance,
+            double? targetLongitudinalG = null,
+            double? startLongitudinalG = null,
+            double? endLongitudinalG = null,
+            IForceEasingFunction? longitudinalGChannel = null)
         {
             TargetNormalG = targetNormalG;
             TargetLateralG = targetLateralG;
+            TargetLongitudinalG = targetLongitudinalG;
             Length = length;
             Duration = duration;
             InterpolationMode = interpolationMode;
@@ -27,16 +32,21 @@ namespace Quantum.Track
             EndNormalG = endNormalG;
             StartLateralG = startLateralG;
             EndLateralG = endLateralG;
+            StartLongitudinalG = startLongitudinalG;
+            EndLongitudinalG = endLongitudinalG;
             EasingFunction = easingFunction;
             NormalGChannel = normalGChannel;
             LateralGChannel = lateralGChannel;
             RollRateChannel = rollRateChannel;
+            LongitudinalGChannel = longitudinalGChannel;
             Domain = domain;
         }
 
         public double? TargetNormalG { get; }
 
         public double? TargetLateralG { get; }
+
+        public double? TargetLongitudinalG { get; }
 
         public double? Length { get; }
 
@@ -52,6 +62,10 @@ namespace Quantum.Track
 
         public double? EndLateralG { get; }
 
+        public double? StartLongitudinalG { get; }
+
+        public double? EndLongitudinalG { get; }
+
         public IForceEasingFunction? EasingFunction { get; }
 
         public IForceEasingFunction? NormalGChannel { get; }
@@ -59,6 +73,8 @@ namespace Quantum.Track
         public IForceEasingFunction? LateralGChannel { get; }
 
         public IForceEasingFunction? RollRateChannel { get; }
+
+        public IForceEasingFunction? LongitudinalGChannel { get; }
 
         public ForceChannelDomain Domain { get; }
 

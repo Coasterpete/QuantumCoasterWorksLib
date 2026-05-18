@@ -11,6 +11,7 @@ public sealed class ForceChannelSetTests
 
         Assert.Equal(ForceChannelBlendMode.Sum, set.NormalGBlendMode);
         Assert.Equal(ForceChannelBlendMode.Sum, set.LateralGBlendMode);
+        Assert.Equal(ForceChannelBlendMode.Sum, set.LongitudinalGBlendMode);
         Assert.Equal(ForceChannelBlendMode.Sum, set.RollRateBlendMode);
         Assert.Null(set.Domain);
     }
@@ -55,6 +56,20 @@ public sealed class ForceChannelSetTests
         var set = new ForceChannelSet();
 
         Assert.Throws<ArgumentException>(() => set.RollRateChannels = channels);
+    }
+
+    [Fact]
+    public void ForceChannelSet_LongitudinalGChannels_NullEntry_ThrowsArgumentException()
+    {
+        var channels = new List<IForceChannel>
+        {
+            new ForceChannel(new FixedForceEasingFunction(0.4)),
+            null!
+        };
+
+        var set = new ForceChannelSet();
+
+        Assert.Throws<ArgumentException>(() => set.LongitudinalGChannels = channels);
     }
 
     private sealed class FixedForceEasingFunction : IForceEasingFunction

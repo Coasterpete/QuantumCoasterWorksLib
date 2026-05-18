@@ -198,6 +198,35 @@ public class FvdFoundationTests
     }
 
     [Fact]
+    public void FvdGraph_BuildNurbsCurve_UsesGSharkAdapterForArcLengthSamplingPath()
+    {
+        Type graphType = RequireFvdGraphType();
+        Type nodeType = RequireFvdControlNodeType();
+
+        object graph = CreateGraphOrFail(
+            graphType,
+            nodeType,
+            degree: 3,
+            CreateNodeOrFail(nodeType, 0.00, new Vector3d(0, 0, 0), 1.0),
+            CreateNodeOrFail(nodeType, 0.33, new Vector3d(4, 5, 0), 0.9),
+            CreateNodeOrFail(nodeType, 0.66, new Vector3d(8, -3, 0), 1.2),
+            CreateNodeOrFail(nodeType, 1.00, new Vector3d(12, 0, 0), 1.0));
+
+        object buildResult = BuildNurbsCurveOrFail(graph, arcLengthSamples: 200);
+        IArcLengthCurve arcCurve = GetArcCurveOrFail(buildResult);
+
+        FieldInfo? curveField = arcCurve.GetType().GetField(
+            "_curve",
+            BindingFlags.NonPublic | BindingFlags.Instance);
+
+        Assert.True(curveField is not null, "Expected ArcLengthCurveAdapter to keep an internal _curve field.");
+
+        object? sourceCurve = curveField!.GetValue(arcCurve);
+        Assert.True(sourceCurve is not null, "Expected ArcLengthCurveAdapter internal source curve to be non-null.");
+        Assert.Equal("GSharkNurbsCurveAdapter", sourceCurve!.GetType().Name);
+    }
+
+    [Fact]
     public void FvdGraph_BuiltArcLengthCurve_ClampsEndpointsSafely()
     {
         Type graphType = RequireFvdGraphType();

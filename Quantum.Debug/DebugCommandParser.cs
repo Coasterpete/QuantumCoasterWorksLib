@@ -7,7 +7,9 @@ namespace Quantum.Debug
     {
         Validate,
         SamplingPerf,
-        TrainPoseExportV1
+        TrainPoseExportV1,
+        LongitudinalForcePreview,
+        LongitudinalSpeedPreview
     }
 
     public static class DebugCommandParser
@@ -36,6 +38,18 @@ namespace Quantum.Debug
             if (string.Equals(args[0], "train-pose-export-v1", StringComparison.OrdinalIgnoreCase))
             {
                 command = DebugCommandKind.TrainPoseExportV1;
+                return true;
+            }
+
+            if (string.Equals(args[0], "longitudinal-force-preview", StringComparison.OrdinalIgnoreCase))
+            {
+                command = DebugCommandKind.LongitudinalForcePreview;
+                return true;
+            }
+
+            if (string.Equals(args[0], "longitudinal-speed-preview", StringComparison.OrdinalIgnoreCase))
+            {
+                command = DebugCommandKind.LongitudinalSpeedPreview;
                 return true;
             }
 

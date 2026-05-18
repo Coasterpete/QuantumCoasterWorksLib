@@ -7,11 +7,14 @@ namespace Quantum.Track
     {
         private IReadOnlyList<IForceChannel>? _normalGChannels;
         private IReadOnlyList<IForceChannel>? _lateralGChannels;
+        private IReadOnlyList<IForceChannel>? _longitudinalGChannels;
         private IReadOnlyList<IForceChannel>? _rollRateChannels;
 
         public IForceChannel? NormalG { get; set; }
 
         public IForceChannel? LateralG { get; set; }
+
+        public IForceChannel? LongitudinalG { get; set; }
 
         public IForceChannel? RollRate { get; set; }
 
@@ -29,6 +32,12 @@ namespace Quantum.Track
             set => _lateralGChannels = ValidateChannels(value, nameof(LateralGChannels));
         }
 
+        public IReadOnlyList<IForceChannel>? LongitudinalGChannels
+        {
+            get => _longitudinalGChannels;
+            set => _longitudinalGChannels = ValidateChannels(value, nameof(LongitudinalGChannels));
+        }
+
         public IReadOnlyList<IForceChannel>? RollRateChannels
         {
             get => _rollRateChannels;
@@ -38,6 +47,8 @@ namespace Quantum.Track
         public ForceChannelBlendMode NormalGBlendMode { get; set; } = ForceChannelBlendMode.Sum;
 
         public ForceChannelBlendMode LateralGBlendMode { get; set; } = ForceChannelBlendMode.Sum;
+
+        public ForceChannelBlendMode LongitudinalGBlendMode { get; set; } = ForceChannelBlendMode.Sum;
 
         public ForceChannelBlendMode RollRateBlendMode { get; set; } = ForceChannelBlendMode.Sum;
 

@@ -1,7 +1,7 @@
-# Backend Milestone Summary (Post Train Pose JSON Export v1)
+# Backend Milestone Summary (Train Pose Export v1 + Wireframe Backend Viewer)
 
-Date: 2026-05-08  
-Scope: Backend handoff after commit `24d15e0` (`Add train pose export JSON contract`)
+Date: 2026-05-14  
+Scope: Backend milestone snapshot including current wireframe backend viewer capabilities.
 
 ## 1) Current Backend Architecture
 
@@ -23,6 +23,11 @@ Scope: Backend handoff after commit `24d15e0` (`Add train pose export JSON contr
 - Export path:
   - `TrainPoseExportV1Mapper.Export(TrainPoseResult)` -> `TrainPoseExportV1Dto`
   - `TrainPoseExportV1Json.Serialize/Deserialize` provides JSON with contract/version validation.
+- Unity wireframe backend viewer path:
+  - `BackendTrainPipelineGizmoVisualizer` renders track/train debug output directly from backend evaluation.
+  - Track layers include rails, cross ties, banking ribbon, and heartline.
+  - Train hierarchy debug markers include bogie markers, wheel markers, articulation center points, and coupler links.
+  - Playback and HUD diagnostics include playhead controls, auto-play/loop speed, lead-distance readout, spacing error stats, and sampled lead speed text.
 
 ## 2) Major Completed Systems
 
@@ -32,6 +37,12 @@ Scope: Backend handoff after commit `24d15e0` (`Add train pose export JSON contr
 - Provider decomposition into focused internal solver/sampler components.
 - Matrix/frame contract documented and tested for train export shape consistency.
 - `Quantum.IO` train pose export DTO contract (`v1`) and JSON contract validation.
+- Wireframe backend viewer renders rails.
+- Wireframe backend viewer renders cross ties.
+- Wireframe backend viewer renders banking ribbon.
+- Wireframe backend viewer renders heartline.
+- Wireframe backend viewer renders train hierarchy debug markers.
+- Wireframe backend viewer supports playback/HUD diagnostics.
 
 ## 3) Current Commit Checkpoints
 
@@ -46,13 +57,13 @@ Scope: Backend handoff after commit `24d15e0` (`Add train pose export JSON contr
 
 ## 4) Test Count / Status
 
-- Current result (2026-05-08): `Passed: 629, Failed: 0, Skipped: 0, Total: 629`.
+- Last recorded result (2026-05-08): `Passed: 629, Failed: 0, Skipped: 0, Total: 629`.
 - Validation command used: `dotnet test QuantumCoasterWorks.sln --nologo`.
 
 ## 5) Intentionally Not Implemented Yet
 
-- Unity bridge implementation is not started; backend remains renderer/host-agnostic.
-- Frontend/Unity integration is intentionally paused.
+- Production Unity runtime bridge is not implemented; current Unity usage is debug-wireframe visualization.
+- Real train meshes/materials and full artist-facing presentation are intentionally deferred.
 - Full 3D train motion and lateral/roll coupling into runtime motion are intentionally deferred.
 - Time-domain FVD solver/runtime coupling remains deferred.
 
@@ -63,10 +74,11 @@ Scope: Backend handoff after commit `24d15e0` (`Add train pose export JSON contr
 - Add optional batch/compiled sampling reuse path in train pose evaluation to avoid recompiling sampling context per query.
 - Add backend-side ingest/validation pathway for train pose JSON `v1` (read + validate + diagnostics), without Unity coupling.
 - Define `v2` versioning policy now (backward-compatible additions only, explicit breaking-change gate).
+- Add viewer-focused regression checks for wireframe feature toggles (rails/cross ties/banking ribbon/heartline/markers/HUD) to keep debug behavior stable while backend evolves.
 
-## 7) Recommended “Do Not Touch Yet” Areas
+## 7) Recommended "Do Not Touch Yet" Areas
 
-- Do not couple train pose export work to Unity/frontend workstreams.
+- Do not couple backend DTO/versioning decisions to Unity-only visualization settings or colors.
 - Do not change `quantum.train_pose` contract name or `version = 1` behavior without formal version bump planning.
 - Do not alter `TrainStepLoop` integration behavior as part of export milestones.
 - Do not merge lateral/roll/time-domain runtime coupling into this lane until explicitly scheduled.

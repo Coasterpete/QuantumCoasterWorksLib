@@ -106,6 +106,18 @@ namespace Quantum.Track
                 resolvedSection.EndLateralG,
                 channelT);
 
+            double? targetLongitudinalG = SampleChannel(
+                resolvedSection.Channels?.LongitudinalGChannels,
+                resolvedSection.Channels?.LongitudinalGBlendMode ?? ForceChannelBlendMode.Sum,
+                resolvedSection.Channels?.LongitudinalG,
+                resolvedSection.LongitudinalGChannel,
+                resolvedSection.InterpolationMode,
+                resolvedSection.EasingFunction,
+                resolvedSection.TargetLongitudinalG,
+                resolvedSection.StartLongitudinalG,
+                resolvedSection.EndLongitudinalG,
+                channelT);
+
             double? targetRollRateDegPerSec = SampleDirectChannel(
                 resolvedSection.Channels?.RollRateChannels,
                 resolvedSection.Channels?.RollRateBlendMode ?? ForceChannelBlendMode.Sum,
@@ -118,7 +130,7 @@ namespace Quantum.Track
                 channelT,
                 targetNormalG,
                 targetLateralG,
-                targetLongitudinalG: null,
+                targetLongitudinalG: targetLongitudinalG,
                 targetRollRateDegPerSec: targetRollRateDegPerSec);
         }
 

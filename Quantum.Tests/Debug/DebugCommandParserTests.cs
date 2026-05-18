@@ -32,6 +32,24 @@ public sealed class DebugCommandParserTests
     }
 
     [Fact]
+    public void TryParse_LongitudinalForcePreviewCommand_ParsesCaseInsensitive()
+    {
+        bool parsed = DebugCommandParser.TryParse(new[] { "LoNgItUdInAl-FoRcE-PrEvIeW" }, out DebugCommandKind command);
+
+        Assert.True(parsed);
+        Assert.Equal(DebugCommandKind.LongitudinalForcePreview, command);
+    }
+
+    [Fact]
+    public void TryParse_LongitudinalSpeedPreviewCommand_ParsesCaseInsensitive()
+    {
+        bool parsed = DebugCommandParser.TryParse(new[] { "LoNgItUdInAl-SpEeD-PrEvIeW" }, out DebugCommandKind command);
+
+        Assert.True(parsed);
+        Assert.Equal(DebugCommandKind.LongitudinalSpeedPreview, command);
+    }
+
+    [Fact]
     public void TryParse_UnknownCommand_ReturnsFalse()
     {
         bool parsed = DebugCommandParser.TryParse(new[] { "unknown-command" }, out DebugCommandKind command);
