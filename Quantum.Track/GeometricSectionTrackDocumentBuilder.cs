@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Quantum.Math;
 using Quantum.Splines;
 
@@ -19,6 +20,65 @@ namespace Quantum.Track
             {
                 BuildSegment(section, segmentId, forceSegmentReference)
             });
+        }
+
+        /// <summary>
+        /// Explicit opt-in adapter for evaluating multiple zero-roll geometric sections
+        /// through one existing TrackDocument/TrackEvaluator segment path.
+        /// </summary>
+        public static TrackDocument BuildZeroRollCompositeDocument(
+            IEnumerable<GeometricSection> sections,
+            string? segmentId = null,
+            string? forceSegmentReference = null)
+        {
+            if (sections is null)
+            {
+                throw new ArgumentNullException(nameof(sections));
+            }
+
+            var materializedSections = new List<GeometricSection>();
+
+            foreach (GeometricSection section in sections)
+            {
+                if (section is null)
+                {
+                    throw new ArgumentException("Section entries cannot be null.", nameof(sections));
+                }
+
+                ValidateZeroRoll(section.Roll);
+                materializedSections.Add(section);
+            }
+
+            if (materializedSections.Count < 2)
+            {
+                throw new ArgumentException(
+                    "At least two geometric sections are required for a composite section document.",
+                    nameof(sections));
+            }
+
+            CompositeSectionCurve centerline = SectionCurveAssembler.Assemble(materializedSections);
+            TrackSegment segment;
+
+            if (ContainsCurvedSection(materializedSections))
+            {
+                segment = new CurvedSegment(
+                    centerline.TotalLength,
+                    segmentId,
+                    forceSegmentReference,
+                    centerline,
+                    rollRadians: 0.0);
+            }
+            else
+            {
+                segment = new StraightSegment(
+                    centerline.TotalLength,
+                    segmentId,
+                    forceSegmentReference,
+                    centerline,
+                    rollRadians: 0.0);
+            }
+
+            return new TrackDocument(new[] { segment }, materializedSections);
         }
 
         public static TrackSegment BuildSegment(
@@ -54,6 +114,35 @@ namespace Quantum.Track
                 forceSegmentReference,
                 curve,
                 rollRadians);
+        }
+
+        private static void ValidateZeroRoll(double? roll)
+        {
+            if (!roll.HasValue)
+            {
+                return;
+            }
+
+            if (!IsFinite(roll.Value) || System.Math.Abs(roll.Value) > MathUtil.Epsilon)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(roll),
+                    roll.Value,
+                    "Composite geometric section documents are limited to zero-roll sections.");
+            }
+        }
+
+        private static bool ContainsCurvedSection(IReadOnlyList<GeometricSection> sections)
+        {
+            for (int i = 0; i < sections.Count; i++)
+            {
+                if (IsCurved(sections[i].Curvature))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private static bool IsCurved(double? curvature)
