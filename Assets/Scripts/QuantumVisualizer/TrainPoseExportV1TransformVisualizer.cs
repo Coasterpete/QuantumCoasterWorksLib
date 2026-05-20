@@ -24,6 +24,16 @@ namespace QuantumVisualizer
         [SerializeField] private bool createWheelPlaceholders = true;
         [SerializeField] private bool createArticulationMarkers = true;
 
+        [Header("Optional Prefab Slots")]
+        [SerializeField, Tooltip("Optional visual prefab for each generated car body. The Body_ArticulatedMatrix node stays driven by TrainPoseExportV1; this prefab is instantiated below it at local identity. Leave empty to use the debug cube fallback.")]
+        private GameObject bodyPrefab;
+        [SerializeField, Tooltip("Optional visual prefab for each generated bogie. The FrontBogie/RearBogie wrapper stays driven by TrainPoseExportV1; this prefab is instantiated below its BogieBox slot at local identity. Leave empty to use the debug cube fallback.")]
+        private GameObject bogiePrefab;
+        [SerializeField, Tooltip("Optional visual prefab for each generated wheel. The Wheel_XX node stays positioned from TrainPoseExportV1 local wheel offsets; this prefab is instantiated below it at local identity. Leave empty to use the debug cylinder fallback.")]
+        private GameObject wheelPrefab;
+        [SerializeField, Tooltip("Optional visual prefab for generated articulation markers. The Center_ArticulatedMatrix node stays driven by TrainPoseExportV1; this prefab is instantiated below it at local identity. Leave empty to use the debug sphere fallback.")]
+        private GameObject articulationPrefab;
+
         [Header("Sizing")]
         [SerializeField, Min(0.01f)] private float bodyScaleMultiplier = 1f;
         [SerializeField, Min(0.01f)] private float fallbackBodyLength = 4f;
@@ -168,18 +178,36 @@ namespace QuantumVisualizer
 
             if (createBodyPlaceholders)
             {
-                GameObject bodyObject = CreatePrimitive(PrimitiveType.Cube, "Body_ArticulatedMatrix", carRoot, bodyMaterial);
+                GameObject bodyObject = CreatePoseVisualNode(
+                    "Body_ArticulatedMatrix",
+                    carRoot,
+                    bodyPrefab,
+                    PrimitiveType.Cube,
+                    bodyMaterial);
                 ApplyLocalPose(bodyObject.transform, body.articulatedMatrix, body.articulatedFrame);
-                bodyObject.transform.localScale = GetBodyScale(geometry);
+
+                if (bodyPrefab == null)
+                {
+                    bodyObject.transform.localScale = GetBodyScale(geometry);
+                }
             }
 
             if (createArticulationMarkers)
             {
                 GameObject markersRoot = CreateEmpty("ArticulationMarkers", carRoot);
-                GameObject marker = CreatePrimitive(PrimitiveType.Sphere, "Center_ArticulatedMatrix", markersRoot.transform, articulationMaterial);
+                GameObject marker = CreatePoseVisualNode(
+                    "Center_ArticulatedMatrix",
+                    markersRoot.transform,
+                    articulationPrefab,
+                    PrimitiveType.Sphere,
+                    articulationMaterial);
                 ApplyLocalPose(marker.transform, body.articulatedMatrix, body.articulatedFrame);
-                float diameter = PositiveOrDefault(articulationMarkerRadius, 0.12f) * 2f;
-                marker.transform.localScale = new Vector3(diameter, diameter, diameter);
+
+                if (articulationPrefab == null)
+                {
+                    float diameter = PositiveOrDefault(articulationMarkerRadius, 0.12f) * 2f;
+                    marker.transform.localScale = new Vector3(diameter, diameter, diameter);
+                }
             }
         }
 
@@ -203,10 +231,17 @@ namespace QuantumVisualizer
 
             if (createBogiePlaceholders)
             {
-                GameObject bogieBox = CreatePrimitive(PrimitiveType.Cube, "BogieBox", bogieRoot.transform, bogieMaterial);
-                bogieBox.transform.localPosition = Vector3.zero;
-                bogieBox.transform.localRotation = Quaternion.identity;
-                bogieBox.transform.localScale = GetBogieScale(geometry, wheelLayout);
+                GameObject bogieBox = CreateSlotVisualNode(
+                    "BogieBox",
+                    bogieRoot.transform,
+                    bogiePrefab,
+                    PrimitiveType.Cube,
+                    bogieMaterial);
+
+                if (bogiePrefab == null)
+                {
+                    bogieBox.transform.localScale = GetBogieScale(geometry, wheelLayout);
+                }
             }
 
             if (!createWheelPlaceholders || bogieWithWheels.wheels == null)
@@ -233,18 +268,23 @@ namespace QuantumVisualizer
             TrainWheelLayoutV1Dto wheelLayout,
             Material wheelMaterial)
         {
-            GameObject wheelObject = CreatePrimitive(
-                PrimitiveType.Cylinder,
+            GameObject wheelObject = CreateSlotVisualNode(
                 "Wheel_" + FormatIndex(wheel.wheelIndex),
                 wheelsRoot,
+                wheelPrefab,
+                PrimitiveType.Cylinder,
                 wheelMaterial);
 
             wheelObject.transform.localPosition = new Vector3(
                 wheel.localOffsetX,
                 wheel.localOffsetY,
                 wheel.localOffsetZ);
-            wheelObject.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
-            wheelObject.transform.localScale = GetWheelScale(wheelLayout);
+
+            if (wheelPrefab == null)
+            {
+                wheelObject.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+                wheelObject.transform.localScale = GetWheelScale(wheelLayout);
+            }
         }
 
         private static int ResolveCarIndex(ArticulatedTrainCarWithWheelsV1Dto car, int fallbackIndex)
@@ -329,6 +369,47 @@ namespace QuantumVisualizer
             }
 
             return gameObject;
+        }
+
+        private GameObject CreatePoseVisualNode(
+            string name,
+            Transform parent,
+            GameObject prefab,
+            PrimitiveType fallbackPrimitive,
+            Material fallbackMaterial)
+        {
+            if (prefab == null)
+            {
+                return CreatePrimitive(fallbackPrimitive, name, parent, fallbackMaterial);
+            }
+
+            GameObject wrapper = CreateEmpty(name, parent);
+            InstantiatePrefabVisual(prefab, wrapper.transform);
+            return wrapper;
+        }
+
+        private GameObject CreateSlotVisualNode(
+            string name,
+            Transform parent,
+            GameObject prefab,
+            PrimitiveType fallbackPrimitive,
+            Material fallbackMaterial)
+        {
+            GameObject slot = CreatePoseVisualNode(name, parent, prefab, fallbackPrimitive, fallbackMaterial);
+            slot.transform.localPosition = Vector3.zero;
+            slot.transform.localRotation = Quaternion.identity;
+            slot.transform.localScale = Vector3.one;
+            return slot;
+        }
+
+        private static GameObject InstantiatePrefabVisual(GameObject prefab, Transform parent)
+        {
+            GameObject instance = Instantiate(prefab, parent, false);
+            instance.name = prefab.name;
+            instance.transform.localPosition = Vector3.zero;
+            instance.transform.localRotation = Quaternion.identity;
+            instance.transform.localScale = Vector3.one;
+            return instance;
         }
 
         private Material CreateMaterial(string name, Color color)
