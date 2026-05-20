@@ -32,10 +32,10 @@ public sealed class TrainPoseExportV1CompositeDocumentBoundaryTests
             carHeight: 1.4,
             bogieSpacing: 1.2,
             wheelLayout: new TrainWheelLayout(
-                wheelCountPerBogie: 2,
+                wheelCountPerBogie: 4,
                 wheelRadius: 0.35,
                 wheelWidth: 0.4,
-                axleSpacing: 0.0));
+                axleSpacing: 1.1));
         const double leadDistance = 8.5;
 
         TrainPoseResult pose = provider.EvaluateTrainPose(leadDistance, definition);
@@ -54,8 +54,7 @@ public sealed class TrainPoseExportV1CompositeDocumentBoundaryTests
         string json = TrainPoseExportV1Json.Serialize(export);
         TrainPoseExportV1Dto roundtrip = TrainPoseExportV1Json.Deserialize(json);
 
-        Assert.Equal(export.Cars.Length, roundtrip.Cars.Length);
-        AssertDistancesMatchExport(export, roundtrip);
+        AssertRoundTripPreservesExport(export, roundtrip);
         AssertExportFinite(roundtrip);
 
         bool isValid = TrainPoseExportV1Validator.TryValidate(
@@ -147,6 +146,165 @@ public sealed class TrainPoseExportV1CompositeDocumentBoundaryTests
             AssertWheelDistancesMatch(expectedCar.FrontBogie.Wheels, actualCar.FrontBogie.Wheels);
             AssertWheelDistancesMatch(expectedCar.RearBogie.Wheels, actualCar.RearBogie.Wheels);
         }
+    }
+
+    private static void AssertRoundTripPreservesExport(
+        TrainPoseExportV1Dto expected,
+        TrainPoseExportV1Dto actual)
+    {
+        Assert.Equal(expected.Contract, actual.Contract);
+        Assert.Equal(expected.Version, actual.Version);
+        AssertDoubleNear(expected.LeadDistance, actual.LeadDistance);
+        AssertDefinitionMatches(expected.Definition, actual.Definition);
+        Assert.Equal(expected.Cars.Length, actual.Cars.Length);
+        AssertDistancesMatchExport(expected, actual);
+
+        for (int i = 0; i < expected.Cars.Length; i++)
+        {
+            AssertCarMatches(expected.Cars[i], actual.Cars[i]);
+        }
+    }
+
+    private static void AssertDefinitionMatches(
+        TrainConsistDefinitionV1Dto expected,
+        TrainConsistDefinitionV1Dto actual)
+    {
+        Assert.Equal(expected.CarCount, actual.CarCount);
+        AssertDoubleNear(expected.CarSpacing, actual.CarSpacing);
+        AssertDoubleNear(expected.CarGeometry.Length, actual.CarGeometry.Length);
+        AssertDoubleNear(expected.CarGeometry.Width, actual.CarGeometry.Width);
+        AssertDoubleNear(expected.CarGeometry.Height, actual.CarGeometry.Height);
+        AssertDoubleNear(expected.BogieLayout.BogieSpacing, actual.BogieLayout.BogieSpacing);
+
+        Assert.NotNull(expected.WheelLayout);
+        Assert.NotNull(actual.WheelLayout);
+        Assert.Equal(expected.WheelLayout!.WheelCountPerBogie, actual.WheelLayout!.WheelCountPerBogie);
+        AssertDoubleNear(expected.WheelLayout.WheelRadius, actual.WheelLayout.WheelRadius);
+        AssertDoubleNear(expected.WheelLayout.WheelWidth, actual.WheelLayout.WheelWidth);
+        AssertDoubleNear(expected.WheelLayout.AxleSpacing, actual.WheelLayout.AxleSpacing);
+        Assert.True(expected.WheelLayout.AxleSpacing > 0.0);
+    }
+
+    private static void AssertCarMatches(
+        ArticulatedTrainCarWithWheelsV1Dto expected,
+        ArticulatedTrainCarWithWheelsV1Dto actual)
+    {
+        AssertArticulatedBodyMatches(expected.Body, actual.Body);
+        AssertBogieWithWheelsMatches(expected.FrontBogie, actual.FrontBogie);
+        AssertBogieWithWheelsMatches(expected.RearBogie, actual.RearBogie);
+    }
+
+    private static void AssertArticulatedBodyMatches(
+        ArticulatedTrainCarV1Dto expected,
+        ArticulatedTrainCarV1Dto actual)
+    {
+        AssertTrainCarMatches(expected.OriginalBody, actual.OriginalBody);
+        AssertBogieMatches(expected.FrontBogie, actual.FrontBogie);
+        AssertBogieMatches(expected.RearBogie, actual.RearBogie);
+        AssertTrackFrameMatches(expected.ArticulatedFrame, actual.ArticulatedFrame);
+        AssertMatrixMatches(expected.ArticulatedMatrix, actual.ArticulatedMatrix);
+        AssertDoubleNear(expected.CenterDistance, actual.CenterDistance);
+    }
+
+    private static void AssertTrainCarMatches(
+        TrainCarTransformV1Dto expected,
+        TrainCarTransformV1Dto actual)
+    {
+        Assert.Equal(expected.CarIndex, actual.CarIndex);
+        AssertDoubleNear(expected.Distance, actual.Distance);
+        AssertTrackFrameMatches(expected.Frame, actual.Frame);
+        AssertMatrixMatches(expected.Matrix, actual.Matrix);
+    }
+
+    private static void AssertBogieWithWheelsMatches(
+        TrainBogieWithWheelsV1Dto expected,
+        TrainBogieWithWheelsV1Dto actual)
+    {
+        AssertBogieMatches(expected.Bogie, actual.Bogie);
+        Assert.Equal(expected.Wheels.Length, actual.Wheels.Length);
+
+        for (int i = 0; i < expected.Wheels.Length; i++)
+        {
+            AssertWheelMatches(expected.Wheels[i], actual.Wheels[i]);
+        }
+    }
+
+    private static void AssertBogieMatches(
+        BogieTransformV1Dto expected,
+        BogieTransformV1Dto actual)
+    {
+        Assert.Equal(expected.CarIndex, actual.CarIndex);
+        Assert.Equal(expected.BogieIndex, actual.BogieIndex);
+        AssertDoubleNear(expected.Distance, actual.Distance);
+        AssertTrackFrameMatches(expected.Frame, actual.Frame);
+        AssertMatrixMatches(expected.Matrix, actual.Matrix);
+    }
+
+    private static void AssertWheelMatches(
+        WheelTransformV1Dto expected,
+        WheelTransformV1Dto actual)
+    {
+        Assert.Equal(expected.CarIndex, actual.CarIndex);
+        Assert.Equal(expected.BogieIndex, actual.BogieIndex);
+        Assert.Equal(expected.WheelIndex, actual.WheelIndex);
+        AssertDoubleNear(expected.LocalOffsetX, actual.LocalOffsetX);
+        AssertDoubleNear(expected.LocalOffsetY, actual.LocalOffsetY);
+        AssertDoubleNear(expected.LocalOffsetZ, actual.LocalOffsetZ);
+        Assert.True(IsNonZeroLocalOffset(expected));
+        Assert.True(System.Math.Abs(expected.LocalOffsetX) > Tolerance);
+        Assert.True(IsNonZeroLocalOffset(actual));
+        Assert.True(System.Math.Abs(actual.LocalOffsetX) > Tolerance);
+        AssertTrackFrameMatches(expected.Frame, actual.Frame);
+        AssertMatrixMatches(expected.Matrix, actual.Matrix);
+    }
+
+    private static bool IsNonZeroLocalOffset(WheelTransformV1Dto wheel)
+    {
+        return System.Math.Abs(wheel.LocalOffsetX) > Tolerance ||
+            System.Math.Abs(wheel.LocalOffsetY) > Tolerance ||
+            System.Math.Abs(wheel.LocalOffsetZ) > Tolerance;
+    }
+
+    private static void AssertTrackFrameMatches(
+        TrackFrameV1Dto expected,
+        TrackFrameV1Dto actual)
+    {
+        AssertDoubleNear(expected.Distance, actual.Distance);
+        AssertVectorMatches(expected.Position, actual.Position);
+        AssertVectorMatches(expected.Tangent, actual.Tangent);
+        AssertVectorMatches(expected.Normal, actual.Normal);
+        AssertVectorMatches(expected.Binormal, actual.Binormal);
+    }
+
+    private static void AssertVectorMatches(
+        Vector3dV1Dto expected,
+        Vector3dV1Dto actual)
+    {
+        AssertDoubleNear(expected.X, actual.X);
+        AssertDoubleNear(expected.Y, actual.Y);
+        AssertDoubleNear(expected.Z, actual.Z);
+    }
+
+    private static void AssertMatrixMatches(
+        Matrix4x4V1Dto expected,
+        Matrix4x4V1Dto actual)
+    {
+        AssertDoubleNear(expected.M11, actual.M11);
+        AssertDoubleNear(expected.M12, actual.M12);
+        AssertDoubleNear(expected.M13, actual.M13);
+        AssertDoubleNear(expected.M14, actual.M14);
+        AssertDoubleNear(expected.M21, actual.M21);
+        AssertDoubleNear(expected.M22, actual.M22);
+        AssertDoubleNear(expected.M23, actual.M23);
+        AssertDoubleNear(expected.M24, actual.M24);
+        AssertDoubleNear(expected.M31, actual.M31);
+        AssertDoubleNear(expected.M32, actual.M32);
+        AssertDoubleNear(expected.M33, actual.M33);
+        AssertDoubleNear(expected.M34, actual.M34);
+        AssertDoubleNear(expected.M41, actual.M41);
+        AssertDoubleNear(expected.M42, actual.M42);
+        AssertDoubleNear(expected.M43, actual.M43);
+        AssertDoubleNear(expected.M44, actual.M44);
     }
 
     private static void AssertWheelDistancesMatch(
