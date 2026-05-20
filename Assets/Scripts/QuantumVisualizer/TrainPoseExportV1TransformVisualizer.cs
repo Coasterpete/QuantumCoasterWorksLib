@@ -104,7 +104,7 @@ namespace QuantumVisualizer
                 Transform child = transform.GetChild(i);
                 if (string.Equals(child.name, GeneratedRootName, StringComparison.Ordinal))
                 {
-                    DestroyObject(child.gameObject);
+                    DestroyGeneratedObject(child.gameObject);
                 }
             }
         }
@@ -319,7 +319,7 @@ namespace QuantumVisualizer
             Collider primitiveCollider = gameObject.GetComponent<Collider>();
             if (primitiveCollider != null)
             {
-                DestroyObject(primitiveCollider);
+                DestroyGeneratedObject(primitiveCollider);
             }
 
             Renderer renderer = gameObject.GetComponent<Renderer>();
@@ -362,7 +362,7 @@ namespace QuantumVisualizer
                 Material material = _generatedMaterials[i];
                 if (material != null)
                 {
-                    DestroyObject(material);
+                    DestroyGeneratedObject(material);
                 }
             }
 
@@ -539,7 +539,7 @@ namespace QuantumVisualizer
             _lastError = error;
         }
 
-        private static void DestroyObject(UnityEngine.Object target)
+        private static void DestroyGeneratedObject(UnityEngine.Object target)
         {
             if (target == null)
             {
