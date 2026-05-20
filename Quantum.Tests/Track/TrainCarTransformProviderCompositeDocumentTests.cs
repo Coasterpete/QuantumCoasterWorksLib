@@ -56,6 +56,61 @@ public sealed class TrainCarTransformProviderCompositeDocumentTests
         }
     }
 
+    [Fact]
+    public void EvaluateTrainPose_CompositeSectionDocument_SamplesWheelsAndArticulationAcrossBoundaries()
+    {
+        TrackDocument document = GeometricSectionTrackDocumentBuilder.BuildZeroRollCompositeDocument(
+            CreateZeroRollSections(),
+            segmentId: "composite-train-pose-regression");
+        TrackSegment segment = Assert.Single(document.Segments);
+        Assert.IsType<CompositeSectionCurve>(segment.Spline);
+        Assert.Equal(3, document.Sections.Count);
+
+        var evaluator = new TrackEvaluator(document);
+        var provider = new TrainCarTransformProvider(evaluator);
+        var definition = new TrainConsistDefinition(
+            carCount: 2,
+            carSpacing: 3.0,
+            carLength: 2.0,
+            carWidth: 1.2,
+            carHeight: 1.4,
+            bogieSpacing: 1.2,
+            wheelLayout: new TrainWheelLayout(
+                wheelCountPerBogie: 2,
+                wheelRadius: 0.35,
+                wheelWidth: 0.4,
+                axleSpacing: 0.0));
+        const double leadDistance = 8.5;
+
+        TrainPoseResult pose = provider.EvaluateTrainPose(
+            leadDistance,
+            definition);
+        TrainPoseResult repeatedPose = provider.EvaluateTrainPose(
+            leadDistance,
+            definition);
+
+        Assert.Equal(definition.CarCount, pose.Cars.Length);
+        Assert.Equal(definition.CarCount, pose.CarsReadOnly.Count);
+        Assert.Equal(definition.CarCount, repeatedPose.CarsReadOnly.Count);
+        AssertPoseBodyDistancesAreDeterministic(pose.CarsReadOnly, repeatedPose.CarsReadOnly);
+
+        double[] expectedBodyDistances = { 8.5, 5.5 };
+        double[] expectedFrontBogieDistances = { 9.1, 6.1 };
+        double[] expectedRearBogieDistances = { 7.9, 4.9 };
+
+        AssertBogieDistancesStraddleBoundary(pose.CarsReadOnly[0], boundaryDistance: 8.0);
+        AssertBogieDistancesStraddleBoundary(pose.CarsReadOnly[1], boundaryDistance: 5.0);
+
+        for (int i = 0; i < pose.CarsReadOnly.Count; i++)
+        {
+            ArticulatedTrainCarWithWheelsTransform car = pose.CarsReadOnly[i];
+
+            AssertPoseBodySampleMatchesTrackEvaluator(evaluator, car.Body, expectedBodyDistances[i]);
+            AssertPoseBogieSampleMatchesTrackEvaluator(evaluator, car.FrontBogie, expectedFrontBogieDistances[i]);
+            AssertPoseBogieSampleMatchesTrackEvaluator(evaluator, car.RearBogie, expectedRearBogieDistances[i]);
+        }
+    }
+
     private static GeometricSection[] CreateZeroRollSections()
     {
         return new[]
@@ -64,6 +119,76 @@ public sealed class TrainCarTransformProviderCompositeDocumentTests
             new GeometricSection(length: 3.0),
             new GeometricSection(length: 4.0, curvature: -0.08, roll: 0.0)
         };
+    }
+
+    private static void AssertPoseBodyDistancesAreDeterministic(
+        IReadOnlyList<ArticulatedTrainCarWithWheelsTransform> expected,
+        IReadOnlyList<ArticulatedTrainCarWithWheelsTransform> actual)
+    {
+        Assert.Equal(expected.Count, actual.Count);
+
+        for (int i = 0; i < expected.Count; i++)
+        {
+            AssertDoubleNear(expected[i].Body.OriginalBody.Distance, actual[i].Body.OriginalBody.Distance);
+            AssertDoubleNear(expected[i].Body.CenterDistance, actual[i].Body.CenterDistance);
+        }
+    }
+
+    private static void AssertBogieDistancesStraddleBoundary(
+        ArticulatedTrainCarWithWheelsTransform car,
+        double boundaryDistance)
+    {
+        Assert.True(car.Body.RearBogie.Distance < boundaryDistance);
+        Assert.True(car.Body.FrontBogie.Distance > boundaryDistance);
+        Assert.True(car.RearBogie.Bogie.Distance < boundaryDistance);
+        Assert.True(car.FrontBogie.Bogie.Distance > boundaryDistance);
+    }
+
+    private static void AssertPoseBodySampleMatchesTrackEvaluator(
+        TrackEvaluator evaluator,
+        ArticulatedTrainCarTransform body,
+        double expectedDistance)
+    {
+        ExportTrackFrame expectedFrame = evaluator.EvaluateFrameAtDistance(expectedDistance);
+
+        AssertBodySampleMatchesTrackEvaluator(evaluator, body.OriginalBody, expectedDistance);
+        AssertDoubleNear(expectedDistance, body.CenterDistance);
+        AssertDoubleNear(expectedDistance, body.ArticulatedFrame.Distance);
+        AssertTrackFrameFinite(body.ArticulatedFrame);
+        AssertTrackFrameOrthonormal(body.ArticulatedFrame);
+        AssertFiniteMatrix(body.ArticulatedMatrix);
+        AssertMatrixNear(
+            Matrix4x4d.FromMatrix4x4(body.ArticulatedFrame.ToMatrix4x4()),
+            body.ArticulatedMatrix);
+        AssertTrackFrameMatches(expectedFrame, body.OriginalBody.Frame);
+    }
+
+    private static void AssertPoseBogieSampleMatchesTrackEvaluator(
+        TrackEvaluator evaluator,
+        TrainBogieWithWheelsTransform bogieWithWheels,
+        double expectedDistance)
+    {
+        AssertBogieSampleMatchesTrackEvaluator(evaluator, bogieWithWheels.Bogie, expectedDistance);
+
+        WheelTransform[] wheels = bogieWithWheels.Wheels;
+        Assert.NotEmpty(wheels);
+
+        for (int i = 0; i < wheels.Length; i++)
+        {
+            WheelTransform wheel = wheels[i];
+
+            Assert.Equal(bogieWithWheels.Bogie.CarIndex, wheel.CarIndex);
+            Assert.Equal(bogieWithWheels.Bogie.BogieIndex, wheel.BogieIndex);
+            Assert.Equal(i, wheel.WheelIndex);
+            AssertFinite(wheel.LocalOffsetX);
+            AssertFinite(wheel.LocalOffsetY);
+            AssertFinite(wheel.LocalOffsetZ);
+            AssertTrackFrameMatches(bogieWithWheels.Bogie.Frame, wheel.Frame);
+            AssertTrackFrameFinite(wheel.Frame);
+            AssertTrackFrameOrthonormal(wheel.Frame);
+            AssertFiniteMatrix(wheel.Matrix);
+            AssertMatrixNear(bogieWithWheels.Bogie.Matrix, wheel.Matrix);
+        }
     }
 
     private static void AssertRequestedDistancesAreDeterministic(
