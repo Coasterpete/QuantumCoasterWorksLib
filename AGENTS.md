@@ -41,9 +41,12 @@ Quantum uses existing frameworks for visualization and tooling, but the backend 
 Planned/considered stack:
 - QuantumCoasterWorksLib / Quantum.* = pure C# backend/domain logic
 - QCWUnityDebug / current Unity assets = optional/legacy debug viewer and prototype only
-- Future standalone editor = Avalonia UI shell
-- Future viewport = Silk.NET or OpenTK renderer
+- Optional Unity/Unreal visualization targets = PBR, ride-through, and presentation rendering through thin adapters
+- Future standalone editor candidate = Avalonia UI shell
+- Future technical viewport candidate = Silk.NET or OpenTK renderer
 - Mature external math/spline libraries where appropriate
+
+No final frontend, renderer, or engine choice is locked yet.
 
 Quantum is NOT currently:
 - a full standalone game engine
@@ -91,6 +94,7 @@ Current train visualization may use:
 
 This is acceptable during backend prototyping.
 Unity visualization is a debug/prototype surface only and should not define backend architecture.
+Unity or Unreal may remain valid optional visualization targets when high-fidelity PBR, ride-through, or presentation rendering is useful.
 
 ## Important
 
@@ -98,3 +102,4 @@ Do not attempt to redesign the entire project architecture unless explicitly req
 
 Focus on helping the existing prototype become more stable and testable.
 Keep Unity-specific work outside the backend library.
+Keep Unreal-specific work outside the backend library.

@@ -25,12 +25,14 @@ QuantumCoasterWorks.sln
 
 - Core backend libraries remain host-independent.
 - Current Unity assets are an optional debug/prototype visualizer.
-- Future standalone editor direction is an Avalonia UI shell.
-- Future viewport direction is Silk.NET or OpenTK, to be evaluated later.
+- Unity or Unreal may remain valid optional visualization targets for PBR, ride-through, and presentation rendering.
+- No final frontend is selected.
+- Future standalone editor candidate is an Avalonia UI shell.
+- Future technical viewport candidate is Silk.NET, with OpenTK still available for evaluation.
 
 ## Rule
 
-Core logic must remain independent from Unity, Avalonia, renderer, and UI APIs.
+Core logic must remain independent from Unity, Unreal, Avalonia, renderer, and UI APIs.
 
 ## Near-Term Notes
 

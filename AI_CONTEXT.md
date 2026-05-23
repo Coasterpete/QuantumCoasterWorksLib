@@ -7,6 +7,8 @@ Advanced roller coaster editor and simulation platform.
 - Keep code modular, deterministic, and test-first.
 - Favor reusable libraries.
 - Unity visualization is debug/prototype layer only.
+- Unity and Unreal may remain valid optional visualization targets for PBR, ride-through, and presentation rendering.
+- Do not choose a final frontend yet; Avalonia/Silk.NET remains a candidate standalone editor shell/technical viewport path.
 - Core coaster logic belongs in Quantum.* libraries.
 - Keep Quantum.* libraries engine-agnostic.
 - Do not add UnityEngine or UnityEditor dependencies to core projects.
