@@ -7,7 +7,7 @@ Quantum CoasterWorks is moving toward a standalone coaster design / FVD-style / 
 The intended split is:
 
 - `QuantumCoasterWorksLib` / `Quantum.*`: pure C# backend/domain libraries for track, spline, FVD, physics, IO, train placement, and export/import adapters.
-- `QCWUnityDebug` / current `Assets` visualizer: optional and legacy Unity debug viewer for prototype inspection only.
+- Current `Assets/Scripts/QuantumVisualizer` Unity visualizer: optional debug/prototype viewer for inspection only. `QCWUnityDebug` is a conceptual/legacy debug surface name, not a current solution project.
 - Future standalone editor: Avalonia UI shell.
 - Future viewport: Silk.NET or OpenTK renderer, evaluated when viewport needs are clearer.
 

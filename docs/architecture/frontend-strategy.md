@@ -16,6 +16,15 @@ Silk.NET or OpenTK are being considered for the future viewport because they pro
 
 No final renderer choice is locked yet. The next step is to keep the backend clean enough that either viewport option can be evaluated later.
 
+## Future Layout
+
+- `Quantum.Editor.Avalonia`: future desktop app shell for windows, panels, inspectors, commands, and host-level UI wiring.
+- `Quantum.Editor.Core` or `Quantum.Editor.Workbench`: optional pure .NET editor state and services layer, if shared editor workflows need to live outside the UI shell.
+- `Quantum.Viewport.SilkNet` or `Quantum.Viewport.OpenTK`: future renderer adapter for drawing sampled coaster data in a standalone viewport.
+- Backend libraries: expose renderer-agnostic sampled data, transforms, frames, diagnostics, and DTOs for any frontend or adapter to consume.
+
+Backend libraries must not contain host-tied cameras, materials, meshes, shaders, input loops, scene objects, draw calls, or other renderer/frontend resources. Those belong in frontend, viewport, debug, or export adapters.
+
 ## What Must Stay Engine-Agnostic
 
 The `Quantum.*` backend projects should stay independent of Unity, Avalonia, Silk.NET, OpenTK, or any other host framework. Backend APIs should describe coaster-domain concepts and simple data contracts, not UI widgets, scene objects, engine components, materials, or render resources.

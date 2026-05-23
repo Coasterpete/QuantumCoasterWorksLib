@@ -33,7 +33,7 @@ Read `ROADMAP.md` and `docs/architecture/frontend-strategy.md` before frontend o
 
 ## Current Backend State
 
-- Current validation: 223/223 tests passing.
+- Current validation command: `dotnet test QuantumCoasterWorks.sln --nologo`; use the latest run output rather than a hard-coded test count.
 - `Quantum.Track` supports document, segments, traversal, frame, transform, and spline-backed spatial evaluation.
 - `TrackDocument`, `TrackSegment`, `StraightSegment`, and `CurvedSegment` exist.
 - `TrackEvaluator` supports:

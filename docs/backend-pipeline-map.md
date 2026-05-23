@@ -1,9 +1,9 @@
 # Quantum Backend Pipeline Map
 
-Purpose: quick plain-language map of how backend track data becomes train pose output for Unity/debug/export/physics.
+Purpose: quick plain-language map of how backend track data becomes engine-agnostic train pose output for debug frontends, export adapters, physics systems, and other consumers.
 
 Pipeline:
-`TrackDocument -> TrackEvaluator -> TrackFrame -> TrainCarTransformProvider -> TrainPoseResult -> Unity/debug/export/physics consumers`
+`TrackDocument -> TrackEvaluator -> TrackFrame -> TrainCarTransformProvider -> TrainPoseResult -> debug/export/physics/frontend consumers`
 
 ## 1) TrackDocument
 What it owns:
@@ -71,19 +71,20 @@ What breaks if changed:
 - Export mappers/validators and downstream readers can break.
 - Unity/debug/physics adapters may misread or reject pose data.
 
-## 6) Unity / Debug / Export / Physics Consumers
+## 6) Debug / Export / Physics / Frontend Consumers
 What they own:
-- Presentation, diagnostics, serialization, and simulation usage of backend output.
-- Host-specific behavior (drawing, schema validation, runtime integration).
+- Presentation, diagnostics, serialization, simulation usage, and host integration built on backend output.
+- Host-specific behavior such as drawing, schema validation, runtime integration, and optional visualization adapters.
 
 What they assume:
 - Upstream pipeline semantics are stable (distance, frame axes, matrix convention).
 - Export contract identity/version remains stable for JSON consumers.
+- Unity is one optional debug/prototype frontend consumer, not the owner of backend pipeline semantics.
 
 What breaks if changed:
 - Visual orientation and debug views can stop matching backend truth.
 - Export contract compatibility can fail.
-- Physics sampling adapters can diverge from track evaluation behavior.
+- Physics sampling adapters and other consumers can diverge from track evaluation behavior.
 
 ---
 
