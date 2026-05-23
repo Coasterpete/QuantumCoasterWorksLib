@@ -20,15 +20,16 @@ QuantumCoasterWorks.sln
 - Quantum.IO = save/load/import/export
 - Quantum.Debug = diagnostics
 
-## Future Host
+## Frontend / Host Direction
 
-- Unity HDRP frontend
-- Editor UI
-- Rendering only
+- Core backend libraries remain host-independent.
+- Current Unity assets are an optional debug/prototype visualizer.
+- Future standalone editor direction is an Avalonia UI shell.
+- Future viewport direction is Silk.NET or OpenTK, to be evaluated later.
 
 ## Rule
 
-Core logic should remain independent from Unity APIs where practical.
+Core logic must remain independent from Unity, Avalonia, renderer, and UI APIs.
 
 ## Near-Term Notes
 

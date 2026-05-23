@@ -6,8 +6,11 @@ Advanced roller coaster editor and simulation platform.
 
 - Keep code modular, deterministic, and test-first.
 - Favor reusable libraries.
-- Unity HDRP is host/render layer only.
+- Unity visualization is debug/prototype layer only.
 - Core coaster logic belongs in Quantum.* libraries.
+- Keep Quantum.* libraries engine-agnostic.
+- Do not add UnityEngine or UnityEditor dependencies to core projects.
+- Use self-authored test assets/fixtures only unless permission is explicit.
 - Keep files small and single responsibility.
 - Reuse before rewriting.
 - Avoid overengineering.
@@ -18,6 +21,7 @@ Advanced roller coaster editor and simulation platform.
 ## Architecture
 
 Read `structure.md` before making changes.
+Read `ROADMAP.md` and `docs/architecture/frontend-strategy.md` before frontend or visualization direction changes.
 
 ## Priority Systems
 
@@ -91,7 +95,7 @@ Read `structure.md` before making changes.
 - Full 3D train motion.
 - Lateral/roll force coupling.
 - Time-domain FVD solver.
-- Unity integration.
+- Production frontend/editor integration.
 - Audio system.
 - Production editor UI.
 - Routing/switch/tilt/drop/bounce systems.
