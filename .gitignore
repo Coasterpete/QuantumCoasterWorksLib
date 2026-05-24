@@ -21,3 +21,6 @@ Build/
 # .NET build output
 **/bin/
 **/obj/
+
+# Generated debug/export artifacts
+artifacts/
