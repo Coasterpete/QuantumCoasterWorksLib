@@ -38,6 +38,25 @@ Box dimensions are coaster-domain dimensions:
 
 `metadata.units` defaults to `meters`, matching the current backend station-distance convention. Viewers may convert units at adapter boundaries, but this contract does not embed renderer or engine coordinate conversion policy.
 
+## Sample Artifact
+
+Generate a deterministic backend sample with:
+
+```powershell
+dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1
+```
+
+The default output path is `artifacts/debug-viewport/DebugViewportSnapshotV1.sample.json`. An explicit path can be passed as the first command argument.
+
+The sample is intentionally small and frontend-neutral. It is built from the existing deterministic debug smoke scenario and includes:
+
+- contract/version metadata and `metadata.units`
+- sampled `centerlinePoints`
+- matching orientation `frames`
+- three frame-axis debug `lines`
+- simple train body `boxes`
+- nested `trainPose` data produced by the existing `TrainPoseExportV1` mapper
+
 ## Adapter Usage
 
 A Unity, Unreal, Avalonia + Silk.NET/OpenTK, or other viewer can consume this snapshot by:
@@ -49,3 +68,9 @@ A Unity, Unreal, Avalonia + Silk.NET/OpenTK, or other viewer can consume this sn
 5. Reading `trainPose` when it needs the fuller body/bogie/wheel transform hierarchy already covered by `TrainPoseExportV1`.
 
 The adapter owns all renderer-specific concerns such as materials, colors, meshes, scene objects, camera controls, and coordinate handedness conversion.
+
+Future viewers should keep this as a thin adapter boundary:
+
+- Unity: load the JSON as a text asset or file, verify `contract` and `version`, convert backend vectors at the Unity adapter edge, then draw gizmos or placeholder cubes.
+- Unreal: parse the same JSON into Unreal-side structs, verify identity/version, convert coordinates in the plugin/module boundary, then draw debug lines or transient actors.
+- Standalone viewer: parse the JSON in the app shell, keep camera/input/rendering state outside the payload, and render the arrays with whichever viewport technology is selected later.

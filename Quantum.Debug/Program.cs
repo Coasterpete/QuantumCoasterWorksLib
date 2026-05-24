@@ -20,6 +20,7 @@ namespace Quantum.Debug
                 Console.WriteLine("Supported commands:");
                 Console.WriteLine("  sampling-perf");
                 Console.WriteLine("  train-pose-export-v1 [outputPath]");
+                Console.WriteLine("  debug-viewport-snapshot-v1 [outputPath]");
                 Console.WriteLine("  longitudinal-force-preview [preset] [outputPath]");
                 Console.WriteLine("    presets: soft | balanced | punchy");
                 Console.WriteLine("  longitudinal-speed-preview [preset] [outputPath] [initialSpeedMps]");
@@ -43,6 +44,18 @@ namespace Quantum.Debug
 
                 string? outputPath = args.Length == 2 ? args[1] : null;
                 return TrainPoseExportV1Command.Run(outputPath);
+            }
+
+            if (command == DebugCommandKind.DebugViewportSnapshotV1)
+            {
+                if (args.Length > 2)
+                {
+                    Console.WriteLine("Usage: debug-viewport-snapshot-v1 [outputPath]");
+                    return 1;
+                }
+
+                string? outputPath = args.Length == 2 ? args[1] : null;
+                return DebugViewportSnapshotV1SampleCommand.Run(outputPath);
             }
 
             if (command == DebugCommandKind.LongitudinalForcePreview)
