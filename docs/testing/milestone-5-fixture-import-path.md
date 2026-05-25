@@ -1,0 +1,89 @@
+# Milestone 5 Fixture Import Path
+
+## Current Status
+
+Milestone 5 uses a deliberately narrow sampled-frame CSV fixture import path. This is a debug/test bridge only, not a general NoLimits importer.
+
+Current pieces:
+
+- `docs/testing/nolimits-csv-fixtures.md` defines allowed fixture sources and scope boundaries.
+- `Quantum.IO/Fixtures/Csv/CenterlineFrameCsvFixtureParser.cs` reads the tiny sampled-frame fixture schema.
+- `Quantum.Debug` can write a deterministic `DebugViewportSnapshotV1` sample from the smoke scenario.
+- `Quantum.Debug` can also bridge a sampled-frame CSV fixture directly to `DebugViewportSnapshotV1` JSON.
+
+## Smallest CSV Schema
+
+Use a tiny self-authored or synthetic CSV that represents already-sampled centerline frames in meters. This keeps the first import path deterministic and avoids rebuilding spline, interpolation, or NoLimits project import behavior.
+
+Required header:
+
+```csv
+distanceMeters,xMeters,yMeters,zMeters,tangentX,tangentY,tangentZ,normalX,normalY,normalZ,binormalX,binormalY,binormalZ
+```
+
+Example fixture:
+
+```csv
+distanceMeters,xMeters,yMeters,zMeters,tangentX,tangentY,tangentZ,normalX,normalY,normalZ,binormalX,binormalY,binormalZ
+0,0,0,0,1,0,0,0,1,0,0,0,1
+5,5,0,0,1,0,0,0,1,0,0,0,1
+10,10,0,0,1,0,0,0,1,0,0,0,1
+```
+
+Rules for the first parser:
+
+- Parse with invariant culture.
+- Require the exact header names above.
+- Require finite numeric values.
+- Require non-negative, monotonically increasing `distanceMeters`.
+- Preserve row order exactly.
+- Do not infer missing tangent, normal, or binormal values in the first version.
+- Treat the CSV as a Quantum test/debug fixture, not as full NoLimits compatibility.
+
+Fixture metadata should stay outside the rows at first: the command or test can pass `sourceFixtureName`, and units should default to `meters`.
+
+## Code Placement
+
+Parser/import code should live in `Quantum.IO`, for example:
+
+- `Quantum.IO/Fixtures/Csv/CenterlineFrameCsvFixture.cs`
+- `Quantum.IO/Fixtures/Csv/CenterlineFrameCsvFixtureParser.cs`
+
+That keeps file parsing near the existing export contracts without adding renderer or frontend dependencies. `Quantum.IO` already references `Quantum.Math` and `Quantum.Track`, so the parser can return `TrackFrame` samples directly.
+
+The debug command bridge should live in `Quantum.Debug` only after the parser exists, for example:
+
+```powershell
+dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1-from-csv Quantum.Tests/IO/Fixtures/Milestone5.synthetic.centerline_frames.csv artifacts/debug-viewport/Milestone5.synthetic.json
+```
+
+That command should be a thin adapter:
+
+1. Read the CSV fixture through `Quantum.IO`.
+2. Convert rows to `TrackFrame[]`.
+3. Build a `DebugViewportSnapshotV1Source` with `Units = "meters"`, `SourceFixtureName`, and `SampledFrames`.
+4. Call `DebugViewportSnapshotV1Mapper.Export(source)`.
+5. Serialize with `DebugViewportSnapshotV1Json.Serialize`.
+
+If `outputJsonPath` is omitted, the command writes beside the input CSV using the suffix `.debug-viewport-snapshot-v1.json`.
+
+No Unity, Unreal, Avalonia, Silk.NET, OpenTK, Veldrid, renderer, or engine package should be referenced by any `Quantum.*` project for this path.
+
+## Test Plan For The First Implementation
+
+The tiny synthetic fixture lives under `Quantum.Tests/IO/Fixtures` and is copied to test output like the existing JSON fixtures.
+
+Coverage includes:
+
+- Parser returns the same frame count and values on repeated parses.
+- Parser preserves sample count, row order, station distances, and source fixture metadata when mapped.
+- Command parser accepts `debug-viewport-snapshot-v1-from-csv`.
+- Command writes an output JSON file.
+- Serialized output deserializes through `DebugViewportSnapshotV1Json.Deserialize`.
+- The deserialized contract is `quantum.debug_viewport_snapshot` with version `1`.
+- Metadata preserves units, source fixture name, and sample count.
+- Centerline and frame counts match the CSV fixture row count.
+- Running the command twice with the same input produces identical JSON.
+- A backend dependency guard confirms `Quantum.IO` and `Quantum.Debug` do not reference Unity, Unreal, Avalonia, Silk.NET, OpenTK, Veldrid, or other renderer/frontend assemblies.
+
+This should be enough to connect a tiny fixture to the existing snapshot pipeline while keeping the change small and reversible.
