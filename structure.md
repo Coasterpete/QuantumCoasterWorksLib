@@ -14,24 +14,28 @@ QuantumCoasterWorks.sln
 - Quantum.Splines = curve logic and track frame sampling
   - `TrackFrame` implements `ITrackFrameBasis`
   - `TrackFrame -> Transform3d` bridge is provided through `Transform3d.FromTrackFrame(...)`
+- Quantum.Track = active major backend project for track documents, segments, traversal, evaluation, and train transform placement
 - Quantum.Geometry = geometry helpers
 - Quantum.Physics = train simulation
 - Quantum.FVD = force vector design systems
 - Quantum.IO = save/load/import/export
 - Quantum.Debug = diagnostics
 
-## Future Host
+## Frontend / Host Direction
 
-- Unity HDRP frontend
-- Editor UI
-- Rendering only
+- Core backend libraries remain host-independent.
+- Current Unity assets are an optional debug/prototype visualizer.
+- Unity or Unreal may remain valid optional visualization targets for PBR, ride-through, and presentation rendering.
+- No final frontend is selected.
+- Future standalone editor candidate is an Avalonia UI shell.
+- Future technical viewport candidate is Silk.NET, with OpenTK still available for evaluation.
 
 ## Rule
 
-Core logic should remain independent from Unity APIs where practical.
+Core logic must remain independent from Unity, Unreal, Avalonia, renderer, and UI APIs.
 
 ## Near-Term Notes
 
 - `Matrix4x4` is not required yet.
 - Quaternion/roll transform systems can be introduced later as needed.
-- `Quantum.Track` should wait until the track evaluation architecture is planned.
+- `Quantum.Track` is active and should continue evolving in small, testable backend increments.

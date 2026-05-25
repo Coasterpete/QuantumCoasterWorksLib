@@ -30,19 +30,28 @@ Rules:
 - Make small, reviewable changes.
 - Explain what changed and why.
 - Add or update tests when behavior changes.
+- Keep backend projects engine-agnostic.
+- Do not add UnityEngine or UnityEditor dependencies to core Quantum.* projects.
+- Use self-authored test assets/fixtures only unless permission is explicit.
 
 ## Current Architecture Direction
 
-Quantum uses existing engines/frameworks for visualization and tooling.
+Quantum uses existing frameworks for visualization and tooling, but the backend remains engine-agnostic.
 
-Planned stack:
-- Unity frontend/editor sandbox
-- C# backend/domain logic
+Planned/considered stack:
+- QuantumCoasterWorksLib / Quantum.* = pure C# backend/domain logic
+- QCWUnityDebug / current Unity assets = optional/legacy debug viewer and prototype only
+- Optional Unity/Unreal visualization targets = PBR, ride-through, and presentation rendering through thin adapters
+- Future standalone editor candidate = Avalonia UI shell
+- Future technical viewport candidate = Silk.NET or OpenTK renderer
 - Mature external math/spline libraries where appropriate
+
+No final frontend, renderer, or engine choice is locked yet.
 
 Quantum is NOT currently:
 - a full standalone game engine
 - a Vulkan renderer
+- a production Avalonia editor
 - a complete NoLimits replacement
 
 ## Current Priorities
@@ -51,7 +60,7 @@ Highest priority:
 1. Stable centerline evaluation
 2. Stable orientation frames
 3. Distance-based train car placement
-4. Debug visualization in Unity
+4. Debug visualization through optional thin adapters, currently Unity
 
 Lower priority:
 - real train meshes
@@ -84,9 +93,13 @@ Current train visualization may use:
 - placeholder transforms
 
 This is acceptable during backend prototyping.
+Unity visualization is a debug/prototype surface only and should not define backend architecture.
+Unity or Unreal may remain valid optional visualization targets when high-fidelity PBR, ride-through, or presentation rendering is useful.
 
 ## Important
 
 Do not attempt to redesign the entire project architecture unless explicitly requested.
 
 Focus on helping the existing prototype become more stable and testable.
+Keep Unity-specific work outside the backend library.
+Keep Unreal-specific work outside the backend library.

@@ -6,8 +6,13 @@ Advanced roller coaster editor and simulation platform.
 
 - Keep code modular, deterministic, and test-first.
 - Favor reusable libraries.
-- Unity HDRP is host/render layer only.
+- Unity visualization is debug/prototype layer only.
+- Unity and Unreal may remain valid optional visualization targets for PBR, ride-through, and presentation rendering.
+- Do not choose a final frontend yet; Avalonia/Silk.NET remains a candidate standalone editor shell/technical viewport path.
 - Core coaster logic belongs in Quantum.* libraries.
+- Keep Quantum.* libraries engine-agnostic.
+- Do not add UnityEngine or UnityEditor dependencies to core projects.
+- Use self-authored test assets/fixtures only unless permission is explicit.
 - Keep files small and single responsibility.
 - Reuse before rewriting.
 - Avoid overengineering.
@@ -18,6 +23,7 @@ Advanced roller coaster editor and simulation platform.
 ## Architecture
 
 Read `structure.md` before making changes.
+Read `ROADMAP.md` and `docs/architecture/frontend-strategy.md` before frontend or visualization direction changes.
 
 ## Priority Systems
 
@@ -29,7 +35,7 @@ Read `structure.md` before making changes.
 
 ## Current Backend State
 
-- Current validation: 223/223 tests passing.
+- Current validation command: `dotnet test QuantumCoasterWorks.sln --nologo`; use the latest run output rather than a hard-coded test count.
 - `Quantum.Track` supports document, segments, traversal, frame, transform, and spline-backed spatial evaluation.
 - `TrackDocument`, `TrackSegment`, `StraightSegment`, and `CurvedSegment` exist.
 - `TrackEvaluator` supports:
@@ -91,7 +97,7 @@ Read `structure.md` before making changes.
 - Full 3D train motion.
 - Lateral/roll force coupling.
 - Time-domain FVD solver.
-- Unity integration.
+- Production frontend/editor integration.
 - Audio system.
 - Production editor UI.
 - Routing/switch/tilt/drop/bounce systems.

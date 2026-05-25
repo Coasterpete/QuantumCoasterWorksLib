@@ -1,5 +1,26 @@
+# Unity generated files and folders
+Library/
+Temp/
+Obj/
+Logs/
+UserSettings/
+MemoryCaptures/
+Builds/
+Build/
+
+# IDE generated files and folders
 .vs/
+.idea/
+*.csproj
+*.sln
+*.user
+*.pidb
+*.booproj
+*.suo
+
+# .NET build output
 **/bin/
 **/obj/
-*.user
-*.suo
+
+# Generated debug/export artifacts
+artifacts/
