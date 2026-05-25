@@ -1,14 +1,15 @@
 # Milestone 5 Fixture Import Path
 
-## Current Finding
+## Current Status
 
-There is no clean CSV fixture import path in the repository yet. The current CSV-related material is policy and release-scope documentation only:
+Milestone 5 uses a deliberately narrow sampled-frame CSV fixture import path. This is a debug/test bridge only, not a general NoLimits importer.
+
+Current pieces:
 
 - `docs/testing/nolimits-csv-fixtures.md` defines allowed fixture sources and scope boundaries.
-- `docs/release/technical-preview-0.1-scope.md` calls for a self-authored fixture path.
-- `Quantum.Debug` can already write a `DebugViewportSnapshotV1` sample, but it builds that sample from `SamplingPerfSmokeScenario`, not from CSV.
-
-Because no parser or fixture CSV exists yet, Milestone 5 should start with a deliberately narrow sampled-frame fixture import instead of a general NoLimits importer.
+- `Quantum.IO/Fixtures/Csv/CenterlineFrameCsvFixtureParser.cs` reads the tiny sampled-frame fixture schema.
+- `Quantum.Debug` can write a deterministic `DebugViewportSnapshotV1` sample from the smoke scenario.
+- `Quantum.Debug` can also bridge a sampled-frame CSV fixture directly to `DebugViewportSnapshotV1` JSON.
 
 ## Smallest CSV Schema
 
@@ -53,7 +54,7 @@ That keeps file parsing near the existing export contracts without adding render
 The debug command bridge should live in `Quantum.Debug` only after the parser exists, for example:
 
 ```powershell
-dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1-from-csv fixtures/milestone5.synthetic.csv artifacts/debug-viewport/Milestone5.synthetic.json
+dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1-from-csv Quantum.Tests/IO/Fixtures/Milestone5.synthetic.centerline_frames.csv artifacts/debug-viewport/Milestone5.synthetic.json
 ```
 
 That command should be a thin adapter:
@@ -64,18 +65,25 @@ That command should be a thin adapter:
 4. Call `DebugViewportSnapshotV1Mapper.Export(source)`.
 5. Serialize with `DebugViewportSnapshotV1Json.Serialize`.
 
+If `outputJsonPath` is omitted, the command writes beside the input CSV using the suffix `.debug-viewport-snapshot-v1.json`.
+
 No Unity, Unreal, Avalonia, Silk.NET, OpenTK, Veldrid, renderer, or engine package should be referenced by any `Quantum.*` project for this path.
 
 ## Test Plan For The First Implementation
 
-Add a tiny synthetic fixture under `Quantum.Tests/IO/Fixtures`, copied to test output like the existing JSON fixtures.
+The tiny synthetic fixture lives under `Quantum.Tests/IO/Fixtures` and is copied to test output like the existing JSON fixtures.
 
-Cover these behaviors:
+Coverage includes:
 
 - Parser returns the same frame count and values on repeated parses.
 - Parser preserves sample count, row order, station distances, and source fixture metadata when mapped.
+- Command parser accepts `debug-viewport-snapshot-v1-from-csv`.
+- Command writes an output JSON file.
 - Serialized output deserializes through `DebugViewportSnapshotV1Json.Deserialize`.
 - The deserialized contract is `quantum.debug_viewport_snapshot` with version `1`.
+- Metadata preserves units, source fixture name, and sample count.
+- Centerline and frame counts match the CSV fixture row count.
+- Running the command twice with the same input produces identical JSON.
 - A backend dependency guard confirms `Quantum.IO` and `Quantum.Debug` do not reference Unity, Unreal, Avalonia, Silk.NET, OpenTK, Veldrid, or other renderer/frontend assemblies.
 
 This should be enough to connect a tiny fixture to the existing snapshot pipeline while keeping the change small and reversible.
