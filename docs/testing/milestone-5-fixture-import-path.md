@@ -10,6 +10,7 @@ Current pieces:
 - `Quantum.IO/Fixtures/Csv/CenterlineFrameCsvFixtureParser.cs` reads the tiny sampled-frame fixture schema.
 - `Quantum.Debug` can write a deterministic `DebugViewportSnapshotV1` sample from the smoke scenario.
 - `Quantum.Debug` can also bridge a sampled-frame CSV fixture directly to `DebugViewportSnapshotV1` JSON.
+- `Quantum.Debug` can validate and summarize a generated `DebugViewportSnapshotV1` JSON file before any viewer consumes it.
 
 ## Smallest CSV Schema
 
@@ -67,6 +68,14 @@ That command should be a thin adapter:
 
 If `outputJsonPath` is omitted, the command writes beside the input CSV using the suffix `.debug-viewport-snapshot-v1.json`.
 
+Validate the generated JSON before handing it to Unity, Unreal, Avalonia/Silk.NET, OpenTK, or another viewer:
+
+```powershell
+dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1-validate artifacts/debug-viewport/Milestone5.synthetic.json
+```
+
+The validator stays in `Quantum.IO/DebugViewport/V1` and checks the renderer-neutral contract only: contract/version, metadata, finite numeric values, centerline distance ordering, sample/frame count consistency, non-zero frame vectors, positive box dimensions, finite line endpoints, and nested train pose diagnostics when present.
+
 No Unity, Unreal, Avalonia, Silk.NET, OpenTK, Veldrid, renderer, or engine package should be referenced by any `Quantum.*` project for this path.
 
 ## Test Plan For The First Implementation
@@ -78,11 +87,15 @@ Coverage includes:
 - Parser returns the same frame count and values on repeated parses.
 - Parser preserves sample count, row order, station distances, and source fixture metadata when mapped.
 - Command parser accepts `debug-viewport-snapshot-v1-from-csv`.
+- Command parser accepts `debug-viewport-snapshot-v1-validate`.
 - Command writes an output JSON file.
 - Serialized output deserializes through `DebugViewportSnapshotV1Json.Deserialize`.
 - The deserialized contract is `quantum.debug_viewport_snapshot` with version `1`.
 - Metadata preserves units, source fixture name, and sample count.
 - Centerline and frame counts match the CSV fixture row count.
+- Validator accepts valid generated snapshot JSON.
+- Validator rejects invalid contract/version, sample count mismatches, decreasing distances, and malformed numeric/frame/box data.
+- Validate command prints contract/version, units, source fixture name, counts, train pose presence, and pass/fail status.
 - Running the command twice with the same input produces identical JSON.
 - A backend dependency guard confirms `Quantum.IO` and `Quantum.Debug` do not reference Unity, Unreal, Avalonia, Silk.NET, OpenTK, Veldrid, or other renderer/frontend assemblies.
 

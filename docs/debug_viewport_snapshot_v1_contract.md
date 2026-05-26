@@ -48,6 +48,14 @@ dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1
 
 The default output path is `artifacts/debug-viewport/DebugViewportSnapshotV1.sample.json`. An explicit path can be passed as the first command argument.
 
+Validate or inspect a generated snapshot with:
+
+```powershell
+dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1-validate artifacts/debug-viewport/DebugViewportSnapshotV1.sample.json
+```
+
+The validation command is backend-only and prints a concise summary of contract/version, units, source fixture name, centerline/frame/line/box counts, train pose presence, and pass/fail status. It checks identity metadata, finite numeric values, centerline distance ordering, sample/frame count consistency, non-zero frame vectors, positive box dimensions, finite line endpoints, and nested train pose validation when `trainPose` is present.
+
 The sample is intentionally small and frontend-neutral. It is built from the existing deterministic debug smoke scenario and includes:
 
 - contract/version metadata and `metadata.units`
