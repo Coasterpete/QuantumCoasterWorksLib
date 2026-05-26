@@ -21,28 +21,18 @@ Use this checklist from a clean checkout before tagging or packaging Technical P
 - [ ] Built-in `DebugViewportSnapshotV1` snapshot generation works.
 - [ ] CSV fixture to `DebugViewportSnapshotV1` snapshot generation works.
 - [ ] Snapshot validation accepts the generated built-in and CSV-derived snapshots.
+- [ ] `.\tools\demo-technical-preview-0.1.ps1` runs the backend demo flow successfully.
 - [ ] Generated artifacts stay local by default, especially under `artifacts/`.
 - [ ] `Quantum.*` backend projects have no Unity, Unreal, Avalonia, Silk.NET, OpenTK, Veldrid, renderer, or frontend dependencies.
 - [ ] Public docs clearly state Technical Preview 0.1 scope and non-goals.
 
 ## Dry Run From A Fresh Checkout
 
-Run these commands from the repository root after checking out `milestone-10-technical-preview-0.1-rc`:
+Run these commands from the repository root after checking out the intended Technical Preview 0.1 branch or tag:
 
 ```powershell
 dotnet restore QuantumCoasterWorks.sln
-dotnet test QuantumCoasterWorks.sln --nologo
-
-dotnet run --project Quantum.Debug -- help
-
-dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1 artifacts/debug-viewport/DebugViewportSnapshotV1.sample.json
-
-dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1-from-csv Quantum.Tests/IO/Fixtures/Milestone7.synthetic.straight_line.centerline_frames.csv artifacts/debug-viewport/Milestone7.synthetic.straight_line.snapshot.json
-
-dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1-validate artifacts/debug-viewport/DebugViewportSnapshotV1.sample.json
-
-dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1-validate artifacts/debug-viewport/Milestone7.synthetic.straight_line.snapshot.json
-
+.\tools\demo-technical-preview-0.1.ps1
 git status --short
 ```
 
