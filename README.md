@@ -57,4 +57,4 @@ Generated JSON under `artifacts/` is local output by default and should not be c
 - `dotnet run --project Quantum.Debug -- longitudinal-force-preview [preset] [outputPath]`: write force preview diagnostics with `soft`, `balanced`, or `punchy` presets.
 - `dotnet run --project Quantum.Debug -- longitudinal-speed-preview [preset] [outputPath] [initialSpeedMps]`: write speed preview diagnostics with `soft`, `balanced`, or `punchy` presets.
 
-See `ROADMAP.md`, `docs/release/technical-preview-0.1-scope.md`, and `docs/architecture/frontend-strategy.md` for the current architecture direction.
+See `ROADMAP.md`, `docs/release/technical-preview-0.1-scope.md`, `docs/release/technical-preview-0.1-release-notes.md`, and `docs/architecture/frontend-strategy.md` for the current architecture direction.
