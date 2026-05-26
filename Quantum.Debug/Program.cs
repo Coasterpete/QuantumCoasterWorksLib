@@ -14,20 +14,21 @@ namespace Quantum.Debug
 
         static int Main(string[] args)
         {
+            if (DebugCommandHelp.TryWriteRequestedHelp(args, Console.Out, out int helpExitCode))
+            {
+                return helpExitCode;
+            }
+
             if (!DebugCommandParser.TryParse(args, out DebugCommandKind command))
             {
-                Console.WriteLine("Unknown command.");
-                Console.WriteLine("Supported commands:");
-                Console.WriteLine("  sampling-perf");
-                Console.WriteLine("  train-pose-export-v1 [outputPath]");
-                Console.WriteLine("  debug-viewport-snapshot-v1 [outputPath]");
-                Console.WriteLine("  debug-viewport-snapshot-v1-from-csv <inputCsvPath> [outputJsonPath]");
-                Console.WriteLine("  debug-viewport-snapshot-v1-validate <snapshotJsonPath>");
-                Console.WriteLine("  longitudinal-force-preview [preset] [outputPath]");
-                Console.WriteLine("    presets: soft | balanced | punchy");
-                Console.WriteLine("  longitudinal-speed-preview [preset] [outputPath] [initialSpeedMps]");
-                Console.WriteLine("    presets: soft | balanced | punchy");
+                DebugCommandHelp.WriteUnknownCommand(Console.Out);
                 return 1;
+            }
+
+            if (command == DebugCommandKind.Help)
+            {
+                DebugCommandHelp.WriteGeneralHelp(Console.Out);
+                return 0;
             }
 
             if (command == DebugCommandKind.SamplingPerf)

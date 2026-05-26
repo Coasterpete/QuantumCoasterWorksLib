@@ -43,6 +43,11 @@ Generated JSON under `artifacts/` is local output by default and should not be c
 
 ## Quantum.Debug Command Reference
 
+- `dotnet run --project Quantum.Debug -- help`: list supported commands, arguments, examples, and artifact guidance.
+- `dotnet run --project Quantum.Debug -- --help`: same as `help`.
+- `dotnet run --project Quantum.Debug -- -h`: same as `help`.
+- `dotnet run --project Quantum.Debug -- help <command>`: show command-specific usage and examples.
+- `dotnet run --project Quantum.Debug -- <command> --help`: show command-specific usage and examples.
 - `dotnet run --project Quantum.Debug`: run the default backend validation smoke checks.
 - `dotnet run --project Quantum.Debug -- sampling-perf`: run deterministic sampling performance diagnostics.
 - `dotnet run --project Quantum.Debug -- train-pose-export-v1 [outputPath]`: write a `TrainPoseExportV1` sample JSON.

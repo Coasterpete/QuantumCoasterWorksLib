@@ -6,6 +6,7 @@ namespace Quantum.Debug
     public enum DebugCommandKind
     {
         Validate,
+        Help,
         SamplingPerf,
         TrainPoseExportV1,
         DebugViewportSnapshotV1,
@@ -29,6 +30,12 @@ namespace Quantum.Debug
             if (args.Count == 0)
             {
                 command = DebugCommandKind.Validate;
+                return true;
+            }
+
+            if (DebugCommandHelp.IsHelpToken(args[0]))
+            {
+                command = DebugCommandKind.Help;
                 return true;
             }
 
