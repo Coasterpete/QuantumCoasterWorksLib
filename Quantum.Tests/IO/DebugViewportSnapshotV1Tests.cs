@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Text.Json;
 using Quantum.IO.DebugViewport.V1;
 using Quantum.IO.TrainPose.V1;
@@ -162,6 +163,128 @@ public sealed class DebugViewportSnapshotV1Tests
         Assert.Contains("malformed", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public void Validation_ValidSnapshotJson_Passes()
+    {
+        DebugViewportSnapshotV1Dto expected = CreateValidationSnapshot();
+        string json = DebugViewportSnapshotV1Json.Serialize(expected, indented: true);
+        DebugViewportSnapshotV1Dto actual = DebugViewportSnapshotV1Json.Deserialize(json);
+
+        bool isValid = DebugViewportSnapshotV1Validator.TryValidate(
+            actual,
+            out IReadOnlyList<DebugViewportSnapshotV1ValidationDiagnostic> diagnostics);
+
+        Assert.True(isValid);
+        Assert.Empty(diagnostics);
+    }
+
+    [Fact]
+    public void Validation_InvalidContractAndVersion_ProducesDiagnostics()
+    {
+        DebugViewportSnapshotV1Dto dto = CreateValidationSnapshot();
+        dto.Contract = "wrong.contract";
+        dto.Version = 999;
+
+        IReadOnlyList<DebugViewportSnapshotV1ValidationDiagnostic> diagnostics =
+            DebugViewportSnapshotV1Validator.Validate(dto);
+
+        Assert.Contains(
+            diagnostics,
+            d => d.Code == DebugViewportSnapshotV1ValidationCode.InvalidContract &&
+                 d.Path == "contract");
+        Assert.Contains(
+            diagnostics,
+            d => d.Code == DebugViewportSnapshotV1ValidationCode.InvalidVersion &&
+                 d.Path == "version");
+    }
+
+    [Fact]
+    public void Validation_BadSampleCount_ProducesDiagnostic()
+    {
+        DebugViewportSnapshotV1Dto dto = CreateValidationSnapshot();
+        dto.Metadata.SampleCount = dto.CenterlinePoints.Length + 1;
+
+        IReadOnlyList<DebugViewportSnapshotV1ValidationDiagnostic> diagnostics =
+            DebugViewportSnapshotV1Validator.Validate(dto);
+
+        Assert.Contains(
+            diagnostics,
+            d => d.Code == DebugViewportSnapshotV1ValidationCode.SampleCountMismatch &&
+                 d.Path == "metadata.sampleCount");
+    }
+
+    [Fact]
+    public void Validation_DecreasingCenterlineDistance_ProducesDiagnostic()
+    {
+        DebugViewportSnapshotV1Dto dto = CreateValidationSnapshot();
+        dto.Frames = Array.Empty<DebugViewportFrameV1Dto>();
+        dto.CenterlinePoints[0].Distance = 5.0;
+        dto.CenterlinePoints[1].Distance = 4.0;
+
+        IReadOnlyList<DebugViewportSnapshotV1ValidationDiagnostic> diagnostics =
+            DebugViewportSnapshotV1Validator.Validate(dto);
+
+        Assert.Contains(
+            diagnostics,
+            d => d.Code == DebugViewportSnapshotV1ValidationCode.DecreasingDistance &&
+                 d.Path == "centerlinePoints[1].distance");
+    }
+
+    [Fact]
+    public void Validation_FrameCountAndDistanceMismatch_ProducesDiagnostics()
+    {
+        DebugViewportSnapshotV1Dto dto = CreateValidationSnapshot();
+        dto.Frames[1].Distance = dto.Frames[1].Distance + 0.5;
+
+        IReadOnlyList<DebugViewportSnapshotV1ValidationDiagnostic> diagnostics =
+            DebugViewportSnapshotV1Validator.Validate(dto);
+
+        Assert.Contains(
+            diagnostics,
+            d => d.Code == DebugViewportSnapshotV1ValidationCode.FrameDistanceMismatch &&
+                 d.Path == "frames[1].distance");
+
+        dto = CreateValidationSnapshot();
+        dto.Frames = new[] { dto.Frames[0] };
+
+        diagnostics = DebugViewportSnapshotV1Validator.Validate(dto);
+
+        Assert.Contains(
+            diagnostics,
+            d => d.Code == DebugViewportSnapshotV1ValidationCode.FrameCountMismatch &&
+                 d.Path == "frames");
+    }
+
+    [Fact]
+    public void Validation_MalformedNumericPayload_ProducesExpectedDiagnostics()
+    {
+        DebugViewportSnapshotV1Dto dto = CreateValidationSnapshot();
+        dto.CenterlinePoints[0].Position.X = double.PositiveInfinity;
+        dto.Frames[0].Tangent = new DebugViewportVector3dV1Dto();
+        dto.Lines[0].End.Z = double.NaN;
+        dto.Boxes[0].Size.Width = 0.0;
+
+        IReadOnlyList<DebugViewportSnapshotV1ValidationDiagnostic> diagnostics =
+            DebugViewportSnapshotV1Validator.Validate(dto);
+
+        Assert.Contains(
+            diagnostics,
+            d => d.Code == DebugViewportSnapshotV1ValidationCode.NonFiniteNumber &&
+                 d.Path == "centerlinePoints[0].position.x");
+        Assert.Contains(
+            diagnostics,
+            d => d.Code == DebugViewportSnapshotV1ValidationCode.NonFiniteNumber &&
+                 d.Path == "lines[0].end.z");
+        Assert.Contains(
+            diagnostics,
+            d => d.Code == DebugViewportSnapshotV1ValidationCode.ZeroLengthVector &&
+                 d.Path == "frames[0].tangent");
+        Assert.Contains(
+            diagnostics,
+            d => d.Code == DebugViewportSnapshotV1ValidationCode.NonPositiveBoxDimension &&
+                 d.Path == "boxes[0].size.width");
+    }
+
     private static TrainPoseResult CreateTrainPose()
     {
         ExportTrackFrame frame = CreateFrame(distance: 12.0, x: 12.0);
@@ -195,6 +318,35 @@ public sealed class DebugViewportSnapshotV1Tests
             rearBogie: new TrainBogieWithWheelsTransform(rearBogie, Array.Empty<WheelTransform>()));
 
         return new TrainPoseResult(leadDistance: 12.0, definition: definition, cars: new[] { car });
+    }
+
+    private static DebugViewportSnapshotV1Dto CreateValidationSnapshot()
+    {
+        ExportTrackFrame[] frames =
+        {
+            CreateFrame(distance: 0.0, x: 0.0),
+            CreateFrame(distance: 5.0, x: 5.0)
+        };
+        DebugLineSegment[] lines = TrackFrameDebugGizmoBuilder.BuildAxes(frames[0], axisLength: 2.0);
+        var boxes = new[]
+        {
+            new DebugViewportBoxSource(
+                role: "train.body",
+                label: "car-0",
+                frame: frames[1],
+                length: 4.5,
+                width: 1.8,
+                height: 2.1)
+        };
+
+        return DebugViewportSnapshotV1Mapper.Export(new DebugViewportSnapshotV1Source
+        {
+            Units = "meters",
+            SourceFixtureName = "validation",
+            SampledFrames = frames,
+            Lines = lines,
+            Boxes = boxes
+        });
     }
 
     private static ExportTrackFrame CreateFrame(double distance, double x)

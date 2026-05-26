@@ -10,6 +10,7 @@ namespace Quantum.Debug
         TrainPoseExportV1,
         DebugViewportSnapshotV1,
         DebugViewportSnapshotV1FromCsv,
+        DebugViewportSnapshotV1Validate,
         LongitudinalForcePreview,
         LongitudinalSpeedPreview
     }
@@ -52,6 +53,12 @@ namespace Quantum.Debug
             if (string.Equals(args[0], "debug-viewport-snapshot-v1-from-csv", StringComparison.OrdinalIgnoreCase))
             {
                 command = DebugCommandKind.DebugViewportSnapshotV1FromCsv;
+                return true;
+            }
+
+            if (string.Equals(args[0], "debug-viewport-snapshot-v1-validate", StringComparison.OrdinalIgnoreCase))
+            {
+                command = DebugCommandKind.DebugViewportSnapshotV1Validate;
                 return true;
             }
 
