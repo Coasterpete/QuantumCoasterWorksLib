@@ -1,0 +1,327 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+
+namespace Quantum.Debug
+{
+    public static class DebugCommandHelp
+    {
+        public const string ProjectPurpose =
+            "Quantum.Debug provides backend-only diagnostics and JSON fixture/export tooling for Quantum CoasterWorks.";
+
+        public const string GeneratedArtifactsNote =
+            "Generated artifacts are local by default and should not be committed unless intentionally included in a release package.";
+
+        private static readonly DebugCommandHelpEntry[] CommandEntries =
+        {
+            new DebugCommandHelpEntry(
+                name: "sampling-perf",
+                usage: "sampling-perf",
+                summary: "Run deterministic sampling performance diagnostics.",
+                arguments: new[]
+                {
+                    "No arguments."
+                },
+                examples: new[]
+                {
+                    "dotnet run --project Quantum.Debug -- sampling-perf"
+                }),
+            new DebugCommandHelpEntry(
+                name: "train-pose-export-v1",
+                usage: "train-pose-export-v1 [outputPath]",
+                summary: "Write a TrainPoseExportV1 sample JSON file.",
+                arguments: new[]
+                {
+                    "outputPath: Optional JSON output path. Defaults to " +
+                    TrainPoseExportV1Command.DefaultRelativeOutputPath + "."
+                },
+                examples: new[]
+                {
+                    "dotnet run --project Quantum.Debug -- train-pose-export-v1",
+                    "dotnet run --project Quantum.Debug -- train-pose-export-v1 artifacts/train-pose/TrainPoseExportV1.sample.json"
+                }),
+            new DebugCommandHelpEntry(
+                name: "debug-viewport-snapshot-v1",
+                usage: "debug-viewport-snapshot-v1 [outputPath]",
+                summary: "Write the built-in DebugViewportSnapshotV1 sample JSON file.",
+                arguments: new[]
+                {
+                    "outputPath: Optional JSON output path. Defaults to " +
+                    DebugViewportSnapshotV1SampleCommand.DefaultRelativeOutputPath + "."
+                },
+                examples: new[]
+                {
+                    "dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1",
+                    "dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1 artifacts/debug-viewport/DebugViewportSnapshotV1.sample.json"
+                }),
+            new DebugCommandHelpEntry(
+                name: "debug-viewport-snapshot-v1-from-csv",
+                usage: "debug-viewport-snapshot-v1-from-csv <inputCsvPath> [outputJsonPath]",
+                summary: "Bridge a sampled-frame CSV fixture to DebugViewportSnapshotV1 JSON.",
+                arguments: new[]
+                {
+                    "inputCsvPath: Required sampled-frame CSV fixture path.",
+                    "outputJsonPath: Optional JSON output path. Defaults next to the input CSV with .debug-viewport-snapshot-v1.json appended."
+                },
+                examples: new[]
+                {
+                    "dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1-from-csv Quantum.Tests/IO/Fixtures/Milestone7.synthetic.straight_line.centerline_frames.csv",
+                    "dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1-from-csv Quantum.Tests/IO/Fixtures/Milestone7.synthetic.straight_line.centerline_frames.csv artifacts/debug-viewport/Milestone7.synthetic.straight_line.snapshot.json"
+                }),
+            new DebugCommandHelpEntry(
+                name: "debug-viewport-snapshot-v1-validate",
+                usage: "debug-viewport-snapshot-v1-validate <snapshotJsonPath>",
+                summary: "Validate and summarize a DebugViewportSnapshotV1 JSON file.",
+                arguments: new[]
+                {
+                    "snapshotJsonPath: Required DebugViewportSnapshotV1 JSON path."
+                },
+                examples: new[]
+                {
+                    "dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1-validate artifacts/debug-viewport/DebugViewportSnapshotV1.sample.json"
+                }),
+            new DebugCommandHelpEntry(
+                name: "longitudinal-force-preview",
+                usage: "longitudinal-force-preview [preset] [outputPath]",
+                summary: "Write longitudinal force preview diagnostics.",
+                arguments: new[]
+                {
+                    "preset: Optional preset name: soft, balanced, or punchy. Defaults to balanced.",
+                    "outputPath: Optional JSON output path. Defaults to " +
+                    LongitudinalForcePreviewCommand.DefaultRelativeOutputPath + ".",
+                    "With one argument, the value is treated as a preset when it matches one; otherwise it is treated as outputPath."
+                },
+                examples: new[]
+                {
+                    "dotnet run --project Quantum.Debug -- longitudinal-force-preview",
+                    "dotnet run --project Quantum.Debug -- longitudinal-force-preview punchy artifacts/force-target/punchy.sample.json"
+                }),
+            new DebugCommandHelpEntry(
+                name: "longitudinal-speed-preview",
+                usage: "longitudinal-speed-preview [preset] [outputPath] [initialSpeedMps]",
+                summary: "Write longitudinal speed preview diagnostics.",
+                arguments: new[]
+                {
+                    "preset: Optional preset name: soft, balanced, or punchy. Defaults to balanced.",
+                    "outputPath: Optional JSON output path. Defaults to " +
+                    LongitudinalSpeedPreviewCommand.DefaultRelativeOutputPath + ".",
+                    "initialSpeedMps: Optional finite value greater than or equal to 0. Defaults to 0."
+                },
+                examples: new[]
+                {
+                    "dotnet run --project Quantum.Debug -- longitudinal-speed-preview",
+                    "dotnet run --project Quantum.Debug -- longitudinal-speed-preview balanced artifacts/speed-preview/balanced.sample.json 12.5"
+                })
+        };
+
+        public static bool TryWriteRequestedHelp(
+            IReadOnlyList<string> args,
+            TextWriter output,
+            out int exitCode)
+        {
+            if (args is null)
+            {
+                throw new ArgumentNullException(nameof(args));
+            }
+
+            if (output is null)
+            {
+                throw new ArgumentNullException(nameof(output));
+            }
+
+            exitCode = 0;
+
+            if (args.Count == 0)
+            {
+                return false;
+            }
+
+            if (IsHelpToken(args[0]))
+            {
+                if (args.Count > 2)
+                {
+                    output.WriteLine("Usage: help [command]");
+                    exitCode = 1;
+                    return true;
+                }
+
+                if (args.Count == 2)
+                {
+                    exitCode = TryWriteCommandHelp(args[1], output) ? 0 : 1;
+                    return true;
+                }
+
+                WriteGeneralHelp(output);
+                return true;
+            }
+
+            if (args.Count == 2 && IsHelpOption(args[1]))
+            {
+                exitCode = TryWriteCommandHelp(args[0], output) ? 0 : 1;
+                return true;
+            }
+
+            return false;
+        }
+
+        public static bool IsHelpToken(string value)
+        {
+            return string.Equals(value, "help", StringComparison.OrdinalIgnoreCase) ||
+                   IsHelpOption(value);
+        }
+
+        public static void WriteGeneralHelp(TextWriter output)
+        {
+            if (output is null)
+            {
+                throw new ArgumentNullException(nameof(output));
+            }
+
+            output.WriteLine(ProjectPurpose);
+            output.WriteLine();
+            output.WriteLine("Usage:");
+            output.WriteLine("  dotnet run --project Quantum.Debug -- <command> [arguments]");
+            output.WriteLine("  dotnet run --project Quantum.Debug -- help [command]");
+            output.WriteLine("  dotnet run --project Quantum.Debug -- <command> --help");
+            output.WriteLine();
+            output.WriteLine("Commands:");
+            output.WriteLine("  (no command) - Run the default backend validation smoke checks.");
+            output.WriteLine("  help [command] - Show general help or command-specific help.");
+
+            for (int i = 0; i < CommandEntries.Length; i++)
+            {
+                DebugCommandHelpEntry entry = CommandEntries[i];
+                output.WriteLine("  " + entry.Usage + " - " + entry.Summary);
+            }
+
+            output.WriteLine();
+            output.WriteLine("Examples:");
+            output.WriteLine("  dotnet run --project Quantum.Debug -- help");
+            output.WriteLine("  dotnet run --project Quantum.Debug -- help debug-viewport-snapshot-v1");
+            output.WriteLine("  dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1 artifacts/debug-viewport/DebugViewportSnapshotV1.sample.json");
+            output.WriteLine();
+            output.WriteLine("Artifact note:");
+            output.WriteLine("  " + GeneratedArtifactsNote);
+        }
+
+        public static bool TryWriteCommandHelp(string commandName, TextWriter output)
+        {
+            if (output is null)
+            {
+                throw new ArgumentNullException(nameof(output));
+            }
+
+            DebugCommandHelpEntry? entry = FindCommand(commandName);
+            if (entry is null)
+            {
+                output.WriteLine("Unknown command.");
+                output.WriteLine("Supported commands:");
+                WriteSupportedCommandLines(output);
+                return false;
+            }
+
+            output.WriteLine(ProjectPurpose);
+            output.WriteLine();
+            output.WriteLine("Command:");
+            output.WriteLine("  " + entry.Name);
+            output.WriteLine();
+            output.WriteLine("Purpose:");
+            output.WriteLine("  " + entry.Summary);
+            output.WriteLine();
+            output.WriteLine("Usage:");
+            output.WriteLine("  dotnet run --project Quantum.Debug -- " + entry.Usage);
+            output.WriteLine();
+            output.WriteLine("Arguments:");
+
+            for (int i = 0; i < entry.Arguments.Length; i++)
+            {
+                output.WriteLine("  " + entry.Arguments[i]);
+            }
+
+            output.WriteLine();
+            output.WriteLine("Examples:");
+
+            for (int i = 0; i < entry.Examples.Length; i++)
+            {
+                output.WriteLine("  " + entry.Examples[i]);
+            }
+
+            output.WriteLine();
+            output.WriteLine("Artifact note:");
+            output.WriteLine("  " + GeneratedArtifactsNote);
+            return true;
+        }
+
+        public static void WriteUnknownCommand(TextWriter output)
+        {
+            if (output is null)
+            {
+                throw new ArgumentNullException(nameof(output));
+            }
+
+            output.WriteLine("Unknown command.");
+            output.WriteLine("Supported commands:");
+            WriteSupportedCommandLines(output);
+        }
+
+        private static bool IsHelpOption(string value)
+        {
+            return string.Equals(value, "--help", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(value, "-h", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static void WriteSupportedCommandLines(TextWriter output)
+        {
+            output.WriteLine("  help [command]");
+
+            for (int i = 0; i < CommandEntries.Length; i++)
+            {
+                output.WriteLine("  " + CommandEntries[i].Usage);
+            }
+
+            output.WriteLine("  longitudinal-force-preview presets: soft | balanced | punchy");
+            output.WriteLine("  longitudinal-speed-preview presets: soft | balanced | punchy");
+        }
+
+        private static DebugCommandHelpEntry? FindCommand(string commandName)
+        {
+            for (int i = 0; i < CommandEntries.Length; i++)
+            {
+                DebugCommandHelpEntry entry = CommandEntries[i];
+                if (string.Equals(commandName, entry.Name, StringComparison.OrdinalIgnoreCase))
+                {
+                    return entry;
+                }
+            }
+
+            return null;
+        }
+
+        private sealed class DebugCommandHelpEntry
+        {
+            public DebugCommandHelpEntry(
+                string name,
+                string usage,
+                string summary,
+                string[] arguments,
+                string[] examples)
+            {
+                Name = name;
+                Usage = usage;
+                Summary = summary;
+                Arguments = arguments;
+                Examples = examples;
+            }
+
+            public string Name { get; }
+
+            public string Usage { get; }
+
+            public string Summary { get; }
+
+            public string[] Arguments { get; }
+
+            public string[] Examples { get; }
+        }
+    }
+}

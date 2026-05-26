@@ -13,6 +13,18 @@ public sealed class DebugCommandParserTests
         Assert.Equal(DebugCommandKind.Validate, command);
     }
 
+    [Theory]
+    [InlineData("help")]
+    [InlineData("--help")]
+    [InlineData("-h")]
+    public void TryParse_HelpToken_ParsesAsHelp(string token)
+    {
+        bool parsed = DebugCommandParser.TryParse(new[] { token }, out DebugCommandKind command);
+
+        Assert.True(parsed);
+        Assert.Equal(DebugCommandKind.Help, command);
+    }
+
     [Fact]
     public void TryParse_SamplingPerfCommand_ParsesCaseInsensitive()
     {
