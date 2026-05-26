@@ -11,6 +11,7 @@ Current pieces:
 - `Quantum.Debug` can write a deterministic `DebugViewportSnapshotV1` sample from the smoke scenario.
 - `Quantum.Debug` can also bridge a sampled-frame CSV fixture directly to `DebugViewportSnapshotV1` JSON.
 - `Quantum.Debug` can validate and summarize a generated `DebugViewportSnapshotV1` JSON file before any viewer consumes it.
+- Milestone 7 adds a small self-authored sampled-frame fixture pack that exercises the CSV-to-snapshot path without committing generated JSON snapshots.
 
 ## Smallest CSV Schema
 
@@ -42,6 +43,17 @@ Rules for the first parser:
 - Treat the CSV as a Quantum test/debug fixture, not as full NoLimits compatibility.
 
 Fixture metadata should stay outside the rows at first: the command or test can pass `sourceFixtureName`, and units should default to `meters`.
+
+## Milestone 7 Synthetic Fixture Pack
+
+The fixture pack lives under `Quantum.Tests/IO/Fixtures` and uses the same sampled-frame CSV schema. These files are intentionally tiny, synthetic, and self-authored:
+
+- `Milestone7.synthetic.straight_line.centerline_frames.csv`: flat X-axis control case with fixed tangent/normal/binormal axes.
+- `Milestone7.synthetic.simple_hill.centerline_frames.csv`: vertical grade changes with changing tangent and normal vectors.
+- `Milestone7.synthetic.banked_turn.centerline_frames.csv`: horizontal quarter-turn samples with rolled normal/binormal axes.
+- `Milestone7.synthetic.descending_ascending_curve.centerline_frames.csv`: lateral curve with descending and ascending grade changes.
+
+The regression tests parse each CSV, preserve row count and monotonically increasing station distances, map the rows to `DebugViewportSnapshotV1`, validate the DTO, and verify JSON serialize/deserialize determinism. Command-path tests generate JSON into temporary directories and run `debug-viewport-snapshot-v1-validate` against those temp snapshots. Generated snapshot JSON is not committed.
 
 ## Code Placement
 

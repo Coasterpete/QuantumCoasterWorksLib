@@ -1,0 +1,5 @@
+distanceMeters,xMeters,yMeters,zMeters,tangentX,tangentY,tangentZ,normalX,normalY,normalZ,binormalX,binormalY,binormalZ
+0,0,0,0,1,0,0,0,1,0,0,0,1
+5,5,0,0,1,0,0,0,1,0,0,0,1
+10,10,0,0,1,0,0,0,1,0,0,0,1
+15,15,0,0,1,0,0,0,1,0,0,0,1
