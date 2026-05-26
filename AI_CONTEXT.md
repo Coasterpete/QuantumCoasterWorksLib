@@ -1,6 +1,6 @@
 # Quantum CoasterWorks
 
-Advanced roller coaster editor and simulation platform.
+Early-stage roller coaster backend and simulation foundation.
 
 ## Core Rules
 
