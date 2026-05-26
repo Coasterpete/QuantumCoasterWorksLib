@@ -65,6 +65,17 @@ The sample is intentionally small and frontend-neutral. It is built from the exi
 - simple train body `boxes`
 - nested `trainPose` data produced by the existing `TrainPoseExportV1` mapper
 
+## Fixture Regression Path
+
+`Quantum.Tests/IO/Fixtures` includes a tiny self-authored Milestone 7 sampled-frame CSV pack for the CSV-to-snapshot bridge:
+
+- straight line
+- simple hill
+- banked turn
+- descending/ascending curve
+
+Tests generate `DebugViewportSnapshotV1` JSON from these CSVs in temporary directories, validate the generated payloads with the backend validator command, and assert deterministic JSON round trips. No generated fixture snapshot JSON is committed.
+
 ## Adapter Usage
 
 A Unity, Unreal, Avalonia + Silk.NET/OpenTK, or other viewer can consume this snapshot by:
