@@ -8,7 +8,7 @@ The intended split is:
 
 - `QuantumCoasterWorksLib` / `Quantum.*`: pure C# backend/domain libraries for track, spline, FVD, physics, IO, train placement, and export/import adapters.
 - Current `Assets/Scripts/QuantumVisualizer` Unity visualizer: optional debug/prototype viewer for inspection only. `QCWUnityDebug` is a conceptual/legacy debug surface name, not a current solution project.
-- Optional high-fidelity visualization targets: Unity and Unreal may remain valid for PBR previews, ride-through views, cinematic/presentation rendering, and prototype workflows through thin adapters.
+- Optional future high-fidelity visualization targets: Unity and Unreal may remain valid for PBR previews, ride-through views, cinematic/presentation rendering, and prototype workflows through thin adapters. These are not Technical Preview 0.1 commitments.
 - Standalone editor candidate: Avalonia UI shell.
 - Technical viewport candidate: Silk.NET, with OpenTK still available for evaluation if it better fits the standalone viewport needs.
 
@@ -22,7 +22,7 @@ The intended split is:
 
 ## Frontend Direction
 
-Do not choose a final frontend yet. Unity should remain available for the current debug visualizer and prototype workflows, and Unity or Unreal may remain useful optional rendering targets for PBR, ride-through, and presentation workflows. Future editor work should assume separated UI, viewport rendering, visualization adapters, and coaster-domain logic rather than making any one host the owner of backend contracts.
+Do not choose a final frontend yet. Unity should remain available for the current debug visualizer and prototype workflows, and Unity or Unreal may remain useful optional future rendering targets for PBR, ride-through, and presentation workflows outside the backend technical-preview slice. Future editor work should assume separated UI, viewport rendering, visualization adapters, and coaster-domain logic rather than making any one host the owner of backend contracts.
 
 Do not scaffold the Avalonia application until the backend boundaries and first editor workflows are ready enough to justify it.
 
