@@ -21,6 +21,14 @@ Quantum CoasterWorks is an early-stage coaster design and simulation backend. Th
 
 The current Technical Preview 0.1 workflow is backend-only. It produces renderer-agnostic JSON that can be consumed by tests, inspectors, or optional thin debug viewers later.
 
+Run the full backend demo script:
+
+```powershell
+.\tools\demo-technical-preview-0.1.ps1
+```
+
+The script runs the test suite, prints the `Quantum.Debug` command reference, generates the built-in and CSV-derived `DebugViewportSnapshotV1` samples, validates both snapshots, and leaves generated JSON under ignored `artifacts/debug-viewport/` output.
+
 Generate the built-in debug viewport snapshot:
 
 ```powershell
