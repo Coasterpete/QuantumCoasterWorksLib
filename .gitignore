@@ -11,8 +11,6 @@ Build/
 # IDE generated files and folders
 .vs/
 .idea/
-*.csproj
-*.sln
 *.user
 *.pidb
 *.booproj
@@ -24,3 +22,6 @@ Build/
 
 # Generated debug/export artifacts
 artifacts/
+
+# Local Unity debug/prototype plugin copies
+Assets/Plugins/Quantum/*.dll
