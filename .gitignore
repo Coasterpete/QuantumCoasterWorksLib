@@ -11,6 +11,8 @@ Build/
 # IDE generated files and folders
 .vs/
 .idea/
+__pycache__/
+*.pyc
 *.user
 *.pidb
 *.booproj
