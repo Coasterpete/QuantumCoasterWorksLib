@@ -126,7 +126,7 @@ namespace Quantum.Debug
                 Format(DefaultCanvasHeight) +
                 "\" role=\"img\" aria-labelledby=\"title desc\">");
             builder.AppendLine("  <title id=\"title\">Quantum DebugViewportSnapshotV1 Technical Preview</title>");
-            builder.AppendLine("  <desc id=\"desc\">Backend-only multi-panel centerline preview generated from renderer-neutral debug data.</desc>");
+            builder.AppendLine("  <desc id=\"desc\">Backend-only multi-panel centerline preview generated from renderer-neutral debug data. Raw exported samples remain visible; smooth-preview paths are Catmull-Rom visual approximations only.</desc>");
             AppendStyles(builder);
             builder.AppendLine(
                 "  <rect width=\"" +
@@ -140,7 +140,7 @@ namespace Quantum.Debug
                 builder,
                 topDownPanel,
                 "top-down X/Z centerline preview",
-                "Plan view for centerline sanity checks and horizontal turns.");
+                "Plan view for centerline sanity checks; raw samples and preview-only smoothing are shown separately.");
             AppendPlotGrid(builder, topDownPlotArea);
             AppendTopDownAxisLabels(builder, topDownPlotArea);
             AppendTopDownCenterline(builder, dto, topDownProjection);
@@ -150,7 +150,7 @@ namespace Quantum.Debug
                 builder,
                 elevationPanel,
                 "elevation/profile preview (distance vs Y)",
-                "Side profile makes hills, drops, and climbs visible even when X/Z is flat.");
+                "Distance vs Y profile; smoothing is a visual approximation over exported samples.");
             AppendPlotGrid(builder, elevationPlotArea);
             AppendElevationAxisLabels(builder, elevationPlotArea);
             AppendElevationProfile(builder, dto, elevationProjection);
@@ -185,8 +185,10 @@ namespace Quantum.Debug
             builder.AppendLine("    .panel { fill: #ffffff; stroke: #cbd5e1; stroke-width: 1; }");
             builder.AppendLine("    .plot-area { fill: #ffffff; stroke: #cbd5e1; stroke-width: 1; }");
             builder.AppendLine("    .grid-line { stroke: #e2e8f0; stroke-width: 1; }");
-            builder.AppendLine("    .centerline { fill: none; stroke: #0f766e; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }");
-            builder.AppendLine("    .sample-point { fill: #0f766e; }");
+            builder.AppendLine("    .centerline { fill: none; stroke-linecap: round; stroke-linejoin: round; }");
+            builder.AppendLine("    .raw-centerline { stroke: #64748b; stroke-width: 1.4; stroke-dasharray: 5 5; opacity: 0.9; }");
+            builder.AppendLine("    .smooth-preview { fill: none; stroke: #0f766e; stroke-width: 3.4; stroke-linecap: round; stroke-linejoin: round; }");
+            builder.AppendLine("    .sample-point { fill: #ffffff; stroke: #0f766e; stroke-width: 1.75; }");
             builder.AppendLine("    .tangent-tick { stroke: #2563eb; stroke-width: 1.5; stroke-linecap: round; }");
             builder.AppendLine("    .binormal-tick { stroke: #7c3aed; stroke-width: 1.5; stroke-linecap: round; }");
             builder.AppendLine("    .baseline { stroke: #94a3b8; stroke-width: 1.25; stroke-dasharray: 5 5; }");
@@ -345,20 +347,10 @@ namespace Quantum.Debug
                 return;
             }
 
-            builder.Append("  <polyline class=\"centerline top-down-centerline\" points=\"");
-            for (int i = 0; i < points.Length; i++)
-            {
-                SvgPoint point = projection.Project(points[i].Position);
-                AppendPolylinePoint(builder, point, i);
-            }
-
-            builder.AppendLine("\" />");
-
-            for (int i = 0; i < points.Length; i++)
-            {
-                SvgPoint point = projection.Project(points[i].Position);
-                AppendSamplePoint(builder, point);
-            }
+            SvgPoint[] projectedPoints = ProjectTopDownPoints(points, projection);
+            AppendPolyline(builder, "centerline top-down-centerline raw-centerline", projectedPoints);
+            AppendSmoothPreviewPath(builder, "smooth-preview top-down-smooth-preview", projectedPoints);
+            AppendSamplePoints(builder, "top-down-raw-samples", "top-down-sample-point", projectedPoints);
         }
 
         private static void AppendElevationProfile(
@@ -387,20 +379,10 @@ namespace Quantum.Debug
                     "\" />");
             }
 
-            builder.Append("  <polyline class=\"centerline elevation-centerline\" points=\"");
-            for (int i = 0; i < points.Length; i++)
-            {
-                SvgPoint point = projection.Project(points[i].Distance, points[i].Position.Y);
-                AppendPolylinePoint(builder, point, i);
-            }
-
-            builder.AppendLine("\" />");
-
-            for (int i = 0; i < points.Length; i++)
-            {
-                SvgPoint point = projection.Project(points[i].Distance, points[i].Position.Y);
-                AppendSamplePoint(builder, point);
-            }
+            SvgPoint[] projectedPoints = ProjectElevationPoints(points, projection);
+            AppendPolyline(builder, "centerline elevation-centerline raw-centerline", projectedPoints);
+            AppendSmoothPreviewPath(builder, "smooth-preview elevation-smooth-preview", projectedPoints);
+            AppendSamplePoints(builder, "elevation-raw-samples", "elevation-sample-point", projectedPoints);
         }
 
         private static void AppendFrameTicks(
@@ -468,14 +450,43 @@ namespace Quantum.Debug
                 " " +
                 Format(y) +
                 ")\">");
-            builder.AppendLine("    <rect x=\"0\" y=\"0\" width=\"300\" height=\"76\" rx=\"8\" fill=\"#ffffff\" stroke=\"#cbd5e1\" />");
-            builder.AppendLine("    <line x1=\"14\" y1=\"22\" x2=\"48\" y2=\"22\" stroke=\"#0f766e\" stroke-width=\"3\" stroke-linecap=\"round\" />");
-            builder.AppendLine("    <text x=\"58\" y=\"26\">centerline / elevation profile</text>");
-            builder.AppendLine("    <line x1=\"14\" y1=\"44\" x2=\"48\" y2=\"44\" stroke=\"#2563eb\" stroke-width=\"1.5\" stroke-linecap=\"round\" />");
-            builder.AppendLine("    <text x=\"58\" y=\"48\">tangent ticks</text>");
-            builder.AppendLine("    <line x1=\"158\" y1=\"44\" x2=\"192\" y2=\"44\" stroke=\"#7c3aed\" stroke-width=\"1.5\" stroke-linecap=\"round\" />");
-            builder.AppendLine("    <text x=\"202\" y=\"48\">binormal ticks</text>");
+            builder.AppendLine("    <rect x=\"0\" y=\"0\" width=\"300\" height=\"96\" rx=\"8\" fill=\"#ffffff\" stroke=\"#cbd5e1\" />");
+            builder.AppendLine("    <circle cx=\"31\" cy=\"20\" r=\"3\" fill=\"#ffffff\" stroke=\"#0f766e\" stroke-width=\"1.75\" />");
+            builder.AppendLine("    <text x=\"58\" y=\"24\">raw samples / exported points</text>");
+            builder.AppendLine("    <line x1=\"14\" y1=\"42\" x2=\"48\" y2=\"42\" stroke=\"#64748b\" stroke-width=\"1.4\" stroke-dasharray=\"5 5\" stroke-linecap=\"round\" />");
+            builder.AppendLine("    <text x=\"58\" y=\"46\">raw sampled centerline</text>");
+            builder.AppendLine("    <line x1=\"14\" y1=\"64\" x2=\"48\" y2=\"64\" stroke=\"#0f766e\" stroke-width=\"3.4\" stroke-linecap=\"round\" />");
+            builder.AppendLine("    <text x=\"58\" y=\"68\">smoothed visual preview only</text>");
+            builder.AppendLine("    <line x1=\"14\" y1=\"84\" x2=\"33\" y2=\"84\" stroke=\"#2563eb\" stroke-width=\"1.5\" stroke-linecap=\"round\" />");
+            builder.AppendLine("    <line x1=\"33\" y1=\"84\" x2=\"48\" y2=\"84\" stroke=\"#7c3aed\" stroke-width=\"1.5\" stroke-linecap=\"round\" />");
+            builder.AppendLine("    <text x=\"58\" y=\"88\">frame tangent/binormal ticks</text>");
             builder.AppendLine("  </g>");
+        }
+
+        private static SvgPoint[] ProjectTopDownPoints(
+            DebugViewportCenterlinePointV1Dto[] points,
+            TopDownProjection projection)
+        {
+            var projectedPoints = new SvgPoint[points.Length];
+            for (int i = 0; i < points.Length; i++)
+            {
+                projectedPoints[i] = projection.Project(points[i].Position);
+            }
+
+            return projectedPoints;
+        }
+
+        private static SvgPoint[] ProjectElevationPoints(
+            DebugViewportCenterlinePointV1Dto[] points,
+            ElevationProjection projection)
+        {
+            var projectedPoints = new SvgPoint[points.Length];
+            for (int i = 0; i < points.Length; i++)
+            {
+                projectedPoints[i] = projection.Project(points[i].Distance, points[i].Position.Y);
+            }
+
+            return projectedPoints;
         }
 
         private static void AppendText(
@@ -509,10 +520,88 @@ namespace Quantum.Debug
             builder.Append(Format(point.Y));
         }
 
-        private static void AppendSamplePoint(StringBuilder builder, SvgPoint point)
+        private static void AppendPathPoint(StringBuilder builder, SvgPoint point)
+        {
+            builder.Append(Format(point.X));
+            builder.Append(',');
+            builder.Append(Format(point.Y));
+        }
+
+        private static void AppendPolyline(StringBuilder builder, string className, SvgPoint[] points)
+        {
+            builder.Append("  <polyline class=\"");
+            builder.Append(className);
+            builder.Append("\" points=\"");
+            for (int i = 0; i < points.Length; i++)
+            {
+                AppendPolylinePoint(builder, points[i], i);
+            }
+
+            builder.AppendLine("\" />");
+        }
+
+        private static void AppendSmoothPreviewPath(StringBuilder builder, string className, SvgPoint[] points)
+        {
+            if (points.Length < 3)
+            {
+                return;
+            }
+
+            builder.Append("  <path class=\"");
+            builder.Append(className);
+            builder.Append("\" d=\"M ");
+            AppendPathPoint(builder, points[0]);
+
+            for (int i = 0; i < points.Length - 1; i++)
+            {
+                SvgPoint previous = i == 0 ? points[i] : points[i - 1];
+                SvgPoint start = points[i];
+                SvgPoint end = points[i + 1];
+                SvgPoint next = i + 2 < points.Length ? points[i + 2] : end;
+
+                // Catmull-Rom converted to cubic Beziers for SVG-only preview smoothing.
+                SvgPoint control1 = new SvgPoint(
+                    start.X + (end.X - previous.X) / 6.0,
+                    start.Y + (end.Y - previous.Y) / 6.0);
+                SvgPoint control2 = new SvgPoint(
+                    end.X - (next.X - start.X) / 6.0,
+                    end.Y - (next.Y - start.Y) / 6.0);
+
+                builder.Append(" C ");
+                AppendPathPoint(builder, control1);
+                builder.Append(' ');
+                AppendPathPoint(builder, control2);
+                builder.Append(' ');
+                AppendPathPoint(builder, end);
+            }
+
+            builder.AppendLine("\" />");
+        }
+
+        private static void AppendSamplePoints(
+            StringBuilder builder,
+            string groupClassName,
+            string pointClassName,
+            SvgPoint[] points)
         {
             builder.AppendLine(
-                "  <circle class=\"sample-point\" cx=\"" +
+                "  <g class=\"" +
+                groupClassName +
+                "\" aria-label=\"raw exported sample points\">");
+            for (int i = 0; i < points.Length; i++)
+            {
+                AppendSamplePoint(builder, pointClassName, points[i]);
+            }
+
+            builder.AppendLine("  </g>");
+        }
+
+        private static void AppendSamplePoint(StringBuilder builder, string pointClassName, SvgPoint point)
+        {
+            builder.AppendLine(
+                "    <circle class=\"raw-sample-point sample-point " +
+                pointClassName +
+                "\" cx=\"" +
                 Format(point.X) +
                 "\" cy=\"" +
                 Format(point.Y) +

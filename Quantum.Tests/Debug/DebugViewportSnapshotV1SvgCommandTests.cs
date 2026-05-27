@@ -11,7 +11,7 @@ namespace Quantum.Tests;
 public sealed class DebugViewportSnapshotV1SvgCommandTests
 {
     [Fact]
-    public void Run_ValidSnapshot_WritesSvgWithCenterlinePolyline()
+    public void Run_ValidSnapshot_WritesSvgWithRawSamplesAndSmoothPreview()
     {
         string tempDirectory = CreateTempDirectoryPath();
         string snapshotPath = Path.Combine(tempDirectory, "DebugViewportSnapshotV1.validation.json");
@@ -33,8 +33,15 @@ public sealed class DebugViewportSnapshotV1SvgCommandTests
             Assert.Contains("<svg", svg);
             Assert.Contains("top-down X/Z centerline preview", svg);
             Assert.Contains("elevation/profile preview", svg);
-            Assert.Contains("class=\"centerline top-down-centerline\"", svg);
-            Assert.Contains("class=\"centerline elevation-centerline\"", svg);
+            Assert.Contains("raw samples / exported points", svg);
+            Assert.Contains("raw sampled centerline", svg);
+            Assert.Contains("smoothed visual preview only", svg);
+            Assert.Contains("class=\"centerline top-down-centerline raw-centerline\"", svg);
+            Assert.Contains("class=\"centerline elevation-centerline raw-centerline\"", svg);
+            Assert.Contains("class=\"smooth-preview top-down-smooth-preview\"", svg);
+            Assert.Contains("class=\"smooth-preview elevation-smooth-preview\"", svg);
+            Assert.Contains("class=\"raw-sample-point sample-point top-down-sample-point\"", svg);
+            Assert.Contains("class=\"raw-sample-point sample-point elevation-sample-point\"", svg);
         }
         finally
         {

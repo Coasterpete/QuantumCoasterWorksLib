@@ -77,7 +77,7 @@ Generate a multi-panel SVG technical preview from a snapshot:
 dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1-svg artifacts/debug-viewport/DebugViewportSnapshotV1.sample.json artifacts/debug-viewport/DebugViewportSnapshotV1.sample.svg
 ```
 
-The SVG previews and generated gallery are backend-only debug aids for quick inspection. Current previews include top-down X/Z and elevation/profile panels so flat plan views can still show hills and drops. They are not a renderer, editor, frontend scaffold, polished viewer, or commitment to any visualization stack.
+The SVG previews and generated gallery are backend-only debug aids for quick inspection. Current previews include top-down X/Z and elevation/profile panels so flat plan views can still show hills and drops. Raw exported centerline samples are shown as small markers with a faint raw polyline, and a Catmull-Rom smooth-preview path is drawn only as a visual approximation for readability. The smoothing does not change the JSON contract, backend spline behavior, track physics, or sampled data. The previews are not a renderer, editor, frontend scaffold, polished viewer, authoritative spline interpolation, or commitment to any visualization stack.
 
 Generated JSON, SVG, and HTML under `artifacts/` are local output by default and should not be committed unless there is a clear release reason.
 
