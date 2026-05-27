@@ -2,9 +2,9 @@
 
 ## What This Release Is
 
-Technical Preview 0.1 is a backend-first release candidate for Quantum CoasterWorks. It proves a narrow, renderer-neutral workflow for stable centerline sampling, orientation frame diagnostics, distance-based train placeholder output, CSV fixture bridging, snapshot validation, and repeatable tests.
+Technical Preview 0.1 is a backend-first release candidate for Quantum CoasterWorks. It proves a narrow, renderer-neutral workflow for stable centerline sampling, orientation frame diagnostics, distance-based train placeholder output, CSV fixture bridging, snapshot validation, a simple SVG debug preview, and repeatable tests.
 
-The preview is intended for backend inspection, test automation, and thin debug viewers that consume JSON contracts at the adapter boundary.
+The preview is intended for backend inspection, test automation, and thin debug viewers that consume JSON contracts at the adapter boundary. The SVG preview is plain text output from `Quantum.Debug` for quick technical inspection; it is not a renderer, editor, frontend scaffold, or polished visualization surface.
 
 ## What This Release Is Not
 
@@ -21,7 +21,9 @@ Use this checklist from a clean checkout before tagging or packaging Technical P
 - [ ] Built-in `DebugViewportSnapshotV1` snapshot generation works.
 - [ ] CSV fixture to `DebugViewportSnapshotV1` snapshot generation works.
 - [ ] Snapshot validation accepts the generated built-in and CSV-derived snapshots.
-- [ ] `.\tools\demo-technical-preview-0.1.ps1` runs the backend demo flow successfully.
+- [ ] SVG preview generation works from a valid `DebugViewportSnapshotV1` JSON snapshot.
+- [ ] `.\tools\demo-technical-preview-0.1.cmd` runs the backend demo flow successfully on Windows.
+- [ ] Direct PowerShell fallback works when needed: `powershell -ExecutionPolicy Bypass -File .\tools\demo-technical-preview-0.1.ps1`.
 - [ ] Generated artifacts stay local by default, especially under `artifacts/`.
 - [ ] `Quantum.*` backend projects have no Unity, Unreal, Avalonia, Silk.NET, OpenTK, Veldrid, renderer, or frontend dependencies.
 - [ ] Public docs clearly state Technical Preview 0.1 scope and non-goals.
@@ -32,22 +34,30 @@ Run these commands from the repository root after checking out the intended Tech
 
 ```powershell
 dotnet restore QuantumCoasterWorks.sln
-.\tools\demo-technical-preview-0.1.ps1
+.\tools\demo-technical-preview-0.1.cmd
 git status --short
+```
+
+Direct PowerShell fallback:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\tools\demo-technical-preview-0.1.ps1
 ```
 
 Expected dry-run result:
 
 - Tests pass.
 - `Quantum.Debug -- help` lists the snapshot generation, CSV bridge, and validation commands.
+- The demo writes a simple SVG technical debug preview under `artifacts/debug-viewport/`.
 - Both generated snapshots validate successfully.
-- Generated JSON remains local under `artifacts/`.
+- Generated JSON and SVG remain local under `artifacts/`.
 - `git status --short` does not show generated artifacts as tracked changes.
 
 ## Known Limitations
 
 - The CSV path is a sampled-frame debug/test bridge for self-authored or synthetic fixtures, not a full NoLimits project importer.
 - Debug viewport snapshots carry renderer-neutral centerline, frame, line, box, and optional train pose data only. They do not define cameras, materials, meshes, scene objects, editor UI, or coordinate conversion policy for a specific engine.
+- The SVG preview is intentionally tiny and top-down. It helps inspect centerline output without adding renderer or frontend dependencies.
 - Train visualization remains placeholder-oriented. Simple boxes and diagnostic transforms are acceptable for this preview.
 - Fixture coverage is intentionally small and synthetic. It protects the current contract path but does not claim broad coaster layout compatibility.
 - Backend physics, force, and train systems are still early technical foundations and should not be treated as production simulation guarantees.
