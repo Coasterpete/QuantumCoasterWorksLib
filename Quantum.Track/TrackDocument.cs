@@ -10,6 +10,12 @@ namespace Quantum.Track
     /// <see cref="TrackEvaluator"/>. Sections carry coaster-domain metadata and force
     /// inputs; spline/math details are support-layer implementation choices behind
     /// segment evaluation.
+    ///
+    /// Documents are intentionally mutable during the current backend prototype.
+    /// Evaluators read the current segment and section lists when an evaluation call
+    /// starts; they do not take ownership of, or freeze, the document. Avoid mutating
+    /// a document while it is being evaluated, and treat mutations as affecting later
+    /// evaluations, including evaluations from an already-bound <see cref="TrackEvaluator"/>.
     /// </remarks>
     public class TrackDocument
     {
@@ -32,11 +38,21 @@ namespace Quantum.Track
         /// <summary>
         /// Ordered centerline segments. Their lengths define station-distance sampling.
         /// </summary>
+        /// <remarks>
+        /// This list is mutable by design for authoring and prototype workflows.
+        /// Mutating it changes the station-distance coordinate for future evaluation
+        /// calls. The backend does not currently provide concurrent mutation safety.
+        /// </remarks>
         public IList<TrackSegment> Segments { get; }
 
         /// <summary>
         /// Coaster-domain sections associated with the document.
         /// </summary>
+        /// <remarks>
+        /// This list is mutable by design. Section mutations are visible to future
+        /// consumers that resolve force, metadata, or authoring information from the
+        /// same document instance.
+        /// </remarks>
         public IList<TrackSection> Sections { get; }
 
         /// <summary>

@@ -12,8 +12,8 @@ namespace Quantum.Track
     /// </remarks>
     public sealed class TrainPoseResult
     {
-        private readonly ArticulatedTrainCarWithWheelsTransform[]? _carsSnapshot;
-        private readonly IReadOnlyList<ArticulatedTrainCarWithWheelsTransform>? _carsReadOnly;
+        private readonly ArticulatedTrainCarWithWheelsTransform[] _carsSnapshot;
+        private readonly IReadOnlyList<ArticulatedTrainCarWithWheelsTransform> _carsReadOnly;
 
         /// <summary>
         /// Creates an immutable train-pose snapshot over the evaluated car hierarchy.
@@ -23,10 +23,20 @@ namespace Quantum.Track
             TrainConsistDefinition definition,
             ArticulatedTrainCarWithWheelsTransform[] cars)
         {
+            if (definition is null)
+            {
+                throw new ArgumentNullException(nameof(definition));
+            }
+
+            if (cars is null)
+            {
+                throw new ArgumentNullException(nameof(cars));
+            }
+
             LeadDistance = leadDistance;
             Definition = definition;
             _carsSnapshot = CopyArray(cars);
-            _carsReadOnly = _carsSnapshot == null ? null : Array.AsReadOnly(_carsSnapshot);
+            _carsReadOnly = Array.AsReadOnly(_carsSnapshot);
         }
 
         /// <summary>
@@ -42,21 +52,16 @@ namespace Quantum.Track
         /// <summary>
         /// Copy of the evaluated car hierarchy.
         /// </summary>
-        public ArticulatedTrainCarWithWheelsTransform[] Cars => CopyArray(_carsSnapshot)!;
+        public ArticulatedTrainCarWithWheelsTransform[] Cars => CopyArray(_carsSnapshot);
 
         /// <summary>
         /// Read-only view of the evaluated car hierarchy.
         /// </summary>
-        public IReadOnlyList<ArticulatedTrainCarWithWheelsTransform> CarsReadOnly => _carsReadOnly!;
+        public IReadOnlyList<ArticulatedTrainCarWithWheelsTransform> CarsReadOnly => _carsReadOnly;
 
-        private static ArticulatedTrainCarWithWheelsTransform[]? CopyArray(
-            ArticulatedTrainCarWithWheelsTransform[]? source)
+        private static ArticulatedTrainCarWithWheelsTransform[] CopyArray(
+            ArticulatedTrainCarWithWheelsTransform[] source)
         {
-            if (source == null)
-            {
-                return null;
-            }
-
             var copy = new ArticulatedTrainCarWithWheelsTransform[source.Length];
             Array.Copy(source, copy, source.Length);
             return copy;
