@@ -12,6 +12,10 @@ namespace Quantum.Debug
         public const string GeneratedArtifactsNote =
             "Generated artifacts are local by default and should not be committed unless intentionally included in a release package.";
 
+        public const string DebugViewportPreviewIndexNote =
+            "When debug viewport outputs are written under artifacts/debug-viewport, Quantum.Debug refreshes artifacts/debug-viewport/" +
+            DebugViewportSnapshotPreviewIndex.FileName + ".";
+
         private static readonly DebugCommandHelpEntry[] CommandEntries =
         {
             new DebugCommandHelpEntry(
@@ -47,7 +51,8 @@ namespace Quantum.Debug
                 arguments: new[]
                 {
                     "outputPath: Optional JSON output path. Defaults to " +
-                    DebugViewportSnapshotV1SampleCommand.DefaultRelativeOutputPath + "."
+                    DebugViewportSnapshotV1SampleCommand.DefaultRelativeOutputPath + ".",
+                    DebugViewportPreviewIndexNote
                 },
                 examples: new[]
                 {
@@ -61,7 +66,8 @@ namespace Quantum.Debug
                 arguments: new[]
                 {
                     "inputCsvPath: Required sampled-frame CSV fixture path.",
-                    "outputJsonPath: Optional JSON output path. Defaults next to the input CSV with .debug-viewport-snapshot-v1.json appended."
+                    "outputJsonPath: Optional JSON output path. Defaults next to the input CSV with .debug-viewport-snapshot-v1.json appended.",
+                    DebugViewportPreviewIndexNote
                 },
                 examples: new[]
                 {
@@ -89,7 +95,8 @@ namespace Quantum.Debug
                     "snapshotJsonPath: Required DebugViewportSnapshotV1 JSON path.",
                     "outputSvgPath: Optional SVG output path. Defaults next to the input JSON with .svg extension.",
                     "The SVG is a technical debug preview, not a renderer or editor surface.",
-                    "Raw exported samples remain visible; Catmull-Rom smooth-preview geometry is visual-only and does not change the JSON contract."
+                    "Raw exported samples remain visible; Catmull-Rom smooth-preview geometry is visual-only and does not change the JSON contract.",
+                    DebugViewportPreviewIndexNote
                 },
                 examples: new[]
                 {

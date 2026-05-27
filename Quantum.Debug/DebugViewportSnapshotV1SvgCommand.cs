@@ -87,6 +87,7 @@ namespace Quantum.Debug
             string svg = BuildSvg(dto, Path.GetFileName(resolvedInputPath));
             File.WriteAllText(resolvedOutputPath, svg, Utf8NoBom);
             output.WriteLine($"Wrote DebugViewportSnapshotV1 SVG preview to '{resolvedOutputPath}'.");
+            DebugViewportSnapshotPreviewIndex.TryWriteForGeneratedOutput(resolvedOutputPath, output);
             return 0;
         }
 

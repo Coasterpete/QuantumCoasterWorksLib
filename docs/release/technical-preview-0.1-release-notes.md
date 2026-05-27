@@ -2,9 +2,9 @@
 
 ## What This Release Is
 
-Technical Preview 0.1 is a backend-first release candidate for Quantum CoasterWorks. It proves a narrow, renderer-neutral workflow for stable centerline sampling, orientation frame diagnostics, distance-based train placeholder output, CSV fixture bridging, snapshot validation, multi-panel SVG debug previews, a generated local debug gallery, and repeatable tests.
+Technical Preview 0.1 is a backend-first release candidate for Quantum CoasterWorks. It proves a narrow, renderer-neutral workflow for stable centerline sampling, orientation frame diagnostics, distance-based train placeholder output, CSV fixture bridging, snapshot validation, multi-panel SVG debug previews, a generated Markdown preview index, a generated local debug gallery, and repeatable tests.
 
-The preview is intended for backend inspection, test automation, and thin debug viewers that consume JSON contracts at the adapter boundary. The SVG previews and generated gallery are plain text local artifacts for quick technical inspection; they are not a renderer, editor, frontend scaffold, polished visualization surface, or authoritative spline interpolation.
+The preview is intended for backend inspection, test automation, and thin debug viewers that consume JSON contracts at the adapter boundary. The SVG previews, generated Markdown index, and generated gallery are plain text local artifacts for quick technical inspection; they are not a renderer, editor, frontend scaffold, polished visualization surface, or authoritative spline interpolation.
 
 ## What This Release Is Not
 
@@ -22,6 +22,7 @@ Use this checklist from a clean checkout before tagging or packaging Technical P
 - [ ] Milestone 7 CSV fixture pack to `DebugViewportSnapshotV1` snapshot generation works.
 - [ ] Snapshot validation accepts the generated built-in and CSV-derived snapshots.
 - [ ] SVG preview generation works for the built-in sample and Milestone 7 fixture pack snapshots.
+- [ ] Generated Markdown preview index is written to `artifacts/debug-viewport/snapshot-preview-index.md`.
 - [ ] Optional generated gallery is written to `artifacts/debug-viewport/index.html`.
 - [ ] `.\tools\demo-technical-preview-0.1.cmd` runs the backend demo flow successfully on Windows.
 - [ ] Direct PowerShell fallback works when needed: `powershell -ExecutionPolicy Bypass -File .\tools\demo-technical-preview-0.1.ps1`.
@@ -50,9 +51,10 @@ Expected dry-run result:
 - Tests pass.
 - `Quantum.Debug -- help` lists the snapshot generation, CSV bridge, and validation commands.
 - The demo writes multi-panel SVG technical debug previews under `artifacts/debug-viewport/`; raw exported sample points remain visible, with a faint raw polyline and preview-only smoothing for readability.
+- The demo writes a Markdown preview index at `artifacts/debug-viewport/snapshot-preview-index.md`.
 - The demo writes a local static gallery at `artifacts/debug-viewport/index.html`.
 - All generated snapshots validate successfully.
-- Generated JSON, SVG, and HTML remain local under `artifacts/`.
+- Generated JSON, SVG, Markdown, and HTML remain local under `artifacts/`.
 - `git status --short` does not show generated artifacts as tracked changes.
 
 Generated debug viewport outputs include the built-in `DebugViewportSnapshotV1.sample.svg` plus one SVG preview for each existing Milestone 7 synthetic fixture: `straight_line`, `simple_hill`, `banked_turn`, and `descending_ascending_curve`.

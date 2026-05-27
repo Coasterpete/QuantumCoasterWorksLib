@@ -48,6 +48,8 @@ dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1
 
 The default output path is `artifacts/debug-viewport/DebugViewportSnapshotV1.sample.json`. An explicit path can be passed as the first command argument.
 
+When `Quantum.Debug` writes debug viewport JSON or SVG output under `artifacts/debug-viewport`, it also refreshes `artifacts/debug-viewport/snapshot-preview-index.md`. The generated Markdown index lists snapshot JSON files and matching SVG previews with repository-relative paths and last-written timestamps so local demo output is easier to find.
+
 Validate or inspect a generated snapshot with:
 
 ```powershell

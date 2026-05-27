@@ -104,6 +104,7 @@ $artifactDirectory = Join-Path $repoRoot "artifacts\debug-viewport"
 $builtInSnapshotPath = Join-Path $artifactDirectory "DebugViewportSnapshotV1.sample.json"
 $builtInSvgPath = Join-Path $artifactDirectory "DebugViewportSnapshotV1.sample.svg"
 $galleryPath = Join-Path $artifactDirectory "index.html"
+$previewIndexPath = Join-Path $artifactDirectory "snapshot-preview-index.md"
 $fixtureDirectory = Join-Path $repoRoot "Quantum.Tests\IO\Fixtures"
 $fixturePreviews = @(
     [PSCustomObject]@{
@@ -231,6 +232,9 @@ try {
     }
 
     New-DebugViewportGallery -OutputPath $galleryPath -Previews $generatedPreviews
+    if (-not (Test-Path -LiteralPath $previewIndexPath -PathType Leaf)) {
+        throw "Snapshot preview index was not generated at '$previewIndexPath'."
+    }
 
     Write-Host ""
     Write-Host "SUCCESS: Technical Preview 0.1 backend demo completed."
@@ -248,6 +252,9 @@ try {
 
     Write-Host "Generated gallery:"
     Write-Host "  $galleryPath"
+
+    Write-Host "Generated snapshot preview index:"
+    Write-Host "  $previewIndexPath"
 }
 finally {
     Pop-Location

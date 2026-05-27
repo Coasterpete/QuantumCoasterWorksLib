@@ -37,6 +37,7 @@ namespace Quantum.Debug
 
             File.WriteAllText(resolvedOutputPath, json, Utf8NoBom);
             Console.WriteLine($"Wrote DebugViewportSnapshotV1 sample to '{resolvedOutputPath}'.");
+            DebugViewportSnapshotPreviewIndex.TryWriteForGeneratedOutput(resolvedOutputPath, Console.Out);
             return 0;
         }
 
