@@ -88,7 +88,8 @@ namespace Quantum.Debug
                 {
                     "snapshotJsonPath: Required DebugViewportSnapshotV1 JSON path.",
                     "outputSvgPath: Optional SVG output path. Defaults next to the input JSON with .svg extension.",
-                    "The SVG is a technical debug preview, not a renderer or editor surface."
+                    "The SVG is a technical debug preview, not a renderer or editor surface.",
+                    "Raw exported samples remain visible; Catmull-Rom smooth-preview geometry is visual-only and does not change the JSON contract."
                 },
                 examples: new[]
                 {

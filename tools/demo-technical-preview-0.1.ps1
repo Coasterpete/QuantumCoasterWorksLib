@@ -72,7 +72,7 @@ function New-DebugViewportGallery {
     [void] $builder.AppendLine("</head>")
     [void] $builder.AppendLine("<body>")
     [void] $builder.AppendLine("  <h1>Quantum DebugViewportSnapshotV1 Gallery</h1>")
-    [void] $builder.AppendLine("  <p>Generated technical debug previews from renderer-neutral backend snapshots. Each SVG includes a top-down X/Z panel and an elevation/profile panel for public-demo sanity checks. This is not a finished editor, viewer, or renderer.</p>")
+    [void] $builder.AppendLine("  <p>Generated technical debug previews from renderer-neutral backend snapshots. Each SVG includes top-down X/Z and elevation/profile panels, raw exported sample markers, a faint raw polyline, and a preview-only Catmull-Rom smoothing layer for public-demo readability. This is not a finished editor, viewer, renderer, or authoritative spline interpolation.</p>")
     [void] $builder.AppendLine("  <div class=""grid"">")
 
     foreach ($preview in $Previews) {
