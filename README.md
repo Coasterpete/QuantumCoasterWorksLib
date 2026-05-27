@@ -51,6 +51,8 @@ Generated debug viewport outputs include:
 
 Open `artifacts/debug-viewport/index.html` locally for a simple static gallery of the generated SVG previews.
 
+For optional Blender screenshots or renders from the same JSON snapshots, see `docs/visualization/blender-debug-viewer.md`.
+
 Generate the built-in debug viewport snapshot:
 
 ```powershell
