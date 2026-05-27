@@ -1066,6 +1066,30 @@ public sealed class TrainCarTransformProviderTests
     }
 
     [Fact]
+    public void TrainPoseResult_WhenDefinitionIsNull_ThrowsArgumentNullException()
+    {
+        var cars = Array.Empty<ArticulatedTrainCarWithWheelsTransform>();
+
+        ArgumentNullException exception = Assert.Throws<ArgumentNullException>(
+            () => new TrainPoseResult(leadDistance: 0.0, definition: null!, cars: cars));
+
+        Assert.Equal("definition", exception.ParamName);
+    }
+
+    [Fact]
+    public void TrainPoseResult_WhenCarsIsNull_ThrowsArgumentNullException()
+    {
+        TrainConsistDefinition definition = BuildConsistDefinitionWithWheels(
+            carCount: 1,
+            wheelCountPerBogie: 4);
+
+        ArgumentNullException exception = Assert.Throws<ArgumentNullException>(
+            () => new TrainPoseResult(leadDistance: 0.0, definition: definition, cars: null!));
+
+        Assert.Equal("cars", exception.ParamName);
+    }
+
+    [Fact]
     public void TrainPoseResult_MutatingSourceCarsArrayDoesNotAffectStoredSnapshot()
     {
         TrackDocument document = BuildSplineTrack(length: 52.0);

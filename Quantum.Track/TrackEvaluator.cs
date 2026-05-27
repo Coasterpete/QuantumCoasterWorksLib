@@ -2,6 +2,7 @@ using Quantum.Math;
 using Quantum.Splines;
 using Quantum.Track.Internal;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using SplineTrackFrame = Quantum.Splines.TrackFrame;
 
@@ -113,7 +114,7 @@ namespace Quantum.Track
         public TrackFrame EvaluateFrameAtDistance(double distance)
         {
             TrackDocument doc = ResolveBoundDocument();
-            SplineTrackFrame splineFrame = EvaluateFrameAtDistance(doc, distance);
+            SplineTrackFrame splineFrame = EvaluateSplineFrameAtDistance(doc, distance);
             return BuildExportFrame(splineFrame);
         }
 
@@ -127,15 +128,35 @@ namespace Quantum.Track
         }
 
         /// <summary>
-        /// Support-layer frame sampling overload retained for existing spline-backed callers.
-        /// Prefer the bound <see cref="EvaluateFrameAtDistance(double)"/> overload for the
-        /// public coaster-domain frame contract.
+        /// Explicit support-layer frame sampling method for callers that still need
+        /// the spline frame contract.
         /// </summary>
-        public SplineTrackFrame EvaluateFrameAtDistance(TrackDocument doc, double distance)
+        /// <remarks>
+        /// This method intentionally returns <see cref="Quantum.Splines.TrackFrame"/>.
+        /// New coaster-facing code should prefer a bound evaluator and
+        /// <see cref="EvaluateFrameAtDistance(double)"/>, which returns
+        /// <see cref="TrackFrame"/>.
+        /// </remarks>
+        public SplineTrackFrame EvaluateSplineFrameAtDistance(TrackDocument doc, double distance)
         {
             TrackEvaluationPoint evaluationPoint = EvaluateAtDistance(doc, distance);
             TrackPosition position = ResolveTrackPosition(doc, evaluationPoint);
             return EvaluateFrame(doc, position);
+        }
+
+        /// <summary>
+        /// Compatibility overload retained for existing spline-backed callers.
+        /// </summary>
+        /// <remarks>
+        /// Prefer <see cref="EvaluateSplineFrameAtDistance(TrackDocument, double)"/>
+        /// when the support-layer return type is intentional, or bind the evaluator
+        /// to a document and call <see cref="EvaluateFrameAtDistance(double)"/> for
+        /// the public coaster-domain frame contract.
+        /// </remarks>
+        [EditorBrowsable(EditorBrowsableState.Never)]
+        public SplineTrackFrame EvaluateFrameAtDistance(TrackDocument doc, double distance)
+        {
+            return EvaluateSplineFrameAtDistance(doc, distance);
         }
 
         /// <summary>
@@ -189,10 +210,16 @@ namespace Quantum.Track
         }
 
         /// <summary>
-        /// Support-layer batch frame sampling overload retained for existing spline-backed callers.
-        /// Prefer the bound batch overload for the public coaster-domain frame contract.
+        /// Explicit support-layer batch frame sampling method for callers that still
+        /// need the spline frame contract.
         /// </summary>
-        public SplineTrackFrame[] EvaluateFramesAtDistances(
+        /// <remarks>
+        /// This method intentionally returns <see cref="Quantum.Splines.TrackFrame"/>
+        /// values. New coaster-facing code should prefer a bound evaluator and
+        /// <see cref="EvaluateFramesAtDistances(IReadOnlyList{double})"/>, which
+        /// returns <see cref="TrackFrame"/> values.
+        /// </remarks>
+        public SplineTrackFrame[] EvaluateSplineFramesAtDistances(
             TrackDocument doc,
             IReadOnlyList<double> distances)
         {
@@ -256,6 +283,23 @@ namespace Quantum.Track
         }
 
         /// <summary>
+        /// Compatibility overload retained for existing spline-backed callers.
+        /// </summary>
+        /// <remarks>
+        /// Prefer <see cref="EvaluateSplineFramesAtDistances(TrackDocument, IReadOnlyList{double})"/>
+        /// when the support-layer return type is intentional, or bind the evaluator
+        /// to a document and call <see cref="EvaluateFramesAtDistances(IReadOnlyList{double})"/>
+        /// for the public coaster-domain frame contract.
+        /// </remarks>
+        [EditorBrowsable(EditorBrowsableState.Never)]
+        public SplineTrackFrame[] EvaluateFramesAtDistances(
+            TrackDocument doc,
+            IReadOnlyList<double> distances)
+        {
+            return EvaluateSplineFramesAtDistances(doc, distances);
+        }
+
+        /// <summary>
         /// Samples the bound track document at station distances and returns public
         /// coaster-domain frame contracts.
         /// </summary>
@@ -263,7 +307,7 @@ namespace Quantum.Track
         public TrackFrame[] EvaluateFramesAtDistances(IReadOnlyList<double> distances)
         {
             TrackDocument doc = ResolveBoundDocument();
-            SplineTrackFrame[] splineFrames = EvaluateFramesAtDistances(doc, distances);
+            SplineTrackFrame[] splineFrames = EvaluateSplineFramesAtDistances(doc, distances);
             var exportFrames = new TrackFrame[splineFrames.Length];
 
             for (int i = 0; i < splineFrames.Length; i++)

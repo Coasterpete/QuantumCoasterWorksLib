@@ -5,6 +5,7 @@ using Quantum.IO.TrainPose.V1;
 using Quantum.Math;
 using Quantum.Track;
 using ExportTrackFrame = Quantum.Track.TrackFrame;
+using SplineTrackFrame = Quantum.Splines.TrackFrame;
 
 namespace Quantum.Tests;
 
@@ -61,6 +62,25 @@ public sealed class CoasterApiBoundaryContractTests
             evaluatorType,
             nameof(TrackEvaluator.EvaluateAtDistances),
             typeof(TrackEvaluationPoint[]),
+            typeof(TrackDocument),
+            typeof(IReadOnlyList<double>));
+    }
+
+    [Fact]
+    public void TrackEvaluator_SupportLayerFrameSampling_IsExplicitlyNamed()
+    {
+        Type evaluatorType = typeof(TrackEvaluator);
+
+        AssertMethod(
+            evaluatorType,
+            nameof(TrackEvaluator.EvaluateSplineFrameAtDistance),
+            typeof(SplineTrackFrame),
+            typeof(TrackDocument),
+            typeof(double));
+        AssertMethod(
+            evaluatorType,
+            nameof(TrackEvaluator.EvaluateSplineFramesAtDistances),
+            typeof(SplineTrackFrame[]),
             typeof(TrackDocument),
             typeof(IReadOnlyList<double>));
     }

@@ -25,7 +25,7 @@ namespace Quantum.Physics
 
         public TrackFrame GetFrameAtDistance(TrackDocument doc, double distance)
         {
-            return _evaluator.EvaluateFrameAtDistance(doc, distance);
+            return _evaluator.EvaluateSplineFrameAtDistance(doc, distance);
         }
 
         public Transform3d GetTransformAtDistance(TrackDocument doc, double distance)
@@ -83,8 +83,8 @@ namespace Quantum.Physics
             TrackFrame nextFrame;
             try
             {
-                prevFrame = _evaluator.EvaluateFrameAtDistance(doc, prevS);
-                nextFrame = _evaluator.EvaluateFrameAtDistance(doc, nextS);
+                prevFrame = _evaluator.EvaluateSplineFrameAtDistance(doc, prevS);
+                nextFrame = _evaluator.EvaluateSplineFrameAtDistance(doc, nextS);
             }
             catch (ArgumentOutOfRangeException)
             {
