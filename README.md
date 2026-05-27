@@ -33,7 +33,23 @@ If direct PowerShell execution is blocked by local execution policy, the `.cmd` 
 powershell -ExecutionPolicy Bypass -File .\tools\demo-technical-preview-0.1.ps1
 ```
 
-The script runs the test suite, prints the `Quantum.Debug` command reference, generates the built-in and CSV-derived `DebugViewportSnapshotV1` samples, validates both snapshots, writes a simple SVG technical debug preview, and leaves generated output under ignored `artifacts/debug-viewport/`.
+The script runs the test suite, prints the `Quantum.Debug` command reference, generates the built-in `DebugViewportSnapshotV1` sample, generates snapshots from the Milestone 7 synthetic fixture pack, validates each snapshot, writes simple SVG technical debug previews, and leaves generated output under ignored `artifacts/debug-viewport/`.
+
+Generated debug viewport outputs include:
+
+- `artifacts/debug-viewport/DebugViewportSnapshotV1.sample.json`
+- `artifacts/debug-viewport/DebugViewportSnapshotV1.sample.svg`
+- `artifacts/debug-viewport/Milestone7.synthetic.straight_line.snapshot.json`
+- `artifacts/debug-viewport/Milestone7.synthetic.straight_line.snapshot.svg`
+- `artifacts/debug-viewport/Milestone7.synthetic.simple_hill.snapshot.json`
+- `artifacts/debug-viewport/Milestone7.synthetic.simple_hill.snapshot.svg`
+- `artifacts/debug-viewport/Milestone7.synthetic.banked_turn.snapshot.json`
+- `artifacts/debug-viewport/Milestone7.synthetic.banked_turn.snapshot.svg`
+- `artifacts/debug-viewport/Milestone7.synthetic.descending_ascending_curve.snapshot.json`
+- `artifacts/debug-viewport/Milestone7.synthetic.descending_ascending_curve.snapshot.svg`
+- `artifacts/debug-viewport/index.html`
+
+Open `artifacts/debug-viewport/index.html` locally for a simple static gallery of the generated SVG previews.
 
 Generate the built-in debug viewport snapshot:
 
@@ -59,9 +75,9 @@ Generate a simple top-down SVG technical preview from a snapshot:
 dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1-svg artifacts/debug-viewport/DebugViewportSnapshotV1.sample.json artifacts/debug-viewport/DebugViewportSnapshotV1.sample.svg
 ```
 
-The SVG preview is a backend-only debug aid for quick inspection. It is not a renderer, editor, frontend scaffold, or commitment to any visualization stack.
+The SVG previews and generated gallery are backend-only debug aids for quick inspection. They are not a renderer, editor, frontend scaffold, polished viewer, or commitment to any visualization stack.
 
-Generated JSON and SVG under `artifacts/` are local output by default and should not be committed unless there is a clear release reason.
+Generated JSON, SVG, and HTML under `artifacts/` are local output by default and should not be committed unless there is a clear release reason.
 
 ## Quantum.Debug Command Reference
 
