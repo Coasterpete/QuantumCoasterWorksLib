@@ -81,6 +81,21 @@ namespace Quantum.Debug
                     "dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1-validate artifacts/debug-viewport/DebugViewportSnapshotV1.sample.json"
                 }),
             new DebugCommandHelpEntry(
+                name: "debug-viewport-snapshot-v1-svg",
+                usage: "debug-viewport-snapshot-v1-svg <snapshotJsonPath> [outputSvgPath]",
+                summary: "Write a simple backend-only SVG preview from DebugViewportSnapshotV1 JSON.",
+                arguments: new[]
+                {
+                    "snapshotJsonPath: Required DebugViewportSnapshotV1 JSON path.",
+                    "outputSvgPath: Optional SVG output path. Defaults next to the input JSON with .svg extension.",
+                    "The SVG is a technical debug preview, not a renderer or editor surface."
+                },
+                examples: new[]
+                {
+                    "dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1-svg artifacts/debug-viewport/DebugViewportSnapshotV1.sample.json",
+                    "dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1-svg artifacts/debug-viewport/DebugViewportSnapshotV1.sample.json artifacts/debug-viewport/DebugViewportSnapshotV1.sample.svg"
+                }),
+            new DebugCommandHelpEntry(
                 name: "longitudinal-force-preview",
                 usage: "longitudinal-force-preview [preset] [outputPath]",
                 summary: "Write longitudinal force preview diagnostics.",

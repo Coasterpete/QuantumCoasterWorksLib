@@ -85,6 +85,19 @@ namespace Quantum.Debug
                 return DebugViewportSnapshotV1ValidateCommand.Run(args[1]);
             }
 
+            if (command == DebugCommandKind.DebugViewportSnapshotV1Svg)
+            {
+                if (args.Length < 2 || args.Length > 3)
+                {
+                    Console.WriteLine("Usage: debug-viewport-snapshot-v1-svg <snapshotJsonPath> [outputSvgPath]");
+                    return 1;
+                }
+
+                string snapshotJsonPath = args[1];
+                string? outputSvgPath = args.Length == 3 ? args[2] : null;
+                return DebugViewportSnapshotV1SvgCommand.Run(snapshotJsonPath, outputSvgPath);
+            }
+
             if (command == DebugCommandKind.LongitudinalForcePreview)
             {
                 if (!TryParseLongitudinalForcePreviewArgs(args, out LongitudinalForcePreviewPreset preset, out string? outputPath))

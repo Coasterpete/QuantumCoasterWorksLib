@@ -38,6 +38,7 @@ $repoRoot = Get-RepoRoot
 $artifactDirectory = Join-Path $repoRoot "artifacts\debug-viewport"
 $builtInSnapshotPath = Join-Path $artifactDirectory "DebugViewportSnapshotV1.sample.json"
 $csvSnapshotPath = Join-Path $artifactDirectory "Milestone7.synthetic.straight_line.snapshot.json"
+$builtInSvgPath = Join-Path $artifactDirectory "DebugViewportSnapshotV1.sample.svg"
 $csvFixturePath = Join-Path $repoRoot "Quantum.Tests\IO\Fixtures\Milestone7.synthetic.straight_line.centerline_frames.csv"
 
 if (-not (Test-Path -LiteralPath $csvFixturePath -PathType Leaf)) {
@@ -103,11 +104,23 @@ try {
         $csvSnapshotPath
     )
 
+    Invoke-DotNetChecked -Arguments @(
+        "run",
+        "--project",
+        "Quantum.Debug",
+        "--",
+        "debug-viewport-snapshot-v1-svg",
+        $builtInSnapshotPath,
+        $builtInSvgPath
+    )
+
     Write-Host ""
     Write-Host "SUCCESS: Technical Preview 0.1 backend demo completed."
     Write-Host "Generated snapshots:"
     Write-Host "  $builtInSnapshotPath"
     Write-Host "  $csvSnapshotPath"
+    Write-Host "Generated SVG preview:"
+    Write-Host "  $builtInSvgPath"
 }
 finally {
     Pop-Location
