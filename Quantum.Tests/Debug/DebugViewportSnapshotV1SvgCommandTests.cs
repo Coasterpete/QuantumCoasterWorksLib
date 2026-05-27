@@ -31,7 +31,10 @@ public sealed class DebugViewportSnapshotV1SvgCommandTests
 
             string svg = File.ReadAllText(svgPath);
             Assert.Contains("<svg", svg);
-            Assert.Contains("<polyline", svg);
+            Assert.Contains("top-down X/Z centerline preview", svg);
+            Assert.Contains("elevation/profile preview", svg);
+            Assert.Contains("class=\"centerline top-down-centerline\"", svg);
+            Assert.Contains("class=\"centerline elevation-centerline\"", svg);
         }
         finally
         {
@@ -93,7 +96,7 @@ public sealed class DebugViewportSnapshotV1SvgCommandTests
         ExportTrackFrame[] frames =
         {
             CreateFrame(distance: 0.0, x: 0.0, z: 0.0),
-            CreateFrame(distance: 5.0, x: 5.0, z: 1.5),
+            CreateFrame(distance: 5.0, x: 5.0, y: 1.0, z: 1.5),
             CreateFrame(distance: 10.0, x: 10.0, z: 0.0)
         };
         DebugLineSegment[] lines = TrackFrameDebugGizmoBuilder.BuildAxes(frames[1], axisLength: 2.0);
@@ -107,11 +110,11 @@ public sealed class DebugViewportSnapshotV1SvgCommandTests
         });
     }
 
-    private static ExportTrackFrame CreateFrame(double distance, double x, double z)
+    private static ExportTrackFrame CreateFrame(double distance, double x, double z, double y = 0.0)
     {
         return new ExportTrackFrame(
             distance: distance,
-            position: new Vector3d(x, 0.0, z),
+            position: new Vector3d(x, y, z),
             tangent: Vector3d.UnitX,
             normal: Vector3d.UnitY,
             binormal: Vector3d.UnitZ);

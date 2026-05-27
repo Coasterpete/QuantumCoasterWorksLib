@@ -33,7 +33,7 @@ If direct PowerShell execution is blocked by local execution policy, the `.cmd` 
 powershell -ExecutionPolicy Bypass -File .\tools\demo-technical-preview-0.1.ps1
 ```
 
-The script runs the test suite, prints the `Quantum.Debug` command reference, generates the built-in `DebugViewportSnapshotV1` sample, generates snapshots from the Milestone 7 synthetic fixture pack, validates each snapshot, writes simple SVG technical debug previews, and leaves generated output under ignored `artifacts/debug-viewport/`.
+The script runs the test suite, prints the `Quantum.Debug` command reference, generates the built-in `DebugViewportSnapshotV1` sample, generates snapshots from the Milestone 7 synthetic fixture pack, validates each snapshot, writes multi-panel SVG technical debug previews, and leaves generated output under ignored `artifacts/debug-viewport/`.
 
 Generated debug viewport outputs include:
 
@@ -69,13 +69,13 @@ Validate and inspect a snapshot JSON file:
 dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1-validate artifacts/debug-viewport/DebugViewportSnapshotV1.sample.json
 ```
 
-Generate a simple top-down SVG technical preview from a snapshot:
+Generate a multi-panel SVG technical preview from a snapshot:
 
 ```powershell
 dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1-svg artifacts/debug-viewport/DebugViewportSnapshotV1.sample.json artifacts/debug-viewport/DebugViewportSnapshotV1.sample.svg
 ```
 
-The SVG previews and generated gallery are backend-only debug aids for quick inspection. They are not a renderer, editor, frontend scaffold, polished viewer, or commitment to any visualization stack.
+The SVG previews and generated gallery are backend-only debug aids for quick inspection. Current previews include top-down X/Z and elevation/profile panels so flat plan views can still show hills and drops. They are not a renderer, editor, frontend scaffold, polished viewer, or commitment to any visualization stack.
 
 Generated JSON, SVG, and HTML under `artifacts/` are local output by default and should not be committed unless there is a clear release reason.
 
@@ -92,7 +92,7 @@ Generated JSON, SVG, and HTML under `artifacts/` are local output by default and
 - `dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1 [outputPath]`: write the built-in `DebugViewportSnapshotV1` sample JSON.
 - `dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1-from-csv <inputCsvPath> [outputJsonPath]`: bridge a sampled-frame CSV fixture to `DebugViewportSnapshotV1` JSON.
 - `dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1-validate <snapshotJsonPath>`: validate and summarize a snapshot JSON file.
-- `dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1-svg <snapshotJsonPath> [outputSvgPath]`: write a simple backend-only SVG preview from snapshot JSON.
+- `dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1-svg <snapshotJsonPath> [outputSvgPath]`: write a multi-panel backend-only SVG preview from snapshot JSON.
 - `dotnet run --project Quantum.Debug -- longitudinal-force-preview [preset] [outputPath]`: write force preview diagnostics with `soft`, `balanced`, or `punchy` presets.
 - `dotnet run --project Quantum.Debug -- longitudinal-speed-preview [preset] [outputPath] [initialSpeedMps]`: write speed preview diagnostics with `soft`, `balanced`, or `punchy` presets.
 

@@ -11,11 +11,14 @@ namespace Quantum.Debug
 {
     public static class DebugViewportSnapshotV1SvgCommand
     {
-        private const double DefaultCanvasWidth = 960.0;
-        private const double DefaultCanvasHeight = 540.0;
-        private const double Padding = 48.0;
-        private const double HeaderHeight = 72.0;
+        private const double DefaultCanvasWidth = 1120.0;
+        private const double DefaultCanvasHeight = 760.0;
+        private const double PagePadding = 32.0;
+        private const double HeaderHeight = 124.0;
+        private const double PanelGap = 22.0;
+        private const double TopDownPanelHeight = 360.0;
         private const double MinimumWorldSpan = 1.0;
+        private const double MinimumDistanceSpan = 1.0;
         private const double FrameTickWorldLength = 1.5;
         private const int MaxFrameTicks = 16;
 
@@ -94,26 +97,63 @@ namespace Quantum.Debug
                 throw new ArgumentNullException(nameof(dto));
             }
 
-            Projection projection = Projection.Create(dto);
+            SvgRect topDownPanel = new SvgRect(
+                PagePadding,
+                HeaderHeight,
+                DefaultCanvasWidth - PagePadding * 2.0,
+                TopDownPanelHeight);
+            SvgRect elevationPanel = new SvgRect(
+                PagePadding,
+                topDownPanel.Bottom + PanelGap,
+                topDownPanel.Width,
+                DefaultCanvasHeight - topDownPanel.Bottom - PanelGap - PagePadding);
+            SvgRect topDownPlotArea = CreatePlotArea(topDownPanel, left: 52.0, top: 52.0, right: 36.0, bottom: 42.0);
+            SvgRect elevationPlotArea = CreatePlotArea(elevationPanel, left: 64.0, top: 52.0, right: 34.0, bottom: 48.0);
+
+            TopDownProjection topDownProjection = TopDownProjection.Create(dto, topDownPlotArea);
+            ElevationProjection elevationProjection = ElevationProjection.Create(dto, elevationPlotArea);
             var builder = new StringBuilder();
 
             builder.AppendLine("<?xml version=\"1.0\" encoding=\"utf-8\"?>");
-            builder.AppendLine("<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"960\" height=\"540\" viewBox=\"0 0 960 540\" role=\"img\" aria-labelledby=\"title desc\">");
-            builder.AppendLine("  <title id=\"title\">Quantum DebugViewportSnapshotV1 Technical Preview</title>");
-            builder.AppendLine("  <desc id=\"desc\">Simple top-down centerline preview generated from renderer-neutral backend debug data.</desc>");
-            builder.AppendLine("  <rect width=\"960\" height=\"540\" fill=\"#f8fafc\" />");
-            builder.AppendLine("  <text x=\"24\" y=\"30\" font-family=\"Segoe UI, Arial, sans-serif\" font-size=\"18\" font-weight=\"600\" fill=\"#111827\">DebugViewportSnapshotV1 Technical Preview</text>");
-
-            string metadata = BuildMetadataLine(dto, sourceFileName);
             builder.AppendLine(
-                "  <text x=\"24\" y=\"54\" font-family=\"Segoe UI, Arial, sans-serif\" font-size=\"12\" fill=\"#475569\">" +
-                Escape(metadata) +
-                "</text>");
+                "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"" +
+                Format(DefaultCanvasWidth) +
+                "\" height=\"" +
+                Format(DefaultCanvasHeight) +
+                "\" viewBox=\"0 0 " +
+                Format(DefaultCanvasWidth) +
+                " " +
+                Format(DefaultCanvasHeight) +
+                "\" role=\"img\" aria-labelledby=\"title desc\">");
+            builder.AppendLine("  <title id=\"title\">Quantum DebugViewportSnapshotV1 Technical Preview</title>");
+            builder.AppendLine("  <desc id=\"desc\">Backend-only multi-panel centerline preview generated from renderer-neutral debug data.</desc>");
+            AppendStyles(builder);
+            builder.AppendLine(
+                "  <rect width=\"" +
+                Format(DefaultCanvasWidth) +
+                "\" height=\"" +
+                Format(DefaultCanvasHeight) +
+                "\" fill=\"#f8fafc\" />");
 
-            AppendGrid(builder);
-            AppendCenterline(builder, dto, projection);
-            AppendFrameTicks(builder, dto, projection);
-            AppendLegend(builder);
+            AppendHeader(builder, dto, sourceFileName);
+            AppendPanelFrame(
+                builder,
+                topDownPanel,
+                "top-down X/Z centerline preview",
+                "Plan view for centerline sanity checks and horizontal turns.");
+            AppendPlotGrid(builder, topDownPlotArea);
+            AppendTopDownAxisLabels(builder, topDownPlotArea);
+            AppendTopDownCenterline(builder, dto, topDownProjection);
+            AppendFrameTicks(builder, dto, topDownProjection);
+
+            AppendPanelFrame(
+                builder,
+                elevationPanel,
+                "elevation/profile preview (distance vs Y)",
+                "Side profile makes hills, drops, and climbs visible even when X/Z is flat.");
+            AppendPlotGrid(builder, elevationPlotArea);
+            AppendElevationAxisLabels(builder, elevationPlotArea);
+            AppendElevationProfile(builder, dto, elevationProjection);
 
             builder.AppendLine("</svg>");
             return builder.ToString();
@@ -136,7 +176,25 @@ namespace Quantum.Debug
             return Path.GetFullPath(Path.Combine(inputDirectory, inputFileName + ".svg"));
         }
 
-        private static string BuildMetadataLine(DebugViewportSnapshotV1Dto dto, string? sourceFileName)
+        private static void AppendStyles(StringBuilder builder)
+        {
+            builder.AppendLine("  <style>");
+            builder.AppendLine("    .title { font: 600 20px Segoe UI, Arial, sans-serif; fill: #111827; }");
+            builder.AppendLine("    .subtitle, .metadata, .axis-label, .legend text, .panel-subtitle { font: 12px Segoe UI, Arial, sans-serif; fill: #475569; }");
+            builder.AppendLine("    .panel-title { font: 600 15px Segoe UI, Arial, sans-serif; fill: #111827; }");
+            builder.AppendLine("    .panel { fill: #ffffff; stroke: #cbd5e1; stroke-width: 1; }");
+            builder.AppendLine("    .plot-area { fill: #ffffff; stroke: #cbd5e1; stroke-width: 1; }");
+            builder.AppendLine("    .grid-line { stroke: #e2e8f0; stroke-width: 1; }");
+            builder.AppendLine("    .centerline { fill: none; stroke: #0f766e; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }");
+            builder.AppendLine("    .sample-point { fill: #0f766e; }");
+            builder.AppendLine("    .tangent-tick { stroke: #2563eb; stroke-width: 1.5; stroke-linecap: round; }");
+            builder.AppendLine("    .binormal-tick { stroke: #7c3aed; stroke-width: 1.5; stroke-linecap: round; }");
+            builder.AppendLine("    .baseline { stroke: #94a3b8; stroke-width: 1.25; stroke-dasharray: 5 5; }");
+            builder.AppendLine("    .empty-message { font: 14px Segoe UI, Arial, sans-serif; fill: #b91c1c; }");
+            builder.AppendLine("  </style>");
+        }
+
+        private static void AppendHeader(StringBuilder builder, DebugViewportSnapshotV1Dto dto, string? sourceFileName)
         {
             DebugViewportMetadataV1Dto? metadata = dto.Metadata;
             string source = string.IsNullOrWhiteSpace(metadata?.SourceFixtureName)
@@ -145,72 +203,153 @@ namespace Quantum.Debug
             string units = string.IsNullOrWhiteSpace(metadata?.Units) ? "<unknown units>" : metadata!.Units;
             string file = string.IsNullOrWhiteSpace(sourceFileName) ? "<memory>" : sourceFileName!;
 
-            return "source: " +
-                   source +
-                   " | file: " +
-                   file +
-                   " | units: " +
-                   units +
-                   " | centerline points: " +
-                   FormatCount(dto.CenterlinePoints) +
-                   " | frames: " +
-                   FormatCount(dto.Frames);
+            builder.AppendLine("  <text class=\"title\" x=\"32\" y=\"34\">DebugViewportSnapshotV1 Technical Preview</text>");
+            builder.AppendLine("  <text class=\"subtitle\" x=\"32\" y=\"58\">Backend-only SVG debug preview; not a renderer, editor, or frontend.</text>");
+            AppendText(builder, "metadata", 32.0, 82.0, "source: " + Shorten(source, 72));
+            AppendText(
+                builder,
+                "metadata",
+                32.0,
+                102.0,
+                "file: " +
+                Shorten(file, 52) +
+                " | units: " +
+                Shorten(units, 20) +
+                " | centerline points: " +
+                FormatCount(dto.CenterlinePoints) +
+                " | frames: " +
+                FormatCount(dto.Frames));
+
+            AppendLegend(builder, DefaultCanvasWidth - PagePadding - 300.0, 28.0);
         }
 
-        private static void AppendGrid(StringBuilder builder)
+        private static SvgRect CreatePlotArea(
+            SvgRect panel,
+            double left,
+            double top,
+            double right,
+            double bottom)
         {
-            builder.AppendLine("  <rect x=\"48\" y=\"72\" width=\"864\" height=\"420\" fill=\"#ffffff\" stroke=\"#cbd5e1\" stroke-width=\"1\" />");
-
-            for (int i = 1; i < 4; i++)
-            {
-                double x = Padding + ((DefaultCanvasWidth - Padding * 2.0) * i / 4.0);
-                builder.AppendLine(
-                    "  <line x1=\"" +
-                    Format(x) +
-                    "\" y1=\"72\" x2=\"" +
-                    Format(x) +
-                    "\" y2=\"492\" stroke=\"#e2e8f0\" stroke-width=\"1\" />");
-            }
-
-            for (int i = 1; i < 4; i++)
-            {
-                double y = HeaderHeight + ((DefaultCanvasHeight - HeaderHeight - Padding) * i / 4.0);
-                builder.AppendLine(
-                    "  <line x1=\"48\" y1=\"" +
-                    Format(y) +
-                    "\" x2=\"912\" y2=\"" +
-                    Format(y) +
-                    "\" stroke=\"#e2e8f0\" stroke-width=\"1\" />");
-            }
-
-            builder.AppendLine(
-                "  <text x=\"54\" y=\"486\" font-family=\"Segoe UI, Arial, sans-serif\" font-size=\"11\" fill=\"#64748b\">top-down X/Z preview</text>");
+            return new SvgRect(
+                panel.X + left,
+                panel.Y + top,
+                panel.Width - left - right,
+                panel.Height - top - bottom);
         }
 
-        private static void AppendCenterline(
+        private static void AppendPanelFrame(
+            StringBuilder builder,
+            SvgRect panel,
+            string title,
+            string subtitle)
+        {
+            builder.AppendLine(
+                "  <rect class=\"panel\" x=\"" +
+                Format(panel.X) +
+                "\" y=\"" +
+                Format(panel.Y) +
+                "\" width=\"" +
+                Format(panel.Width) +
+                "\" height=\"" +
+                Format(panel.Height) +
+                "\" rx=\"8\" />");
+            AppendText(builder, "panel-title", panel.X + 16.0, panel.Y + 26.0, title);
+            AppendText(builder, "panel-subtitle", panel.X + 16.0, panel.Y + 44.0, subtitle);
+        }
+
+        private static void AppendPlotGrid(StringBuilder builder, SvgRect plotArea)
+        {
+            builder.AppendLine(
+                "  <rect class=\"plot-area\" x=\"" +
+                Format(plotArea.X) +
+                "\" y=\"" +
+                Format(plotArea.Y) +
+                "\" width=\"" +
+                Format(plotArea.Width) +
+                "\" height=\"" +
+                Format(plotArea.Height) +
+                "\" />");
+
+            for (int i = 1; i < 4; i++)
+            {
+                double x = plotArea.X + plotArea.Width * i / 4.0;
+                builder.AppendLine(
+                    "  <line class=\"grid-line\" x1=\"" +
+                    Format(x) +
+                    "\" y1=\"" +
+                    Format(plotArea.Y) +
+                    "\" x2=\"" +
+                    Format(x) +
+                    "\" y2=\"" +
+                    Format(plotArea.Bottom) +
+                    "\" />");
+            }
+
+            for (int i = 1; i < 4; i++)
+            {
+                double y = plotArea.Y + plotArea.Height * i / 4.0;
+                builder.AppendLine(
+                    "  <line class=\"grid-line\" x1=\"" +
+                    Format(plotArea.X) +
+                    "\" y1=\"" +
+                    Format(y) +
+                    "\" x2=\"" +
+                    Format(plotArea.Right) +
+                    "\" y2=\"" +
+                    Format(y) +
+                    "\" />");
+            }
+        }
+
+        private static void AppendTopDownAxisLabels(StringBuilder builder, SvgRect plotArea)
+        {
+            builder.AppendLine(
+                "  <text class=\"axis-label\" x=\"" +
+                Format(plotArea.Right - 2.0) +
+                "\" y=\"" +
+                Format(plotArea.Bottom + 24.0) +
+                "\" text-anchor=\"end\">X (m)</text>");
+            builder.AppendLine(
+                "  <text class=\"axis-label\" x=\"" +
+                Format(plotArea.X + 2.0) +
+                "\" y=\"" +
+                Format(plotArea.Y - 10.0) +
+                "\">Z (m)</text>");
+        }
+
+        private static void AppendElevationAxisLabels(StringBuilder builder, SvgRect plotArea)
+        {
+            builder.AppendLine(
+                "  <text class=\"axis-label\" x=\"" +
+                Format(plotArea.X + plotArea.Width * 0.5) +
+                "\" y=\"" +
+                Format(plotArea.Bottom + 32.0) +
+                "\" text-anchor=\"middle\">station distance (m)</text>");
+            builder.AppendLine(
+                "  <text class=\"axis-label\" transform=\"translate(" +
+                Format(plotArea.X - 44.0) +
+                " " +
+                Format(plotArea.Y + plotArea.Height * 0.5) +
+                ") rotate(-90)\" text-anchor=\"middle\">Y elevation (m)</text>");
+        }
+
+        private static void AppendTopDownCenterline(
             StringBuilder builder,
             DebugViewportSnapshotV1Dto dto,
-            Projection projection)
+            TopDownProjection projection)
         {
             DebugViewportCenterlinePointV1Dto[] points = dto.CenterlinePoints ?? Array.Empty<DebugViewportCenterlinePointV1Dto>();
             if (points.Length == 0)
             {
-                builder.AppendLine("  <text x=\"72\" y=\"120\" font-family=\"Segoe UI, Arial, sans-serif\" font-size=\"14\" fill=\"#b91c1c\">No centerline points found.</text>");
+                AppendText(builder, "empty-message", projection.PlotArea.X + 20.0, projection.PlotArea.Y + 32.0, "No centerline points found.");
                 return;
             }
 
-            builder.Append("  <polyline fill=\"none\" stroke=\"#0f766e\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\" points=\"");
+            builder.Append("  <polyline class=\"centerline top-down-centerline\" points=\"");
             for (int i = 0; i < points.Length; i++)
             {
                 SvgPoint point = projection.Project(points[i].Position);
-                if (i > 0)
-                {
-                    builder.Append(' ');
-                }
-
-                builder.Append(Format(point.X));
-                builder.Append(',');
-                builder.Append(Format(point.Y));
+                AppendPolylinePoint(builder, point, i);
             }
 
             builder.AppendLine("\" />");
@@ -218,19 +357,56 @@ namespace Quantum.Debug
             for (int i = 0; i < points.Length; i++)
             {
                 SvgPoint point = projection.Project(points[i].Position);
+                AppendSamplePoint(builder, point);
+            }
+        }
+
+        private static void AppendElevationProfile(
+            StringBuilder builder,
+            DebugViewportSnapshotV1Dto dto,
+            ElevationProjection projection)
+        {
+            DebugViewportCenterlinePointV1Dto[] points = dto.CenterlinePoints ?? Array.Empty<DebugViewportCenterlinePointV1Dto>();
+            if (points.Length == 0)
+            {
+                AppendText(builder, "empty-message", projection.PlotArea.X + 20.0, projection.PlotArea.Y + 32.0, "No centerline points found.");
+                return;
+            }
+
+            if (projection.TryProjectBaseline(0.0, out SvgPoint baselineStart, out SvgPoint baselineEnd))
+            {
                 builder.AppendLine(
-                    "  <circle cx=\"" +
-                    Format(point.X) +
-                    "\" cy=\"" +
-                    Format(point.Y) +
-                    "\" r=\"3\" fill=\"#0f766e\" />");
+                    "  <line class=\"baseline\" x1=\"" +
+                    Format(baselineStart.X) +
+                    "\" y1=\"" +
+                    Format(baselineStart.Y) +
+                    "\" x2=\"" +
+                    Format(baselineEnd.X) +
+                    "\" y2=\"" +
+                    Format(baselineEnd.Y) +
+                    "\" />");
+            }
+
+            builder.Append("  <polyline class=\"centerline elevation-centerline\" points=\"");
+            for (int i = 0; i < points.Length; i++)
+            {
+                SvgPoint point = projection.Project(points[i].Distance, points[i].Position.Y);
+                AppendPolylinePoint(builder, point, i);
+            }
+
+            builder.AppendLine("\" />");
+
+            for (int i = 0; i < points.Length; i++)
+            {
+                SvgPoint point = projection.Project(points[i].Distance, points[i].Position.Y);
+                AppendSamplePoint(builder, point);
             }
         }
 
         private static void AppendFrameTicks(
             StringBuilder builder,
             DebugViewportSnapshotV1Dto dto,
-            Projection projection)
+            TopDownProjection projection)
         {
             DebugViewportFrameV1Dto[] frames = dto.Frames ?? Array.Empty<DebugViewportFrameV1Dto>();
             if (frames.Length == 0)
@@ -242,17 +418,17 @@ namespace Quantum.Debug
             for (int i = 0; i < frames.Length; i += step)
             {
                 DebugViewportFrameV1Dto frame = frames[i];
-                AppendAxisTick(builder, projection, frame.Position, frame.Tangent, "#2563eb", FrameTickWorldLength);
-                AppendAxisTick(builder, projection, frame.Position, frame.Binormal, "#7c3aed", FrameTickWorldLength * 0.8);
+                AppendAxisTick(builder, projection, frame.Position, frame.Tangent, "tangent-tick", FrameTickWorldLength);
+                AppendAxisTick(builder, projection, frame.Position, frame.Binormal, "binormal-tick", FrameTickWorldLength * 0.8);
             }
         }
 
         private static void AppendAxisTick(
             StringBuilder builder,
-            Projection projection,
+            TopDownProjection projection,
             DebugViewportVector3dV1Dto origin,
             DebugViewportVector3dV1Dto direction,
-            string stroke,
+            string className,
             double worldLength)
         {
             double length = System.Math.Sqrt(direction.X * direction.X + direction.Z * direction.Z);
@@ -271,7 +447,9 @@ namespace Quantum.Debug
             SvgPoint startPoint = projection.Project(origin);
             SvgPoint endPoint = projection.Project(end);
             builder.AppendLine(
-                "  <line x1=\"" +
+                "  <line class=\"" +
+                className +
+                "\" x1=\"" +
                 Format(startPoint.X) +
                 "\" y1=\"" +
                 Format(startPoint.Y) +
@@ -279,21 +457,83 @@ namespace Quantum.Debug
                 Format(endPoint.X) +
                 "\" y2=\"" +
                 Format(endPoint.Y) +
-                "\" stroke=\"" +
-                stroke +
-                "\" stroke-width=\"1.5\" stroke-linecap=\"round\" />");
+                "\" />");
         }
 
-        private static void AppendLegend(StringBuilder builder)
+        private static void AppendLegend(StringBuilder builder, double x, double y)
         {
-            builder.AppendLine("  <g font-family=\"Segoe UI, Arial, sans-serif\" font-size=\"11\" fill=\"#475569\">");
-            builder.AppendLine("    <line x1=\"720\" y1=\"32\" x2=\"752\" y2=\"32\" stroke=\"#0f766e\" stroke-width=\"3\" stroke-linecap=\"round\" />");
-            builder.AppendLine("    <text x=\"760\" y=\"36\">centerline</text>");
-            builder.AppendLine("    <line x1=\"720\" y1=\"50\" x2=\"752\" y2=\"50\" stroke=\"#2563eb\" stroke-width=\"1.5\" stroke-linecap=\"round\" />");
-            builder.AppendLine("    <text x=\"760\" y=\"54\">tangent ticks</text>");
-            builder.AppendLine("    <line x1=\"820\" y1=\"50\" x2=\"852\" y2=\"50\" stroke=\"#7c3aed\" stroke-width=\"1.5\" stroke-linecap=\"round\" />");
-            builder.AppendLine("    <text x=\"860\" y=\"54\">binormal ticks</text>");
+            builder.AppendLine(
+                "  <g class=\"legend\" transform=\"translate(" +
+                Format(x) +
+                " " +
+                Format(y) +
+                ")\">");
+            builder.AppendLine("    <rect x=\"0\" y=\"0\" width=\"300\" height=\"76\" rx=\"8\" fill=\"#ffffff\" stroke=\"#cbd5e1\" />");
+            builder.AppendLine("    <line x1=\"14\" y1=\"22\" x2=\"48\" y2=\"22\" stroke=\"#0f766e\" stroke-width=\"3\" stroke-linecap=\"round\" />");
+            builder.AppendLine("    <text x=\"58\" y=\"26\">centerline / elevation profile</text>");
+            builder.AppendLine("    <line x1=\"14\" y1=\"44\" x2=\"48\" y2=\"44\" stroke=\"#2563eb\" stroke-width=\"1.5\" stroke-linecap=\"round\" />");
+            builder.AppendLine("    <text x=\"58\" y=\"48\">tangent ticks</text>");
+            builder.AppendLine("    <line x1=\"158\" y1=\"44\" x2=\"192\" y2=\"44\" stroke=\"#7c3aed\" stroke-width=\"1.5\" stroke-linecap=\"round\" />");
+            builder.AppendLine("    <text x=\"202\" y=\"48\">binormal ticks</text>");
             builder.AppendLine("  </g>");
+        }
+
+        private static void AppendText(
+            StringBuilder builder,
+            string className,
+            double x,
+            double y,
+            string value)
+        {
+            builder.AppendLine(
+                "  <text class=\"" +
+                className +
+                "\" x=\"" +
+                Format(x) +
+                "\" y=\"" +
+                Format(y) +
+                "\">" +
+                Escape(value) +
+                "</text>");
+        }
+
+        private static void AppendPolylinePoint(StringBuilder builder, SvgPoint point, int index)
+        {
+            if (index > 0)
+            {
+                builder.Append(' ');
+            }
+
+            builder.Append(Format(point.X));
+            builder.Append(',');
+            builder.Append(Format(point.Y));
+        }
+
+        private static void AppendSamplePoint(StringBuilder builder, SvgPoint point)
+        {
+            builder.AppendLine(
+                "  <circle class=\"sample-point\" cx=\"" +
+                Format(point.X) +
+                "\" cy=\"" +
+                Format(point.Y) +
+                "\" r=\"3\" />");
+        }
+
+        private static string Shorten(string value, int maxLength)
+        {
+            if (value.Length <= maxLength)
+            {
+                return value;
+            }
+
+            if (maxLength <= 3)
+            {
+                return value.Substring(0, maxLength);
+            }
+
+            int prefixLength = (maxLength - 3) / 2;
+            int suffixLength = maxLength - prefixLength - 3;
+            return value.Substring(0, prefixLength) + "..." + value.Substring(value.Length - suffixLength);
         }
 
         private static string FormatCount<T>(T[]? values)
@@ -321,6 +561,35 @@ namespace Quantum.Debug
                    ex is InvalidOperationException;
         }
 
+        private readonly struct SvgRect
+        {
+            public SvgRect(double x, double y, double width, double height)
+            {
+                X = x;
+                Y = y;
+                Width = width;
+                Height = height;
+            }
+
+            public double X { get; }
+
+            public double Y { get; }
+
+            public double Width { get; }
+
+            public double Height { get; }
+
+            public double Right
+            {
+                get { return X + Width; }
+            }
+
+            public double Bottom
+            {
+                get { return Y + Height; }
+            }
+        }
+
         private readonly struct SvgPoint
         {
             public SvgPoint(double x, double y)
@@ -334,7 +603,7 @@ namespace Quantum.Debug
             public double Y { get; }
         }
 
-        private sealed class Projection
+        private sealed class TopDownProjection
         {
             private readonly double _minX;
             private readonly double _minZ;
@@ -343,8 +612,16 @@ namespace Quantum.Debug
             private readonly double _offsetY;
             private readonly double _scaledDepth;
 
-            private Projection(double minX, double minZ, double scale, double offsetX, double offsetY, double scaledDepth)
+            private TopDownProjection(
+                SvgRect plotArea,
+                double minX,
+                double minZ,
+                double scale,
+                double offsetX,
+                double offsetY,
+                double scaledDepth)
             {
+                PlotArea = plotArea;
                 _minX = minX;
                 _minZ = minZ;
                 _scale = scale;
@@ -353,7 +630,9 @@ namespace Quantum.Debug
                 _scaledDepth = scaledDepth;
             }
 
-            public static Projection Create(DebugViewportSnapshotV1Dto dto)
+            public SvgRect PlotArea { get; }
+
+            public static TopDownProjection Create(DebugViewportSnapshotV1Dto dto, SvgRect plotArea)
             {
                 double minX = double.PositiveInfinity;
                 double maxX = double.NegativeInfinity;
@@ -375,15 +654,13 @@ namespace Quantum.Debug
                 ExpandDegenerateRange(ref minX, ref maxX);
                 ExpandDegenerateRange(ref minZ, ref maxZ);
 
-                double drawWidth = DefaultCanvasWidth - Padding * 2.0;
-                double drawHeight = DefaultCanvasHeight - HeaderHeight - Padding;
                 double worldWidth = maxX - minX;
                 double worldDepth = maxZ - minZ;
-                double scale = System.Math.Min(drawWidth / worldWidth, drawHeight / worldDepth);
-                double offsetX = Padding + (drawWidth - worldWidth * scale) / 2.0;
-                double offsetY = HeaderHeight + (drawHeight - worldDepth * scale) / 2.0;
+                double scale = System.Math.Min(plotArea.Width / worldWidth, plotArea.Height / worldDepth);
+                double offsetX = plotArea.X + (plotArea.Width - worldWidth * scale) / 2.0;
+                double offsetY = plotArea.Y + (plotArea.Height - worldDepth * scale) / 2.0;
 
-                return new Projection(minX, minZ, scale, offsetX, offsetY, worldDepth * scale);
+                return new TopDownProjection(plotArea, minX, minZ, scale, offsetX, offsetY, worldDepth * scale);
             }
 
             public SvgPoint Project(DebugViewportVector3dV1Dto vector)
@@ -462,6 +739,155 @@ namespace Quantum.Debug
             }
 
             private static void ExpandDegenerateRange(ref double min, ref double max)
+            {
+                double span = max - min;
+                if (span >= MinimumWorldSpan)
+                {
+                    return;
+                }
+
+                double center = (min + max) * 0.5;
+                min = center - MinimumWorldSpan * 0.5;
+                max = center + MinimumWorldSpan * 0.5;
+            }
+        }
+
+        private sealed class ElevationProjection
+        {
+            private readonly double _minDistance;
+            private readonly double _maxDistance;
+            private readonly double _minY;
+            private readonly double _maxY;
+            private readonly double _scaleX;
+            private readonly double _scaleY;
+
+            private ElevationProjection(
+                SvgRect plotArea,
+                double minDistance,
+                double maxDistance,
+                double minY,
+                double maxY)
+            {
+                PlotArea = plotArea;
+                _minDistance = minDistance;
+                _maxDistance = maxDistance;
+                _minY = minY;
+                _maxY = maxY;
+                _scaleX = plotArea.Width / (_maxDistance - _minDistance);
+                _scaleY = plotArea.Height / (_maxY - _minY);
+            }
+
+            public SvgRect PlotArea { get; }
+
+            public static ElevationProjection Create(DebugViewportSnapshotV1Dto dto, SvgRect plotArea)
+            {
+                double minDistance = double.PositiveInfinity;
+                double maxDistance = double.NegativeInfinity;
+                double minY = double.PositiveInfinity;
+                double maxY = double.NegativeInfinity;
+
+                IncludeCenterline(dto.CenterlinePoints, ref minDistance, ref maxDistance, ref minY, ref maxY);
+                IncludeFrames(dto.Frames, ref minDistance, ref maxDistance, ref minY, ref maxY);
+
+                if (double.IsPositiveInfinity(minDistance) || double.IsNegativeInfinity(maxDistance))
+                {
+                    minDistance = 0.0;
+                    maxDistance = 1.0;
+                    minY = -0.5;
+                    maxY = 0.5;
+                }
+
+                ExpandDegenerateDistanceRange(ref minDistance, ref maxDistance);
+                ExpandDegenerateYRange(ref minY, ref maxY);
+
+                return new ElevationProjection(plotArea, minDistance, maxDistance, minY, maxY);
+            }
+
+            public SvgPoint Project(double distance, double y)
+            {
+                double x = PlotArea.X + (distance - _minDistance) * _scaleX;
+                double screenY = PlotArea.Bottom - (y - _minY) * _scaleY;
+                return new SvgPoint(x, screenY);
+            }
+
+            public bool TryProjectBaseline(double y, out SvgPoint start, out SvgPoint end)
+            {
+                if (y < _minY || y > _maxY)
+                {
+                    start = new SvgPoint(0.0, 0.0);
+                    end = new SvgPoint(0.0, 0.0);
+                    return false;
+                }
+
+                start = Project(_minDistance, y);
+                end = Project(_maxDistance, y);
+                return true;
+            }
+
+            private static void IncludeCenterline(
+                DebugViewportCenterlinePointV1Dto[]? points,
+                ref double minDistance,
+                ref double maxDistance,
+                ref double minY,
+                ref double maxY)
+            {
+                if (points == null)
+                {
+                    return;
+                }
+
+                for (int i = 0; i < points.Length; i++)
+                {
+                    Include(points[i].Distance, points[i].Position.Y, ref minDistance, ref maxDistance, ref minY, ref maxY);
+                }
+            }
+
+            private static void IncludeFrames(
+                DebugViewportFrameV1Dto[]? frames,
+                ref double minDistance,
+                ref double maxDistance,
+                ref double minY,
+                ref double maxY)
+            {
+                if (frames == null)
+                {
+                    return;
+                }
+
+                for (int i = 0; i < frames.Length; i++)
+                {
+                    Include(frames[i].Distance, frames[i].Position.Y, ref minDistance, ref maxDistance, ref minY, ref maxY);
+                }
+            }
+
+            private static void Include(
+                double distance,
+                double y,
+                ref double minDistance,
+                ref double maxDistance,
+                ref double minY,
+                ref double maxY)
+            {
+                minDistance = System.Math.Min(minDistance, distance);
+                maxDistance = System.Math.Max(maxDistance, distance);
+                minY = System.Math.Min(minY, y);
+                maxY = System.Math.Max(maxY, y);
+            }
+
+            private static void ExpandDegenerateDistanceRange(ref double min, ref double max)
+            {
+                double span = max - min;
+                if (span >= MinimumDistanceSpan)
+                {
+                    return;
+                }
+
+                double center = (min + max) * 0.5;
+                min = center - MinimumDistanceSpan * 0.5;
+                max = center + MinimumDistanceSpan * 0.5;
+            }
+
+            private static void ExpandDegenerateYRange(ref double min, ref double max)
             {
                 double span = max - min;
                 if (span >= MinimumWorldSpan)
