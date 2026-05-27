@@ -109,6 +109,96 @@ public sealed class SectionNormalizerTests
     }
 
     [Fact]
+    public void SectionNormalizer_ForceValuePluralChannelsOverrideCompatibilityFields()
+    {
+        var source = new ForceSection(
+            length: 10.0,
+            interpolationMode: ForceInterpolationMode.Linear,
+            startNormalG: 10.0,
+            endNormalG: 20.0,
+            normalGChannel: new FixedForceEasingFunction(0.75))
+        {
+            Channels = new ForceChannelSet
+            {
+                NormalG = new ForceChannel(new FixedForceEasingFunction(0.25)),
+                NormalGChannels = new IForceChannel[]
+                {
+                    new ForceChannel(new FixedForceEasingFunction(1.25)),
+                    new ForceChannel(new FixedForceEasingFunction(2.75))
+                }
+            }
+        };
+
+        SectionDefinition normalized = SectionNormalizer.Normalize(
+            new ResolvedSectionInterval<ForceSection>(source, 0.0, 10.0));
+
+        Assert.Equal(new[] { SectionChannel.NormalG }, Channels(normalized));
+        Assert.Equal(4.0, normalized.EvaluateAt(SectionChannel.NormalG, 5.0), 10);
+        Assert.NotEqual(12.5, normalized.EvaluateAt(SectionChannel.NormalG, 5.0));
+        Assert.NotEqual(17.5, normalized.EvaluateAt(SectionChannel.NormalG, 5.0));
+    }
+
+    [Fact]
+    public void SectionNormalizer_EmptyPluralChannelsFallBackToSingleChannel()
+    {
+        var source = new ForceSection(
+            length: 10.0,
+            interpolationMode: ForceInterpolationMode.Linear,
+            startNormalG: 10.0,
+            endNormalG: 20.0,
+            normalGChannel: new FixedForceEasingFunction(0.75))
+        {
+            Channels = new ForceChannelSet
+            {
+                NormalG = new ForceChannel(new FixedForceEasingFunction(0.25)),
+                NormalGChannels = Array.Empty<IForceChannel>()
+            }
+        };
+
+        SectionDefinition normalized = SectionNormalizer.Normalize(
+            new ResolvedSectionInterval<ForceSection>(source, 0.0, 10.0));
+
+        Assert.Equal(12.5, normalized.EvaluateAt(SectionChannel.NormalG, 5.0), 10);
+        Assert.NotEqual(17.5, normalized.EvaluateAt(SectionChannel.NormalG, 5.0));
+    }
+
+    [Fact]
+    public void SectionNormalizer_ForceValueScalarFieldsRemainCompatibilityFallback()
+    {
+        var source = new ForceSection(
+            targetLateralG: -0.2,
+            length: 10.0,
+            interpolationMode: ForceInterpolationMode.Linear,
+            startNormalG: 10.0,
+            endNormalG: 20.0);
+
+        SectionDefinition normalized = SectionNormalizer.Normalize(
+            new ResolvedSectionInterval<ForceSection>(source, 0.0, 10.0));
+
+        Assert.Equal(new[] { SectionChannel.NormalG, SectionChannel.LateralG }, Channels(normalized));
+        Assert.Equal(12.5, normalized.EvaluateAt(SectionChannel.NormalG, 2.5), 10);
+        Assert.Equal(-0.2, normalized.EvaluateAt(SectionChannel.LateralG, 2.5), 10);
+    }
+
+    [Fact]
+    public void SectionNormalizer_DirectRollRateChannelDoesNotRequireScalarForceValues()
+    {
+        var source = new ForceSection(length: 10.0)
+        {
+            Channels = new ForceChannelSet
+            {
+                RollRate = new ForceChannel(new FixedForceEasingFunction(3.25))
+            }
+        };
+
+        SectionDefinition normalized = SectionNormalizer.Normalize(
+            new ResolvedSectionInterval<ForceSection>(source, 0.0, 10.0));
+
+        Assert.Equal(new[] { SectionChannel.RollRateDegPerSec }, Channels(normalized));
+        Assert.Equal(3.25, normalized.EvaluateAt(SectionChannel.RollRateDegPerSec, 5.0), 10);
+    }
+
+    [Fact]
     public void SectionNormalizer_InvalidResolvedIntervalRange_IsRejected()
     {
         var source = new ForceSection(targetNormalG: 2.0, length: 10.0);
@@ -177,5 +267,20 @@ public sealed class SectionNormalizerTests
         }
 
         return channels;
+    }
+
+    private sealed class FixedForceEasingFunction : IForceEasingFunction
+    {
+        private readonly double _value;
+
+        public FixedForceEasingFunction(double value)
+        {
+            _value = value;
+        }
+
+        public double Evaluate(double t)
+        {
+            return _value;
+        }
     }
 }

@@ -3,12 +3,18 @@ using System.Collections.Generic;
 
 namespace Quantum.Track
 {
+    /// <summary>
+    /// Normalized function for one section channel.
+    /// </summary>
     public sealed class SectionFunction
     {
         private readonly Func<double, double>? _evaluateAt;
         private readonly List<SectionSample> _samples;
         private readonly IReadOnlyList<SectionSample> _samplesView;
 
+        /// <summary>
+        /// Initializes a sample-backed section function.
+        /// </summary>
         public SectionFunction(SectionChannel channel, List<SectionSample> samples)
             : this(channel, samples, evaluateAt: null)
         {
@@ -35,10 +41,19 @@ namespace Quantum.Track
             _evaluateAt = evaluateAt;
         }
 
+        /// <summary>
+        /// Channel evaluated by this function.
+        /// </summary>
         public SectionChannel Channel { get; }
 
+        /// <summary>
+        /// Ordered sample points in the owning section domain.
+        /// </summary>
         public IReadOnlyList<SectionSample> Samples => _samplesView;
 
+        /// <summary>
+        /// Evaluates the function at a coordinate in the owning section domain.
+        /// </summary>
         public double EvaluateAt(double x)
         {
             if (!IsFinite(x))

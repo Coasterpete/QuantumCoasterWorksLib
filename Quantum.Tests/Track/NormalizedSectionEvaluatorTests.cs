@@ -133,6 +133,56 @@ public sealed class NormalizedSectionEvaluatorTests
     }
 
     [Fact]
+    public void NormalizedSectionEvaluator_OverlappingSectionsWithDifferentDomains_AreIndependent()
+    {
+        SectionDefinition distanceSection = ForceSectionDefinition(
+            startX: 0.0,
+            endX: 10.0,
+            SectionChannel.NormalG,
+            startValue: 1.0,
+            endValue: 1.0);
+        SectionDefinition timeSection = ForceSectionDefinition(
+            startX: 0.0,
+            endX: 10.0,
+            SectionChannel.NormalG,
+            startValue: 2.0,
+            endValue: 2.0,
+            domain: SectionDomain.Time);
+        var evaluator = new NormalizedSectionEvaluator(new[] { distanceSection, timeSection });
+
+        double value = evaluator.EvaluateDistanceChannelAt(
+            SectionKind.Force,
+            SectionChannel.NormalG,
+            distance: 5.0);
+
+        Assert.Equal(1.0, value);
+        Assert.Same(distanceSection, evaluator.ResolveDistanceSection(SectionKind.Force, 5.0));
+    }
+
+    [Fact]
+    public void NormalizedSectionEvaluator_MissingChannel_ReturnsMissingChannelDiagnostic()
+    {
+        SectionDefinition section = ForceSectionDefinition(
+            startX: 0.0,
+            endX: 10.0,
+            SectionChannel.NormalG,
+            startValue: 1.0,
+            endValue: 1.0);
+        var evaluator = new NormalizedSectionEvaluator(new[] { section });
+
+        bool evaluated = evaluator.TryEvaluateDistanceChannelAt(
+            SectionKind.Force,
+            SectionChannel.LateralG,
+            distance: 5.0,
+            out double value,
+            out SectionEvaluationDiagnostic diagnostic);
+
+        Assert.False(evaluated);
+        Assert.Equal(0.0, value);
+        Assert.Equal(SectionEvaluationDiagnostic.MissingChannel, diagnostic);
+    }
+
+    [Fact]
     public void SectionDefinition_DuplicateChannelWithinSection_IsRejected()
     {
         SectionFunction first = Function(
@@ -207,6 +257,113 @@ public sealed class NormalizedSectionEvaluatorTests
             SectionChannel.RollRateDegPerSec,
             distance,
             expected.TargetRollRateDegPerSec);
+    }
+
+    [Fact]
+    public void NormalizedSectionEvaluator_DistanceForceChannelSetDefinitions_MatchForceTargetSampler()
+    {
+        var section = new ForceSection(
+            length: 10.0,
+            interpolationMode: ForceInterpolationMode.Linear,
+            startNormalG: 10.0,
+            endNormalG: 20.0,
+            startLateralG: -1.0,
+            endLateralG: 1.0,
+            startLongitudinalG: -0.5,
+            endLongitudinalG: 0.5,
+            normalGChannel: new FixedForceEasingFunction(0.75),
+            lateralGChannel: new FixedForceEasingFunction(0.2),
+            longitudinalGChannel: new FixedForceEasingFunction(0.1),
+            rollRateChannel: new FixedForceEasingFunction(5.0))
+        {
+            Channels = new ForceChannelSet
+            {
+                NormalGChannels = new IForceChannel[]
+                {
+                    new ForceChannel(new FixedForceEasingFunction(1.0)),
+                    new ForceChannel(new FixedForceEasingFunction(2.0))
+                },
+                LateralG = new ForceChannel(new FixedForceEasingFunction(0.75)),
+                LongitudinalGChannels = new IForceChannel[]
+                {
+                    new ForceChannel(new FixedForceEasingFunction(-0.2)),
+                    new ForceChannel(new FixedForceEasingFunction(0.1))
+                },
+                RollRateBlendMode = ForceChannelBlendMode.Override,
+                RollRateChannels = new IForceChannel[]
+                {
+                    new ForceChannel(new FixedForceEasingFunction(1.0)),
+                    new ForceChannel(new FixedForceEasingFunction(2.0))
+                }
+            }
+        };
+        IReadOnlyList<ResolvedSectionInterval<ForceSection>> intervals = ForceTargetResolver.Resolve(new[]
+        {
+            (section, 10.0)
+        });
+        IReadOnlyList<SectionDefinition> normalized = SectionNormalizer.NormalizeForceSections(intervals);
+        var evaluator = new NormalizedSectionEvaluator(normalized);
+        const double distance = 5.0;
+
+        SampledForceTarget expected = ForceTargetSampler.Sample(intervals, distance);
+
+        Assert.Equal(
+            new[]
+            {
+                SectionChannel.NormalG,
+                SectionChannel.LateralG,
+                SectionChannel.LongitudinalG,
+                SectionChannel.RollRateDegPerSec
+            },
+            Channels(normalized[0]));
+        AssertChannelMatches(
+            evaluator,
+            SectionChannel.NormalG,
+            distance,
+            expected.TargetNormalG);
+        AssertChannelMatches(
+            evaluator,
+            SectionChannel.LateralG,
+            distance,
+            expected.TargetLateralG);
+        AssertChannelMatches(
+            evaluator,
+            SectionChannel.LongitudinalG,
+            distance,
+            expected.TargetLongitudinalG);
+        AssertChannelMatches(
+            evaluator,
+            SectionChannel.RollRateDegPerSec,
+            distance,
+            expected.TargetRollRateDegPerSec);
+    }
+
+    [Fact]
+    public void NormalizedSectionEvaluator_EvaluateDistanceAllAt_ReturnsDefinedChannelsInStableOrder()
+    {
+        var source = new ForceSection(
+            targetNormalG: 2.0,
+            targetLateralG: -0.2,
+            targetLongitudinalG: 0.4,
+            length: 10.0,
+            rollRateChannel: new FixedForceEasingFunction(6.0));
+        SectionDefinition normalized = SectionNormalizer.Normalize(
+            new ResolvedSectionInterval<ForceSection>(source, 0.0, 10.0));
+        var evaluator = new NormalizedSectionEvaluator(new[] { normalized });
+
+        IReadOnlyList<SectionChannelEvaluation> evaluations = evaluator.EvaluateDistanceAllAt(
+            SectionKind.Force,
+            distance: 5.0);
+
+        Assert.Equal(4, evaluations.Count);
+        Assert.Equal(SectionChannel.NormalG, evaluations[0].Channel);
+        Assert.Equal(2.0, evaluations[0].Value);
+        Assert.Equal(SectionChannel.LateralG, evaluations[1].Channel);
+        Assert.Equal(-0.2, evaluations[1].Value);
+        Assert.Equal(SectionChannel.LongitudinalG, evaluations[2].Channel);
+        Assert.Equal(0.4, evaluations[2].Value);
+        Assert.Equal(SectionChannel.RollRateDegPerSec, evaluations[3].Channel);
+        Assert.Equal(6.0, evaluations[3].Value);
     }
 
     [Fact]
