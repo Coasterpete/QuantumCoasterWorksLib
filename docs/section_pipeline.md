@@ -37,6 +37,7 @@ Evolve both section types from scalar payloads into timeline/channel sections th
   - Channel functions for:
     - `NormalG`
     - `LateralG`
+    - `LongitudinalG`
     - `RollRateDegPerSec`
 - Existing scalar fields (`TargetNormalG`, `TargetLateralG`, `Length`, `Duration`) become shorthand for constant channel sections.
 - Preserve current adapter semantics:
@@ -191,6 +192,7 @@ Status:
 `ForceSection` now supports optional channel-based definitions:
 - `NormalGChannel : IForceEasingFunction?`
 - `LateralGChannel : IForceEasingFunction?`
+- `LongitudinalGChannel : IForceEasingFunction?`
 - `RollRateChannel : IForceEasingFunction?`
 
 Channels override interpolation when present. When null, existing start/end + interpolation behavior is preserved.
@@ -206,6 +208,7 @@ A minimal channel container abstraction has been introduced via `ForceChannelSet
 - `ForceChannelSet` groups channel definitions:
   - `NormalG : IForceChannel?`
   - `LateralG : IForceChannel?`
+  - `LongitudinalG : IForceChannel?`
   - `RollRate : IForceChannel?`
 
 - `ForceChannel` is a lightweight adapter over `IForceEasingFunction`.
@@ -218,6 +221,8 @@ When sampling a section:
 1. `ForceSection.Channels` (v2 container) is used when a matching channel is present
 2. Individual channel properties (`NormalGChannel`, etc.) are used if present
 3. Fallback to existing start/end + interpolation behavior (v1)
+
+For `NormalG`, `LateralG`, and `LongitudinalG`, the v2 single channel behaves as a normalized `t` remapper over the scalar target/start/end values. It does not define a direct G target by itself. `RollRate` is direct because there are no scalar roll-rate compatibility fields.
 
 ### Notes
 
@@ -233,6 +238,7 @@ Status:
 - Additional optional collections:
   - `NormalGChannels : IReadOnlyList<IForceChannel>?`
   - `LateralGChannels : IReadOnlyList<IForceChannel>?`
+  - `LongitudinalGChannels : IReadOnlyList<IForceChannel>?`
   - `RollRateChannels : IReadOnlyList<IForceChannel>?`
 
 ### Resolution Priority (Multi-Channel)
@@ -247,7 +253,9 @@ When sampling a section (per force type):
 ### Combination Rule
 
 - When multiple channels are present, each channel is evaluated at `t`
-- Results are combined via deterministic summation
+- Results are combined via deterministic summation by default
+- For `NormalG`, `LateralG`, and `LongitudinalG`, multi-channel lists are direct target-value channels and can define values without scalar compatibility fields
+- Empty multi-channel lists do not mask lower-priority single-channel or scalar paths
 
 ### Notes
 
@@ -268,6 +276,7 @@ Status:
 - Blend modes are configurable per force type:
   - `NormalGBlendMode`
   - `LateralGBlendMode`
+  - `LongitudinalGBlendMode`
   - `RollRateBlendMode`
 
 ### Blend Behavior
@@ -283,6 +292,32 @@ When a multi-channel list is used:
 - Default blend mode is `Sum`, preserving v3 behavior.
 - Blend modes only affect multi-channel lists.
 - Single-channel paths and legacy fallback behavior remain unchanged.
+
+### ForceSection Normalization Contract (v4.1)
+
+Status:
+Milestone 18e documents and tests the current section/channel normalization behavior without changing runtime physics.
+
+For each force component, normalization resolves inputs independently:
+
+1. Non-empty `ForceChannelSet.*Channels` list
+2. Matching single `ForceChannelSet` channel
+3. Matching legacy `ForceSection.*Channel`
+4. Scalar compatibility fields (`Target*`, `Start*`, `End*`, `InterpolationMode`, `EasingFunction`)
+
+Value meaning:
+
+- `NormalG`, `LateralG`, and `LongitudinalG` plural lists are direct target-value channels.
+- `NormalG`, `LateralG`, and `LongitudinalG` single channels remap normalized `t` across scalar target/start/end values.
+- `RollRate` single and plural channels are direct roll-rate targets in degrees per second.
+- Missing channels stay missing; downstream permissive providers may choose defaults, but normalization does not synthesize force channels except from explicit scalar shorthand.
+
+Evaluation contract:
+
+- Normalized distance evaluation only resolves `SectionDomain.Distance`.
+- Time-domain normalized definitions can coexist and overlap with distance-domain definitions because overlap checks are scoped by `(Kind, Domain)`.
+- Within one section, duplicate channels are rejected.
+- `EvaluateAllAt` reports defined channels in `SectionChannel` enum order.
 
 ### ForceSection Domain Support (v5)
 
@@ -310,8 +345,8 @@ When sampling a section:
 ### Notes
 
 - `Distance` preserves existing behavior.
-- `Time` is currently a stub and uses the same normalized sampling value as `Distance`.
-- No time-based integration behavior is active yet.
+- Distance-only sampling overloads preserve legacy distance-normalized behavior.
+- Elapsed-time sampling is explicit and described in the v6/v7/v8 sections below.
 - This prepares the system for future time-domain force sections.
 
 ### ForceSection Time-Domain Sampling (v6)

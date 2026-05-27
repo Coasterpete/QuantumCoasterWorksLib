@@ -3,20 +3,38 @@ using System.Collections.Generic;
 
 namespace Quantum.Track
 {
+    /// <summary>
+    /// Converts shorthand section models into normalized section definitions.
+    /// </summary>
     public static class SectionNormalizer
     {
         private static readonly ForceInterpolationEvaluator InterpolationEvaluator = new ForceInterpolationEvaluator();
 
+        /// <summary>
+        /// Normalizes a resolved force section interval.
+        /// </summary>
         public static SectionDefinition Normalize(ResolvedSectionInterval<ForceSection> interval)
         {
             return NormalizeForceSection(interval);
         }
 
+        /// <summary>
+        /// Normalizes a resolved geometric section interval.
+        /// </summary>
         public static SectionDefinition Normalize(ResolvedSectionInterval<GeometricSection> interval)
         {
             return NormalizeGeometricSection(interval);
         }
 
+        /// <summary>
+        /// Normalizes a force section, preserving compatibility precedence for each channel.
+        /// </summary>
+        /// <remarks>
+        /// Per channel, normalization chooses the first available source in this order:
+        /// non-empty plural channel list, single <see cref="ForceChannelSet"/> channel,
+        /// legacy <see cref="IForceEasingFunction"/> channel, then scalar target/start/end
+        /// fields. The channel-set domain overrides the section domain when present.
+        /// </remarks>
         public static SectionDefinition NormalizeForceSection(ResolvedSectionInterval<ForceSection> interval)
         {
             ValidateInterval(interval, out ForceSection section);
@@ -85,6 +103,9 @@ namespace Quantum.Track
                 functions);
         }
 
+        /// <summary>
+        /// Normalizes a geometric section into curvature and roll channels.
+        /// </summary>
         public static SectionDefinition NormalizeGeometricSection(ResolvedSectionInterval<GeometricSection> interval)
         {
             ValidateInterval(interval, out GeometricSection section);
@@ -114,6 +135,9 @@ namespace Quantum.Track
                 functions);
         }
 
+        /// <summary>
+        /// Normalizes resolved force intervals in order.
+        /// </summary>
         public static IReadOnlyList<SectionDefinition> NormalizeForceSections(
             IReadOnlyList<ResolvedSectionInterval<ForceSection>> intervals)
         {
@@ -131,6 +155,9 @@ namespace Quantum.Track
             return definitions;
         }
 
+        /// <summary>
+        /// Normalizes resolved geometric intervals in order.
+        /// </summary>
         public static IReadOnlyList<SectionDefinition> NormalizeGeometricSections(
             IReadOnlyList<ResolvedSectionInterval<GeometricSection>> intervals)
         {

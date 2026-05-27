@@ -3,11 +3,23 @@ using System.Collections.Generic;
 
 namespace Quantum.Track
 {
+    /// <summary>
+    /// Normalized, resolved section interval with one function per channel.
+    /// </summary>
+    /// <remarks>
+    /// A section definition is the engine-agnostic contract produced by shorthand section
+    /// types. Intervals use half-open coverage <c>[StartX, EndX)</c> during evaluator
+    /// lookup, with the final section endpoint handled by <see cref="NormalizedSectionEvaluator"/>.
+    /// Functions must be unique by channel within a section.
+    /// </remarks>
     public sealed class SectionDefinition
     {
         private readonly List<SectionFunction> _functions;
         private readonly IReadOnlyList<SectionFunction> _functionsView;
 
+        /// <summary>
+        /// Initializes a normalized section definition.
+        /// </summary>
         public SectionDefinition(
             SectionKind kind,
             SectionDomain domain,
@@ -67,16 +79,35 @@ namespace Quantum.Track
             _functionsView = _functions.AsReadOnly();
         }
 
+        /// <summary>
+        /// Section family that determines which channels are valid.
+        /// </summary>
         public SectionKind Kind { get; }
 
+        /// <summary>
+        /// Coordinate domain for <see cref="StartX"/>, <see cref="EndX"/>, and function samples.
+        /// </summary>
         public SectionDomain Domain { get; }
 
+        /// <summary>
+        /// Inclusive start coordinate in the section domain.
+        /// </summary>
         public double StartX { get; }
 
+        /// <summary>
+        /// Exclusive end coordinate during normal lookup. The last section endpoint can
+        /// be included by evaluator boundary rules.
+        /// </summary>
         public double EndX { get; }
 
+        /// <summary>
+        /// Channel functions carried by this section.
+        /// </summary>
         public IReadOnlyList<SectionFunction> Functions => _functionsView;
 
+        /// <summary>
+        /// Evaluates a channel at the requested coordinate.
+        /// </summary>
         public double EvaluateAt(SectionChannel channel, double x)
         {
             for (int i = 0; i < _functions.Count; i++)
@@ -92,6 +123,9 @@ namespace Quantum.Track
                 $"Section does not contain a function for channel '{channel}'.");
         }
 
+        /// <summary>
+        /// Evaluates all channels at the requested coordinate in <see cref="SectionChannel"/> order.
+        /// </summary>
         public IReadOnlyList<SectionChannelEvaluation> EvaluateAllAt(double x)
         {
             var evaluations = new List<SectionChannelEvaluation>(_functions.Count);
