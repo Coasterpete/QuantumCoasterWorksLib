@@ -83,7 +83,7 @@ namespace Quantum.Debug
             new DebugCommandHelpEntry(
                 name: "debug-viewport-snapshot-v1-svg",
                 usage: "debug-viewport-snapshot-v1-svg <snapshotJsonPath> [outputSvgPath]",
-                summary: "Write a simple backend-only SVG preview from DebugViewportSnapshotV1 JSON.",
+                summary: "Write a multi-panel backend-only SVG preview from DebugViewportSnapshotV1 JSON.",
                 arguments: new[]
                 {
                     "snapshotJsonPath: Required DebugViewportSnapshotV1 JSON path.",

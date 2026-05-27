@@ -2,7 +2,7 @@
 
 ## What This Release Is
 
-Technical Preview 0.1 is a backend-first release candidate for Quantum CoasterWorks. It proves a narrow, renderer-neutral workflow for stable centerline sampling, orientation frame diagnostics, distance-based train placeholder output, CSV fixture bridging, snapshot validation, simple SVG debug previews, a generated local debug gallery, and repeatable tests.
+Technical Preview 0.1 is a backend-first release candidate for Quantum CoasterWorks. It proves a narrow, renderer-neutral workflow for stable centerline sampling, orientation frame diagnostics, distance-based train placeholder output, CSV fixture bridging, snapshot validation, multi-panel SVG debug previews, a generated local debug gallery, and repeatable tests.
 
 The preview is intended for backend inspection, test automation, and thin debug viewers that consume JSON contracts at the adapter boundary. The SVG previews and generated gallery are plain text local artifacts for quick technical inspection; they are not a renderer, editor, frontend scaffold, or polished visualization surface.
 
@@ -49,7 +49,7 @@ Expected dry-run result:
 
 - Tests pass.
 - `Quantum.Debug -- help` lists the snapshot generation, CSV bridge, and validation commands.
-- The demo writes simple SVG technical debug previews under `artifacts/debug-viewport/`.
+- The demo writes multi-panel SVG technical debug previews under `artifacts/debug-viewport/`.
 - The demo writes a local static gallery at `artifacts/debug-viewport/index.html`.
 - All generated snapshots validate successfully.
 - Generated JSON, SVG, and HTML remain local under `artifacts/`.
@@ -61,7 +61,7 @@ Generated debug viewport outputs include the built-in `DebugViewportSnapshotV1.s
 
 - The CSV path is a sampled-frame debug/test bridge for self-authored or synthetic fixtures, not a full NoLimits project importer.
 - Debug viewport snapshots carry renderer-neutral centerline, frame, line, box, and optional train pose data only. They do not define cameras, materials, meshes, scene objects, editor UI, or coordinate conversion policy for a specific engine.
-- The SVG previews and generated gallery are intentionally tiny and top-down. They help inspect centerline output without adding renderer or frontend dependencies.
+- The SVG previews and generated gallery remain technical debug surfaces. They now include top-down X/Z and elevation/profile panels to make hills, drops, and climbs easier to inspect without adding renderer or frontend dependencies.
 - Train visualization remains placeholder-oriented. Simple boxes and diagnostic transforms are acceptable for this preview.
 - Fixture coverage is intentionally small and synthetic. It protects the current contract path but does not claim broad coaster layout compatibility.
 - Backend physics, force, and train systems are still early technical foundations and should not be treated as production simulation guarantees.
