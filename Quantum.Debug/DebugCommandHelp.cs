@@ -33,11 +33,13 @@ namespace Quantum.Debug
             new DebugCommandHelpEntry(
                 name: "train-pose-export-v1",
                 usage: "train-pose-export-v1 [outputPath]",
-                summary: "Write a TrainPoseExportV1 sample JSON file.",
+                summary: "Write the deterministic TrainPoseExportV1 regression sample JSON file.",
                 arguments: new[]
                 {
                     "outputPath: Optional JSON output path. Defaults to " +
-                    TrainPoseExportV1Command.DefaultRelativeOutputPath + "."
+                    TrainPoseExportV1Command.DefaultRelativeOutputPath + ".",
+                    "The generated payload matches Quantum.Tests/IO/Fixtures/TrainPoseExportV1.golden.json.",
+                    "The output is backend-only JSON and does not depend on Unity or any renderer."
                 },
                 examples: new[]
                 {

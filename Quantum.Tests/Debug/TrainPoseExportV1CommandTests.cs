@@ -52,6 +52,29 @@ public sealed class TrainPoseExportV1CommandTests
     }
 
     [Fact]
+    public void Run_WithExplicitOutputPath_MatchesGoldenRegressionFixture()
+    {
+        string tempDirectory = CreateTempDirectoryPath();
+        string outputPath = Path.Combine(tempDirectory, "sample.json");
+
+        try
+        {
+            int exitCode = TrainPoseExportV1Command.Run(outputPath);
+
+            Assert.Equal(0, exitCode);
+
+            string actual = NormalizeLineEndings(File.ReadAllText(outputPath)).TrimEnd();
+            string expected = NormalizeLineEndings(LoadGoldenFixtureJson()).TrimEnd();
+
+            Assert.Equal(expected, actual);
+        }
+        finally
+        {
+            DeleteDirectoryIfPresent(tempDirectory);
+        }
+    }
+
+    [Fact]
     public void Run_OutputJson_DeserializeAndValidateCleanly()
     {
         string tempDirectory = CreateTempDirectoryPath();
@@ -81,6 +104,18 @@ public sealed class TrainPoseExportV1CommandTests
     private static string CreateTempDirectoryPath()
     {
         return Path.Combine(Path.GetTempPath(), "QuantumCoasterWorks.TrainPoseExportV1CommandTests", Guid.NewGuid().ToString("N"));
+    }
+
+    private static string LoadGoldenFixtureJson()
+    {
+        string fixturePath = Path.Combine(AppContext.BaseDirectory, "IO", "Fixtures", "TrainPoseExportV1.golden.json");
+        Assert.True(File.Exists(fixturePath), $"Golden fixture file was not found at '{fixturePath}'.");
+        return File.ReadAllText(fixturePath);
+    }
+
+    private static string NormalizeLineEndings(string value)
+    {
+        return value.ReplaceLineEndings("\n");
     }
 
     private static void DeleteDirectoryIfPresent(string path)
