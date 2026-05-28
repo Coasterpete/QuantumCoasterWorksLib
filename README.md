@@ -17,6 +17,34 @@ Quantum CoasterWorks is an early-stage coaster design and simulation backend. Th
 - `Quantum.Tests` contains automated tests and contract fixtures.
 - `Assets` contains the current Unity debug visualizer/prototype assets.
 
+## Contributor Setup
+
+Required local tools:
+
+- Git.
+- .NET SDK 8.0 or newer. The backend libraries target `netstandard2.1`; `Quantum.Debug` and `Quantum.Tests` target `net8.0`.
+- Network access to NuGet package sources for a first restore, unless the required packages are already cached locally.
+
+Unity, Blender, Visual Studio, and other renderer/editor tools are optional for the current backend preview. They are not required to restore, build, or test the solution.
+
+From a fresh checkout:
+
+```powershell
+git clone <repo-url>
+cd QuantumCoasterWorksLib
+dotnet restore QuantumCoasterWorks.sln
+dotnet build QuantumCoasterWorks.sln --no-restore --nologo
+dotnet test QuantumCoasterWorks.sln --no-build --nologo
+```
+
+For the shorter everyday backend check:
+
+```powershell
+dotnet test QuantumCoasterWorks.sln --nologo
+```
+
+There is currently no `global.json`, so the installed .NET SDK selected by `dotnet` is used. If a release needs exact SDK reproducibility, record `dotnet --info` during the release gate.
+
 ## Backend Sample Workflow
 
 The current Technical Preview 0.1 workflow is backend-only. It produces renderer-agnostic JSON that can be consumed by tests, inspectors, or optional thin debug viewers later.
@@ -99,4 +127,4 @@ Generated JSON, SVG, Markdown, and HTML under `artifacts/` are local output by d
 - `dotnet run --project Quantum.Debug -- longitudinal-force-preview [preset] [outputPath]`: write force preview diagnostics with `soft`, `balanced`, or `punchy` presets.
 - `dotnet run --project Quantum.Debug -- longitudinal-speed-preview [preset] [outputPath] [initialSpeedMps]`: write speed preview diagnostics with `soft`, `balanced`, or `punchy` presets.
 
-See `ROADMAP.md`, `docs/release/v0.1.0-preview.md`, `docs/release/technical-preview-0.1-scope.md`, and `docs/architecture/frontend-strategy.md` for the current architecture direction and first public preview checklist.
+See `ROADMAP.md`, `docs/release/v0.1.0-preview.md`, `docs/release/technical-preview-0.1-scope.md`, `docs/release/technical-preview-0.1-release-gate.md`, and `docs/architecture/frontend-strategy.md` for the current architecture direction and first public preview checklist.
