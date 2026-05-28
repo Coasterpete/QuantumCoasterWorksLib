@@ -17,6 +17,8 @@ Quantum CoasterWorks is an early-stage coaster design and simulation backend. Th
 - `Quantum.Tests` contains automated tests and contract fixtures.
 - `Assets` contains the current Unity debug visualizer/prototype assets.
 
+Testing fixture notes live under `docs/testing/`, including `docs/testing/train-pose-regression-fixtures.md` for the deterministic train pose and `TrainPoseExportV1` regression fixtures.
+
 ## Contributor Setup
 
 Required local tools:
