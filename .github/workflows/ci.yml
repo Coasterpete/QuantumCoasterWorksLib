@@ -1,0 +1,24 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - run: dotnet restore QuantumCoasterWorks.sln
+
+      - run: dotnet build QuantumCoasterWorks.sln --no-restore
+
+      - run: dotnet test QuantumCoasterWorks.sln --no-build
