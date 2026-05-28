@@ -68,6 +68,26 @@ public sealed class DebugCommandHelpTests
     }
 
     [Fact]
+    public void TryWriteRequestedHelp_TrainPoseExportV1_PrintsRegressionSampleDetails()
+    {
+        var writer = new StringWriter(CultureInfo.InvariantCulture);
+
+        bool handled = DebugCommandHelp.TryWriteRequestedHelp(
+            new[] { "help", "train-pose-export-v1" },
+            writer,
+            out int exitCode);
+
+        Assert.True(handled);
+        Assert.Equal(0, exitCode);
+
+        string output = writer.ToString();
+        Assert.Contains("train-pose-export-v1 [outputPath]", output);
+        Assert.Contains("deterministic TrainPoseExportV1 regression sample", output);
+        Assert.Contains("Quantum.Tests/IO/Fixtures/TrainPoseExportV1.golden.json", output);
+        Assert.Contains("backend-only JSON", output);
+    }
+
+    [Fact]
     public void WriteUnknownCommand_PrintsUnknownCommandAndSupportedCommands()
     {
         var writer = new StringWriter(CultureInfo.InvariantCulture);

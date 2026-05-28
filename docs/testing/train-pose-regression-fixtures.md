@@ -9,6 +9,7 @@ These fixtures are synthetic and self-authored. They are built in test code rath
 - `Quantum.Tests/Track/TrainPoseDeterministicRegressionFixtureTests.cs` validates the in-memory `TrainPoseResult` produced by `TrainCarTransformProvider`.
 - `Quantum.Tests/IO/TrainPoseExportV1RegressionTests.cs` validates the same representative pose after it crosses the public `TrainPoseExportV1` DTO and JSON boundary.
 - `Quantum.Tests/IO/TrainPoseExportV1CompositeDocumentBoundaryTests.cs` validates a composite-section train pose export round trip from the public geometric-section builder path.
+- `Quantum.Tests/Debug/TrainPoseExportV1CommandTests.cs` validates that the `train-pose-export-v1` sample command writes deterministic JSON matching `Quantum.Tests/IO/Fixtures/TrainPoseExportV1.golden.json`.
 
 ## Straight Synthetic Layout
 

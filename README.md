@@ -121,7 +121,7 @@ Generated JSON, SVG, Markdown, and HTML under `artifacts/` are local output by d
 - `dotnet run --project Quantum.Debug -- <command> --help`: show command-specific usage and examples.
 - `dotnet run --project Quantum.Debug`: run the default backend validation smoke checks.
 - `dotnet run --project Quantum.Debug -- sampling-perf`: run deterministic sampling performance diagnostics.
-- `dotnet run --project Quantum.Debug -- train-pose-export-v1 [outputPath]`: write a `TrainPoseExportV1` sample JSON.
+- `dotnet run --project Quantum.Debug -- train-pose-export-v1 [outputPath]`: write a deterministic `TrainPoseExportV1` sample JSON matching `Quantum.Tests/IO/Fixtures/TrainPoseExportV1.golden.json`.
 - `dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1 [outputPath]`: write the built-in `DebugViewportSnapshotV1` sample JSON.
 - `dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1-from-csv <inputCsvPath> [outputJsonPath]`: bridge a sampled-frame CSV fixture to `DebugViewportSnapshotV1` JSON.
 - `dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1-validate <snapshotJsonPath>`: validate and summarize a snapshot JSON file.
