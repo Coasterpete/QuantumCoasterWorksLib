@@ -136,6 +136,22 @@ namespace Quantum.Debug
                 {
                     "dotnet run --project Quantum.Debug -- longitudinal-speed-preview",
                     "dotnet run --project Quantum.Debug -- longitudinal-speed-preview balanced artifacts/speed-preview/balanced.sample.json 12.5"
+                }),
+            new DebugCommandHelpEntry(
+                name: "centerline-frame-continuity",
+                usage: "centerline-frame-continuity [outputPath]",
+                summary: "Write deterministic centerline frame continuity diagnostics.",
+                arguments: new[]
+                {
+                    "outputPath: Optional JSON output path. Defaults to " +
+                    CenterlineFrameContinuityCommand.DefaultRelativeOutputPath + ".",
+                    "The command samples a self-authored deterministic centerline and reports tangent, normal, binormal, roll, and matrix orientation continuity.",
+                    "The output is backend-only JSON and does not depend on Unity or any renderer."
+                },
+                examples: new[]
+                {
+                    "dotnet run --project Quantum.Debug -- centerline-frame-continuity",
+                    "dotnet run --project Quantum.Debug -- centerline-frame-continuity artifacts/frame-continuity/centerline-frame-continuity.sample.json"
                 })
         };
 

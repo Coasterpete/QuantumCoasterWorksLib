@@ -14,7 +14,8 @@ namespace Quantum.Debug
         DebugViewportSnapshotV1Validate,
         DebugViewportSnapshotV1Svg,
         LongitudinalForcePreview,
-        LongitudinalSpeedPreview
+        LongitudinalSpeedPreview,
+        CenterlineFrameContinuity
     }
 
     public static class DebugCommandParser
@@ -85,6 +86,12 @@ namespace Quantum.Debug
             if (string.Equals(args[0], "longitudinal-speed-preview", StringComparison.OrdinalIgnoreCase))
             {
                 command = DebugCommandKind.LongitudinalSpeedPreview;
+                return true;
+            }
+
+            if (string.Equals(args[0], "centerline-frame-continuity", StringComparison.OrdinalIgnoreCase))
+            {
+                command = DebugCommandKind.CenterlineFrameContinuity;
                 return true;
             }
 

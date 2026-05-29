@@ -134,6 +134,18 @@ namespace Quantum.Debug
                 return LongitudinalSpeedPreviewCommand.Run(outputPath, preset, initialSpeedMps);
             }
 
+            if (command == DebugCommandKind.CenterlineFrameContinuity)
+            {
+                if (args.Length > 2)
+                {
+                    Console.WriteLine("Usage: centerline-frame-continuity [outputPath]");
+                    return 1;
+                }
+
+                string? outputPath = args.Length == 2 ? args[1] : null;
+                return CenterlineFrameContinuityCommand.Run(outputPath);
+            }
+
             RunValidation();
             return 0;
         }
