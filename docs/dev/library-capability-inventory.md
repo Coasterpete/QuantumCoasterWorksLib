@@ -16,7 +16,7 @@ Scope reviewed:
 - `Quantum.Debug`
 - `Quantum.Tests`
 
-Adjacent note: `Quantum.Geometry` exists in the solution, but it is currently a placeholder project with no meaningful geometry implementation. It should not be counted as a current library capability.
+Adjacent note: `Quantum.Geometry` is not an active project after the Milestone 30 scope decision. The package name is reserved for a future narrow backend-only geometry role if one becomes necessary, but it should not be counted as a current library capability.
 
 ## Validation
 
@@ -223,7 +223,7 @@ That pipeline is documented, tested, and reflected in the public API boundary te
 
 Weakest/prototype areas:
 
-- `Quantum.Geometry` has no meaningful implementation and should not be claimed.
+- `Quantum.Geometry` is intentionally absent from the active solution and should not be claimed.
 - Full coaster authoring is not present. There is no complete editor model, node graph, constraint workflow, or interactive section authoring system.
 - FVD solving is prototype-only. `Fvd2dNormalGSolver` is intentionally tiny and limited to a one-step 2D Normal-G adjustment.
 - `ForceSection` has accumulated several compatibility layers. It works, but the API shape is still transitional.
@@ -380,8 +380,8 @@ Recommended near-term milestones:
    - Add schema/documentation parity checks for v1 contracts if contract churn increases.
    - Add compatibility samples only when they are self-authored or synthetic.
 
-8. Decide what to do with placeholder packages.
-   - Either give `Quantum.Geometry` a real scoped purpose or remove it from capability claims.
+8. Keep placeholder packages out of the active build.
+   - `Quantum.Geometry` is reserved by name only until a real scoped backend purpose exists.
 
 9. Define a minimal authoring workflow before building an editor.
    - The next powerful step is not a full UI; it is a clearer backend story for creating sections, sampling them, and seeing predictable output.
