@@ -1,6 +1,7 @@
 using System.IO;
 using System.Text.Json;
 using Quantum.Debug;
+using Quantum.IO.TrackFrameContinuity.V1;
 
 namespace Quantum.Tests;
 
@@ -22,29 +23,42 @@ public sealed class CenterlineFrameContinuityCommandTests
             using JsonDocument document = JsonDocument.Parse(File.ReadAllText(outputPath));
             JsonElement root = document.RootElement;
 
-            Assert.Equal("centerline-frame-continuity-diagnostics", root.GetProperty("kind").GetString());
-            Assert.Equal(1, root.GetProperty("schemaVersion").GetInt32());
+            Assert.Equal(
+                TrackFrameContinuityDiagnosticsExportV1Dto.ContractName,
+                root.GetProperty("contract").GetString());
+            Assert.Equal(
+                TrackFrameContinuityDiagnosticsExportV1Dto.ContractVersion,
+                root.GetProperty("version").GetInt32());
             Assert.True(root.GetProperty("backendOnly").GetBoolean());
-            Assert.Equal("deterministic-roll-step-centerline", root.GetProperty("sampleName").GetString());
-            Assert.Equal(120.0, root.GetProperty("trackLength").GetDouble(), 10);
-            Assert.Equal(13, root.GetProperty("sampleCount").GetInt32());
-            Assert.Equal(12, root.GetProperty("intervalCount").GetInt32());
-            Assert.True(root.GetProperty("hasDiscontinuities").GetBoolean());
-            Assert.True(root.GetProperty("discontinuityCount").GetInt32() > 0);
+
+            JsonElement metadata = root.GetProperty("metadata");
+            Assert.Equal("meters", metadata.GetProperty("units").GetString());
+            Assert.Equal("deterministic-roll-step-centerline", metadata.GetProperty("sourceName").GetString());
+            Assert.Equal(120.0, metadata.GetProperty("trackLength").GetDouble(), 10);
+
+            JsonElement summary = root.GetProperty("summaryStatistics");
+            Assert.Equal(13, summary.GetProperty("sampleCount").GetInt32());
+            Assert.Equal(12, summary.GetProperty("intervalCount").GetInt32());
+            Assert.True(summary.GetProperty("hasIssues").GetBoolean());
+            Assert.True(summary.GetProperty("issueCount").GetInt32() > 0);
 
             Assert.Equal(
-                root.GetProperty("sampleCount").GetInt32(),
+                summary.GetProperty("sampleCount").GetInt32(),
                 root.GetProperty("samples").GetArrayLength());
             Assert.Equal(
-                root.GetProperty("intervalCount").GetInt32(),
+                summary.GetProperty("intervalCount").GetInt32(),
                 root.GetProperty("intervals").GetArrayLength());
             Assert.Equal(
-                root.GetProperty("discontinuityCount").GetInt32(),
+                summary.GetProperty("issueCount").GetInt32(),
                 root.GetProperty("issues").GetArrayLength());
 
             JsonElement thresholds = root.GetProperty("thresholdsDegrees");
             Assert.Equal(15.0, thresholds.GetProperty("tangent").GetDouble(), 10);
             Assert.Equal(15.0, thresholds.GetProperty("roll").GetDouble(), 10);
+
+            JsonElement rollStatistics = summary.GetProperty("rollDegrees");
+            Assert.True(rollStatistics.GetProperty("maxAbsolute").GetDouble() > 15.0);
+            Assert.True(rollStatistics.GetProperty("averageAbsolute").GetDouble() > 0.0);
 
             string diagnosticText = root.GetProperty("diagnosticText").GetString()!;
             Assert.Contains("Frame continuity:", diagnosticText);
@@ -100,14 +114,17 @@ public sealed class CenterlineFrameContinuityCommandTests
             JsonElement rollIssue = Assert.Single(
                 issues.EnumerateArray(),
                 issue =>
-                    issue.GetProperty("kind").GetString() == "Roll" &&
+                    issue.GetProperty("issueType").GetString() == "Roll" &&
                     issue.GetProperty("startSampleIndex").GetInt32() == 3 &&
                     issue.GetProperty("endSampleIndex").GetInt32() == 4);
 
+            Assert.Equal(4, rollIssue.GetProperty("sampleIndex").GetInt32());
+            Assert.Equal(40.0, rollIssue.GetProperty("distance").GetDouble(), 10);
             Assert.Equal(30.0, rollIssue.GetProperty("startDistance").GetDouble(), 10);
             Assert.Equal(40.0, rollIssue.GetProperty("endDistance").GetDouble(), 10);
             Assert.True(rollIssue.GetProperty("actualDegrees").GetDouble() > 15.0);
             Assert.Equal(15.0, rollIssue.GetProperty("thresholdDegrees").GetDouble(), 10);
+            Assert.True(rollIssue.GetProperty("exceededByDegrees").GetDouble() > 0.0);
         }
         finally
         {
