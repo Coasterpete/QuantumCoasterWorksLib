@@ -80,7 +80,7 @@ Generated debug viewport outputs include:
 - `artifacts/debug-viewport/snapshot-preview-index.md`
 - `artifacts/debug-viewport/index.html`
 
-Open `artifacts/debug-viewport/snapshot-preview-index.md` for a generated Markdown list of snapshot JSON and SVG preview files, or open `artifacts/debug-viewport/index.html` locally for a simple static gallery of the generated SVG previews.
+Open `artifacts/debug-viewport/snapshot-preview-index.md` first for the generated artifact index/README, including what the JSON, SVG, and HTML files represent. Open `artifacts/debug-viewport/index.html` locally for a simple static gallery of the generated SVG previews.
 
 For optional Blender screenshots or renders from the same JSON snapshots, see `docs/visualization/blender-debug-viewer.md`.
 
