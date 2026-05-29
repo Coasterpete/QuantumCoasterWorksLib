@@ -33,8 +33,15 @@ public sealed class DebugViewportSnapshotPreviewIndexTests
             Assert.True(File.Exists(indexPath));
 
             string markdown = File.ReadAllText(indexPath);
-            Assert.Contains("# Debug Viewport Snapshot Preview Index", markdown);
+            Assert.Contains("# Technical Preview 0.1 Debug Artifact Index", markdown);
             Assert.Contains("Directory: `artifacts/debug-viewport`", markdown);
+            Assert.Contains("backend/debug-preview artifacts only", markdown);
+            Assert.Contains("Static gallery: [`artifacts/debug-viewport/index.html`](index.html)", markdown);
+            Assert.Contains("| JSON snapshot | `DebugViewportSnapshotV1` renderer-neutral backend data", markdown);
+            Assert.Contains("| SVG preview | Multi-panel technical debug preview", markdown);
+            Assert.Contains("| HTML gallery | Static local gallery", markdown);
+            Assert.Contains("| # | Last Written (UTC) | Represents | Snapshot JSON | SVG Preview |", markdown);
+            Assert.Contains("DebugViewportSnapshotV1 snapshot output and its paired backend-only SVG preview.", markdown);
             Assert.Contains("[`artifacts/debug-viewport/Alpha.snapshot.json`](Alpha.snapshot.json)", markdown);
             Assert.Contains("[`artifacts/debug-viewport/Alpha.snapshot.svg`](Alpha.snapshot.svg)", markdown);
             Assert.Contains("2026-05-01T12:01:00", markdown);
@@ -95,6 +102,36 @@ public sealed class DebugViewportSnapshotPreviewIndexTests
             string markdown = File.ReadAllText(indexPath);
             Assert.Contains("artifacts/debug-viewport/DebugViewportSnapshotV1.validation.json", markdown);
             Assert.Contains("artifacts/debug-viewport/DebugViewportSnapshotV1.validation.svg", markdown);
+            Assert.Contains("Open First", markdown);
+            Assert.Contains("Artifact Types", markdown);
+        }
+        finally
+        {
+            DeleteDirectoryIfPresent(tempDirectory);
+        }
+    }
+
+    [Fact]
+    public void WriteIndex_Milestone7FixtureNames_DescribesWhatTheArtifactsRepresent()
+    {
+        string tempDirectory = CreateTempDirectoryPath();
+        string artifactDirectory = Path.Combine(tempDirectory, "artifacts", "debug-viewport");
+        string snapshotPath = Path.Combine(artifactDirectory, "Milestone7.synthetic.simple_hill.snapshot.json");
+        string previewPath = Path.Combine(artifactDirectory, "Milestone7.synthetic.simple_hill.snapshot.svg");
+        string indexPath = Path.Combine(artifactDirectory, DebugViewportSnapshotPreviewIndex.FileName);
+
+        try
+        {
+            Directory.CreateDirectory(artifactDirectory);
+            File.WriteAllText(snapshotPath, "{}");
+            File.WriteAllText(previewPath, "<svg />");
+
+            DebugViewportSnapshotPreviewIndex.WriteIndex(artifactDirectory, indexPath, tempDirectory);
+
+            string markdown = File.ReadAllText(indexPath);
+            Assert.Contains(
+                "Milestone 7 synthetic simple hill CSV fixture converted to DebugViewportSnapshotV1 for centerline/frame preview.",
+                markdown);
         }
         finally
         {

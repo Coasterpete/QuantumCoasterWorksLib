@@ -62,6 +62,12 @@ function New-DebugViewportGallery {
     [void] $builder.AppendLine("    body { margin: 28px; font-family: Segoe UI, Arial, sans-serif; color: #111827; background: #f8fafc; }")
     [void] $builder.AppendLine("    h1 { margin: 0 0 8px; font-size: 24px; }")
     [void] $builder.AppendLine("    p { margin: 0 0 20px; max-width: 920px; color: #475569; line-height: 1.45; }")
+    [void] $builder.AppendLine("    .artifact-guide { margin: 0 0 22px; max-width: 980px; border: 1px solid #cbd5e1; border-radius: 8px; background: #ffffff; overflow: hidden; }")
+    [void] $builder.AppendLine("    .artifact-guide h2 { margin: 0; padding: 12px 14px; font-size: 15px; border-bottom: 1px solid #e2e8f0; }")
+    [void] $builder.AppendLine("    .artifact-guide dl { display: grid; grid-template-columns: 140px 1fr; gap: 0; margin: 0; }")
+    [void] $builder.AppendLine("    .artifact-guide dt, .artifact-guide dd { padding: 10px 14px; border-top: 1px solid #e2e8f0; }")
+    [void] $builder.AppendLine("    .artifact-guide dt { font-weight: 700; color: #111827; }")
+    [void] $builder.AppendLine("    .artifact-guide dd { margin: 0; color: #475569; line-height: 1.4; }")
     [void] $builder.AppendLine("    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(520px, 1fr)); gap: 20px; align-items: start; }")
     [void] $builder.AppendLine("    figure { margin: 0; padding: 14px; border: 1px solid #cbd5e1; border-radius: 8px; background: #ffffff; }")
     [void] $builder.AppendLine("    h2 { margin: 0 0 12px; font-size: 16px; }")
@@ -73,6 +79,14 @@ function New-DebugViewportGallery {
     [void] $builder.AppendLine("<body>")
     [void] $builder.AppendLine("  <h1>Quantum DebugViewportSnapshotV1 Gallery</h1>")
     [void] $builder.AppendLine("  <p>Generated technical debug previews from renderer-neutral backend snapshots. Each SVG includes top-down X/Z and elevation/profile panels, raw exported sample markers, a faint raw polyline, and a preview-only Catmull-Rom smoothing layer for public-demo readability. This is not a finished editor, viewer, renderer, or authoritative spline interpolation.</p>")
+    [void] $builder.AppendLine("  <section class=""artifact-guide"" aria-labelledby=""artifact-guide-title"">")
+    [void] $builder.AppendLine("    <h2 id=""artifact-guide-title"">Artifact guide</h2>")
+    [void] $builder.AppendLine("    <dl>")
+    [void] $builder.AppendLine("      <dt>JSON</dt><dd>Renderer-neutral DebugViewportSnapshotV1 backend snapshots for validation, importer checks, and optional thin debug adapters.</dd>")
+    [void] $builder.AppendLine("      <dt>SVG</dt><dd>Backend-only technical previews rendered from the JSON snapshots for centerline, frame, elevation, and simple train-box sanity checks.</dd>")
+    [void] $builder.AppendLine("      <dt>HTML</dt><dd>This static local gallery for quickly scanning all generated SVG previews. It is not a frontend or renderer commitment.</dd>")
+    [void] $builder.AppendLine("    </dl>")
+    [void] $builder.AppendLine("  </section>")
     [void] $builder.AppendLine("  <div class=""grid"">")
 
     foreach ($preview in $Previews) {
@@ -83,7 +97,7 @@ function New-DebugViewportGallery {
         [void] $builder.AppendLine("    <figure>")
         [void] $builder.AppendLine("      <h2>$label</h2>")
         [void] $builder.AppendLine("      <a href=""$svgFile""><img src=""$svgFile"" alt=""$label SVG preview""></a>")
-        [void] $builder.AppendLine("      <figcaption><a href=""$snapshotFile"">$snapshotFile</a> | <a href=""$svgFile"">$svgFile</a></figcaption>")
+        [void] $builder.AppendLine("      <figcaption>JSON snapshot: <a href=""$snapshotFile"">$snapshotFile</a> | SVG preview: <a href=""$svgFile"">$svgFile</a></figcaption>")
         [void] $builder.AppendLine("    </figure>")
     }
 
@@ -238,23 +252,24 @@ try {
 
     Write-Host ""
     Write-Host "SUCCESS: Technical Preview 0.1 backend demo completed."
-    Write-Host "Generated snapshots:"
+    Write-Host "Open first:"
+    Write-Host "  Artifact index / README: $previewIndexPath"
+    Write-Host "  Static SVG gallery:      $galleryPath"
+    Write-Host "  Built-in sample JSON:    $builtInSnapshotPath"
+    Write-Host "  Built-in sample SVG:     $builtInSvgPath"
+
+    Write-Host ""
+    Write-Host "Generated JSON snapshots (renderer-neutral DebugViewportSnapshotV1 data):"
     Write-Host "  $builtInSnapshotPath"
     foreach ($preview in $generatedPreviews | Select-Object -Skip 1) {
         Write-Host "  $($preview.SnapshotPath)"
     }
 
-    Write-Host "Generated SVG previews:"
+    Write-Host "Generated SVG previews (backend-only technical visual checks):"
     Write-Host "  $builtInSvgPath"
     foreach ($preview in $generatedPreviews | Select-Object -Skip 1) {
         Write-Host "  $($preview.SvgPath)"
     }
-
-    Write-Host "Generated gallery:"
-    Write-Host "  $galleryPath"
-
-    Write-Host "Generated snapshot preview index:"
-    Write-Host "  $previewIndexPath"
 }
 finally {
     Pop-Location
