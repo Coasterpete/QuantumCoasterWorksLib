@@ -2,7 +2,7 @@
 
 Date: 2026-05-27
 
-Scope: `Quantum.Core` plus nearby backend projects: `Quantum.Math`, `Quantum.Geometry`, `Quantum.Splines`, `Quantum.Track`, `Quantum.Physics`, `Quantum.FVD`, `Quantum.IO`, and the optional `Quantum.Debug` CLI surface where it affects backend contracts.
+Scope: `Quantum.Core` plus nearby active backend projects: `Quantum.Math`, `Quantum.Splines`, `Quantum.Track`, `Quantum.Physics`, `Quantum.FVD`, `Quantum.IO`, and the optional `Quantum.Debug` CLI surface where it affects backend contracts. `Quantum.Geometry` is discussed as a reserved package name, not an active project.
 
 This is an inventory and cleanup report only. No backend code was changed as part of this audit.
 
@@ -26,7 +26,6 @@ Project references are mostly layered and engine-agnostic:
 | --- | --- | --- |
 | `Quantum.Core` | none | Small guard/numeric helper package. |
 | `Quantum.Math` | none | Custom vector/matrix/transform primitives. |
-| `Quantum.Geometry` | none | Currently only contains placeholder `Class1`. |
 | `Quantum.Splines` | `Quantum.Math`, `GShark` | Curve primitives, arc-length adapter, G-Shark adapter, support frame sampler. |
 | `Quantum.Track` | `Quantum.Math`, `Quantum.Splines` | Main coaster-domain surface: tracks, sections, train transforms, debug geometry, cameras. |
 | `Quantum.Physics` | `Quantum.Core`, `Quantum.Math`, `Quantum.Splines`, `Quantum.Track` | Train stepping and force/track adapters. |
@@ -54,9 +53,9 @@ Examples:
 
 This is not urgent behavior debt, but it is polish debt. The backend already has a small foundation package; cleanup should either adopt it consistently or keep it intentionally narrow and avoid pretending it is a universal core.
 
-### `Quantum.Geometry` Is A Placeholder Package
+### `Quantum.Geometry` Is Reserved, Not Active
 
-`Quantum.Geometry/Class1.cs:5` is an empty public class in a project that has no references and no meaningful implementation. This is the clearest dead package. Removing or parking the project is probably safe later, but it touches the solution and should be done as an explicit cleanup PR.
+Milestone 30 removed the empty `Quantum.Geometry` project from the active solution and test graph. The package name remains reserved for a future narrow backend-only geometry role if one becomes necessary, but Quantum should not claim a geometry package until it has real coaster-domain responsibility.
 
 ### `Quantum.Track` Is Carrying Several Subsystems In One Namespace
 
@@ -206,7 +205,7 @@ This is documented in code and `docs/math-backend-status.md`, but downstream con
 
 ### Clear Dead Code
 
-- `Quantum.Geometry/Class1.cs:5`: empty placeholder public class.
+- No active `Quantum.Geometry` project remains in the solution.
 
 ### Duplicate Or Transitional Math/Spline Code
 
@@ -270,7 +269,6 @@ Approximate public type doc coverage from source scanning:
 | --- | ---: | ---: |
 | `Quantum.Core` | 2 | 2 |
 | `Quantum.Math` | 6 | 0 |
-| `Quantum.Geometry` | 1 | 1 |
 | `Quantum.Splines` | 19 | 5 |
 | `Quantum.Track` | 69 | 48 |
 | `Quantum.Physics` | 14 | 0 |
@@ -325,7 +323,7 @@ Particularly valuable:
 ### Gaps To Add
 
 - Backend-wide forbidden dependency test. Current guard only checks `Quantum.IO` and `Quantum.Debug` in `CenterlineFrameCsvFixtureParserTests`. Expand it to all backend assemblies.
-- `Quantum.Geometry` has no meaningful tests because it has no meaningful code.
+- `Quantum.Geometry` has no tests because it is intentionally absent from the active solution.
 - No automated XML-doc coverage or package public-surface approval test.
 - No shared build/analyzer configuration to keep nullable, docs, formatting, and API warnings consistent across projects.
 - Public constructor edge tests are incomplete for API polish cases:
@@ -345,7 +343,6 @@ These do not need immediate splitting, but future changes will be easier if fixt
 
 | File | Why it feels prototype-quality | Suggested handling |
 | --- | --- | --- |
-| `Quantum.Geometry/Class1.cs` | Empty placeholder public class. | Remove or park project in cleanup PR. |
 | `Quantum.Track/TrackSection.cs` | Empty abstract base. | Keep only if it remains the document extension point; add docs or normalize. |
 | `Quantum.Track/ForceSection.cs` | Large optional constructor, multiple compatibility representations, mutable `Channels`. | Add clearer factories/builders before expanding. |
 | `Quantum.Splines/Curves/BSplineCurve.cs` | Custom generic B-spline implementation, missing docs. | Keep as debug/sample support or replace with mature path. |
@@ -366,9 +363,7 @@ These do not need immediate splitting, but future changes will be easier if fixt
 
 ### P1 - Tiny Inventory Cleanup
 
-- Decide what to do with `Quantum.Geometry`:
-  - remove the placeholder project, or
-  - add a real purpose and delete `Class1`.
+- Keep `Quantum.Geometry` out of the active solution until it has a real scoped backend purpose.
 - Add XML docs to `Quantum.Core.Guard` and `Quantum.Core.Numeric`.
 - Add a backend-wide forbidden dependency test for all `Quantum.*` assemblies.
 - Add a short doc comment to the most visible missing train-pose wrapper types.

@@ -15,7 +15,6 @@ QuantumCoasterWorks.sln
   - `TrackFrame` implements `ITrackFrameBasis`
   - `TrackFrame -> Transform3d` bridge is provided through `Transform3d.FromTrackFrame(...)`
 - Quantum.Track = active major backend project for track documents, segments, traversal, evaluation, and train transform placement
-- Quantum.Geometry = geometry helpers
 - Quantum.Physics = train simulation
 - Quantum.FVD = force vector design systems
 - Quantum.IO = save/load/import/export
@@ -39,3 +38,4 @@ Core logic must remain independent from Unity, Unreal, Avalonia, renderer, and U
 - `Matrix4x4` is not required yet.
 - Quaternion/roll transform systems can be introduced later as needed.
 - `Quantum.Track` is active and should continue evolving in small, testable backend increments.
+- `Quantum.Geometry` is not an active project; the package name is reserved for a future narrow backend-only geometry role if one becomes necessary.

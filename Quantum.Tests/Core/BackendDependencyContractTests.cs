@@ -9,7 +9,6 @@ public sealed class BackendDependencyContractTests
     {
         "Quantum.Core",
         "Quantum.Math",
-        "Quantum.Geometry",
         "Quantum.Splines",
         "Quantum.Track",
         "Quantum.Physics",
