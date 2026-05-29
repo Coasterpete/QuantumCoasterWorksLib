@@ -108,6 +108,12 @@ Generate a multi-panel SVG technical preview from a snapshot:
 dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1-svg artifacts/debug-viewport/DebugViewportSnapshotV1.sample.json artifacts/debug-viewport/DebugViewportSnapshotV1.sample.svg
 ```
 
+Generate backend-only frame continuity diagnostics for a deterministic sample centerline:
+
+```powershell
+dotnet run --project Quantum.Debug -- centerline-frame-continuity artifacts/frame-continuity/centerline-frame-continuity.sample.json
+```
+
 The SVG previews, Markdown preview index, and generated gallery are backend-only debug aids for quick inspection. Current previews include top-down X/Z and elevation/profile panels so flat plan views can still show hills and drops. Raw exported centerline samples are shown as small markers with a faint raw polyline, and a Catmull-Rom smooth-preview path is drawn only as a visual approximation for readability. The smoothing does not change the JSON contract, backend spline behavior, track physics, or sampled data. The previews are not a renderer, editor, frontend scaffold, polished viewer, authoritative spline interpolation, or commitment to any visualization stack.
 
 Generated JSON, SVG, Markdown, and HTML under `artifacts/` are local output by default and should not be committed unless there is a clear release reason.
@@ -128,5 +134,6 @@ Generated JSON, SVG, Markdown, and HTML under `artifacts/` are local output by d
 - `dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1-svg <snapshotJsonPath> [outputSvgPath]`: write a multi-panel backend-only SVG preview from snapshot JSON.
 - `dotnet run --project Quantum.Debug -- longitudinal-force-preview [preset] [outputPath]`: write force preview diagnostics with `soft`, `balanced`, or `punchy` presets.
 - `dotnet run --project Quantum.Debug -- longitudinal-speed-preview [preset] [outputPath] [initialSpeedMps]`: write speed preview diagnostics with `soft`, `balanced`, or `punchy` presets.
+- `dotnet run --project Quantum.Debug -- centerline-frame-continuity [outputPath]`: write backend-only JSON diagnostics for frame continuity on a deterministic sample centerline.
 
 See `ROADMAP.md`, `docs/release/v0.1.0-preview.md`, `docs/release/technical-preview-0.1-scope.md`, `docs/release/technical-preview-0.1-release-gate.md`, and `docs/architecture/frontend-strategy.md` for the current architecture direction and first public preview checklist.

@@ -23,6 +23,7 @@ public sealed class DebugCommandHelpTests
         Assert.Contains(DebugCommandHelp.ProjectPurpose, output);
         Assert.Contains("Commands:", output);
         Assert.Contains("debug-viewport-snapshot-v1-from-csv <inputCsvPath> [outputJsonPath]", output);
+        Assert.Contains("centerline-frame-continuity [outputPath]", output);
         Assert.Contains("Examples:", output);
         Assert.Contains(DebugCommandHelp.GeneratedArtifactsNote, output);
     }
@@ -88,6 +89,26 @@ public sealed class DebugCommandHelpTests
     }
 
     [Fact]
+    public void TryWriteRequestedHelp_CenterlineFrameContinuity_PrintsDiagnosticDetails()
+    {
+        var writer = new StringWriter(CultureInfo.InvariantCulture);
+
+        bool handled = DebugCommandHelp.TryWriteRequestedHelp(
+            new[] { "help", "centerline-frame-continuity" },
+            writer,
+            out int exitCode);
+
+        Assert.True(handled);
+        Assert.Equal(0, exitCode);
+
+        string output = writer.ToString();
+        Assert.Contains("centerline-frame-continuity [outputPath]", output);
+        Assert.Contains("deterministic centerline", output);
+        Assert.Contains("tangent, normal, binormal, roll, and matrix orientation continuity", output);
+        Assert.Contains("backend-only JSON", output);
+    }
+
+    [Fact]
     public void WriteUnknownCommand_PrintsUnknownCommandAndSupportedCommands()
     {
         var writer = new StringWriter(CultureInfo.InvariantCulture);
@@ -99,5 +120,6 @@ public sealed class DebugCommandHelpTests
         Assert.Contains("Supported commands:", output);
         Assert.Contains("debug-viewport-snapshot-v1 [outputPath]", output);
         Assert.Contains("longitudinal-speed-preview [preset] [outputPath] [initialSpeedMps]", output);
+        Assert.Contains("centerline-frame-continuity [outputPath]", output);
     }
 }
