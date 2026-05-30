@@ -39,6 +39,7 @@ $artifactDirectory = Join-Path $repoRoot "artifacts\debug-viewport"
 $builtInSnapshotPath = Join-Path $artifactDirectory "DebugViewportSnapshotV1.sample.json"
 $builtInSvgPath = Join-Path $artifactDirectory "DebugViewportSnapshotV1.sample.svg"
 $galleryPath = Join-Path $artifactDirectory "index.html"
+$browserPath = Join-Path $artifactDirectory "browser.html"
 $previewIndexPath = Join-Path $artifactDirectory "snapshot-preview-index.md"
 $fixtureDirectory = Join-Path $repoRoot "Quantum.Tests\IO\Fixtures"
 $fixturePreviews = @(
@@ -176,8 +177,22 @@ try {
         $galleryPath
     )
 
+    Invoke-DotNetChecked -Arguments @(
+        "run",
+        "--project",
+        "Quantum.Debug",
+        "--",
+        "debug-viewport-snapshot-v1-browser",
+        $artifactDirectory,
+        $browserPath
+    )
+
     if (-not (Test-Path -LiteralPath $galleryPath -PathType Leaf)) {
         throw "Static SVG gallery was not generated at '$galleryPath'."
+    }
+
+    if (-not (Test-Path -LiteralPath $browserPath -PathType Leaf)) {
+        throw "Browser debug viewer was not generated at '$browserPath'."
     }
 
     if (-not (Test-Path -LiteralPath $previewIndexPath -PathType Leaf)) {
@@ -189,6 +204,7 @@ try {
     Write-Host "Open first:"
     Write-Host "  Artifact index / README: $previewIndexPath"
     Write-Host "  Static SVG gallery:      $galleryPath"
+    Write-Host "  Browser debug viewer:    $browserPath"
     Write-Host "  Built-in sample JSON:    $builtInSnapshotPath"
     Write-Host "  Built-in sample SVG:     $builtInSvgPath"
 

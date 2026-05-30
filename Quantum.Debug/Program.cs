@@ -111,6 +111,19 @@ namespace Quantum.Debug
                 return DebugViewportSnapshotGalleryCommand.Run(artifactDirectory, outputHtmlPath);
             }
 
+            if (command == DebugCommandKind.DebugViewportSnapshotV1Browser)
+            {
+                if (args.Length > 3)
+                {
+                    Console.WriteLine("Usage: debug-viewport-snapshot-v1-browser [artifactDirectory] [outputHtmlPath]");
+                    return 1;
+                }
+
+                string? artifactDirectory = args.Length >= 2 ? args[1] : null;
+                string? outputHtmlPath = args.Length == 3 ? args[2] : null;
+                return DebugViewportSnapshotBrowserCommand.Run(artifactDirectory, outputHtmlPath);
+            }
+
             if (command == DebugCommandKind.LongitudinalForcePreview)
             {
                 if (!TryParseLongitudinalForcePreviewArgs(args, out LongitudinalForcePreviewPreset preset, out string? outputPath))
