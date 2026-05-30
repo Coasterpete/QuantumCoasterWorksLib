@@ -19,6 +19,12 @@ Quantum CoasterWorks is an early-stage coaster design and simulation backend. Th
 
 Testing fixture notes live under `docs/testing/`, including `docs/testing/train-pose-regression-fixtures.md` for the deterministic train pose and `TrainPoseExportV1` regression fixtures.
 
+## Geometry Interchange Roadmap
+
+Milestone 33 adds a backend-only `Quantum.IO.GeometryInterchange` boundary for future external curve import/export. It can represent external curve document metadata, NURBS/B-spline-style control points, degree/order metadata, knot vectors, result objects, and diagnostics without making Rhino or openNURBS part of the core dependency graph.
+
+`Rhino3dmGeometryAdapter` is intentionally a placeholder today. It returns deterministic unsupported import/export diagnostics until a real rhino3dm/openNURBS dependency is deliberately selected and isolated behind this boundary.
+
 ## Contributor Setup
 
 Required local tools:
@@ -63,7 +69,7 @@ If direct PowerShell execution is blocked by local execution policy, the `.cmd` 
 powershell -ExecutionPolicy Bypass -File .\tools\demo-technical-preview-0.1.ps1
 ```
 
-The script runs the test suite, prints the `Quantum.Debug` command reference, generates the built-in `DebugViewportSnapshotV1` sample, generates snapshots from the Milestone 7 synthetic fixture pack, validates each snapshot, writes multi-panel SVG technical debug previews, refreshes a small Markdown preview index, and leaves generated output under ignored `artifacts/debug-viewport/`.
+The script runs the test suite, prints the `Quantum.Debug` command reference, generates the built-in `DebugViewportSnapshotV1` sample, generates snapshots from the Milestone 7 synthetic fixture pack, validates each snapshot, writes multi-panel SVG technical debug previews, refreshes a small Markdown preview index, writes static HTML inspection pages, and leaves generated output under ignored `artifacts/debug-viewport/`.
 
 Generated debug viewport outputs include:
 
@@ -79,8 +85,9 @@ Generated debug viewport outputs include:
 - `artifacts/debug-viewport/Milestone7.synthetic.descending_ascending_curve.snapshot.svg`
 - `artifacts/debug-viewport/snapshot-preview-index.md`
 - `artifacts/debug-viewport/index.html`
+- `artifacts/debug-viewport/browser.html`
 
-Open `artifacts/debug-viewport/snapshot-preview-index.md` first for the generated artifact index/README, including what the JSON, SVG, and HTML files represent. Open `artifacts/debug-viewport/index.html` locally for a static gallery of the generated SVG previews, source JSON/SVG links, and key snapshot metadata.
+Open `artifacts/debug-viewport/snapshot-preview-index.md` first for the generated artifact index/README, including what the JSON, SVG, and HTML files represent. Open `artifacts/debug-viewport/index.html` locally for a static gallery of the generated SVG previews, source JSON/SVG links, and key snapshot metadata. Open `artifacts/debug-viewport/browser.html` locally for a tiny artifact-first browser inspector that embeds `DebugViewportSnapshotV1` JSON and draws centerline samples, frame axes, debug lines, train boxes, bogie markers, wheel markers, and metadata with inline style/script only.
 
 For optional Blender screenshots or renders from the same JSON snapshots, see `docs/visualization/blender-debug-viewer.md`.
 
@@ -114,13 +121,19 @@ Generate the static debug viewport gallery:
 dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1-gallery artifacts/debug-viewport artifacts/debug-viewport/index.html
 ```
 
+Generate the static browser inspection viewer:
+
+```powershell
+dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1-browser artifacts/debug-viewport artifacts/debug-viewport/browser.html
+```
+
 Generate backend-only frame continuity diagnostics for a deterministic sample centerline:
 
 ```powershell
 dotnet run --project Quantum.Debug -- centerline-frame-continuity artifacts/frame-continuity/centerline-frame-continuity.sample.json
 ```
 
-The SVG previews, Markdown preview index, and generated gallery are backend-only debug aids for quick inspection. Current previews include top-down X/Z and elevation/profile panels so flat plan views can still show hills and drops. Raw exported centerline samples are shown as small markers with a faint raw polyline, and a Catmull-Rom smooth-preview path is drawn only as a visual approximation for readability. The smoothing does not change the JSON contract, backend spline behavior, track physics, or sampled data. The previews are not a renderer, editor, frontend scaffold, polished viewer, authoritative spline interpolation, or commitment to any visualization stack.
+The SVG previews, Markdown preview index, generated gallery, and browser inspector are backend-only debug aids for quick inspection. Current previews include top-down X/Z and elevation/profile panels so flat plan views can still show hills and drops. Raw exported centerline samples are shown as small markers with a faint raw polyline, and a Catmull-Rom smooth-preview path is drawn only as a visual approximation for readability. The browser inspector is a small local-file-friendly HTML/SVG/vanilla JavaScript artifact for checking backend output layers; it is not a production renderer or frontend. The smoothing and browser inspection view do not change the JSON contract, backend spline behavior, track physics, or sampled data. The previews are not a renderer, editor, frontend scaffold, polished viewer, authoritative spline interpolation, or commitment to any visualization stack.
 
 Generated JSON, SVG, Markdown, and HTML under `artifacts/` are local output by default and should not be committed unless there is a clear release reason.
 
@@ -139,6 +152,7 @@ Generated JSON, SVG, Markdown, and HTML under `artifacts/` are local output by d
 - `dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1-validate <snapshotJsonPath>`: validate and summarize a snapshot JSON file.
 - `dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1-svg <snapshotJsonPath> [outputSvgPath]`: write a multi-panel backend-only SVG preview from snapshot JSON.
 - `dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1-gallery [artifactDirectory] [outputHtmlPath]`: write a static HTML gallery for generated DebugViewportSnapshotV1 JSON and SVG artifacts.
+- `dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1-browser [artifactDirectory] [outputHtmlPath]`: write a self-contained browser inspector for generated `DebugViewportSnapshotV1` JSON artifacts.
 - `dotnet run --project Quantum.Debug -- longitudinal-force-preview [preset] [outputPath]`: write force preview diagnostics with `soft`, `balanced`, or `punchy` presets.
 - `dotnet run --project Quantum.Debug -- longitudinal-speed-preview [preset] [outputPath] [initialSpeedMps]`: write speed preview diagnostics with `soft`, `balanced`, or `punchy` presets.
 - `dotnet run --project Quantum.Debug -- centerline-frame-continuity [outputPath]`: write backend-only JSON diagnostics for frame continuity on a deterministic sample centerline.
