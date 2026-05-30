@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.IO;
+using System.Text.RegularExpressions;
 using Quantum.Debug;
 using Quantum.IO.DebugViewport.V1;
 
@@ -7,6 +8,10 @@ namespace Quantum.Tests;
 
 public sealed class DebugViewportSnapshotBrowserCommandTests
 {
+    private static readonly Regex GeneratedTimestampRegex = new Regex(
+        @"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z",
+        RegexOptions.Compiled);
+
     [Fact]
     public void Run_ValidSnapshot_WritesSelfContainedViewerWithExpectedLayersAndMetadata()
     {
@@ -42,8 +47,19 @@ public sealed class DebugViewportSnapshotBrowserCommandTests
             Assert.Contains("Train boxes", html);
             Assert.Contains("Bogie markers", html);
             Assert.Contains("Wheel markers", html);
+            Assert.Contains("Animation", html);
+            Assert.Contains("id=\"playPauseButton\"", html);
+            Assert.Contains("id=\"timelineSlider\"", html);
+            Assert.Contains("id=\"timelineReadout\"", html);
+            Assert.Contains("requestAnimationFrame", html);
+            Assert.Contains("function animationTrackSamples(snapshot)", html);
+            Assert.Contains("function generatedAnimationFrameSamples(snapshot)", html);
+            Assert.Contains("function animatedTrain(snapshot, progress)", html);
+            Assert.Contains("function setAnimationProgress(value, shouldRender)", html);
+            Assert.Contains("metric('Animation'", html);
             Assert.Contains(".distance-tick", html);
             Assert.Contains(".distance-label", html);
+            Assert.Contains(".animation-panel", html);
             Assert.Contains("Measurement", html);
             Assert.Contains("id=\"measurementList\"", html);
             Assert.Contains(".measurement-panel", html);
@@ -76,9 +92,42 @@ public sealed class DebugViewportSnapshotBrowserCommandTests
             Assert.DoesNotContain("import ", lowerHtml);
             Assert.DoesNotContain("node_modules", lowerHtml);
             Assert.DoesNotContain("npm", lowerHtml);
+            Assert.DoesNotContain("three.js", lowerHtml);
+            Assert.DoesNotContain("gltf", lowerHtml);
             Assert.DoesNotContain("unpkg", lowerHtml);
             Assert.DoesNotContain("cdnjs", lowerHtml);
             Assert.Contains("Wrote DebugViewportSnapshotV1 browser viewer", writer.ToString());
+        }
+        finally
+        {
+            DeleteDirectoryIfPresent(tempDirectory);
+        }
+    }
+
+    [Fact]
+    public void Run_ValidSnapshot_GeneratedViewerContentIsDeterministicExceptTimestamp()
+    {
+        string tempDirectory = CreateTempDirectoryPath();
+        string artifactDirectory = Path.Combine(tempDirectory, "artifacts", "debug-viewport");
+        string snapshotPath = Path.Combine(artifactDirectory, "DebugViewportSnapshotV1.sample.json");
+        string browserPath = Path.Combine(artifactDirectory, "browser.html");
+
+        try
+        {
+            Directory.CreateDirectory(artifactDirectory);
+            File.WriteAllText(
+                snapshotPath,
+                DebugViewportSnapshotV1Json.Serialize(DebugViewportSnapshotV1SampleCommand.BuildSample(), indented: true));
+
+            Assert.Equal(0, DebugViewportSnapshotBrowserCommand.Run(artifactDirectory, browserPath));
+            string firstHtml = File.ReadAllText(browserPath);
+
+            Assert.Equal(0, DebugViewportSnapshotBrowserCommand.Run(artifactDirectory, browserPath));
+            string secondHtml = File.ReadAllText(browserPath);
+
+            Assert.Equal(
+                NormalizeGeneratedTimestamp(firstHtml),
+                NormalizeGeneratedTimestamp(secondHtml));
         }
         finally
         {
@@ -144,6 +193,11 @@ public sealed class DebugViewportSnapshotBrowserCommandTests
             Path.GetTempPath(),
             "QuantumCoasterWorks.DebugViewportSnapshotBrowserCommandTests",
             Guid.NewGuid().ToString("N"));
+    }
+
+    private static string NormalizeGeneratedTimestamp(string html)
+    {
+        return GeneratedTimestampRegex.Replace(html, "<generated-at>");
     }
 
     private static void DeleteDirectoryIfPresent(string path)
