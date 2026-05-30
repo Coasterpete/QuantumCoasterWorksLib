@@ -34,85 +34,6 @@ function Invoke-DotNetChecked {
     }
 }
 
-function ConvertTo-HtmlText {
-    param(
-        [Parameter(Mandatory = $true)]
-        [string] $Value
-    )
-
-    return [System.Net.WebUtility]::HtmlEncode($Value)
-}
-
-function New-DebugViewportGallery {
-    param(
-        [Parameter(Mandatory = $true)]
-        [string] $OutputPath,
-
-        [Parameter(Mandatory = $true)]
-        [object[]] $Previews
-    )
-
-    $builder = [System.Text.StringBuilder]::new()
-    [void] $builder.AppendLine("<!doctype html>")
-    [void] $builder.AppendLine("<html lang=""en"">")
-    [void] $builder.AppendLine("<head>")
-    [void] $builder.AppendLine("  <meta charset=""utf-8"">")
-    [void] $builder.AppendLine("  <title>Quantum DebugViewportSnapshotV1 Gallery</title>")
-    [void] $builder.AppendLine("  <style>")
-    [void] $builder.AppendLine("    body { margin: 28px; font-family: Segoe UI, Arial, sans-serif; color: #111827; background: #f8fafc; }")
-    [void] $builder.AppendLine("    h1 { margin: 0 0 8px; font-size: 24px; }")
-    [void] $builder.AppendLine("    p { margin: 0 0 20px; max-width: 920px; color: #475569; line-height: 1.45; }")
-    [void] $builder.AppendLine("    .artifact-guide { margin: 0 0 22px; max-width: 980px; border: 1px solid #cbd5e1; border-radius: 8px; background: #ffffff; overflow: hidden; }")
-    [void] $builder.AppendLine("    .artifact-guide h2 { margin: 0; padding: 12px 14px; font-size: 15px; border-bottom: 1px solid #e2e8f0; }")
-    [void] $builder.AppendLine("    .artifact-guide dl { display: grid; grid-template-columns: 140px 1fr; gap: 0; margin: 0; }")
-    [void] $builder.AppendLine("    .artifact-guide dt, .artifact-guide dd { padding: 10px 14px; border-top: 1px solid #e2e8f0; }")
-    [void] $builder.AppendLine("    .artifact-guide dt { font-weight: 700; color: #111827; }")
-    [void] $builder.AppendLine("    .artifact-guide dd { margin: 0; color: #475569; line-height: 1.4; }")
-    [void] $builder.AppendLine("    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(520px, 1fr)); gap: 20px; align-items: start; }")
-    [void] $builder.AppendLine("    figure { margin: 0; padding: 14px; border: 1px solid #cbd5e1; border-radius: 8px; background: #ffffff; }")
-    [void] $builder.AppendLine("    h2 { margin: 0 0 12px; font-size: 16px; }")
-    [void] $builder.AppendLine("    img { display: block; width: 100%; height: auto; border: 1px solid #e2e8f0; background: #ffffff; }")
-    [void] $builder.AppendLine("    figcaption { margin-top: 10px; font-size: 13px; color: #475569; }")
-    [void] $builder.AppendLine("    a { color: #0f766e; }")
-    [void] $builder.AppendLine("  </style>")
-    [void] $builder.AppendLine("</head>")
-    [void] $builder.AppendLine("<body>")
-    [void] $builder.AppendLine("  <h1>Quantum DebugViewportSnapshotV1 Gallery</h1>")
-    [void] $builder.AppendLine("  <p>Generated technical debug previews from renderer-neutral backend snapshots. Each SVG includes top-down X/Z and elevation/profile panels, raw exported sample markers, a faint raw polyline, and a preview-only Catmull-Rom smoothing layer for public-demo readability. This is not a finished editor, viewer, renderer, or authoritative spline interpolation.</p>")
-    [void] $builder.AppendLine("  <section class=""artifact-guide"" aria-labelledby=""artifact-guide-title"">")
-    [void] $builder.AppendLine("    <h2 id=""artifact-guide-title"">Artifact guide</h2>")
-    [void] $builder.AppendLine("    <dl>")
-    [void] $builder.AppendLine("      <dt>JSON</dt><dd>Renderer-neutral DebugViewportSnapshotV1 backend snapshots for validation, importer checks, and optional thin debug adapters.</dd>")
-    [void] $builder.AppendLine("      <dt>SVG</dt><dd>Backend-only technical previews rendered from the JSON snapshots for centerline, frame, elevation, and simple train-box sanity checks.</dd>")
-    [void] $builder.AppendLine("      <dt>HTML</dt><dd>This static local gallery for quickly scanning all generated SVG previews. It is not a frontend or renderer commitment.</dd>")
-    [void] $builder.AppendLine("    </dl>")
-    [void] $builder.AppendLine("  </section>")
-    [void] $builder.AppendLine("  <div class=""grid"">")
-
-    foreach ($preview in $Previews) {
-        $label = ConvertTo-HtmlText -Value $preview.Label
-        $snapshotFile = ConvertTo-HtmlText -Value ([System.IO.Path]::GetFileName($preview.SnapshotPath))
-        $svgFile = ConvertTo-HtmlText -Value ([System.IO.Path]::GetFileName($preview.SvgPath))
-
-        [void] $builder.AppendLine("    <figure>")
-        [void] $builder.AppendLine("      <h2>$label</h2>")
-        [void] $builder.AppendLine("      <a href=""$svgFile""><img src=""$svgFile"" alt=""$label SVG preview""></a>")
-        [void] $builder.AppendLine("      <figcaption>JSON snapshot: <a href=""$snapshotFile"">$snapshotFile</a> | SVG preview: <a href=""$svgFile"">$svgFile</a></figcaption>")
-        [void] $builder.AppendLine("    </figure>")
-    }
-
-    [void] $builder.AppendLine("  </div>")
-    [void] $builder.AppendLine("</body>")
-    [void] $builder.AppendLine("</html>")
-
-    $parentDirectory = Split-Path -Parent $OutputPath
-    if (-not [string]::IsNullOrWhiteSpace($parentDirectory)) {
-        New-Item -ItemType Directory -Force -Path $parentDirectory | Out-Null
-    }
-
-    [System.IO.File]::WriteAllText($OutputPath, $builder.ToString(), [System.Text.UTF8Encoding]::new($false))
-}
-
 $repoRoot = Get-RepoRoot
 $artifactDirectory = Join-Path $repoRoot "artifacts\debug-viewport"
 $builtInSnapshotPath = Join-Path $artifactDirectory "DebugViewportSnapshotV1.sample.json"
@@ -245,7 +166,20 @@ try {
         }
     }
 
-    New-DebugViewportGallery -OutputPath $galleryPath -Previews $generatedPreviews
+    Invoke-DotNetChecked -Arguments @(
+        "run",
+        "--project",
+        "Quantum.Debug",
+        "--",
+        "debug-viewport-snapshot-v1-gallery",
+        $artifactDirectory,
+        $galleryPath
+    )
+
+    if (-not (Test-Path -LiteralPath $galleryPath -PathType Leaf)) {
+        throw "Static SVG gallery was not generated at '$galleryPath'."
+    }
+
     if (-not (Test-Path -LiteralPath $previewIndexPath -PathType Leaf)) {
         throw "Snapshot preview index was not generated at '$previewIndexPath'."
     }

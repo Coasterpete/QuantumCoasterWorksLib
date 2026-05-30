@@ -80,7 +80,7 @@ Generated debug viewport outputs include:
 - `artifacts/debug-viewport/snapshot-preview-index.md`
 - `artifacts/debug-viewport/index.html`
 
-Open `artifacts/debug-viewport/snapshot-preview-index.md` first for the generated artifact index/README, including what the JSON, SVG, and HTML files represent. Open `artifacts/debug-viewport/index.html` locally for a simple static gallery of the generated SVG previews.
+Open `artifacts/debug-viewport/snapshot-preview-index.md` first for the generated artifact index/README, including what the JSON, SVG, and HTML files represent. Open `artifacts/debug-viewport/index.html` locally for a static gallery of the generated SVG previews, source JSON/SVG links, and key snapshot metadata.
 
 For optional Blender screenshots or renders from the same JSON snapshots, see `docs/visualization/blender-debug-viewer.md`.
 
@@ -108,6 +108,12 @@ Generate a multi-panel SVG technical preview from a snapshot:
 dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1-svg artifacts/debug-viewport/DebugViewportSnapshotV1.sample.json artifacts/debug-viewport/DebugViewportSnapshotV1.sample.svg
 ```
 
+Generate the static debug viewport gallery:
+
+```powershell
+dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1-gallery artifacts/debug-viewport artifacts/debug-viewport/index.html
+```
+
 Generate backend-only frame continuity diagnostics for a deterministic sample centerline:
 
 ```powershell
@@ -132,6 +138,7 @@ Generated JSON, SVG, Markdown, and HTML under `artifacts/` are local output by d
 - `dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1-from-csv <inputCsvPath> [outputJsonPath]`: bridge a sampled-frame CSV fixture to `DebugViewportSnapshotV1` JSON.
 - `dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1-validate <snapshotJsonPath>`: validate and summarize a snapshot JSON file.
 - `dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1-svg <snapshotJsonPath> [outputSvgPath]`: write a multi-panel backend-only SVG preview from snapshot JSON.
+- `dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1-gallery [artifactDirectory] [outputHtmlPath]`: write a static HTML gallery for generated DebugViewportSnapshotV1 JSON and SVG artifacts.
 - `dotnet run --project Quantum.Debug -- longitudinal-force-preview [preset] [outputPath]`: write force preview diagnostics with `soft`, `balanced`, or `punchy` presets.
 - `dotnet run --project Quantum.Debug -- longitudinal-speed-preview [preset] [outputPath] [initialSpeedMps]`: write speed preview diagnostics with `soft`, `balanced`, or `punchy` presets.
 - `dotnet run --project Quantum.Debug -- centerline-frame-continuity [outputPath]`: write backend-only JSON diagnostics for frame continuity on a deterministic sample centerline.
