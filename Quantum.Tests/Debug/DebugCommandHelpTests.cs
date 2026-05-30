@@ -24,9 +24,12 @@ public sealed class DebugCommandHelpTests
         Assert.Contains("Commands:", output);
         Assert.Contains("debug-viewport-snapshot-v1-from-csv <inputCsvPath> [outputJsonPath]", output);
         Assert.Contains("debug-viewport-snapshot-v1-gallery [artifactDirectory] [outputHtmlPath]", output);
+        Assert.Contains("debug-viewport-snapshot-v1-browser [artifactDirectory] [outputHtmlPath]", output);
         Assert.Contains("centerline-frame-continuity [outputPath]", output);
         Assert.Contains("Examples:", output);
         Assert.Contains(DebugCommandHelp.GeneratedArtifactsNote, output);
+        Assert.Contains("Geometry Interchange Roadmap:", output);
+        Assert.Contains(DebugCommandHelp.GeometryInterchangeRoadmapNote, output);
     }
 
     [Fact]
@@ -90,6 +93,27 @@ public sealed class DebugCommandHelpTests
     }
 
     [Fact]
+    public void TryWriteRequestedHelp_DebugViewportBrowser_PrintsBrowserViewerDetails()
+    {
+        var writer = new StringWriter(CultureInfo.InvariantCulture);
+
+        bool handled = DebugCommandHelp.TryWriteRequestedHelp(
+            new[] { "help", "debug-viewport-snapshot-v1-browser" },
+            writer,
+            out int exitCode);
+
+        Assert.True(handled);
+        Assert.Equal(0, exitCode);
+
+        string output = writer.ToString();
+        Assert.Contains("debug-viewport-snapshot-v1-browser [artifactDirectory] [outputHtmlPath]", output);
+        Assert.Contains("Defaults to artifacts/debug-viewport", output);
+        Assert.Contains("centerline samples, frame axes, debug lines, train boxes, bogie markers, wheel markers", output);
+        Assert.Contains("backend-only debug aid", output);
+        Assert.Contains("not a final editor, frontend, renderer, or JSON contract change", output);
+    }
+
+    [Fact]
     public void TryWriteRequestedHelp_TrainPoseExportV1_PrintsRegressionSampleDetails()
     {
         var writer = new StringWriter(CultureInfo.InvariantCulture);
@@ -141,6 +165,7 @@ public sealed class DebugCommandHelpTests
         Assert.Contains("Supported commands:", output);
         Assert.Contains("debug-viewport-snapshot-v1 [outputPath]", output);
         Assert.Contains("debug-viewport-snapshot-v1-gallery [artifactDirectory] [outputHtmlPath]", output);
+        Assert.Contains("debug-viewport-snapshot-v1-browser [artifactDirectory] [outputHtmlPath]", output);
         Assert.Contains("longitudinal-speed-preview [preset] [outputPath] [initialSpeedMps]", output);
         Assert.Contains("centerline-frame-continuity [outputPath]", output);
     }

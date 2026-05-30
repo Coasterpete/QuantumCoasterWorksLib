@@ -16,6 +16,9 @@ namespace Quantum.Debug
             "When debug viewport outputs are written under artifacts/debug-viewport, Quantum.Debug refreshes artifacts/debug-viewport/" +
             DebugViewportSnapshotPreviewIndex.FileName + ".";
 
+        public const string GeometryInterchangeRoadmapNote =
+            "Quantum.IO.GeometryInterchange defines backend-only curve interchange data and placeholder unsupported Rhino3dm diagnostics; no rhino3dm/openNURBS dependency is included.";
+
         private static readonly DebugCommandHelpEntry[] CommandEntries =
         {
             new DebugCommandHelpEntry(
@@ -121,6 +124,24 @@ namespace Quantum.Debug
                 {
                     "dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1-gallery",
                     "dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1-gallery artifacts/debug-viewport artifacts/debug-viewport/index.html"
+                }),
+            new DebugCommandHelpEntry(
+                name: DebugViewportSnapshotBrowserCommand.CommandName,
+                usage: "debug-viewport-snapshot-v1-browser [artifactDirectory] [outputHtmlPath]",
+                summary: "Write a self-contained browser inspector for DebugViewportSnapshotV1 JSON artifacts.",
+                arguments: new[]
+                {
+                    "artifactDirectory: Optional directory to scan. Defaults to " +
+                    DebugViewportSnapshotBrowserCommand.DefaultRelativeArtifactDirectory + ".",
+                    "outputHtmlPath: Optional HTML output path. Defaults to artifacts/debug-viewport/" +
+                    DebugViewportSnapshotBrowserCommand.DefaultFileName + ".",
+                    "The viewer embeds local DebugViewportSnapshotV1 JSON, draws centerline samples, frame axes, debug lines, train boxes, bogie markers, wheel markers, and metadata with inline style/script only.",
+                    "This is a backend-only debug aid, not a final editor, frontend, renderer, or JSON contract change."
+                },
+                examples: new[]
+                {
+                    "dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1-browser",
+                    "dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1-browser artifacts/debug-viewport artifacts/debug-viewport/browser.html"
                 }),
             new DebugCommandHelpEntry(
                 name: "longitudinal-force-preview",
@@ -260,6 +281,9 @@ namespace Quantum.Debug
             output.WriteLine();
             output.WriteLine("Artifact note:");
             output.WriteLine("  " + GeneratedArtifactsNote);
+            output.WriteLine();
+            output.WriteLine("Geometry Interchange Roadmap:");
+            output.WriteLine("  " + GeometryInterchangeRoadmapNote);
         }
 
         public static bool TryWriteCommandHelp(string commandName, TextWriter output)

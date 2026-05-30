@@ -37,9 +37,11 @@ public sealed class DebugViewportSnapshotPreviewIndexTests
             Assert.Contains("Directory: `artifacts/debug-viewport`", markdown);
             Assert.Contains("backend/debug-preview artifacts only", markdown);
             Assert.Contains("Static gallery: [`artifacts/debug-viewport/index.html`](index.html)", markdown);
+            Assert.Contains("Browser inspector: [`artifacts/debug-viewport/browser.html`](browser.html)", markdown);
             Assert.Contains("| JSON snapshot | `DebugViewportSnapshotV1` renderer-neutral backend data", markdown);
             Assert.Contains("| SVG preview | Multi-panel technical debug preview", markdown);
             Assert.Contains("| HTML gallery | Static local gallery", markdown);
+            Assert.Contains("| Browser inspector | Static local HTML/SVG/vanilla JavaScript viewer", markdown);
             Assert.Contains("| # | Last Written (UTC) | Represents | Snapshot JSON | SVG Preview |", markdown);
             Assert.Contains("DebugViewportSnapshotV1 snapshot output and its paired backend-only SVG preview.", markdown);
             Assert.Contains("[`artifacts/debug-viewport/Alpha.snapshot.json`](Alpha.snapshot.json)", markdown);

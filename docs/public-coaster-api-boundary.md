@@ -83,6 +83,18 @@ This lane owns coaster train placement semantics:
 Schema and field semantics remain documented in
 `docs/train_pose_export_v1_contract.md`.
 
+### 6) Geometry Interchange Roadmap
+
+`Quantum.IO.GeometryInterchange` is the backend-only holding boundary for future
+external curve import/export adapters. The current surface models external curve
+document metadata, import/export results, control points, degree/order metadata,
+knot vectors, and diagnostics while keeping Rhino/openNURBS out of the direct
+backend dependency graph.
+
+The current `Rhino3dmGeometryAdapter` is a placeholder only. It returns stable
+unsupported diagnostics for import and export until a real rhino3dm/openNURBS
+implementation is intentionally added behind this boundary.
+
 ## Support-Layer Rule
 
 `Quantum.Splines` and `Quantum.Math` remain implementation/support layers. They
