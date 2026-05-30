@@ -140,6 +140,14 @@ namespace Quantum.Debug
             builder.AppendLine("        <select id=\"snapshotSelect\"></select>");
             builder.AppendLine("        <label class=\"field-label\" for=\"fileInput\">Load local JSON</label>");
             builder.AppendLine("        <input id=\"fileInput\" type=\"file\" accept=\"application/json,.json\">");
+            builder.AppendLine("        <section class=\"animation-panel\" aria-labelledby=\"animation-title\">");
+            builder.AppendLine("          <h2 id=\"animation-title\">Animation</h2>");
+            builder.AppendLine("          <div class=\"animation-controls\">");
+            builder.AppendLine("            <button id=\"playPauseButton\" type=\"button\">Play</button>");
+            builder.AppendLine("            <input id=\"timelineSlider\" type=\"range\" min=\"0\" max=\"1000\" step=\"1\" value=\"0\" aria-label=\"Animation timeline\">");
+            builder.AppendLine("          </div>");
+            builder.AppendLine("          <p id=\"timelineReadout\">Animation unavailable</p>");
+            builder.AppendLine("        </section>");
             builder.AppendLine("        <fieldset class=\"layer-list\">");
             builder.AppendLine("          <legend>Layers</legend>");
             AppendLayerToggle(builder, "centerline", "Centerline samples");
@@ -217,6 +225,13 @@ namespace Quantum.Debug
             builder.AppendLine("    .controls { padding: 14px; }");
             builder.AppendLine("    .field-label { display: block; margin: 0 0 6px; color: #334155; font-size: 13px; font-weight: 700; }");
             builder.AppendLine("    select, input[type=file] { width: 100%; min-height: 36px; margin: 0 0 14px; font: 13px Segoe UI, Arial, sans-serif; }");
+            builder.AppendLine("    button { min-height: 34px; padding: 6px 12px; border: 1px solid #0f766e; border-radius: 8px; color: #ffffff; background: #0f766e; font: 700 13px Segoe UI, Arial, sans-serif; cursor: pointer; }");
+            builder.AppendLine("    button:disabled { border-color: #cbd5e1; color: #64748b; background: #f1f5f9; cursor: not-allowed; }");
+            builder.AppendLine("    .animation-panel { margin: 0 0 14px; padding: 10px 12px 12px; border: 1px solid #d8e0eb; border-radius: 8px; }");
+            builder.AppendLine("    .animation-panel h2 { margin-bottom: 9px; color: #334155; font-size: 13px; }");
+            builder.AppendLine("    .animation-controls { display: flex; gap: 9px; align-items: center; }");
+            builder.AppendLine("    #timelineSlider { flex: 1 1 auto; min-width: 0; margin: 0; accent-color: #0f766e; }");
+            builder.AppendLine("    #timelineReadout { margin: 8px 0 0; color: #526173; font-size: 12px; }");
             builder.AppendLine("    .layer-list { margin: 0 0 14px; padding: 10px 12px 12px; border: 1px solid #d8e0eb; border-radius: 8px; }");
             builder.AppendLine("    .layer-list legend { padding: 0 5px; color: #334155; font-size: 13px; font-weight: 700; }");
             builder.AppendLine("    .layer-list label { display: flex; align-items: center; gap: 8px; min-height: 28px; color: #253244; font-size: 13px; }");
@@ -271,8 +286,15 @@ namespace Quantum.Debug
             builder.AppendLine("      const statusLine = document.getElementById('statusLine');");
             builder.AppendLine("      const viewport = document.getElementById('viewport');");
             builder.AppendLine("      const fileInput = document.getElementById('fileInput');");
+            builder.AppendLine("      const playPauseButton = document.getElementById('playPauseButton');");
+            builder.AppendLine("      const timelineSlider = document.getElementById('timelineSlider');");
+            builder.AppendLine("      const timelineReadout = document.getElementById('timelineReadout');");
             builder.AppendLine("      let currentEntry = null;");
             builder.AppendLine("      let selectedSampleIndex = null;");
+            builder.AppendLine("      let animationProgress = 0;");
+            builder.AppendLine("      let animationPlaying = false;");
+            builder.AppendLine("      let animationFrameHandle = null;");
+            builder.AppendLine("      let lastAnimationTimestamp = null;");
             builder.AppendLine();
             builder.AppendLine("      function asArray(value) { return Array.isArray(value) ? value : []; }");
             builder.AppendLine("      function finite(value, fallback) { const number = Number(value); return Number.isFinite(number) ? number : fallback; }");
@@ -389,6 +411,7 @@ namespace Quantum.Debug
             builder.AppendLine("        return value.toFixed(2) + ' m';");
             builder.AppendLine("      }");
             builder.AppendLine("      function formatNumber(value) { return finite(value, 0).toFixed(3); }");
+            AppendAnimationScript(builder);
             builder.AppendLine("      function markerNormal(samples, index, project) {");
             builder.AppendLine("        const previous = samples[Math.max(0, index - 1)];");
             builder.AppendLine("        const next = samples[Math.min(samples.length - 1, index + 1)];");
@@ -410,6 +433,10 @@ namespace Quantum.Debug
             builder.AppendLine("        asArray(snapshot && snapshot.boxes).forEach(function (box) { boxCorners(box).forEach(function (corner) { points.push(corner); }); });");
             builder.AppendLine("        trainBogies(snapshot).forEach(function (marker) { push(marker.frame && marker.frame.position); });");
             builder.AppendLine("        trainWheels(snapshot).forEach(function (marker) { points.push({ x: marker.x, z: marker.z }); });");
+            builder.AppendLine("        const train = animatedTrain(snapshot, animationProgress);");
+            builder.AppendLine("        train.boxes.forEach(function (box) { boxCorners(box).forEach(function (corner) { points.push(corner); }); });");
+            builder.AppendLine("        train.bogies.forEach(function (marker) { push(marker.frame && marker.frame.position); });");
+            builder.AppendLine("        train.wheels.forEach(function (marker) { points.push({ x: marker.x, z: marker.z }); });");
             builder.AppendLine("        if (points.length === 0) { points.push({ x: -1, z: -1 }, { x: 1, z: 1 }); }");
             builder.AppendLine("        let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;");
             builder.AppendLine("        points.forEach(function (point) { minX = Math.min(minX, point.x); maxX = Math.max(maxX, point.x); minZ = Math.min(minZ, point.z); maxZ = Math.max(maxZ, point.z); });");
@@ -499,18 +526,21 @@ namespace Quantum.Debug
             builder.AppendLine("          group.appendChild(svg('line', { class: 'debug-line ' + kind, x1: start.x.toFixed(1), y1: start.y.toFixed(1), x2: end.x.toFixed(1), y2: end.y.toFixed(1) }));");
             builder.AppendLine("        });");
             builder.AppendLine("      }");
-            builder.AppendLine("      function drawBoxes(group, snapshot, project) {");
-            builder.AppendLine("        asArray(snapshot.boxes).forEach(function (box) {");
+            builder.AppendLine("      function drawBoxes(group, snapshot, project, boxes) {");
+            builder.AppendLine("        const sourceBoxes = boxes || asArray(snapshot.boxes);");
+            builder.AppendLine("        sourceBoxes.forEach(function (box) {");
             builder.AppendLine("          const points = boxCorners(box).map(function (corner) { const p = project.raw(corner); return p.x.toFixed(1) + ',' + p.y.toFixed(1); }).join(' ');");
             builder.AppendLine("          group.appendChild(svg('polygon', { class: 'train-box', points }));");
             builder.AppendLine("          if (box.label) { const p = project.point(box.frame && box.frame.position); appendText(group, p.x + 6, p.y - 6, box.label, 'train-label'); }");
             builder.AppendLine("        });");
             builder.AppendLine("      }");
-            builder.AppendLine("      function drawBogies(group, snapshot, project) {");
-            builder.AppendLine("        trainBogies(snapshot).forEach(function (marker) { const p = project.point(marker.frame.position); group.appendChild(svg('circle', { class: 'bogie-marker', cx: p.x.toFixed(1), cy: p.y.toFixed(1), r: 6 })); });");
+            builder.AppendLine("      function drawBogies(group, snapshot, project, bogies) {");
+            builder.AppendLine("        const sourceBogies = bogies || trainBogies(snapshot);");
+            builder.AppendLine("        sourceBogies.forEach(function (marker) { const p = project.point(marker.frame.position); group.appendChild(svg('circle', { class: 'bogie-marker', cx: p.x.toFixed(1), cy: p.y.toFixed(1), r: 6 })); });");
             builder.AppendLine("      }");
-            builder.AppendLine("      function drawWheels(group, snapshot, project) {");
-            builder.AppendLine("        trainWheels(snapshot).forEach(function (marker) { const p = project.point(marker); group.appendChild(svg('circle', { class: 'wheel-marker', cx: p.x.toFixed(1), cy: p.y.toFixed(1), r: 3.5 })); });");
+            builder.AppendLine("      function drawWheels(group, snapshot, project, wheels) {");
+            builder.AppendLine("        const sourceWheels = wheels || trainWheels(snapshot);");
+            builder.AppendLine("        sourceWheels.forEach(function (marker) { const p = project.point(marker); group.appendChild(svg('circle', { class: 'wheel-marker', cx: p.x.toFixed(1), cy: p.y.toFixed(1), r: 3.5 })); });");
             builder.AppendLine("      }");
             builder.AppendLine("      function metric(label, value) {");
             builder.AppendLine("        const dt = document.createElement('dt');");
@@ -582,10 +612,12 @@ namespace Quantum.Debug
             builder.AppendLine("        const bogieCount = trainBogies(snapshot).length;");
             builder.AppendLine("        const wheelCount = trainWheels(snapshot).length;");
             builder.AppendLine("        const distanceLabelCount = distanceMarkerIndexes(distanceSamples(snapshot)).length;");
+            builder.AppendLine("        const trainAnimation = animatedTrain(snapshot, animationProgress);");
             builder.AppendLine("        metric('Source', metadata.sourceFixtureName || entry.sourcePath || '<unspecified>');");
             builder.AppendLine("        metric('Contract', snapshot.contract || '<missing>');");
             builder.AppendLine("        metric('Version', String(snapshot.version));");
             builder.AppendLine("        metric('Units', metadata.units || '<unknown>');");
+            builder.AppendLine("        metric('Animation', trainAnimation.supported ? 'Available' : 'Unavailable');");
             builder.AppendLine("        metric('Centerline', String(asArray(snapshot.centerlinePoints).length));");
             builder.AppendLine("        metric('Distance ticks', String(distanceLabelCount));");
             builder.AppendLine("        metric('Frames', String(asArray(snapshot.frames).length));");
@@ -597,7 +629,7 @@ namespace Quantum.Debug
             builder.AppendLine("      function render(entry) {");
             builder.AppendLine("        const entryChanged = currentEntry !== entry;");
             builder.AppendLine("        currentEntry = entry;");
-            builder.AppendLine("        if (entryChanged) { selectedSampleIndex = null; }");
+            builder.AppendLine("        if (entryChanged) { selectedSampleIndex = null; animationProgress = 0; stopAnimationClock(); }");
             builder.AppendLine("        viewport.setAttribute('viewBox', '0 0 ' + WIDTH + ' ' + HEIGHT);");
             builder.AppendLine("        clear(viewport);");
             builder.AppendLine("        viewport.appendChild(svg('rect', { class: 'plot-bg', x: 0, y: 0, width: WIDTH, height: HEIGHT }));");
@@ -606,22 +638,25 @@ namespace Quantum.Debug
             builder.AppendLine("        drawGrid(grid);");
             builder.AppendLine("        renderMetadata(entry);");
             builder.AppendLine("        if (!entry || !entry.snapshot) {");
+            builder.AppendLine("          updateAnimationControls(null, null);");
             builder.AppendLine("          renderMeasurement(null, 'None');");
             builder.AppendLine("          appendText(viewport, PAD, PAD + 24, 'No valid DebugViewportSnapshotV1 JSON snapshots are embedded.', 'empty-message');");
             builder.AppendLine("          statusLine.textContent = entry && entry.error ? entry.error : 'No snapshot selected.';");
             builder.AppendLine("          return;");
             builder.AppendLine("        }");
             builder.AppendLine("        const snapshot = entry.snapshot;");
+            builder.AppendLine("        const trainAnimation = animatedTrain(snapshot, animationProgress);");
             builder.AppendLine("        const project = projector(snapshot);");
             builder.AppendLine("        if (layerVisible('debugLines')) { drawDebugLines(viewport, snapshot, project); }");
             builder.AppendLine("        if (layerVisible('centerline')) { drawCenterline(viewport, snapshot, project); }");
             builder.AppendLine("        if (layerVisible('distances')) { drawDistanceMarkers(viewport, snapshot, project); }");
             builder.AppendLine("        if (layerVisible('frames')) { drawFrames(viewport, snapshot, project); }");
-            builder.AppendLine("        if (layerVisible('boxes')) { drawBoxes(viewport, snapshot, project); }");
-            builder.AppendLine("        if (layerVisible('bogies')) { drawBogies(viewport, snapshot, project); }");
-            builder.AppendLine("        if (layerVisible('wheels')) { drawWheels(viewport, snapshot, project); }");
+            builder.AppendLine("        if (layerVisible('boxes')) { drawBoxes(viewport, snapshot, project, trainAnimation.supported ? trainAnimation.boxes : null); }");
+            builder.AppendLine("        if (layerVisible('bogies')) { drawBogies(viewport, snapshot, project, trainAnimation.supported ? trainAnimation.bogies : null); }");
+            builder.AppendLine("        if (layerVisible('wheels')) { drawWheels(viewport, snapshot, project, trainAnimation.supported ? trainAnimation.wheels : null); }");
             builder.AppendLine("        renderSelectedMeasurement(snapshot);");
-            builder.AppendLine("        statusLine.textContent = (entry.label || entry.sourcePath || 'Snapshot') + ' rendered from embedded or local DebugViewportSnapshotV1 JSON.';");
+            builder.AppendLine("        updateAnimationControls(snapshot, trainAnimation);");
+            builder.AppendLine("        statusLine.textContent = (entry.label || entry.sourcePath || 'Snapshot') + ' rendered from embedded or local DebugViewportSnapshotV1 JSON.' + (trainAnimation.supported ? ' Train animation preview is available.' : '');");
             builder.AppendLine("      }");
             builder.AppendLine("      function populateSelect() {");
             builder.AppendLine("        clear(select);");
@@ -637,6 +672,8 @@ namespace Quantum.Debug
             builder.AppendLine("      }");
             builder.AppendLine("      select.addEventListener('change', function () { render(entries[Number(select.value)]); });");
             builder.AppendLine("      document.querySelectorAll('[data-layer]').forEach(function (input) { input.addEventListener('change', function () { render(currentEntry); }); });");
+            builder.AppendLine("      playPauseButton.addEventListener('click', function () { if (animationPlaying) { pauseAnimation(); } else { startAnimation(); } });");
+            builder.AppendLine("      timelineSlider.addEventListener('input', function () { pauseAnimation(); setAnimationProgress(Number(timelineSlider.value) / 1000, true); });");
             builder.AppendLine("      fileInput.addEventListener('change', function () {");
             builder.AppendLine("        const file = fileInput.files && fileInput.files[0];");
             builder.AppendLine("        if (!file) { return; }");
@@ -662,6 +699,267 @@ namespace Quantum.Debug
             builder.AppendLine("      populateSelect();");
             builder.AppendLine("    }());");
             builder.AppendLine("  </script>");
+        }
+
+        private static void AppendAnimationScript(StringBuilder builder)
+        {
+            builder.Append(
+"""
+      function positiveNumber(value) {
+        const number = optionalNumber(value);
+        return number !== null && number > 0 ? number : null;
+      }
+      function firstPositive() {
+        for (let i = 0; i < arguments.length; i += 1) {
+          const value = positiveNumber(arguments[i]);
+          if (value !== null) { return value; }
+        }
+        return 1;
+      }
+      function normalize3(value, fallback) {
+        const vector = vec(value);
+        const length = Math.hypot(vector.x, vector.y, vector.z);
+        if (length < 1e-9) { return fallback; }
+        return { x: vector.x / length, y: vector.y / length, z: vector.z / length };
+      }
+      function lerpNumber(a, b, t) { return a + (b - a) * t; }
+      function lerpVector(a, b, t) {
+        return {
+          x: lerpNumber(a.x, b.x, t),
+          y: lerpNumber(a.y, b.y, t),
+          z: lerpNumber(a.z, b.z, t)
+        };
+      }
+      function directionBetween(a, b, fallback) {
+        return normalize3({ x: b.x - a.x, y: b.y - a.y, z: b.z - a.z }, fallback);
+      }
+      function fallbackBinormal(tangent) {
+        return normalize3({ x: -tangent.z, y: 0, z: tangent.x }, { x: 0, y: 0, z: 1 });
+      }
+      function frameSampleFromFrame(frame, index) {
+        const sample = sampleFromPosition(frame && frame.distance, frame && frame.position, index);
+        if (!sample) { return null; }
+        return {
+          index: sample.index,
+          distance: sample.distance,
+          position: sample.position,
+          tangent: vec(frame && frame.tangent),
+          normal: vec(frame && frame.normal),
+          binormal: vec(frame && frame.binormal),
+          derived: sample.derived
+        };
+      }
+      function resolveFrameSampleDistances(samples) {
+        let cumulative = 0;
+        let previous = null;
+        return samples.map(function (sample) {
+          if (previous) { cumulative += Math.hypot(sample.position.x - previous.x, sample.position.y - previous.y, sample.position.z - previous.z); }
+          previous = sample.position;
+          const value = sample.distance === null ? cumulative : sample.distance;
+          return Object.assign({}, sample, { distance: value, derived: sample.distance === null });
+        });
+      }
+      function normalizeFrameSample(sample, index, samples) {
+        const previous = samples[Math.max(0, index - 1)] || sample;
+        const next = samples[Math.min(samples.length - 1, index + 1)] || sample;
+        const fallbackTangent = directionBetween(previous.position, next.position, { x: 1, y: 0, z: 0 });
+        const tangent = normalize3(sample.tangent, fallbackTangent);
+        const normal = normalize3(sample.normal, { x: 0, y: 1, z: 0 });
+        const binormal = normalize3(sample.binormal, fallbackBinormal(tangent));
+        return Object.assign({}, sample, { tangent, normal, binormal });
+      }
+      function generatedAnimationFrameSamples(snapshot) {
+        const samples = distanceSamples(snapshot);
+        if (samples.length < 2) { return []; }
+        return samples.map(function (sample, index) {
+          const previous = samples[Math.max(0, index - 1)];
+          const next = samples[Math.min(samples.length - 1, index + 1)];
+          const tangent = directionBetween(previous.position, next.position, { x: 1, y: 0, z: 0 });
+          return {
+            index: sample.index,
+            distance: sample.distance,
+            position: sample.position,
+            tangent,
+            normal: { x: 0, y: 1, z: 0 },
+            binormal: fallbackBinormal(tangent),
+            derived: true
+          };
+        });
+      }
+      function animationTrackSamples(snapshot) {
+        const frameSamples = resolveFrameSampleDistances(asArray(snapshot && snapshot.frames).map(frameSampleFromFrame).filter(Boolean));
+        if (frameSamples.length > 1) {
+          return frameSamples.map(function (sample, index) { return normalizeFrameSample(sample, index, frameSamples); });
+        }
+        return generatedAnimationFrameSamples(snapshot);
+      }
+      function animationDistanceRange(samples) {
+        if (samples.length < 2) { return { start: 0, end: 0, length: 0 }; }
+        const start = finite(samples[0].distance, 0);
+        const end = finite(samples[samples.length - 1].distance, start);
+        return { start, end, length: Math.max(0, end - start) };
+      }
+      function wrapTrackDistance(distance, range) {
+        const value = finite(distance, range.start);
+        if (range.length < 1e-9) { return range.start; }
+        const offset = ((value - range.start) % range.length + range.length) % range.length;
+        return range.start + offset;
+      }
+      function interpolateAnimationFrame(samples, distance) {
+        const range = animationDistanceRange(samples);
+        const target = wrapTrackDistance(distance, range);
+        for (let i = 0; i < samples.length - 1; i += 1) {
+          const a = samples[i];
+          const b = samples[i + 1];
+          if (target <= b.distance || i === samples.length - 2) {
+            const span = b.distance - a.distance;
+            const t = span < 1e-9 ? 0 : Math.max(0, Math.min(1, (target - a.distance) / span));
+            const segmentTangent = directionBetween(a.position, b.position, normalize3(a.tangent, { x: 1, y: 0, z: 0 }));
+            const tangent = normalize3(lerpVector(a.tangent, b.tangent, t), segmentTangent);
+            return {
+              distance: target,
+              position: lerpVector(a.position, b.position, t),
+              tangent,
+              normal: normalize3(lerpVector(a.normal, b.normal, t), { x: 0, y: 1, z: 0 }),
+              binormal: normalize3(lerpVector(a.binormal, b.binormal, t), fallbackBinormal(tangent))
+            };
+          }
+        }
+        return samples[samples.length - 1];
+      }
+      function inferBoxSpacing(boxes) {
+        const distances = boxes.map(function (box) { return optionalNumber(box && box.frame && box.frame.distance); }).filter(function (value) { return value !== null; });
+        if (distances.length < 2) { return null; }
+        let total = 0;
+        for (let i = 1; i < distances.length; i += 1) { total += Math.abs(distances[i] - distances[i - 1]); }
+        return total / (distances.length - 1);
+      }
+      function animationTrainLayout(snapshot) {
+        const trainPose = snapshot && snapshot.trainPose;
+        const definition = (trainPose && trainPose.definition) || {};
+        const boxes = asArray(snapshot && snapshot.boxes).filter(function (box) { return !!box && !!box.size; });
+        const cars = asArray(trainPose && trainPose.cars);
+        const definitionCarCount = Math.max(0, Math.floor(finite(definition.carCount, 0)));
+        const carCount = Math.max(boxes.length, cars.length, definitionCarCount);
+        if (carCount <= 0) {
+          return { carCount: 0, boxes, hasBogies: false, carGeometry: { length: 4.5, width: 1.8, height: 2.1 }, carSpacing: 5, bogieSpacing: 2.5, wheelLayout: null };
+        }
+        const firstBox = boxes[0] || {};
+        const geometry = definition.carGeometry || {};
+        const carGeometry = {
+          length: firstPositive(geometry.length, firstBox.size && firstBox.size.length, 4.5),
+          width: firstPositive(geometry.width, firstBox.size && firstBox.size.width, 1.8),
+          height: firstPositive(geometry.height, firstBox.size && firstBox.size.height, 2.1)
+        };
+        const carSpacing = firstPositive(definition.carSpacing, inferBoxSpacing(boxes), carGeometry.length * 1.25);
+        const bogieSpacing = firstPositive(definition.bogieLayout && definition.bogieLayout.bogieSpacing, carGeometry.length * 0.58);
+        const wheelLayout = definition.wheelLayout || null;
+        const hasBogies = cars.length > 0 || !!definition.bogieLayout;
+        return { carCount, boxes, hasBogies, carGeometry, carSpacing, bogieSpacing, wheelLayout };
+      }
+      function animationCarLabel(layout, carIndex) {
+        const box = layout.boxes[carIndex];
+        return box && box.label ? box.label : 'car-' + carIndex;
+      }
+      function wheelOffsets(wheelLayout) {
+        if (!wheelLayout) { return []; }
+        const wheelCount = Math.max(0, Math.floor(finite(wheelLayout.wheelCountPerBogie, 0)));
+        if (wheelCount <= 0) { return []; }
+        const axleCount = Math.ceil(wheelCount / 2);
+        const centeredAxleOffset = (axleCount - 1) * 0.5;
+        const axleSpacing = finite(wheelLayout.axleSpacing, 0);
+        const sideOffsetMagnitude = firstPositive(wheelLayout.wheelWidth, 0.25) * 0.5;
+        const offsets = [];
+        for (let i = 0; i < wheelCount; i += 1) {
+          const axleIndex = Math.floor(i / 2);
+          offsets.push({
+            x: (axleIndex - centeredAxleOffset) * axleSpacing,
+            y: (i % 2 === 0 ? -1 : 1) * sideOffsetMagnitude,
+            z: 0
+          });
+        }
+        return offsets;
+      }
+      function animatedTrain(snapshot, progress) {
+        const samples = animationTrackSamples(snapshot);
+        const layout = animationTrainLayout(snapshot);
+        if (samples.length < 2 || layout.carCount <= 0) {
+          return { supported: false, boxes: [], bogies: [], wheels: [], leadDistance: null, trackStart: 0, trackLength: 0 };
+        }
+        const range = animationDistanceRange(samples);
+        if (range.length < 1e-9) {
+          return { supported: false, boxes: [], bogies: [], wheels: [], leadDistance: null, trackStart: range.start, trackLength: 0 };
+        }
+        const baseLead = optionalNumber(snapshot && snapshot.trainPose && snapshot.trainPose.leadDistance);
+        const leadDistance = (baseLead === null ? range.start : baseLead) + Math.max(0, Math.min(1, finite(progress, 0))) * range.length;
+        const boxes = [];
+        const bogies = [];
+        const wheels = [];
+        const offsets = wheelOffsets(layout.wheelLayout);
+        for (let carIndex = 0; carIndex < layout.carCount; carIndex += 1) {
+          const bodyDistance = leadDistance - carIndex * layout.carSpacing;
+          const bodyFrame = interpolateAnimationFrame(samples, bodyDistance);
+          boxes.push({ role: 'train.body', label: animationCarLabel(layout, carIndex), frame: bodyFrame, size: layout.carGeometry });
+          if (layout.hasBogies) {
+            [
+              { label: 'car ' + carIndex + ' front bogie', distance: bodyDistance + layout.bogieSpacing * 0.5 },
+              { label: 'car ' + carIndex + ' rear bogie', distance: bodyDistance - layout.bogieSpacing * 0.5 }
+            ].forEach(function (bogie) {
+              const bogieFrame = interpolateAnimationFrame(samples, bogie.distance);
+              bogies.push({ label: bogie.label, frame: bogieFrame });
+              offsets.forEach(function (offset) { wheels.push(addLocal(bogieFrame, offset.x, offset.y, offset.z)); });
+            });
+          }
+        }
+        return { supported: true, boxes, bogies, wheels, leadDistance, trackStart: range.start, trackLength: range.length };
+      }
+      function stopAnimationClock() {
+        animationPlaying = false;
+        lastAnimationTimestamp = null;
+        if (animationFrameHandle !== null) {
+          cancelAnimationFrame(animationFrameHandle);
+          animationFrameHandle = null;
+        }
+      }
+      function updateAnimationControls(snapshot, train) {
+        const currentTrain = train || animatedTrain(snapshot, animationProgress);
+        if (!currentTrain.supported) { stopAnimationClock(); }
+        playPauseButton.disabled = !currentTrain.supported;
+        timelineSlider.disabled = !currentTrain.supported;
+        playPauseButton.textContent = animationPlaying ? 'Pause' : 'Play';
+        timelineSlider.value = String(Math.round(animationProgress * 1000));
+        timelineReadout.textContent = currentTrain.supported
+          ? 'Lead ' + formatDistance(wrapTrackDistance(currentTrain.leadDistance, { start: currentTrain.trackStart, end: currentTrain.trackStart + currentTrain.trackLength, length: currentTrain.trackLength })) + ' / loop ' + formatDistance(currentTrain.trackLength)
+          : 'Animation unavailable';
+      }
+      function setAnimationProgress(value, shouldRender) {
+        animationProgress = Math.max(0, Math.min(1, finite(value, 0)));
+        timelineSlider.value = String(Math.round(animationProgress * 1000));
+        if (shouldRender && currentEntry) { render(currentEntry); } else { updateAnimationControls(currentEntry && currentEntry.snapshot, null); }
+      }
+      function stepAnimation(timestamp) {
+        if (!animationPlaying || !currentEntry) { stopAnimationClock(); updateAnimationControls(currentEntry && currentEntry.snapshot, null); return; }
+        if (lastAnimationTimestamp === null) { lastAnimationTimestamp = timestamp; }
+        const elapsed = Math.max(0, timestamp - lastAnimationTimestamp);
+        lastAnimationTimestamp = timestamp;
+        animationProgress = (animationProgress + elapsed / 12000) % 1;
+        timelineSlider.value = String(Math.round(animationProgress * 1000));
+        render(currentEntry);
+        animationFrameHandle = requestAnimationFrame(stepAnimation);
+      }
+      function startAnimation() {
+        const currentTrain = animatedTrain(currentEntry && currentEntry.snapshot, animationProgress);
+        if (!currentTrain.supported) { updateAnimationControls(currentEntry && currentEntry.snapshot, currentTrain); return; }
+        animationPlaying = true;
+        lastAnimationTimestamp = null;
+        updateAnimationControls(currentEntry && currentEntry.snapshot, currentTrain);
+        animationFrameHandle = requestAnimationFrame(stepAnimation);
+      }
+      function pauseAnimation() {
+        stopAnimationClock();
+        updateAnimationControls(currentEntry && currentEntry.snapshot, null);
+      }
+""");
         }
 
         private static string FormatTimestamp(DateTimeOffset value)
