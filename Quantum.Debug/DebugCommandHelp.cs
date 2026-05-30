@@ -106,6 +106,23 @@ namespace Quantum.Debug
                     "dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1-svg artifacts/debug-viewport/DebugViewportSnapshotV1.sample.json artifacts/debug-viewport/DebugViewportSnapshotV1.sample.svg"
                 }),
             new DebugCommandHelpEntry(
+                name: DebugViewportSnapshotGalleryCommand.CommandName,
+                usage: "debug-viewport-snapshot-v1-gallery [artifactDirectory] [outputHtmlPath]",
+                summary: "Write a static HTML gallery for generated DebugViewportSnapshotV1 JSON and SVG artifacts.",
+                arguments: new[]
+                {
+                    "artifactDirectory: Optional directory to scan. Defaults to " +
+                    DebugViewportSnapshotGalleryCommand.DefaultRelativeArtifactDirectory + ".",
+                    "outputHtmlPath: Optional HTML output path. Defaults to artifacts/debug-viewport/" +
+                    DebugViewportSnapshotPreviewIndex.GalleryFileName + ".",
+                    "The gallery reads DebugViewportSnapshotV1 JSON metadata, links source JSON/SVG files, and remains a static local debug artifact."
+                },
+                examples: new[]
+                {
+                    "dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1-gallery",
+                    "dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1-gallery artifacts/debug-viewport artifacts/debug-viewport/index.html"
+                }),
+            new DebugCommandHelpEntry(
                 name: "longitudinal-force-preview",
                 usage: "longitudinal-force-preview [preset] [outputPath]",
                 summary: "Write longitudinal force preview diagnostics.",

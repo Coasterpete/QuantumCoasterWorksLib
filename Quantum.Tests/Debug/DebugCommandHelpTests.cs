@@ -23,6 +23,7 @@ public sealed class DebugCommandHelpTests
         Assert.Contains(DebugCommandHelp.ProjectPurpose, output);
         Assert.Contains("Commands:", output);
         Assert.Contains("debug-viewport-snapshot-v1-from-csv <inputCsvPath> [outputJsonPath]", output);
+        Assert.Contains("debug-viewport-snapshot-v1-gallery [artifactDirectory] [outputHtmlPath]", output);
         Assert.Contains("centerline-frame-continuity [outputPath]", output);
         Assert.Contains("Examples:", output);
         Assert.Contains(DebugCommandHelp.GeneratedArtifactsNote, output);
@@ -66,6 +67,26 @@ public sealed class DebugCommandHelpTests
         string output = writer.ToString();
         Assert.Contains("debug-viewport-snapshot-v1-validate", output);
         Assert.Contains("snapshotJsonPath: Required DebugViewportSnapshotV1 JSON path.", output);
+    }
+
+    [Fact]
+    public void TryWriteRequestedHelp_DebugViewportGallery_PrintsStaticGalleryDetails()
+    {
+        var writer = new StringWriter(CultureInfo.InvariantCulture);
+
+        bool handled = DebugCommandHelp.TryWriteRequestedHelp(
+            new[] { "help", "debug-viewport-snapshot-v1-gallery" },
+            writer,
+            out int exitCode);
+
+        Assert.True(handled);
+        Assert.Equal(0, exitCode);
+
+        string output = writer.ToString();
+        Assert.Contains("debug-viewport-snapshot-v1-gallery [artifactDirectory] [outputHtmlPath]", output);
+        Assert.Contains("Defaults to artifacts/debug-viewport", output);
+        Assert.Contains("links source JSON/SVG files", output);
+        Assert.Contains("static local debug artifact", output);
     }
 
     [Fact]
@@ -119,6 +140,7 @@ public sealed class DebugCommandHelpTests
         Assert.Contains("Unknown command.", output);
         Assert.Contains("Supported commands:", output);
         Assert.Contains("debug-viewport-snapshot-v1 [outputPath]", output);
+        Assert.Contains("debug-viewport-snapshot-v1-gallery [artifactDirectory] [outputHtmlPath]", output);
         Assert.Contains("longitudinal-speed-preview [preset] [outputPath] [initialSpeedMps]", output);
         Assert.Contains("centerline-frame-continuity [outputPath]", output);
     }

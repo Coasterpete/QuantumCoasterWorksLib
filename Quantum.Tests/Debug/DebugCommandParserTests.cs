@@ -80,6 +80,15 @@ public sealed class DebugCommandParserTests
     }
 
     [Fact]
+    public void TryParse_DebugViewportSnapshotV1GalleryCommand_ParsesCaseInsensitive()
+    {
+        bool parsed = DebugCommandParser.TryParse(new[] { "DeBuG-ViEwPoRt-SnApShOt-V1-GaLlErY" }, out DebugCommandKind command);
+
+        Assert.True(parsed);
+        Assert.Equal(DebugCommandKind.DebugViewportSnapshotV1Gallery, command);
+    }
+
+    [Fact]
     public void TryParse_LongitudinalForcePreviewCommand_ParsesCaseInsensitive()
     {
         bool parsed = DebugCommandParser.TryParse(new[] { "LoNgItUdInAl-FoRcE-PrEvIeW" }, out DebugCommandKind command);
