@@ -1,12 +1,13 @@
 # Diagnostic Track Fixtures
 
 Milestone 42 adds a small backend-only fixture library in
-`Quantum.Tests/Diagnostics/DiagnosticTrackFixtures.cs`.
+`Quantum.Debug/DiagnosticTrackFixtures.cs`.
 
 The fixtures are self-authored deterministic `TrackDocument` cases for frame,
-distance, and curvature diagnostics. They are intentionally test assets only:
+distance, and curvature diagnostics. They are intentionally diagnostic assets:
 they do not define new production frame behavior, transported-frame sampling, or
-runtime banking-profile behavior.
+runtime banking-profile behavior. Tests and debug commands use the same fixture
+set so generated diagnostics stay aligned with regression coverage.
 
 ## Fixture Set
 
@@ -40,13 +41,24 @@ orientation deltas. It also carries the existing smoothness and continuity
 reports for both frame sets so tests can check whether transported sampling
 reduces unintended frame jumps without changing scalar evaluator behavior.
 
+`Quantum.Debug` can export the same comparison data as deterministic local JSON:
+
+```powershell
+dotnet run --project Quantum.Debug -- transported-frame-comparison artifacts/frame-comparison/transported-frame-comparison.sample.json
+```
+
+The generated `quantum.transported_frame_comparison_diagnostics` artifact
+contains one report per fixture, with per-sample deltas, summary metrics,
+smoothness metrics, and continuity metrics for both stateless and transported
+frame sets.
+
 Straight fixtures intentionally have zero curvature, so their mathematical radius
 is not finite. Curved fixtures provide non-zero curvature probes with finite
 radius diagnostics.
 
 ## Non-Goals
 
-These fixtures do not:
+These fixtures and exports do not:
 
 - implement transported frame sampling
 - implement `BankingProfile` runtime behavior

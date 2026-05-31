@@ -172,6 +172,18 @@ namespace Quantum.Debug
                 return CenterlineFrameContinuityCommand.Run(outputPath);
             }
 
+            if (command == DebugCommandKind.TransportedFrameComparison)
+            {
+                if (args.Length > 2)
+                {
+                    Console.WriteLine("Usage: transported-frame-comparison [outputPath]");
+                    return 1;
+                }
+
+                string? outputPath = args.Length == 2 ? args[1] : null;
+                return TransportedFrameComparisonCommand.Run(outputPath);
+            }
+
             RunValidation();
             return 0;
         }

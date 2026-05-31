@@ -1,3 +1,4 @@
+using Quantum.Debug;
 using Quantum.Track;
 using SystemMath = System.Math;
 
