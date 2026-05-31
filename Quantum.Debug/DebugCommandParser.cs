@@ -17,7 +17,8 @@ namespace Quantum.Debug
         DebugViewportSnapshotV1Browser,
         LongitudinalForcePreview,
         LongitudinalSpeedPreview,
-        CenterlineFrameContinuity
+        CenterlineFrameContinuity,
+        TransportedFrameComparison
     }
 
     public static class DebugCommandParser
@@ -106,6 +107,12 @@ namespace Quantum.Debug
             if (string.Equals(args[0], "centerline-frame-continuity", StringComparison.OrdinalIgnoreCase))
             {
                 command = DebugCommandKind.CenterlineFrameContinuity;
+                return true;
+            }
+
+            if (string.Equals(args[0], "transported-frame-comparison", StringComparison.OrdinalIgnoreCase))
+            {
+                command = DebugCommandKind.TransportedFrameComparison;
                 return true;
             }
 

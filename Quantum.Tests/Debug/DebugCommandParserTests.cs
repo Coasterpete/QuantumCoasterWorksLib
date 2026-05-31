@@ -125,6 +125,15 @@ public sealed class DebugCommandParserTests
     }
 
     [Fact]
+    public void TryParse_TransportedFrameComparisonCommand_ParsesCaseInsensitive()
+    {
+        bool parsed = DebugCommandParser.TryParse(new[] { "TrAnSpOrTeD-FrAmE-CoMpArIsOn" }, out DebugCommandKind command);
+
+        Assert.True(parsed);
+        Assert.Equal(DebugCommandKind.TransportedFrameComparison, command);
+    }
+
+    [Fact]
     public void TryParse_UnknownCommand_ReturnsFalse()
     {
         bool parsed = DebugCommandParser.TryParse(new[] { "unknown-command" }, out DebugCommandKind command);

@@ -26,6 +26,7 @@ public sealed class DebugCommandHelpTests
         Assert.Contains("debug-viewport-snapshot-v1-gallery [artifactDirectory] [outputHtmlPath]", output);
         Assert.Contains("debug-viewport-snapshot-v1-browser [artifactDirectory] [outputHtmlPath]", output);
         Assert.Contains("centerline-frame-continuity [outputPath]", output);
+        Assert.Contains("transported-frame-comparison [outputPath]", output);
         Assert.Contains("Examples:", output);
         Assert.Contains(DebugCommandHelp.GeneratedArtifactsNote, output);
         Assert.Contains("Geometry Interchange Roadmap:", output);
@@ -156,6 +157,27 @@ public sealed class DebugCommandHelpTests
     }
 
     [Fact]
+    public void TryWriteRequestedHelp_TransportedFrameComparison_PrintsDiagnosticDetails()
+    {
+        var writer = new StringWriter(CultureInfo.InvariantCulture);
+
+        bool handled = DebugCommandHelp.TryWriteRequestedHelp(
+            new[] { "help", "transported-frame-comparison" },
+            writer,
+            out int exitCode);
+
+        Assert.True(handled);
+        Assert.Equal(0, exitCode);
+
+        string output = writer.ToString();
+        Assert.Contains("transported-frame-comparison [outputPath]", output);
+        Assert.Contains("stateless TrackEvaluator frames", output);
+        Assert.Contains("TransportedTrackFrameSampler frames", output);
+        Assert.Contains("per-sample deltas, summary metrics, smoothness metrics, and continuity metrics", output);
+        Assert.Contains("backend-only JSON", output);
+    }
+
+    [Fact]
     public void WriteUnknownCommand_PrintsUnknownCommandAndSupportedCommands()
     {
         var writer = new StringWriter(CultureInfo.InvariantCulture);
@@ -170,5 +192,6 @@ public sealed class DebugCommandHelpTests
         Assert.Contains("debug-viewport-snapshot-v1-browser [artifactDirectory] [outputHtmlPath]", output);
         Assert.Contains("longitudinal-speed-preview [preset] [outputPath] [initialSpeedMps]", output);
         Assert.Contains("centerline-frame-continuity [outputPath]", output);
+        Assert.Contains("transported-frame-comparison [outputPath]", output);
     }
 }

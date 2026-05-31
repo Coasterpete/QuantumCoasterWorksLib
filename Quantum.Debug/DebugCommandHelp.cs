@@ -191,6 +191,23 @@ namespace Quantum.Debug
                 {
                     "dotnet run --project Quantum.Debug -- centerline-frame-continuity",
                     "dotnet run --project Quantum.Debug -- centerline-frame-continuity artifacts/frame-continuity/centerline-frame-continuity.sample.json"
+                }),
+            new DebugCommandHelpEntry(
+                name: "transported-frame-comparison",
+                usage: "transported-frame-comparison [outputPath]",
+                summary: "Write deterministic transported frame comparison diagnostics for the diagnostic fixture set.",
+                arguments: new[]
+                {
+                    "outputPath: Optional JSON output path. Defaults to " +
+                    TransportedFrameComparisonCommand.DefaultRelativeOutputPath + ".",
+                    "The command compares stateless TrackEvaluator frames with TransportedTrackFrameSampler frames over the self-authored diagnostic track fixtures.",
+                    "The output includes per-sample deltas, summary metrics, smoothness metrics, and continuity metrics for both frame sets.",
+                    "The output is backend-only JSON and does not depend on Unity or any renderer."
+                },
+                examples: new[]
+                {
+                    "dotnet run --project Quantum.Debug -- transported-frame-comparison",
+                    "dotnet run --project Quantum.Debug -- transported-frame-comparison artifacts/frame-comparison/transported-frame-comparison.sample.json"
                 })
         };
 
