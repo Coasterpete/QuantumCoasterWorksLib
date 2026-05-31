@@ -32,6 +32,14 @@ runtime banking-profile behavior.
 - can be passed through `TrackFrameSmoothnessDiagnostics` and
   `TrackFrameContinuityDiagnostics` without changing those production contracts
 
+`TransportedFrameComparisonDiagnosticsTests` uses the same fixture distances to
+compare existing stateless `TrackEvaluator` frame sampling against
+`TransportedTrackFrameSampler`. The comparison diagnostic is backend-only and
+records per-station tangent, normal, binormal, frame, roll/twist, and matrix
+orientation deltas. It also carries the existing smoothness and continuity
+reports for both frame sets so tests can check whether transported sampling
+reduces unintended frame jumps without changing scalar evaluator behavior.
+
 Straight fixtures intentionally have zero curvature, so their mathematical radius
 is not finite. Curved fixtures provide non-zero curvature probes with finite
 radius diagnostics.
