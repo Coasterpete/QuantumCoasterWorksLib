@@ -152,6 +152,8 @@ namespace Quantum.Debug
             builder.AppendLine("          <legend>Layers</legend>");
             AppendLayerToggle(builder, "centerline", "Centerline samples");
             AppendLayerToggle(builder, "distances", "Distance labels/ticks");
+            AppendLayerToggle(builder, "curvature", "Curvature/radius diagnostics");
+            AppendLayerToggle(builder, "curvatureColor", "Curvature colorization");
             AppendLayerToggle(builder, "frames", "Frame axes");
             AppendLayerToggle(builder, "debugLines", "Debug lines");
             AppendLayerToggle(builder, "boxes", "Train boxes");
@@ -171,7 +173,7 @@ namespace Quantum.Debug
             builder.AppendLine("        <div class=\"viewport-header\">");
             builder.AppendLine("          <div>");
             builder.AppendLine("            <h2 id=\"viewport-title\">Top-down X/Z Inspection</h2>");
-            builder.AppendLine("            <p id=\"statusLine\">Select a snapshot to render centerline, distance labels, frames, debug lines, train boxes, bogies, and wheels.</p>");
+            builder.AppendLine("            <p id=\"statusLine\">Select a snapshot to render centerline, distance labels, curvature/radius diagnostics, frames, debug lines, train boxes, bogies, and wheels.</p>");
             builder.AppendLine("          </div>");
             builder.AppendLine("          <p class=\"axis-note\">Projection: X/Z top-down, Y available in metadata and raw JSON.</p>");
             builder.AppendLine("        </div>");
@@ -252,6 +254,17 @@ namespace Quantum.Debug
             builder.AppendLine("    .sample-point.is-selected { fill: #0f766e; stroke: #0f172a; stroke-width: 3; }");
             builder.AppendLine("    .distance-tick { stroke: #334155; stroke-width: 1.5; stroke-linecap: round; }");
             builder.AppendLine("    .distance-label { fill: #334155; stroke: #fbfcfe; stroke-width: 3; paint-order: stroke; stroke-linejoin: round; font: 11px Segoe UI, Arial, sans-serif; }");
+            builder.AppendLine("    .curvature-segment { stroke: #64748b; stroke-width: 6; stroke-linecap: round; opacity: 0.58; }");
+            builder.AppendLine("    .curvature-point { fill: #ffffff; stroke: #64748b; stroke-width: 2; cursor: crosshair; opacity: 0.95; }");
+            builder.AppendLine("    .curvature-point.is-hovered { stroke: #d97706; stroke-width: 3; }");
+            builder.AppendLine("    .curvature-point.is-selected { stroke: #0f172a; stroke-width: 3; }");
+            builder.AppendLine("    .curvature-low { stroke: #16a34a; }");
+            builder.AppendLine("    .curvature-moderate { stroke: #eab308; }");
+            builder.AppendLine("    .curvature-high { stroke: #dc2626; }");
+            builder.AppendLine("    .curvature-point.curvature-low { fill: #dcfce7; }");
+            builder.AppendLine("    .curvature-point.curvature-moderate { fill: #fef9c3; }");
+            builder.AppendLine("    .curvature-point.curvature-high { fill: #fee2e2; }");
+            builder.AppendLine("    .radius-label { fill: #7f1d1d; stroke: #fbfcfe; stroke-width: 4; paint-order: stroke; stroke-linejoin: round; font: 12px Segoe UI, Arial, sans-serif; font-weight: 700; }");
             builder.AppendLine("    .frame-tangent { stroke: #2563eb; }");
             builder.AppendLine("    .frame-normal { stroke: #d97706; }");
             builder.AppendLine("    .frame-binormal { stroke: #7c3aed; }");
@@ -368,14 +381,14 @@ namespace Quantum.Debug
             builder.AppendLine("        });");
             builder.AppendLine("        return markers;");
             builder.AppendLine("      }");
-            builder.AppendLine("      function sampleFromPosition(distance, position, index) {");
+            builder.AppendLine("      function sampleFromPosition(distance, position, index, source) {");
             builder.AppendLine("        if (!hasPosition(position)) { return null; }");
-            builder.AppendLine("        return { index: index === undefined ? null : index, distance: optionalNumber(distance), position: vec(position), derived: false };");
+            builder.AppendLine("        return { index: index === undefined ? null : index, distance: optionalNumber(distance), position: vec(position), derived: false, source: source || null };");
             builder.AppendLine("      }");
             builder.AppendLine("      function rawDistanceSamples(snapshot) {");
-            builder.AppendLine("        const centerline = asArray(snapshot && snapshot.centerlinePoints).map(function (point) { return sampleFromPosition(point && point.distance, point && point.position); }).filter(Boolean);");
+            builder.AppendLine("        const centerline = asArray(snapshot && snapshot.centerlinePoints).map(function (point) { return sampleFromPosition(point && point.distance, point && point.position, undefined, point); }).filter(Boolean);");
             builder.AppendLine("        if (centerline.length > 0) { return centerline; }");
-            builder.AppendLine("        return asArray(snapshot && snapshot.frames).map(function (frame) { return sampleFromPosition(frame && frame.distance, frame && frame.position); }).filter(Boolean);");
+            builder.AppendLine("        return asArray(snapshot && snapshot.frames).map(function (frame) { return sampleFromPosition(frame && frame.distance, frame && frame.position, undefined, frame); }).filter(Boolean);");
             builder.AppendLine("      }");
             builder.AppendLine("      function resolveSampleDistances(samples) {");
             builder.AppendLine("        let cumulative = 0;");
@@ -384,15 +397,109 @@ namespace Quantum.Debug
             builder.AppendLine("          if (previous) { cumulative += Math.hypot(sample.position.x - previous.x, sample.position.y - previous.y, sample.position.z - previous.z); }");
             builder.AppendLine("          previous = sample.position;");
             builder.AppendLine("          const value = sample.distance === null ? cumulative : sample.distance;");
-            builder.AppendLine("          return { index: sample.index, distance: value, position: sample.position, derived: sample.distance === null };");
+            builder.AppendLine("          return { index: sample.index, distance: value, position: sample.position, derived: sample.distance === null, source: sample.source || null };");
             builder.AppendLine("        });");
             builder.AppendLine("      }");
             builder.AppendLine("      function distanceSamples(snapshot) {");
             builder.AppendLine("        return resolveSampleDistances(rawDistanceSamples(snapshot));");
             builder.AppendLine("      }");
             builder.AppendLine("      function centerlineInspectionSamples(snapshot) {");
-            builder.AppendLine("        const samples = asArray(snapshot && snapshot.centerlinePoints).map(function (point, index) { return sampleFromPosition(point && point.distance, point && point.position, index); }).filter(Boolean);");
+            builder.AppendLine("        const samples = asArray(snapshot && snapshot.centerlinePoints).map(function (point, index) { return sampleFromPosition(point && point.distance, point && point.position, index, point); }).filter(Boolean);");
             builder.AppendLine("        return resolveSampleDistances(samples);");
+            builder.AppendLine("      }");
+            builder.AppendLine("      function fieldNumber(source, names) {");
+            builder.AppendLine("        if (!source) { return null; }");
+            builder.AppendLine("        for (let i = 0; i < names.length; i += 1) {");
+            builder.AppendLine("          const value = optionalNumber(source[names[i]]);");
+            builder.AppendLine("          if (value !== null) { return value; }");
+            builder.AppendLine("        }");
+            builder.AppendLine("        return null;");
+            builder.AppendLine("      }");
+            builder.AppendLine("      function firstFieldNumber(sources, names) {");
+            builder.AppendLine("        for (let i = 0; i < sources.length; i += 1) {");
+            builder.AppendLine("          const value = fieldNumber(sources[i], names);");
+            builder.AppendLine("          if (value !== null) { return value; }");
+            builder.AppendLine("        }");
+            builder.AppendLine("        return null;");
+            builder.AppendLine("      }");
+            builder.AppendLine("      function radiusFromCurvature(curvature) {");
+            builder.AppendLine("        if (curvature === null || curvature === undefined) { return null; }");
+            builder.AppendLine("        const magnitude = Math.abs(curvature);");
+            builder.AppendLine("        return magnitude > 1e-9 ? 1 / magnitude : Infinity;");
+            builder.AppendLine("      }");
+            builder.AppendLine("      function frameForSample(snapshot, index, distance) {");
+            builder.AppendLine("        const frames = asArray(snapshot && snapshot.frames);");
+            builder.AppendLine("        if (index !== null && index !== undefined && frames[index]) { return frames[index]; }");
+            builder.AppendLine("        const target = optionalNumber(distance);");
+            builder.AppendLine("        if (target === null) { return null; }");
+            builder.AppendLine("        let best = null;");
+            builder.AppendLine("        let bestDelta = Infinity;");
+            builder.AppendLine("        frames.forEach(function (frame) {");
+            builder.AppendLine("          const frameDistance = optionalNumber(frame && frame.distance);");
+            builder.AppendLine("          if (frameDistance === null) { return; }");
+            builder.AppendLine("          const delta = Math.abs(frameDistance - target);");
+            builder.AppendLine("          if (delta < bestDelta) { best = frame; bestDelta = delta; }");
+            builder.AppendLine("        });");
+            builder.AppendLine("        return best;");
+            builder.AppendLine("      }");
+            builder.AppendLine("      function explicitCurvatureForSample(sample, frame) {");
+            builder.AppendLine("        const sampleSource = sample && sample.source;");
+            builder.AppendLine("        const sources = [sampleSource, frame, sampleSource && sampleSource.diagnostics, frame && frame.diagnostics];");
+            builder.AppendLine("        const curvature = firstFieldNumber(sources, ['curvature', 'curvatureMagnitude', 'curvature1PerMeter']);");
+            builder.AppendLine("        const radius = firstFieldNumber(sources, ['radius', 'turnRadius', 'curvatureRadius']);");
+            builder.AppendLine("        if (curvature !== null) {");
+            builder.AppendLine("          const magnitude = Math.abs(curvature);");
+            builder.AppendLine("          const resolvedRadius = radius !== null && Math.abs(radius) > 1e-9 ? Math.abs(radius) : radiusFromCurvature(magnitude);");
+            builder.AppendLine("          return { curvature: magnitude, radius: resolvedRadius, source: 'explicit' };");
+            builder.AppendLine("        }");
+            builder.AppendLine("        if (radius !== null && Math.abs(radius) > 1e-9) {");
+            builder.AppendLine("          return { curvature: 1 / Math.abs(radius), radius: Math.abs(radius), source: 'explicit' };");
+            builder.AppendLine("        }");
+            builder.AppendLine("        return null;");
+            builder.AppendLine("      }");
+            builder.AppendLine("      function subtract3(a, b) { return { x: a.x - b.x, y: a.y - b.y, z: a.z - b.z }; }");
+            builder.AppendLine("      function cross3(a, b) { return { x: a.y * b.z - a.z * b.y, y: a.z * b.x - a.x * b.z, z: a.x * b.y - a.y * b.x }; }");
+            builder.AppendLine("      function length3(value) { return Math.hypot(value.x, value.y, value.z); }");
+            builder.AppendLine("      function triangleCurvature(a, b, c) {");
+            builder.AppendLine("        const ab = subtract3(b, a);");
+            builder.AppendLine("        const bc = subtract3(c, b);");
+            builder.AppendLine("        const ca = subtract3(a, c);");
+            builder.AppendLine("        const abLength = length3(ab);");
+            builder.AppendLine("        const bcLength = length3(bc);");
+            builder.AppendLine("        const caLength = length3(ca);");
+            builder.AppendLine("        const denominator = abLength * bcLength * caLength;");
+            builder.AppendLine("        if (denominator < 1e-9) { return null; }");
+            builder.AppendLine("        const ac = subtract3(c, a);");
+            builder.AppendLine("        const crossLength = length3(cross3(ab, ac));");
+            builder.AppendLine("        const curvature = 2 * crossLength / denominator;");
+            builder.AppendLine("        return Number.isFinite(curvature) ? curvature : null;");
+            builder.AppendLine("      }");
+            builder.AppendLine("      function deriveSampleCurvature(samples, index) {");
+            builder.AppendLine("        if (samples.length < 3) { return null; }");
+            builder.AppendLine("        let leftIndex = index - 1;");
+            builder.AppendLine("        let middleIndex = index;");
+            builder.AppendLine("        let rightIndex = index + 1;");
+            builder.AppendLine("        if (index <= 0) { leftIndex = 0; middleIndex = 1; rightIndex = 2; }");
+            builder.AppendLine("        if (index >= samples.length - 1) { leftIndex = samples.length - 3; middleIndex = samples.length - 2; rightIndex = samples.length - 1; }");
+            builder.AppendLine("        const curvature = triangleCurvature(samples[leftIndex].position, samples[middleIndex].position, samples[rightIndex].position);");
+            builder.AppendLine("        if (curvature === null) { return null; }");
+            builder.AppendLine("        return { curvature, radius: radiusFromCurvature(curvature), source: 'derived' };");
+            builder.AppendLine("      }");
+            builder.AppendLine("      function curvatureInspectionSamples(snapshot) {");
+            builder.AppendLine("        const samples = centerlineInspectionSamples(snapshot);");
+            builder.AppendLine("        return samples.map(function (sample, index) {");
+            builder.AppendLine("          const frame = frameForSample(snapshot, sample.index, sample.distance);");
+            builder.AppendLine("          const diagnostics = explicitCurvatureForSample(sample, frame) || deriveSampleCurvature(samples, index);");
+            builder.AppendLine("          return Object.assign({}, sample, {");
+            builder.AppendLine("            curvature: diagnostics ? diagnostics.curvature : null,");
+            builder.AppendLine("            radius: diagnostics ? diagnostics.radius : null,");
+            builder.AppendLine("            curvatureSource: diagnostics ? diagnostics.source : 'unavailable'");
+            builder.AppendLine("          });");
+            builder.AppendLine("        });");
+            builder.AppendLine("      }");
+            builder.AppendLine("      function sampleByIndexFromSamples(samples, index) {");
+            builder.AppendLine("        if (index === null || index === undefined) { return null; }");
+            builder.AppendLine("        return samples.find(function (sample) { return sample.index === index; }) || null;");
             builder.AppendLine("      }");
             builder.AppendLine("      function distanceMarkerIndexes(samples) {");
             builder.AppendLine("        if (samples.length === 0) { return []; }");
@@ -411,6 +518,39 @@ namespace Quantum.Debug
             builder.AppendLine("        return value.toFixed(2) + ' m';");
             builder.AppendLine("      }");
             builder.AppendLine("      function formatNumber(value) { return finite(value, 0).toFixed(3); }");
+            builder.AppendLine("      function formatCurvature(value) {");
+            builder.AppendLine("        if (value === null || value === undefined || !Number.isFinite(value)) { return '<unavailable>'; }");
+            builder.AppendLine("        const magnitude = Math.abs(value);");
+            builder.AppendLine("        return (magnitude < 0.0001 ? value.toExponential(2) : value.toFixed(4)) + ' 1/m';");
+            builder.AppendLine("      }");
+            builder.AppendLine("      function formatRadius(value) {");
+            builder.AppendLine("        if (value === null || value === undefined) { return '<unavailable>'; }");
+            builder.AppendLine("        if (!Number.isFinite(value)) { return 'straight'; }");
+            builder.AppendLine("        return formatDistance(value);");
+            builder.AppendLine("      }");
+            builder.AppendLine("      function curvatureLevel(curvature) {");
+            builder.AppendLine("        const magnitude = Math.abs(finite(curvature, 0));");
+            builder.AppendLine("        if (magnitude >= 0.05) { return 'high'; }");
+            builder.AppendLine("        if (magnitude >= 0.015) { return 'moderate'; }");
+            builder.AppendLine("        return 'low';");
+            builder.AppendLine("      }");
+            builder.AppendLine("      function curvatureClass(sample) { return 'curvature-' + curvatureLevel(sample && sample.curvature); }");
+            builder.AppendLine("      function curvatureTitle(sample) {");
+            builder.AppendLine("        if (!sample || sample.curvature === null) { return 'curvature unavailable'; }");
+            builder.AppendLine("        return 'curvature ' + formatCurvature(sample.curvature) + ', radius ' + formatRadius(sample.radius) + ' (' + sample.curvatureSource + ')';");
+            builder.AppendLine("      }");
+            builder.AppendLine("      function summarizeCurvature(samples) {");
+            builder.AppendLine("        const available = samples.filter(function (sample) { return sample.curvature !== null; });");
+            builder.AppendLine("        if (available.length === 0) { return 'unavailable'; }");
+            builder.AppendLine("        let maxCurvature = 0;");
+            builder.AppendLine("        let explicitCount = 0;");
+            builder.AppendLine("        available.forEach(function (sample) {");
+            builder.AppendLine("          maxCurvature = Math.max(maxCurvature, Math.abs(sample.curvature));");
+            builder.AppendLine("          if (sample.curvatureSource === 'explicit') { explicitCount += 1; }");
+            builder.AppendLine("        });");
+            builder.AppendLine("        const sourceText = explicitCount > 0 ? explicitCount + ' explicit' : 'derived';");
+            builder.AppendLine("        return available.length + '/' + samples.length + ' samples, max ' + formatCurvature(maxCurvature) + ', min R=' + formatRadius(radiusFromCurvature(maxCurvature)) + ', ' + sourceText;");
+            builder.AppendLine("      }");
             AppendAnimationScript(builder);
             builder.AppendLine("      function markerNormal(samples, index, project) {");
             builder.AppendLine("        const previous = samples[Math.max(0, index - 1)];");
@@ -466,7 +606,7 @@ namespace Quantum.Debug
             builder.AppendLine("        }");
             builder.AppendLine("      }");
             builder.AppendLine("      function drawCenterline(group, snapshot, project) {");
-            builder.AppendLine("        const samples = centerlineInspectionSamples(snapshot);");
+            builder.AppendLine("        const samples = curvatureInspectionSamples(snapshot);");
             builder.AppendLine("        if (samples.length > 1) {");
             builder.AppendLine("          const polyline = samples.map(function (sample) { const p = project.point(sample.position); return p.x.toFixed(1) + ',' + p.y.toFixed(1); }).join(' ');");
             builder.AppendLine("          group.appendChild(svg('polyline', { class: 'centerline-path', points: polyline }));");
@@ -476,7 +616,7 @@ namespace Quantum.Debug
             builder.AppendLine("          const className = 'sample-point inspectable-sample-point' + (selectedSampleIndex === sample.index ? ' is-selected' : '');");
             builder.AppendLine("          const circle = svg('circle', { class: className, 'data-sample-index': String(sample.index), cx: p.x.toFixed(1), cy: p.y.toFixed(1), r: selectedSampleIndex === sample.index ? 6 : 4, tabindex: '0', role: 'button', 'aria-label': 'centerline sample ' + sample.index });");
             builder.AppendLine("          const title = svg('title');");
-            builder.AppendLine("          title.textContent = 'sample ' + sample.index + ' s=' + formatDistance(sample.distance);");
+            builder.AppendLine("          title.textContent = 'sample ' + sample.index + ' s=' + formatDistance(sample.distance) + ', ' + curvatureTitle(sample);");
             builder.AppendLine("          circle.appendChild(title);");
             builder.AppendLine("          wireSampleInspection(circle, sample, snapshot);");
             builder.AppendLine("          group.appendChild(circle);");
@@ -493,6 +633,36 @@ namespace Quantum.Debug
             builder.AppendLine("          group.appendChild(svg('line', { class: 'distance-tick', x1: (p.x - normal.x * tickHalf).toFixed(1), y1: (p.y - normal.y * tickHalf).toFixed(1), x2: (p.x + normal.x * tickHalf).toFixed(1), y2: (p.y + normal.y * tickHalf).toFixed(1) }));");
             builder.AppendLine("          appendText(group, p.x + normal.x * labelOffset, p.y + normal.y * labelOffset - 3, 's=' + formatDistance(sample.distance), 'distance-label');");
             builder.AppendLine("        });");
+            builder.AppendLine("      }");
+            builder.AppendLine("      function drawCurvature(group, snapshot, project) {");
+            builder.AppendLine("        const samples = curvatureInspectionSamples(snapshot);");
+            builder.AppendLine("        const colorize = layerVisible('curvatureColor');");
+            builder.AppendLine("        for (let i = 1; i < samples.length; i += 1) {");
+            builder.AppendLine("          const previous = samples[i - 1];");
+            builder.AppendLine("          const sample = samples[i];");
+            builder.AppendLine("          const start = project.point(previous.position);");
+            builder.AppendLine("          const end = project.point(sample.position);");
+            builder.AppendLine("          const segmentCurvature = Math.max(Math.abs(finite(previous.curvature, 0)), Math.abs(finite(sample.curvature, 0)));");
+            builder.AppendLine("          const className = 'curvature-segment' + (colorize ? ' curvature-' + curvatureLevel(segmentCurvature) : '');");
+            builder.AppendLine("          group.appendChild(svg('line', { class: className, x1: start.x.toFixed(1), y1: start.y.toFixed(1), x2: end.x.toFixed(1), y2: end.y.toFixed(1) }));");
+            builder.AppendLine("        }");
+            builder.AppendLine("        samples.forEach(function (sample) {");
+            builder.AppendLine("          const p = project.point(sample.position);");
+            builder.AppendLine("          const className = 'curvature-point inspectable-sample-point' + (colorize ? ' ' + curvatureClass(sample) : '') + (selectedSampleIndex === sample.index ? ' is-selected' : '');");
+            builder.AppendLine("          const circle = svg('circle', { class: className, 'data-sample-index': String(sample.index), cx: p.x.toFixed(1), cy: p.y.toFixed(1), r: selectedSampleIndex === sample.index ? 6 : 4, tabindex: '0', role: 'button', 'aria-label': 'curvature sample ' + sample.index });");
+            builder.AppendLine("          const title = svg('title');");
+            builder.AppendLine("          title.textContent = 'sample ' + sample.index + ' s=' + formatDistance(sample.distance) + ', ' + curvatureTitle(sample);");
+            builder.AppendLine("          circle.appendChild(title);");
+            builder.AppendLine("          wireSampleInspection(circle, sample, snapshot);");
+            builder.AppendLine("          group.appendChild(circle);");
+            builder.AppendLine("        });");
+            builder.AppendLine("        const selected = sampleByIndexFromSamples(samples, selectedSampleIndex);");
+            builder.AppendLine("        if (selected && selected.curvature !== null) {");
+            builder.AppendLine("          const index = samples.indexOf(selected);");
+            builder.AppendLine("          const p = project.point(selected.position);");
+            builder.AppendLine("          const normal = markerNormal(samples, index, project);");
+            builder.AppendLine("          appendText(group, p.x + normal.x * 32, p.y + normal.y * 32 - 4, 'R=' + formatRadius(selected.radius), 'radius-label');");
+            builder.AppendLine("        }");
             builder.AppendLine("      }");
             builder.AppendLine("      function drawAxis(group, frame, direction, className, project) {");
             builder.AppendLine("        const origin = framePosition(frame);");
@@ -564,6 +734,8 @@ namespace Quantum.Debug
             builder.AppendLine("          measurement('Sample', 'None');");
             builder.AppendLine("          measurement('Station', '<unselected>');");
             builder.AppendLine("          measurement('Position', '<unselected>');");
+            builder.AppendLine("          measurement('Curvature', '<unselected>');");
+            builder.AppendLine("          measurement('Radius', '<unselected>');");
             builder.AppendLine("          return;");
             builder.AppendLine("        }");
             builder.AppendLine("        measurement('Mode', mode);");
@@ -572,10 +744,12 @@ namespace Quantum.Debug
             builder.AppendLine("        measurement('X', formatNumber(sample.position.x));");
             builder.AppendLine("        measurement('Y', formatNumber(sample.position.y));");
             builder.AppendLine("        measurement('Z', formatNumber(sample.position.z));");
+            builder.AppendLine("        measurement('Curvature', formatCurvature(sample.curvature));");
+            builder.AppendLine("        measurement('Radius', formatRadius(sample.radius));");
+            builder.AppendLine("        measurement('Curvature source', sample.curvatureSource || '<unavailable>');");
             builder.AppendLine("      }");
             builder.AppendLine("      function sampleByIndex(snapshot, index) {");
-            builder.AppendLine("        if (index === null || index === undefined) { return null; }");
-            builder.AppendLine("        return centerlineInspectionSamples(snapshot).find(function (sample) { return sample.index === index; }) || null;");
+            builder.AppendLine("        return sampleByIndexFromSamples(curvatureInspectionSamples(snapshot), index);");
             builder.AppendLine("      }");
             builder.AppendLine("      function renderSelectedMeasurement(snapshot) {");
             builder.AppendLine("        const sample = sampleByIndex(snapshot, selectedSampleIndex);");
@@ -583,10 +757,9 @@ namespace Quantum.Debug
             builder.AppendLine("      }");
             builder.AppendLine("      function selectSample(sample, element) {");
             builder.AppendLine("        selectedSampleIndex = sample.index;");
-            builder.AppendLine("        viewport.querySelectorAll('.inspectable-sample-point.is-selected').forEach(function (point) { point.classList.remove('is-selected'); point.setAttribute('r', '4'); });");
-            builder.AppendLine("        element.classList.add('is-selected');");
-            builder.AppendLine("        element.setAttribute('r', '6');");
-            builder.AppendLine("        renderMeasurement(sample, 'Selected');");
+            builder.AppendLine("        render(currentEntry);");
+            builder.AppendLine("        const selected = currentEntry && currentEntry.snapshot ? sampleByIndex(currentEntry.snapshot, selectedSampleIndex) : sample;");
+            builder.AppendLine("        renderMeasurement(selected || sample, 'Selected');");
             builder.AppendLine("        statusLine.textContent = 'Selected centerline sample ' + sample.index + ' at s=' + formatDistance(sample.distance) + '.';");
             builder.AppendLine("      }");
             builder.AppendLine("      function wireSampleInspection(element, sample, snapshot) {");
@@ -613,6 +786,7 @@ namespace Quantum.Debug
             builder.AppendLine("        const wheelCount = trainWheels(snapshot).length;");
             builder.AppendLine("        const distanceLabelCount = distanceMarkerIndexes(distanceSamples(snapshot)).length;");
             builder.AppendLine("        const trainAnimation = animatedTrain(snapshot, animationProgress);");
+            builder.AppendLine("        const curvatureSummary = summarizeCurvature(curvatureInspectionSamples(snapshot));");
             builder.AppendLine("        metric('Source', metadata.sourceFixtureName || entry.sourcePath || '<unspecified>');");
             builder.AppendLine("        metric('Contract', snapshot.contract || '<missing>');");
             builder.AppendLine("        metric('Version', String(snapshot.version));");
@@ -620,6 +794,7 @@ namespace Quantum.Debug
             builder.AppendLine("        metric('Animation', trainAnimation.supported ? 'Available' : 'Unavailable');");
             builder.AppendLine("        metric('Centerline', String(asArray(snapshot.centerlinePoints).length));");
             builder.AppendLine("        metric('Distance ticks', String(distanceLabelCount));");
+            builder.AppendLine("        metric('Curvature', curvatureSummary);");
             builder.AppendLine("        metric('Frames', String(asArray(snapshot.frames).length));");
             builder.AppendLine("        metric('Lines', String(asArray(snapshot.lines).length));");
             builder.AppendLine("        metric('Boxes', String(asArray(snapshot.boxes).length));");
@@ -648,6 +823,7 @@ namespace Quantum.Debug
             builder.AppendLine("        const trainAnimation = animatedTrain(snapshot, animationProgress);");
             builder.AppendLine("        const project = projector(snapshot);");
             builder.AppendLine("        if (layerVisible('debugLines')) { drawDebugLines(viewport, snapshot, project); }");
+            builder.AppendLine("        if (layerVisible('curvature')) { drawCurvature(viewport, snapshot, project); }");
             builder.AppendLine("        if (layerVisible('centerline')) { drawCenterline(viewport, snapshot, project); }");
             builder.AppendLine("        if (layerVisible('distances')) { drawDistanceMarkers(viewport, snapshot, project); }");
             builder.AppendLine("        if (layerVisible('frames')) { drawFrames(viewport, snapshot, project); }");
@@ -1011,7 +1187,7 @@ namespace Quantum.Debug
 
             public string SortKey { get; set; } = string.Empty;
 
-            public DebugViewportSnapshotV1Dto? Snapshot { get; set; }
+            public JsonElement? Snapshot { get; set; }
 
             public string? Error { get; set; }
 
@@ -1028,14 +1204,15 @@ namespace Quantum.Debug
                 try
                 {
                     string json = File.ReadAllText(snapshotFile.FullName);
-                    DebugViewportSnapshotV1Dto dto = DebugViewportSnapshotV1Json.Deserialize(json);
+                    _ = DebugViewportSnapshotV1Json.Deserialize(json);
+                    using JsonDocument document = JsonDocument.Parse(json);
 
                     return new SnapshotBrowserEntry
                     {
                         Label = label,
                         SourcePath = sourcePath,
                         SortKey = CreateSortKey(label, sourcePath),
-                        Snapshot = dto
+                        Snapshot = document.RootElement.Clone()
                     };
                 }
                 catch (Exception ex) when (IsReadOrParseException(ex))

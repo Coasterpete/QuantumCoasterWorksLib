@@ -108,7 +108,8 @@ public sealed class DebugCommandHelpTests
         string output = writer.ToString();
         Assert.Contains("debug-viewport-snapshot-v1-browser [artifactDirectory] [outputHtmlPath]", output);
         Assert.Contains("Defaults to artifacts/debug-viewport", output);
-        Assert.Contains("centerline samples, distance labels/ticks, frame axes, debug lines, train boxes, bogie markers, wheel markers", output);
+        Assert.Contains("centerline samples, distance labels/ticks, curvature/radius diagnostics, frame axes, debug lines, train boxes, bogie markers, wheel markers", output);
+        Assert.Contains("derive deterministic approximate curvature from neighboring centerline samples", output);
         Assert.Contains("sample measurement readout", output);
         Assert.Contains("backend-only debug aid", output);
         Assert.Contains("not a final editor, frontend, renderer, or JSON contract change", output);

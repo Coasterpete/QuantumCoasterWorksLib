@@ -135,7 +135,8 @@ namespace Quantum.Debug
                     DebugViewportSnapshotBrowserCommand.DefaultRelativeArtifactDirectory + ".",
                     "outputHtmlPath: Optional HTML output path. Defaults to artifacts/debug-viewport/" +
                     DebugViewportSnapshotBrowserCommand.DefaultFileName + ".",
-                    "The viewer embeds local DebugViewportSnapshotV1 JSON, draws centerline samples, distance labels/ticks, frame axes, debug lines, train boxes, bogie markers, wheel markers, metadata, and a sample measurement readout with inline style/script only.",
+                    "The viewer embeds local DebugViewportSnapshotV1 JSON, draws centerline samples, distance labels/ticks, curvature/radius diagnostics, frame axes, debug lines, train boxes, bogie markers, wheel markers, metadata, and a sample measurement readout with inline style/script only.",
+                    "Curvature/radius diagnostics use optional per-sample curvature or radius fields when present and otherwise derive deterministic approximate curvature from neighboring centerline samples.",
                     "This is a backend-only debug aid, not a final editor, frontend, renderer, or JSON contract change."
                 },
                 examples: new[]
