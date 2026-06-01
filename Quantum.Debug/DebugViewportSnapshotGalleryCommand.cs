@@ -203,6 +203,7 @@ namespace Quantum.Debug
             builder.AppendLine("    .snapshot-card { min-width: 0; margin: 0; padding: 14px; border: 1px solid #cbd5e1; border-radius: 8px; background: #ffffff; }");
             builder.AppendLine("    .snapshot-card header { display: flex; gap: 12px; align-items: start; justify-content: space-between; margin-bottom: 12px; }");
             builder.AppendLine("    .source-label { margin: 4px 0 0; color: #64748b; font-size: 13px; overflow-wrap: anywhere; }");
+            builder.AppendLine("    .snapshot-description { margin: 8px 0 12px; color: #475569; font-size: 13px; }");
             builder.AppendLine("    .status-pill { flex: 0 0 auto; padding: 3px 8px; border: 1px solid #99f6e4; border-radius: 999px; color: #115e59; background: #f0fdfa; font-size: 12px; font-weight: 700; }");
             builder.AppendLine("    .status-pill.warning { border-color: #fed7aa; color: #9a3412; background: #fff7ed; }");
             builder.AppendLine("    .metadata-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(132px, 1fr)); gap: 8px; margin: 0 0 12px; }");
@@ -250,12 +251,15 @@ namespace Quantum.Debug
             builder.AppendLine("            </div>");
             builder.AppendLine("            <span class=\"" + statusClass + "\">" + Escape(statusText) + "</span>");
             builder.AppendLine("          </header>");
+            builder.AppendLine("          <p class=\"snapshot-description\">" + Escape(entry.Description) + "</p>");
             builder.AppendLine("          <dl class=\"metadata-grid\">");
             AppendMetadataItem(builder, "Contract", metadata.Contract, code: metadata.HasMetadata);
             AppendMetadataItem(builder, "Version", metadata.Version);
             AppendMetadataItem(builder, "Sample count", metadata.SampleCount);
             AppendMetadataItem(builder, "Box count", metadata.BoxCount);
             AppendMetadataItem(builder, "Line count", metadata.LineCount);
+            AppendMetadataItem(builder, "TrainPose", metadata.TrainPosePresence);
+            AppendMetadataItem(builder, "Train cars", metadata.TrainPoseCarCount);
             AppendMetadataItem(builder, "Units", metadata.Units);
             builder.AppendLine("          </dl>");
             builder.AppendLine("          <div class=\"artifact-links\">");
@@ -343,12 +347,14 @@ namespace Quantum.Debug
                 FileInfo? snapshotFile,
                 FileInfo? previewFile,
                 string label,
+                string description,
                 string sortKey,
                 SnapshotGalleryMetadata metadata)
             {
                 SnapshotFile = snapshotFile;
                 PreviewFile = previewFile;
                 Label = label;
+                Description = description;
                 SortKey = sortKey;
                 Metadata = metadata;
             }
@@ -358,6 +364,8 @@ namespace Quantum.Debug
             public FileInfo? PreviewFile { get; }
 
             public string Label { get; }
+
+            public string Description { get; }
 
             public string SortKey { get; }
 
@@ -370,6 +378,7 @@ namespace Quantum.Debug
                     snapshotFile,
                     previewFile,
                     CreateLabel(stem),
+                    CreateDescription(stem),
                     CreateSortKey(stem),
                     SnapshotGalleryMetadata.Read(snapshotFile));
             }
@@ -393,6 +402,11 @@ namespace Quantum.Debug
                     return "Built-in sample";
                 }
 
+                if (string.Equals(stem, "DebugViewportSnapshotV1.banking-profile.sample", StringComparison.OrdinalIgnoreCase))
+                {
+                    return "BankingProfile train-pose sample";
+                }
+
                 if (stem.StartsWith("Milestone7.synthetic.", StringComparison.OrdinalIgnoreCase))
                 {
                     string fixtureName = stem.Substring("Milestone7.synthetic.".Length).Replace('_', ' ');
@@ -402,11 +416,37 @@ namespace Quantum.Debug
                 return stem.Replace('.', ' ').Replace('_', ' ');
             }
 
+            private static string CreateDescription(string stem)
+            {
+                if (string.Equals(stem, "DebugViewportSnapshotV1.sample", StringComparison.OrdinalIgnoreCase))
+                {
+                    return "Built-in backend sample with sampled centerline, stable frames, debug axes, simple train boxes, and nested TrainPoseExportV1.";
+                }
+
+                if (string.Equals(stem, "DebugViewportSnapshotV1.banking-profile.sample", StringComparison.OrdinalIgnoreCase))
+                {
+                    return "Opt-in BankingProfile train-pose snapshot with oriented train boxes and nested TrainPoseExportV1 data for pose inspection.";
+                }
+
+                if (stem.StartsWith("Milestone7.synthetic.", StringComparison.OrdinalIgnoreCase))
+                {
+                    string fixtureName = stem.Substring("Milestone7.synthetic.".Length).Replace('_', ' ');
+                    return "Milestone 7 synthetic " + fixtureName + " CSV fixture converted for centerline and frame preview.";
+                }
+
+                return "DebugViewportSnapshotV1 snapshot output and paired backend-only SVG preview.";
+            }
+
             private static string CreateSortKey(string stem)
             {
                 if (string.Equals(stem, "DebugViewportSnapshotV1.sample", StringComparison.OrdinalIgnoreCase))
                 {
-                    return "0:" + stem;
+                    return "0:0:" + stem;
+                }
+
+                if (string.Equals(stem, "DebugViewportSnapshotV1.banking-profile.sample", StringComparison.OrdinalIgnoreCase))
+                {
+                    return "0:1:" + stem;
                 }
 
                 if (stem.StartsWith("Milestone7.synthetic.", StringComparison.OrdinalIgnoreCase))
@@ -428,7 +468,9 @@ namespace Quantum.Debug
                 string units,
                 string sampleCount,
                 string boxCount,
-                string lineCount)
+                string lineCount,
+                string trainPosePresence,
+                string trainPoseCarCount)
             {
                 HasMetadata = hasMetadata;
                 Contract = contract;
@@ -438,6 +480,8 @@ namespace Quantum.Debug
                 SampleCount = sampleCount;
                 BoxCount = boxCount;
                 LineCount = lineCount;
+                TrainPosePresence = trainPosePresence;
+                TrainPoseCarCount = trainPoseCarCount;
             }
 
             public bool HasMetadata { get; }
@@ -455,6 +499,10 @@ namespace Quantum.Debug
             public string BoxCount { get; }
 
             public string LineCount { get; }
+
+            public string TrainPosePresence { get; }
+
+            public string TrainPoseCarCount { get; }
 
             public static SnapshotGalleryMetadata Read(FileInfo? snapshotFile)
             {
@@ -477,7 +525,9 @@ namespace Quantum.Debug
                         units: string.IsNullOrWhiteSpace(metadata?.Units) ? "<unknown>" : metadata!.Units,
                         sampleCount: ResolveSampleCount(dto, metadata).ToString(CultureInfo.InvariantCulture),
                         boxCount: Count(dto.Boxes).ToString(CultureInfo.InvariantCulture),
-                        lineCount: Count(dto.Lines).ToString(CultureInfo.InvariantCulture));
+                        lineCount: Count(dto.Lines).ToString(CultureInfo.InvariantCulture),
+                        trainPosePresence: dto.TrainPose == null ? "No" : "Yes",
+                        trainPoseCarCount: Count(dto.TrainPose?.Cars).ToString(CultureInfo.InvariantCulture));
                 }
                 catch (Exception ex) when (IsReadOrParseException(ex))
                 {
@@ -495,7 +545,9 @@ namespace Quantum.Debug
                     units: "<unavailable>",
                     sampleCount: "<unavailable>",
                     boxCount: "<unavailable>",
-                    lineCount: "<unavailable>");
+                    lineCount: "<unavailable>",
+                    trainPosePresence: "<unavailable>",
+                    trainPoseCarCount: "<unavailable>");
             }
 
             private static int ResolveSampleCount(
