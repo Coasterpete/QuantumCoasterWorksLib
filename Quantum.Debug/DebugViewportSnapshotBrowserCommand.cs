@@ -786,12 +786,15 @@ namespace Quantum.Debug
             builder.AppendLine("        const wheelCount = trainWheels(snapshot).length;");
             builder.AppendLine("        const distanceLabelCount = distanceMarkerIndexes(distanceSamples(snapshot)).length;");
             builder.AppendLine("        const trainAnimation = animatedTrain(snapshot, animationProgress);");
+            builder.AppendLine("        const trainPoseCarCount = asArray(snapshot.trainPose && snapshot.trainPose.cars).length;");
             builder.AppendLine("        const curvatureSummary = summarizeCurvature(curvatureInspectionSamples(snapshot));");
             builder.AppendLine("        metric('Source', metadata.sourceFixtureName || entry.sourcePath || '<unspecified>');");
             builder.AppendLine("        metric('Contract', snapshot.contract || '<missing>');");
             builder.AppendLine("        metric('Version', String(snapshot.version));");
             builder.AppendLine("        metric('Units', metadata.units || '<unknown>');");
             builder.AppendLine("        metric('Animation', trainAnimation.supported ? 'Available' : 'Unavailable');");
+            builder.AppendLine("        metric('TrainPose', snapshot.trainPose ? 'Present' : 'Absent');");
+            builder.AppendLine("        metric('Train cars', String(trainPoseCarCount));");
             builder.AppendLine("        metric('Centerline', String(asArray(snapshot.centerlinePoints).length));");
             builder.AppendLine("        metric('Distance ticks', String(distanceLabelCount));");
             builder.AppendLine("        metric('Curvature', curvatureSummary);");
@@ -1199,7 +1202,8 @@ namespace Quantum.Debug
                 }
 
                 string sourcePath = ToDisplayPath(Path.GetRelativePath(artifactDirectory, snapshotFile.FullName));
-                string label = CreateLabel(Path.GetFileNameWithoutExtension(snapshotFile.Name));
+                string stem = NormalizeStem(Path.GetFileNameWithoutExtension(snapshotFile.Name));
+                string label = CreateLabel(stem);
 
                 try
                 {
@@ -1211,7 +1215,7 @@ namespace Quantum.Debug
                     {
                         Label = label,
                         SourcePath = sourcePath,
-                        SortKey = CreateSortKey(label, sourcePath),
+                        SortKey = CreateSortKey(stem, sourcePath),
                         Snapshot = document.RootElement.Clone()
                     };
                 }
@@ -1221,22 +1225,32 @@ namespace Quantum.Debug
                     {
                         Label = label,
                         SourcePath = sourcePath,
-                        SortKey = CreateSortKey(label, sourcePath),
+                        SortKey = CreateSortKey(stem, sourcePath),
                         Error = "Skipped " + sourcePath + ": " + ex.Message
                     };
                 }
             }
 
-            private static string CreateLabel(string stem)
+            private static string NormalizeStem(string stem)
             {
                 if (stem.EndsWith(".snapshot", StringComparison.OrdinalIgnoreCase))
                 {
-                    stem = stem.Substring(0, stem.Length - ".snapshot".Length);
+                    return stem.Substring(0, stem.Length - ".snapshot".Length);
                 }
 
+                return stem;
+            }
+
+            private static string CreateLabel(string stem)
+            {
                 if (string.Equals(stem, "DebugViewportSnapshotV1.sample", StringComparison.OrdinalIgnoreCase))
                 {
                     return "Built-in sample";
+                }
+
+                if (string.Equals(stem, "DebugViewportSnapshotV1.banking-profile.sample", StringComparison.OrdinalIgnoreCase))
+                {
+                    return "BankingProfile train-pose sample";
                 }
 
                 if (stem.StartsWith("Milestone7.synthetic.", StringComparison.OrdinalIgnoreCase))
@@ -1248,14 +1262,19 @@ namespace Quantum.Debug
                 return stem.Replace('.', ' ').Replace('_', ' ');
             }
 
-            private static string CreateSortKey(string label, string sourcePath)
+            private static string CreateSortKey(string stem, string sourcePath)
             {
-                if (string.Equals(label, "Built-in sample", StringComparison.OrdinalIgnoreCase))
+                if (string.Equals(stem, "DebugViewportSnapshotV1.sample", StringComparison.OrdinalIgnoreCase))
                 {
-                    return "0:" + sourcePath;
+                    return "0:0:" + sourcePath;
                 }
 
-                if (label.StartsWith("Milestone 7 synthetic ", StringComparison.OrdinalIgnoreCase))
+                if (string.Equals(stem, "DebugViewportSnapshotV1.banking-profile.sample", StringComparison.OrdinalIgnoreCase))
+                {
+                    return "0:1:" + sourcePath;
+                }
+
+                if (stem.StartsWith("Milestone7.synthetic.", StringComparison.OrdinalIgnoreCase))
                 {
                     return "1:" + sourcePath;
                 }

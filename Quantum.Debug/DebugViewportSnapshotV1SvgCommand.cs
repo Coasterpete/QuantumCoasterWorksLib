@@ -14,7 +14,7 @@ namespace Quantum.Debug
         private const double DefaultCanvasWidth = 1120.0;
         private const double DefaultCanvasHeight = 760.0;
         private const double PagePadding = 32.0;
-        private const double HeaderHeight = 124.0;
+        private const double HeaderHeight = 144.0;
         private const double PanelGap = 22.0;
         private const double TopDownPanelHeight = 360.0;
         private const double MinimumWorldSpan = 1.0;
@@ -145,6 +145,8 @@ namespace Quantum.Debug
             AppendPlotGrid(builder, topDownPlotArea);
             AppendTopDownAxisLabels(builder, topDownPlotArea);
             AppendTopDownCenterline(builder, dto, topDownProjection);
+            AppendTopDownDebugLines(builder, dto, topDownProjection);
+            AppendTopDownBoxes(builder, dto, topDownProjection);
             AppendFrameTicks(builder, dto, topDownProjection);
 
             AppendPanelFrame(
@@ -192,6 +194,14 @@ namespace Quantum.Debug
             builder.AppendLine("    .sample-point { fill: #ffffff; stroke: #0f766e; stroke-width: 1.75; }");
             builder.AppendLine("    .tangent-tick { stroke: #2563eb; stroke-width: 1.5; stroke-linecap: round; }");
             builder.AppendLine("    .binormal-tick { stroke: #7c3aed; stroke-width: 1.5; stroke-linecap: round; }");
+            builder.AppendLine("    .debug-line { stroke: #475569; stroke-width: 1.8; stroke-dasharray: 5 4; stroke-linecap: round; opacity: 0.9; }");
+            builder.AppendLine("    .debug-line-kind-tangent { stroke: #2563eb; }");
+            builder.AppendLine("    .debug-line-kind-normal { stroke: #d97706; }");
+            builder.AppendLine("    .debug-line-kind-binormal { stroke: #7c3aed; }");
+            builder.AppendLine("    .train-box { fill: #ccfbf1; fill-opacity: 0.38; stroke: #0f766e; stroke-width: 1.8; stroke-linejoin: round; }");
+            builder.AppendLine("    .train-box-role-train-body, .train-box-role-train-body-banking-profile { fill: #99f6e4; }");
+            builder.AppendLine("    .train-box-forward { stroke: #0f766e; stroke-width: 1.4; stroke-linecap: round; }");
+            builder.AppendLine("    .train-box-label { font: 11px Segoe UI, Arial, sans-serif; fill: #0f766e; stroke: #ffffff; stroke-width: 3; paint-order: stroke; stroke-linejoin: round; }");
             builder.AppendLine("    .baseline { stroke: #94a3b8; stroke-width: 1.25; stroke-dasharray: 5 5; }");
             builder.AppendLine("    .empty-message { font: 14px Segoe UI, Arial, sans-serif; fill: #b91c1c; }");
             builder.AppendLine("  </style>");
@@ -223,7 +233,21 @@ namespace Quantum.Debug
                 " | frames: " +
                 FormatCount(dto.Frames));
 
-            AppendLegend(builder, DefaultCanvasWidth - PagePadding - 300.0, 28.0);
+            AppendText(
+                builder,
+                "metadata",
+                32.0,
+                122.0,
+                "boxes: " +
+                FormatCount(dto.Boxes) +
+                " | debug lines: " +
+                FormatCount(dto.Lines) +
+                " | nested TrainPoseExportV1: " +
+                FormatTrainPosePresence(dto) +
+                " | train cars: " +
+                FormatTrainPoseCarCount(dto));
+
+            AppendLegend(builder, DefaultCanvasWidth - PagePadding - 330.0, 18.0, dto);
         }
 
         private static SvgRect CreatePlotArea(
@@ -406,6 +430,122 @@ namespace Quantum.Debug
             }
         }
 
+        private static void AppendTopDownDebugLines(
+            StringBuilder builder,
+            DebugViewportSnapshotV1Dto dto,
+            TopDownProjection projection)
+        {
+            DebugViewportLineSegmentV1Dto[] lines = dto.Lines ?? Array.Empty<DebugViewportLineSegmentV1Dto>();
+            if (lines.Length == 0)
+            {
+                return;
+            }
+
+            builder.AppendLine("  <g class=\"top-down-debug-lines\" aria-label=\"debug lines\">");
+            for (int i = 0; i < lines.Length; i++)
+            {
+                DebugViewportLineSegmentV1Dto line = lines[i];
+                SvgPoint startPoint = projection.Project(line.Start);
+                SvgPoint endPoint = projection.Project(line.End);
+                string kind = NormalizeCssToken(line.Kind, "unknown");
+                string displayKind = string.IsNullOrWhiteSpace(line.Kind) ? "unknown" : line.Kind;
+
+                builder.AppendLine(
+                    "    <line class=\"debug-line debug-line-kind-" +
+                    kind +
+                    "\" data-kind=\"" +
+                    Escape(displayKind) +
+                    "\" x1=\"" +
+                    Format(startPoint.X) +
+                    "\" y1=\"" +
+                    Format(startPoint.Y) +
+                    "\" x2=\"" +
+                    Format(endPoint.X) +
+                    "\" y2=\"" +
+                    Format(endPoint.Y) +
+                    "\"><title>" +
+                    Escape("debug line: " + displayKind) +
+                    "</title></line>");
+            }
+
+            builder.AppendLine("  </g>");
+        }
+
+        private static void AppendTopDownBoxes(
+            StringBuilder builder,
+            DebugViewportSnapshotV1Dto dto,
+            TopDownProjection projection)
+        {
+            DebugViewportBoxV1Dto[] boxes = dto.Boxes ?? Array.Empty<DebugViewportBoxV1Dto>();
+            if (boxes.Length == 0)
+            {
+                return;
+            }
+
+            builder.AppendLine("  <g class=\"top-down-train-boxes\" aria-label=\"train and debug boxes\">");
+            for (int i = 0; i < boxes.Length; i++)
+            {
+                DebugViewportBoxV1Dto box = boxes[i];
+                TopDownWorldPoint[] corners = GetBoxTopDownCorners(box);
+                string role = string.IsNullOrWhiteSpace(box.Role) ? "box" : box.Role;
+                string label = string.IsNullOrWhiteSpace(box.Label) ? role + " " + i.ToString(CultureInfo.InvariantCulture) : box.Label!;
+                string roleClass = NormalizeCssToken(role, "box");
+
+                builder.Append("    <polygon class=\"train-box train-box-role-");
+                builder.Append(roleClass);
+                builder.Append("\" data-role=\"");
+                builder.Append(Escape(role));
+                builder.Append("\" points=\"");
+                for (int cornerIndex = 0; cornerIndex < corners.Length; cornerIndex++)
+                {
+                    SvgPoint point = projection.Project(corners[cornerIndex]);
+                    AppendPolylinePoint(builder, point, cornerIndex);
+                }
+
+                builder.Append("\"><title>");
+                builder.Append(Escape(label));
+                builder.AppendLine("</title></polygon>");
+
+                AppendBoxForwardLine(builder, box, projection);
+
+                if (!string.IsNullOrWhiteSpace(box.Label))
+                {
+                    SvgPoint labelPoint = projection.Project(box.Frame.Position);
+                    AppendText(builder, "train-box-label", labelPoint.X + 6.0, labelPoint.Y - 6.0, box.Label!);
+                }
+            }
+
+            builder.AppendLine("  </g>");
+        }
+
+        private static void AppendBoxForwardLine(
+            StringBuilder builder,
+            DebugViewportBoxV1Dto box,
+            TopDownProjection projection)
+        {
+            TopDownWorldPoint center = new TopDownWorldPoint(box.Frame.Position.X, box.Frame.Position.Z);
+            TopDownWorldPoint tangent = NormalizeTopDownDirection(
+                box.Frame.Tangent,
+                new TopDownWorldPoint(1.0, 0.0));
+            double halfLength = box.Size.Length * 0.5;
+            TopDownWorldPoint nose = new TopDownWorldPoint(
+                center.X + tangent.X * halfLength,
+                center.Z + tangent.Z * halfLength);
+            SvgPoint startPoint = projection.Project(center);
+            SvgPoint endPoint = projection.Project(nose);
+
+            builder.AppendLine(
+                "    <line class=\"train-box-forward\" x1=\"" +
+                Format(startPoint.X) +
+                "\" y1=\"" +
+                Format(startPoint.Y) +
+                "\" x2=\"" +
+                Format(endPoint.X) +
+                "\" y2=\"" +
+                Format(endPoint.Y) +
+                "\" />");
+        }
+
         private static void AppendAxisTick(
             StringBuilder builder,
             TopDownProjection projection,
@@ -443,7 +583,11 @@ namespace Quantum.Debug
                 "\" />");
         }
 
-        private static void AppendLegend(StringBuilder builder, double x, double y)
+        private static void AppendLegend(
+            StringBuilder builder,
+            double x,
+            double y,
+            DebugViewportSnapshotV1Dto dto)
         {
             builder.AppendLine(
                 "  <g class=\"legend\" transform=\"translate(" +
@@ -451,16 +595,18 @@ namespace Quantum.Debug
                 " " +
                 Format(y) +
                 ")\">");
-            builder.AppendLine("    <rect x=\"0\" y=\"0\" width=\"300\" height=\"96\" rx=\"8\" fill=\"#ffffff\" stroke=\"#cbd5e1\" />");
+            builder.AppendLine("    <rect x=\"0\" y=\"0\" width=\"330\" height=\"116\" rx=\"8\" fill=\"#ffffff\" stroke=\"#cbd5e1\" />");
             builder.AppendLine("    <circle cx=\"31\" cy=\"20\" r=\"3\" fill=\"#ffffff\" stroke=\"#0f766e\" stroke-width=\"1.75\" />");
             builder.AppendLine("    <text x=\"58\" y=\"24\">raw samples / exported points</text>");
             builder.AppendLine("    <line x1=\"14\" y1=\"42\" x2=\"48\" y2=\"42\" stroke=\"#64748b\" stroke-width=\"1.4\" stroke-dasharray=\"5 5\" stroke-linecap=\"round\" />");
             builder.AppendLine("    <text x=\"58\" y=\"46\">raw sampled centerline</text>");
-            builder.AppendLine("    <line x1=\"14\" y1=\"64\" x2=\"48\" y2=\"64\" stroke=\"#0f766e\" stroke-width=\"3.4\" stroke-linecap=\"round\" />");
-            builder.AppendLine("    <text x=\"58\" y=\"68\">smoothed visual preview only</text>");
-            builder.AppendLine("    <line x1=\"14\" y1=\"84\" x2=\"33\" y2=\"84\" stroke=\"#2563eb\" stroke-width=\"1.5\" stroke-linecap=\"round\" />");
-            builder.AppendLine("    <line x1=\"33\" y1=\"84\" x2=\"48\" y2=\"84\" stroke=\"#7c3aed\" stroke-width=\"1.5\" stroke-linecap=\"round\" />");
-            builder.AppendLine("    <text x=\"58\" y=\"88\">frame tangent/binormal ticks</text>");
+            builder.AppendLine("    <line x1=\"14\" y1=\"62\" x2=\"48\" y2=\"62\" stroke=\"#0f766e\" stroke-width=\"3.4\" stroke-linecap=\"round\" />");
+            builder.AppendLine("    <text x=\"58\" y=\"66\">smoothed visual preview only</text>");
+            builder.AppendLine("    <line x1=\"14\" y1=\"82\" x2=\"33\" y2=\"82\" stroke=\"#2563eb\" stroke-width=\"1.5\" stroke-linecap=\"round\" />");
+            builder.AppendLine("    <line x1=\"33\" y1=\"82\" x2=\"48\" y2=\"82\" stroke=\"#7c3aed\" stroke-width=\"1.5\" stroke-linecap=\"round\" />");
+            builder.AppendLine("    <text x=\"58\" y=\"86\">frame ticks / debug lines (" + FormatCount(dto.Lines) + ")</text>");
+            builder.AppendLine("    <rect x=\"17\" y=\"98\" width=\"28\" height=\"10\" fill=\"#ccfbf1\" fill-opacity=\"0.38\" stroke=\"#0f766e\" stroke-width=\"1.4\" />");
+            builder.AppendLine("    <text x=\"58\" y=\"108\">train boxes (" + FormatCount(dto.Boxes) + "), TrainPose: " + FormatTrainPosePresence(dto) + "</text>");
             builder.AppendLine("  </g>");
         }
 
@@ -631,6 +777,86 @@ namespace Quantum.Debug
             return values == null ? "0" : values.Length.ToString(CultureInfo.InvariantCulture);
         }
 
+        private static string FormatTrainPosePresence(DebugViewportSnapshotV1Dto dto)
+        {
+            return dto.TrainPose == null ? "no" : "yes";
+        }
+
+        private static string FormatTrainPoseCarCount(DebugViewportSnapshotV1Dto dto)
+        {
+            return dto.TrainPose?.Cars == null
+                ? "0"
+                : dto.TrainPose.Cars.Length.ToString(CultureInfo.InvariantCulture);
+        }
+
+        private static string NormalizeCssToken(string? value, string fallback)
+        {
+            string source = string.IsNullOrWhiteSpace(value) ? fallback : value!;
+            var builder = new StringBuilder(source.Length);
+            bool previousDash = false;
+
+            for (int i = 0; i < source.Length; i++)
+            {
+                char c = char.ToLowerInvariant(source[i]);
+                bool isTokenCharacter = (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9');
+                if (isTokenCharacter)
+                {
+                    builder.Append(c);
+                    previousDash = false;
+                }
+                else if (!previousDash)
+                {
+                    builder.Append('-');
+                    previousDash = true;
+                }
+            }
+
+            string token = builder.ToString().Trim('-');
+            return token.Length == 0 ? fallback : token;
+        }
+
+        private static TopDownWorldPoint[] GetBoxTopDownCorners(DebugViewportBoxV1Dto box)
+        {
+            TopDownWorldPoint center = new TopDownWorldPoint(box.Frame.Position.X, box.Frame.Position.Z);
+            TopDownWorldPoint tangent = NormalizeTopDownDirection(
+                box.Frame.Tangent,
+                new TopDownWorldPoint(1.0, 0.0));
+            TopDownWorldPoint binormal = NormalizeTopDownDirection(
+                box.Frame.Binormal,
+                new TopDownWorldPoint(-tangent.Z, tangent.X));
+            double halfLength = box.Size.Length * 0.5;
+            double halfWidth = box.Size.Width * 0.5;
+
+            return new[]
+            {
+                new TopDownWorldPoint(
+                    center.X + tangent.X * halfLength + binormal.X * halfWidth,
+                    center.Z + tangent.Z * halfLength + binormal.Z * halfWidth),
+                new TopDownWorldPoint(
+                    center.X + tangent.X * halfLength - binormal.X * halfWidth,
+                    center.Z + tangent.Z * halfLength - binormal.Z * halfWidth),
+                new TopDownWorldPoint(
+                    center.X - tangent.X * halfLength - binormal.X * halfWidth,
+                    center.Z - tangent.Z * halfLength - binormal.Z * halfWidth),
+                new TopDownWorldPoint(
+                    center.X - tangent.X * halfLength + binormal.X * halfWidth,
+                    center.Z - tangent.Z * halfLength + binormal.Z * halfWidth)
+            };
+        }
+
+        private static TopDownWorldPoint NormalizeTopDownDirection(
+            DebugViewportVector3dV1Dto direction,
+            TopDownWorldPoint fallback)
+        {
+            double length = System.Math.Sqrt(direction.X * direction.X + direction.Z * direction.Z);
+            if (length <= 1e-9)
+            {
+                return fallback;
+            }
+
+            return new TopDownWorldPoint(direction.X / length, direction.Z / length);
+        }
+
         private static string Format(double value)
         {
             return value.ToString("0.###", CultureInfo.InvariantCulture);
@@ -693,6 +919,19 @@ namespace Quantum.Debug
             public double Y { get; }
         }
 
+        private readonly struct TopDownWorldPoint
+        {
+            public TopDownWorldPoint(double x, double z)
+            {
+                X = x;
+                Z = z;
+            }
+
+            public double X { get; }
+
+            public double Z { get; }
+        }
+
         private sealed class TopDownProjection
         {
             private readonly double _minX;
@@ -732,6 +971,7 @@ namespace Quantum.Debug
                 IncludeCenterline(dto.CenterlinePoints, ref minX, ref maxX, ref minZ, ref maxZ);
                 IncludeFrames(dto.Frames, ref minX, ref maxX, ref minZ, ref maxZ);
                 IncludeLines(dto.Lines, ref minX, ref maxX, ref minZ, ref maxZ);
+                IncludeBoxes(dto.Boxes, ref minX, ref maxX, ref minZ, ref maxZ);
 
                 if (double.IsPositiveInfinity(minX) || double.IsNegativeInfinity(maxX))
                 {
@@ -755,9 +995,19 @@ namespace Quantum.Debug
 
             public SvgPoint Project(DebugViewportVector3dV1Dto vector)
             {
-                double x = _offsetX + (vector.X - _minX) * _scale;
-                double y = _offsetY + _scaledDepth - (vector.Z - _minZ) * _scale;
-                return new SvgPoint(x, y);
+                return Project(vector.X, vector.Z);
+            }
+
+            public SvgPoint Project(TopDownWorldPoint point)
+            {
+                return Project(point.X, point.Z);
+            }
+
+            private SvgPoint Project(double x, double z)
+            {
+                double projectedX = _offsetX + (x - _minX) * _scale;
+                double projectedY = _offsetY + _scaledDepth - (z - _minZ) * _scale;
+                return new SvgPoint(projectedX, projectedY);
             }
 
             private static void IncludeCenterline(
@@ -815,6 +1065,28 @@ namespace Quantum.Debug
                 }
             }
 
+            private static void IncludeBoxes(
+                DebugViewportBoxV1Dto[]? boxes,
+                ref double minX,
+                ref double maxX,
+                ref double minZ,
+                ref double maxZ)
+            {
+                if (boxes == null)
+                {
+                    return;
+                }
+
+                for (int i = 0; i < boxes.Length; i++)
+                {
+                    TopDownWorldPoint[] corners = GetBoxTopDownCorners(boxes[i]);
+                    for (int cornerIndex = 0; cornerIndex < corners.Length; cornerIndex++)
+                    {
+                        Include(corners[cornerIndex], ref minX, ref maxX, ref minZ, ref maxZ);
+                    }
+                }
+            }
+
             private static void Include(
                 DebugViewportVector3dV1Dto vector,
                 ref double minX,
@@ -826,6 +1098,19 @@ namespace Quantum.Debug
                 maxX = System.Math.Max(maxX, vector.X);
                 minZ = System.Math.Min(minZ, vector.Z);
                 maxZ = System.Math.Max(maxZ, vector.Z);
+            }
+
+            private static void Include(
+                TopDownWorldPoint point,
+                ref double minX,
+                ref double maxX,
+                ref double minZ,
+                ref double maxZ)
+            {
+                minX = System.Math.Min(minX, point.X);
+                maxX = System.Math.Max(maxX, point.X);
+                minZ = System.Math.Min(minZ, point.Z);
+                maxZ = System.Math.Max(maxZ, point.Z);
             }
 
             private static void ExpandDegenerateRange(ref double min, ref double max)

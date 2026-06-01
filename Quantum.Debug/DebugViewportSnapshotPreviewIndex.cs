@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Text;
+using System.Text.Json;
+using Quantum.IO.DebugViewport.V1;
 
 namespace Quantum.Debug
 {
@@ -108,8 +110,8 @@ namespace Quantum.Debug
 
             builder.AppendLine("## Generated Snapshot Pairs");
             builder.AppendLine();
-            builder.AppendLine("| # | Last Written (UTC) | Represents | Snapshot JSON | SVG Preview |");
-            builder.AppendLine("|---:|---|---|---|---|");
+            builder.AppendLine("| # | Last Written (UTC) | Represents | TrainPose | Cars | Snapshot JSON | SVG Preview |");
+            builder.AppendLine("|---:|---|---|---|---:|---|---|");
 
             for (int i = 0; i < entries.Count; i++)
             {
@@ -119,7 +121,11 @@ namespace Quantum.Debug
                 builder.Append(" | `");
                 builder.Append(FormatTimestamp(entry.LastWrittenUtc));
                 builder.Append("` | ");
-                builder.Append(EscapeMarkdownTableText(DescribeEntry(entry)));
+                builder.Append(EscapeMarkdownTableText(entry.Description));
+                builder.Append(" | ");
+                builder.Append(EscapeMarkdownTableText(entry.Metadata.TrainPosePresence));
+                builder.Append(" | ");
+                builder.Append(EscapeMarkdownTableText(entry.Metadata.TrainPoseCarCount));
                 builder.Append(" | ");
                 builder.Append(FormatFileLink(entry.SnapshotFile, relativeBaseDirectory, linkBaseDirectory));
                 builder.Append(" | ");
@@ -150,7 +156,7 @@ namespace Quantum.Debug
             builder.AppendLine("- Browser inspector: [`" + EscapeMarkdownCode(displayBrowserPath) + "`](" + EscapeMarkdownLink(browserLinkPath) + ") - local HTML/SVG/vanilla JavaScript viewer for snapshot JSON layers, distance labels, and sample measurement readouts.");
             builder.AppendLine("- This index: generated map of JSON snapshots, paired SVG previews, and what each artifact is meant to prove.");
             builder.AppendLine("- JSON snapshots: renderer-neutral `DebugViewportSnapshotV1` data for contract validation and optional thin adapters.");
-            builder.AppendLine("- SVG previews: backend-only technical previews for centerline, elevation, raw sample, frame, and simple train-box sanity checks.");
+            builder.AppendLine("- SVG previews: backend-only technical previews for centerline, elevation, raw sample, frame, debug-line, and oriented train-box sanity checks.");
         }
 
         private static void AppendArtifactTypeGuide(StringBuilder builder)
@@ -160,23 +166,21 @@ namespace Quantum.Debug
             builder.AppendLine("| Type | Represents | Use For |");
             builder.AppendLine("|---|---|---|");
             builder.AppendLine("| JSON snapshot | `DebugViewportSnapshotV1` renderer-neutral backend data: sampled centerline points, stable frames, optional debug lines, optional train boxes, and optional embedded `TrainPoseExportV1`. | Contract validation, importer checks, and debug adapter handoff. |");
-            builder.AppendLine("| SVG preview | Multi-panel technical debug preview rendered from one JSON snapshot. It shows top-down X/Z, elevation/profile, raw exported points, raw centerline, frame ticks, and preview-only smoothing. | Fast visual sanity checks without Unity, Unreal, or a frontend. |");
+            builder.AppendLine("| SVG preview | Multi-panel technical debug preview rendered from one JSON snapshot. It shows top-down X/Z, elevation/profile, raw exported points, raw centerline, frame ticks, debug lines, oriented train boxes, and preview-only smoothing. | Fast visual sanity checks without Unity, Unreal, or a frontend. |");
             builder.AppendLine("| HTML gallery | Static local gallery written by `tools/demo-technical-preview-0.1.ps1` that embeds the generated SVG previews and links to their source JSON. | First-pass Technical Preview review of the generated sample set. |");
             builder.AppendLine("| Browser inspector | Static local HTML/SVG/vanilla JavaScript viewer written by `debug-viewport-snapshot-v1-browser`. It embeds snapshot JSON and adds layer toggles for centerline samples, distance labels/ticks, frame axes, debug lines, train boxes, bogie markers, wheel markers, metadata, and sample measurement readouts. | Artifact-first inspection of backend correctness without adding frontend packages or changing contracts. |");
         }
 
-        private static string DescribeEntry(SnapshotPreviewIndexEntry entry)
+        private static string CreateDescription(string stem)
         {
-            string fileName = entry.SnapshotFile?.Name ?? entry.PreviewFile?.Name ?? string.Empty;
-            string stem = Path.GetFileNameWithoutExtension(fileName);
-            if (stem.EndsWith(".snapshot", StringComparison.OrdinalIgnoreCase))
-            {
-                stem = stem.Substring(0, stem.Length - ".snapshot".Length);
-            }
-
             if (string.Equals(stem, "DebugViewportSnapshotV1.sample", StringComparison.OrdinalIgnoreCase))
             {
                 return "Built-in backend sample with sampled centerline, frames, debug axes, simple train boxes, and embedded TrainPoseExportV1.";
+            }
+
+            if (string.Equals(stem, "DebugViewportSnapshotV1.banking-profile.sample", StringComparison.OrdinalIgnoreCase))
+            {
+                return "BankingProfile train-pose sample with oriented train boxes and nested TrainPoseExportV1 from the opt-in BankingProfile pose path.";
             }
 
             if (stem.StartsWith("Milestone7.synthetic.", StringComparison.OrdinalIgnoreCase))
@@ -228,16 +232,48 @@ namespace Quantum.Debug
 
         private static int CompareEntries(SnapshotPreviewIndexEntry left, SnapshotPreviewIndexEntry right)
         {
-            int timestampComparison = left.LastWrittenUtc.CompareTo(right.LastWrittenUtc);
-            if (timestampComparison != 0)
+            int sortComparison = string.Compare(left.SortKey, right.SortKey, StringComparison.OrdinalIgnoreCase);
+            if (sortComparison != 0)
             {
-                return timestampComparison;
+                return sortComparison;
             }
 
-            return string.Compare(
-                left.SortPath,
-                right.SortPath,
-                StringComparison.OrdinalIgnoreCase);
+            int timestampComparison = left.LastWrittenUtc.CompareTo(right.LastWrittenUtc);
+            return timestampComparison != 0
+                ? timestampComparison
+                : string.Compare(left.SortPath, right.SortPath, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static string GetStem(FileInfo? snapshotFile, FileInfo? previewFile)
+        {
+            string fileName = snapshotFile?.Name ?? previewFile?.Name ?? string.Empty;
+            string stem = Path.GetFileNameWithoutExtension(fileName);
+            if (stem.EndsWith(".snapshot", StringComparison.OrdinalIgnoreCase))
+            {
+                stem = stem.Substring(0, stem.Length - ".snapshot".Length);
+            }
+
+            return stem;
+        }
+
+        private static string CreateSortKey(string stem, string sortPath)
+        {
+            if (string.Equals(stem, "DebugViewportSnapshotV1.sample", StringComparison.OrdinalIgnoreCase))
+            {
+                return "0:0:" + sortPath;
+            }
+
+            if (string.Equals(stem, "DebugViewportSnapshotV1.banking-profile.sample", StringComparison.OrdinalIgnoreCase))
+            {
+                return "0:1:" + sortPath;
+            }
+
+            if (stem.StartsWith("Milestone7.synthetic.", StringComparison.OrdinalIgnoreCase))
+            {
+                return "1:" + sortPath;
+            }
+
+            return "2:" + sortPath;
         }
 
         private static string FormatFileLink(FileInfo? file, string displayBaseDirectory, string linkBaseDirectory)
@@ -349,6 +385,10 @@ namespace Quantum.Debug
 
                 LastWrittenUtc = lastWrittenUtc;
                 SortPath = snapshotFile?.FullName ?? previewFile?.FullName ?? string.Empty;
+                string stem = GetStem(snapshotFile, previewFile);
+                Description = CreateDescription(stem);
+                SortKey = CreateSortKey(stem, SortPath);
+                Metadata = SnapshotPreviewIndexMetadata.Read(snapshotFile);
             }
 
             public FileInfo? SnapshotFile { get; }
@@ -359,9 +399,64 @@ namespace Quantum.Debug
 
             public string SortPath { get; }
 
+            public string SortKey { get; }
+
+            public string Description { get; }
+
+            public SnapshotPreviewIndexMetadata Metadata { get; }
+
             private static DateTimeOffset GetLastWriteTimeUtc(FileInfo file)
             {
                 return new DateTimeOffset(file.LastWriteTimeUtc, TimeSpan.Zero);
+            }
+        }
+
+        private sealed class SnapshotPreviewIndexMetadata
+        {
+            private SnapshotPreviewIndexMetadata(string trainPosePresence, string trainPoseCarCount)
+            {
+                TrainPosePresence = trainPosePresence;
+                TrainPoseCarCount = trainPoseCarCount;
+            }
+
+            public string TrainPosePresence { get; }
+
+            public string TrainPoseCarCount { get; }
+
+            public static SnapshotPreviewIndexMetadata Read(FileInfo? snapshotFile)
+            {
+                if (snapshotFile == null)
+                {
+                    return new SnapshotPreviewIndexMetadata("<unavailable>", "<unavailable>");
+                }
+
+                try
+                {
+                    string json = File.ReadAllText(snapshotFile.FullName);
+                    DebugViewportSnapshotV1Dto dto = DebugViewportSnapshotV1Json.Deserialize(json);
+                    return new SnapshotPreviewIndexMetadata(
+                        dto.TrainPose == null ? "no" : "yes",
+                        Count(dto.TrainPose?.Cars).ToString(CultureInfo.InvariantCulture));
+                }
+                catch (Exception ex) when (IsReadOrParseException(ex))
+                {
+                    return new SnapshotPreviewIndexMetadata("<unavailable>", "<unavailable>");
+                }
+            }
+
+            private static int Count<T>(T[]? values)
+            {
+                return values == null ? 0 : values.Length;
+            }
+
+            private static bool IsReadOrParseException(Exception ex)
+            {
+                return ex is IOException ||
+                       ex is UnauthorizedAccessException ||
+                       ex is ArgumentException ||
+                       ex is NotSupportedException ||
+                       ex is JsonException ||
+                       ex is InvalidOperationException;
             }
         }
     }

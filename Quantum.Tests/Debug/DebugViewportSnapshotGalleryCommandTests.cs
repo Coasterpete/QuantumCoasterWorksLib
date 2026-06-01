@@ -45,10 +45,59 @@ public sealed class DebugViewportSnapshotGalleryCommandTests
             Assert.Contains("<dt>Sample count</dt><dd>2</dd>", html);
             Assert.Contains("<dt>Box count</dt><dd>1</dd>", html);
             Assert.Contains("<dt>Line count</dt><dd>3</dd>", html);
+            Assert.Contains("<dt>TrainPose</dt><dd>No</dd>", html);
+            Assert.Contains("<dt>Train cars</dt><dd>0</dd>", html);
             Assert.Contains("href=\"Alpha.snapshot.json\">Source JSON: Alpha.snapshot.json</a>", html);
             Assert.Contains("href=\"Alpha.snapshot.svg\">SVG preview: Alpha.snapshot.svg</a>", html);
             Assert.Contains("<img src=\"Alpha.snapshot.svg\" alt=\"Alpha SVG preview\">", html);
             Assert.Contains("Wrote DebugViewportSnapshotV1 static gallery", writer.ToString());
+        }
+        finally
+        {
+            DeleteDirectoryIfPresent(tempDirectory);
+        }
+    }
+
+    [Fact]
+    public void Run_BankingProfileSample_UsesSpecificLabelDescriptionMetadataAndBuiltInSortGroup()
+    {
+        string tempDirectory = CreateTempDirectoryPath();
+        string artifactDirectory = Path.Combine(tempDirectory, "artifacts", "debug-viewport");
+        string builtInPath = Path.Combine(artifactDirectory, "DebugViewportSnapshotV1.sample.json");
+        string bankingPath = Path.Combine(artifactDirectory, "DebugViewportSnapshotV1.banking-profile.sample.json");
+        string milestonePath = Path.Combine(artifactDirectory, "Milestone7.synthetic.simple_hill.snapshot.json");
+        string galleryPath = Path.Combine(artifactDirectory, DebugViewportSnapshotPreviewIndex.GalleryFileName);
+
+        try
+        {
+            Directory.CreateDirectory(artifactDirectory);
+            File.WriteAllText(
+                builtInPath,
+                DebugViewportSnapshotV1Json.Serialize(DebugViewportSnapshotV1SampleCommand.BuildSample(), indented: true));
+            File.WriteAllText(
+                bankingPath,
+                DebugViewportSnapshotV1Json.Serialize(DebugViewportSnapshotV1BankingProfileSampleCommand.BuildSample(), indented: true));
+            File.WriteAllText(
+                milestonePath,
+                DebugViewportSnapshotV1Json.Serialize(CreateSnapshot(), indented: true));
+
+            int exitCode = DebugViewportSnapshotGalleryCommand.Run(artifactDirectory, galleryPath);
+
+            Assert.Equal(0, exitCode);
+            string html = File.ReadAllText(galleryPath);
+
+            int builtInIndex = html.IndexOf("<h3>Built-in sample</h3>", StringComparison.Ordinal);
+            int bankingIndex = html.IndexOf("<h3>BankingProfile train-pose sample</h3>", StringComparison.Ordinal);
+            int milestoneIndex = html.IndexOf("<h3>Milestone 7 synthetic simple hill</h3>", StringComparison.Ordinal);
+
+            Assert.True(builtInIndex >= 0);
+            Assert.True(bankingIndex > builtInIndex);
+            Assert.True(milestoneIndex > bankingIndex);
+            Assert.Contains(
+                "Opt-in BankingProfile train-pose snapshot with oriented train boxes and nested TrainPoseExportV1 data for pose inspection.",
+                html);
+            Assert.Contains("<dt>TrainPose</dt><dd>Yes</dd>", html);
+            Assert.Contains("<dt>Train cars</dt><dd>3</dd>", html);
         }
         finally
         {

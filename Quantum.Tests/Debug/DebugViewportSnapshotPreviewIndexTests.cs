@@ -42,8 +42,8 @@ public sealed class DebugViewportSnapshotPreviewIndexTests
             Assert.Contains("| SVG preview | Multi-panel technical debug preview", markdown);
             Assert.Contains("| HTML gallery | Static local gallery", markdown);
             Assert.Contains("| Browser inspector | Static local HTML/SVG/vanilla JavaScript viewer", markdown);
-            Assert.Contains("| # | Last Written (UTC) | Represents | Snapshot JSON | SVG Preview |", markdown);
-            Assert.Contains("DebugViewportSnapshotV1 snapshot output and its paired backend-only SVG preview.", markdown);
+            Assert.Contains("| # | Last Written (UTC) | Represents | TrainPose | Cars | Snapshot JSON | SVG Preview |", markdown);
+            Assert.Contains("DebugViewportSnapshotV1 snapshot output and its paired backend-only SVG preview. | no | 0 |", markdown);
             Assert.Contains("[`artifacts/debug-viewport/Alpha.snapshot.json`](Alpha.snapshot.json)", markdown);
             Assert.Contains("[`artifacts/debug-viewport/Alpha.snapshot.svg`](Alpha.snapshot.svg)", markdown);
             Assert.Contains("2026-05-01T12:01:00", markdown);
@@ -106,6 +106,54 @@ public sealed class DebugViewportSnapshotPreviewIndexTests
             Assert.Contains("artifacts/debug-viewport/DebugViewportSnapshotV1.validation.svg", markdown);
             Assert.Contains("Open First", markdown);
             Assert.Contains("Artifact Types", markdown);
+        }
+        finally
+        {
+            DeleteDirectoryIfPresent(tempDirectory);
+        }
+    }
+
+    [Fact]
+    public void WriteIndex_BankingProfileSample_UsesSpecificDescriptionMetadataAndBuiltInSortGroup()
+    {
+        string tempDirectory = CreateTempDirectoryPath();
+        string artifactDirectory = Path.Combine(tempDirectory, "artifacts", "debug-viewport");
+        string builtInPath = Path.Combine(artifactDirectory, "DebugViewportSnapshotV1.sample.json");
+        string bankingPath = Path.Combine(artifactDirectory, "DebugViewportSnapshotV1.banking-profile.sample.json");
+        string milestonePath = Path.Combine(artifactDirectory, "Milestone7.synthetic.simple_hill.snapshot.json");
+        string indexPath = Path.Combine(artifactDirectory, DebugViewportSnapshotPreviewIndex.FileName);
+
+        try
+        {
+            Directory.CreateDirectory(artifactDirectory);
+            File.WriteAllText(
+                builtInPath,
+                DebugViewportSnapshotV1Json.Serialize(DebugViewportSnapshotV1SampleCommand.BuildSample(), indented: true));
+            File.WriteAllText(
+                bankingPath,
+                DebugViewportSnapshotV1Json.Serialize(DebugViewportSnapshotV1BankingProfileSampleCommand.BuildSample(), indented: true));
+            File.WriteAllText(
+                milestonePath,
+                DebugViewportSnapshotV1Json.Serialize(CreateSnapshot(), indented: true));
+            File.SetLastWriteTimeUtc(milestonePath, new DateTime(2026, 5, 1, 12, 0, 0, DateTimeKind.Utc));
+            File.SetLastWriteTimeUtc(bankingPath, new DateTime(2026, 5, 1, 12, 1, 0, DateTimeKind.Utc));
+            File.SetLastWriteTimeUtc(builtInPath, new DateTime(2026, 5, 1, 12, 2, 0, DateTimeKind.Utc));
+
+            DebugViewportSnapshotPreviewIndex.WriteIndex(artifactDirectory, indexPath, tempDirectory);
+
+            string markdown = File.ReadAllText(indexPath);
+            string builtInDescription = "Built-in backend sample with sampled centerline, frames, debug axes, simple train boxes, and embedded TrainPoseExportV1.";
+            string bankingDescription = "BankingProfile train-pose sample with oriented train boxes and nested TrainPoseExportV1 from the opt-in BankingProfile pose path.";
+            string milestoneDescription = "Milestone 7 synthetic simple hill CSV fixture converted to DebugViewportSnapshotV1 for centerline/frame preview.";
+
+            int builtInIndex = markdown.IndexOf(builtInDescription, StringComparison.Ordinal);
+            int bankingIndex = markdown.IndexOf(bankingDescription, StringComparison.Ordinal);
+            int milestoneIndex = markdown.IndexOf(milestoneDescription, StringComparison.Ordinal);
+
+            Assert.True(builtInIndex >= 0);
+            Assert.True(bankingIndex > builtInIndex);
+            Assert.True(milestoneIndex > bankingIndex);
+            Assert.Contains(bankingDescription + " | yes | 3 |", markdown);
         }
         finally
         {

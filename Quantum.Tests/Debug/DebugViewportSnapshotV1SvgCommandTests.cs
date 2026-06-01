@@ -36,12 +36,21 @@ public sealed class DebugViewportSnapshotV1SvgCommandTests
             Assert.Contains("raw samples / exported points", svg);
             Assert.Contains("raw sampled centerline", svg);
             Assert.Contains("smoothed visual preview only", svg);
+            Assert.Contains("boxes: 1 | debug lines: 3 | nested TrainPoseExportV1: no | train cars: 0", svg);
+            Assert.Contains("frame ticks / debug lines (3)", svg);
+            Assert.Contains("train boxes (1), TrainPose: no", svg);
             Assert.Contains("class=\"centerline top-down-centerline raw-centerline\"", svg);
             Assert.Contains("class=\"centerline elevation-centerline raw-centerline\"", svg);
             Assert.Contains("class=\"smooth-preview top-down-smooth-preview\"", svg);
             Assert.Contains("class=\"smooth-preview elevation-smooth-preview\"", svg);
             Assert.Contains("class=\"raw-sample-point sample-point top-down-sample-point\"", svg);
             Assert.Contains("class=\"raw-sample-point sample-point elevation-sample-point\"", svg);
+            Assert.Contains("class=\"debug-line debug-line-kind-tangent\"", svg);
+            Assert.Contains("class=\"debug-line debug-line-kind-normal\"", svg);
+            Assert.Contains("class=\"debug-line debug-line-kind-binormal\"", svg);
+            Assert.Contains("class=\"train-box train-box-role-train-body\"", svg);
+            Assert.Contains("class=\"train-box-forward\"", svg);
+            Assert.Contains("class=\"train-box-label\"", svg);
         }
         finally
         {
@@ -107,13 +116,24 @@ public sealed class DebugViewportSnapshotV1SvgCommandTests
             CreateFrame(distance: 10.0, x: 10.0, z: 0.0)
         };
         DebugLineSegment[] lines = TrackFrameDebugGizmoBuilder.BuildAxes(frames[1], axisLength: 2.0);
+        var boxes = new[]
+        {
+            new DebugViewportBoxSource(
+                role: "train.body",
+                label: "car-0",
+                frame: frames[1],
+                length: 4.0,
+                width: 1.6,
+                height: 1.4)
+        };
 
         return DebugViewportSnapshotV1Mapper.Export(new DebugViewportSnapshotV1Source
         {
             Units = "meters",
             SourceFixtureName = "svg-command-output",
             SampledFrames = frames,
-            Lines = lines
+            Lines = lines,
+            Boxes = boxes
         });
     }
 
