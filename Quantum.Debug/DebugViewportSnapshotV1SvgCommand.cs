@@ -195,9 +195,9 @@ namespace Quantum.Debug
             builder.AppendLine("    .tangent-tick { stroke: #2563eb; stroke-width: 1.5; stroke-linecap: round; }");
             builder.AppendLine("    .binormal-tick { stroke: #7c3aed; stroke-width: 1.5; stroke-linecap: round; }");
             builder.AppendLine("    .debug-line { stroke: #475569; stroke-width: 1.8; stroke-dasharray: 5 4; stroke-linecap: round; opacity: 0.9; }");
-            builder.AppendLine("    .debug-line-kind-tangent { stroke: #2563eb; }");
-            builder.AppendLine("    .debug-line-kind-normal { stroke: #d97706; }");
-            builder.AppendLine("    .debug-line-kind-binormal { stroke: #7c3aed; }");
+            builder.AppendLine("    .debug-line-kind-frame-axis-tangent { stroke: #2563eb; }");
+            builder.AppendLine("    .debug-line-kind-frame-axis-normal { stroke: #d97706; }");
+            builder.AppendLine("    .debug-line-kind-frame-axis-binormal { stroke: #7c3aed; }");
             builder.AppendLine("    .train-box { fill: #ccfbf1; fill-opacity: 0.38; stroke: #0f766e; stroke-width: 1.8; stroke-linejoin: round; }");
             builder.AppendLine("    .train-box-role-train-body, .train-box-role-train-body-banking-profile { fill: #99f6e4; }");
             builder.AppendLine("    .train-box-forward { stroke: #0f766e; stroke-width: 1.4; stroke-linecap: round; }");

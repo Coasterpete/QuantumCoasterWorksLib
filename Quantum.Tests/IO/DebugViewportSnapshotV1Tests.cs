@@ -1,6 +1,10 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Text.Json;
+using System.Text.Json.Nodes;
+using Json.Schema;
+using Quantum.Debug;
 using Quantum.IO.DebugViewport.V1;
 using Quantum.IO.TrainPose.V1;
 using Quantum.Math;
@@ -11,6 +15,8 @@ namespace Quantum.Tests;
 
 public sealed class DebugViewportSnapshotV1Tests
 {
+    private static readonly Lazy<JsonSchema> DebugViewportSnapshotSchema = new(CreateDebugViewportSnapshotSchema);
+
     [Fact]
     public void Export_SetsContractMetadataAndSampledTrackData()
     {
@@ -23,7 +29,7 @@ public sealed class DebugViewportSnapshotV1Tests
         var boxes = new[]
         {
             new DebugViewportBoxSource(
-                role: "train.body",
+                role: DebugViewportSnapshotV1Vocabulary.TrainBodyRole,
                 label: "car-0",
                 frame: frames[1],
                 length: 4.5,
@@ -56,12 +62,12 @@ public sealed class DebugViewportSnapshotV1Tests
         Assert.Equal(1.0, dto.Frames[0].Binormal.Z);
 
         Assert.Equal(3, dto.Lines.Length);
-        Assert.Equal("tangent", dto.Lines[0].Kind);
-        Assert.Equal("normal", dto.Lines[1].Kind);
-        Assert.Equal("binormal", dto.Lines[2].Kind);
+        Assert.Equal(DebugViewportSnapshotV1Vocabulary.FrameAxisTangentKind, dto.Lines[0].Kind);
+        Assert.Equal(DebugViewportSnapshotV1Vocabulary.FrameAxisNormalKind, dto.Lines[1].Kind);
+        Assert.Equal(DebugViewportSnapshotV1Vocabulary.FrameAxisBinormalKind, dto.Lines[2].Kind);
 
         DebugViewportBoxV1Dto box = Assert.Single(dto.Boxes);
-        Assert.Equal("train.body", box.Role);
+        Assert.Equal(DebugViewportSnapshotV1Vocabulary.TrainBodyRole, box.Role);
         Assert.Equal("car-0", box.Label);
         Assert.Equal(4.5, box.Size.Length);
         Assert.Equal(1.8, box.Size.Width);
@@ -96,7 +102,7 @@ public sealed class DebugViewportSnapshotV1Tests
         };
         var boxes = new[]
         {
-            new DebugViewportBoxSource("train.wheel", "wheel-0", frames[0], 0.8, 0.25, 0.8)
+            new DebugViewportBoxSource(DebugViewportSnapshotV1Vocabulary.TrainWheelRole, "wheel-0", frames[0], 0.8, 0.25, 0.8)
         };
         DebugViewportSnapshotV1Dto expected = DebugViewportSnapshotV1Mapper.Export(new DebugViewportSnapshotV1Source
         {
@@ -285,6 +291,139 @@ public sealed class DebugViewportSnapshotV1Tests
                  d.Path == "boxes[0].size.width");
     }
 
+    [Fact]
+    public void SchemaValidation_BuiltInSample_IsValid()
+    {
+        string json = DebugViewportSnapshotV1Json.Serialize(DebugViewportSnapshotV1SampleCommand.BuildSample());
+
+        Assert.True(IsValidAgainstSchema(json));
+    }
+
+    [Theory]
+    [MemberData(
+        nameof(DebugViewportSnapshotV1FixtureTestHelper.Milestone7FixtureData),
+        MemberType = typeof(DebugViewportSnapshotV1FixtureTestHelper))]
+    public void SchemaValidation_CsvDerivedSnapshot_IsValid(CenterlineFrameCsvFixtureSpec fixtureSpec)
+    {
+        DebugViewportSnapshotV1Dto dto = DebugViewportSnapshotV1FixtureTestHelper.BuildSnapshot(fixtureSpec);
+        string json = DebugViewportSnapshotV1Json.Serialize(dto);
+
+        Assert.True(IsValidAgainstSchema(json));
+    }
+
+    [Fact]
+    public void SchemaValidation_BankingProfileSnapshot_IsValid()
+    {
+        string json = DebugViewportSnapshotV1Json.Serialize(
+            DebugViewportSnapshotV1BankingProfileSampleCommand.BuildSample());
+
+        Assert.True(IsValidAgainstSchema(json));
+    }
+
+    [Fact]
+    public void SchemaValidation_RejectsMissingRequiredField()
+    {
+        JsonObject json = ParseJsonObject(DebugViewportSnapshotV1Json.Serialize(CreateValidationSnapshot()));
+        Assert.True(json.Remove("frames"));
+
+        Assert.False(IsValidAgainstSchema(json.ToJsonString()));
+    }
+
+    [Fact]
+    public void SchemaValidation_RejectsUnknownVocabulary()
+    {
+        JsonObject json = ParseJsonObject(DebugViewportSnapshotV1Json.Serialize(CreateValidationSnapshot()));
+        json["boxes"]![0]!["role"] = "renderer.mesh";
+
+        Assert.False(IsValidAgainstSchema(json.ToJsonString()));
+    }
+
+    [Fact]
+    public void Validation_BadFrameOrthonormality_ProducesDiagnostic()
+    {
+        DebugViewportSnapshotV1Dto dto = CreateValidationSnapshot();
+        dto.Frames[0].Normal = new DebugViewportVector3dV1Dto { X = 0.25, Y = 1.0, Z = 0.0 };
+
+        IReadOnlyList<DebugViewportSnapshotV1ValidationDiagnostic> diagnostics =
+            DebugViewportSnapshotV1Validator.Validate(dto);
+
+        Assert.Contains(
+            diagnostics,
+            d => d.Code == DebugViewportSnapshotV1ValidationCode.NonOrthonormalFrame &&
+                 d.Path == "frames[0].tangentNormalDot");
+    }
+
+    [Fact]
+    public void Validation_BadFrameHandedness_ProducesDiagnostic()
+    {
+        DebugViewportSnapshotV1Dto dto = CreateValidationSnapshot();
+        dto.Frames[0].Binormal = new DebugViewportVector3dV1Dto { X = 0.0, Y = 0.0, Z = -1.0 };
+
+        IReadOnlyList<DebugViewportSnapshotV1ValidationDiagnostic> diagnostics =
+            DebugViewportSnapshotV1Validator.Validate(dto);
+
+        Assert.Contains(
+            diagnostics,
+            d => d.Code == DebugViewportSnapshotV1ValidationCode.InvalidFrameHandedness &&
+                 d.Path == "frames[0].handedness");
+    }
+
+    [Fact]
+    public void Validation_UnknownRoleAndKind_ProduceDiagnostics()
+    {
+        DebugViewportSnapshotV1Dto dto = CreateValidationSnapshot();
+        dto.Lines[0].Kind = "legacy.tangent";
+        dto.Boxes[0].Role = "renderer.mesh";
+
+        IReadOnlyList<DebugViewportSnapshotV1ValidationDiagnostic> diagnostics =
+            DebugViewportSnapshotV1Validator.Validate(dto);
+
+        Assert.Contains(
+            diagnostics,
+            d => d.Code == DebugViewportSnapshotV1ValidationCode.UnknownLineKind &&
+                 d.Path == "lines[0].kind");
+        Assert.Contains(
+            diagnostics,
+            d => d.Code == DebugViewportSnapshotV1ValidationCode.UnknownBoxRole &&
+                 d.Path == "boxes[0].role");
+    }
+
+    [Fact]
+    public void Validation_DegenerateLine_ProducesDiagnostic()
+    {
+        DebugViewportSnapshotV1Dto dto = CreateValidationSnapshot();
+        dto.Lines[0].End = new DebugViewportVector3dV1Dto
+        {
+            X = dto.Lines[0].Start.X,
+            Y = dto.Lines[0].Start.Y,
+            Z = dto.Lines[0].Start.Z
+        };
+
+        IReadOnlyList<DebugViewportSnapshotV1ValidationDiagnostic> diagnostics =
+            DebugViewportSnapshotV1Validator.Validate(dto);
+
+        Assert.Contains(
+            diagnostics,
+            d => d.Code == DebugViewportSnapshotV1ValidationCode.DegenerateLineSegment &&
+                 d.Path == "lines[0]");
+    }
+
+    [Fact]
+    public void Validation_InvalidNestedTrainPose_ProducesDiagnostic()
+    {
+        DebugViewportSnapshotV1Dto dto = CreateValidationSnapshot();
+        dto.TrainPose = TrainPoseExportV1Mapper.Export(CreateTrainPose());
+        dto.TrainPose.Cars[0].Body.OriginalBody.Matrix.M14 += 0.25;
+
+        IReadOnlyList<DebugViewportSnapshotV1ValidationDiagnostic> diagnostics =
+            DebugViewportSnapshotV1Validator.Validate(dto);
+
+        Assert.Contains(
+            diagnostics,
+            d => d.Code == DebugViewportSnapshotV1ValidationCode.NestedTrainPoseValidationError &&
+                 d.Path == "trainPose.cars[0].body.originalBody.matrix.m14");
+    }
+
     private static TrainPoseResult CreateTrainPose()
     {
         ExportTrackFrame frame = CreateFrame(distance: 12.0, x: 12.0);
@@ -331,7 +470,7 @@ public sealed class DebugViewportSnapshotV1Tests
         var boxes = new[]
         {
             new DebugViewportBoxSource(
-                role: "train.body",
+                role: DebugViewportSnapshotV1Vocabulary.TrainBodyRole,
                 label: "car-0",
                 frame: frames[1],
                 length: 4.5,
@@ -347,6 +486,39 @@ public sealed class DebugViewportSnapshotV1Tests
             Lines = lines,
             Boxes = boxes
         });
+    }
+
+    private static bool IsValidAgainstSchema(string instanceJson)
+    {
+        using JsonDocument instanceDocument = JsonDocument.Parse(instanceJson);
+
+        EvaluationResults results = DebugViewportSnapshotSchema.Value.Evaluate(
+            instanceDocument.RootElement,
+            new EvaluationOptions
+            {
+                OutputFormat = OutputFormat.List
+            });
+
+        return results.IsValid;
+    }
+
+    private static JsonSchema CreateDebugViewportSnapshotSchema()
+    {
+        string schemaPath = Path.Combine(AppContext.BaseDirectory, "IO", "Fixtures", "DebugViewportSnapshotV1.schema.json");
+        if (!File.Exists(schemaPath))
+        {
+            throw new FileNotFoundException($"Schema file was not found at '{schemaPath}'.", schemaPath);
+        }
+
+        string schemaJson = File.ReadAllText(schemaPath);
+        return JsonSchema.FromText(schemaJson);
+    }
+
+    private static JsonObject ParseJsonObject(string json)
+    {
+        JsonNode? node = JsonNode.Parse(json);
+        Assert.NotNull(node);
+        return Assert.IsType<JsonObject>(node);
     }
 
     private static ExportTrackFrame CreateFrame(double distance, double x)

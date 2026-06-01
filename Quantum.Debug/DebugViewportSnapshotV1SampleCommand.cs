@@ -112,7 +112,7 @@ namespace Quantum.Debug
             {
                 ArticulatedTrainCarTransform body = cars[i].Body;
                 boxes[i] = new DebugViewportBoxSource(
-                    role: "train.body",
+                    role: DebugViewportSnapshotV1Vocabulary.TrainBodyRole,
                     label: "car-" + i,
                     frame: body.ArticulatedFrame,
                     length: geometry.Length,

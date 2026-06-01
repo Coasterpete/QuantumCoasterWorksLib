@@ -212,7 +212,11 @@ def create_materials():
         "tangent": material("Quantum.Tangent", (0.05, 0.35, 1.0, 1.0)),
         "normal": material("Quantum.Normal", (0.1, 0.72, 0.22, 1.0)),
         "binormal": material("Quantum.Binormal", (0.55, 0.25, 0.95, 1.0)),
+        "frame.axis.tangent": material("Quantum.Tangent", (0.05, 0.35, 1.0, 1.0)),
+        "frame.axis.normal": material("Quantum.Normal", (0.1, 0.72, 0.22, 1.0)),
+        "frame.axis.binormal": material("Quantum.Binormal", (0.55, 0.25, 0.95, 1.0)),
         "line": material("Quantum.DebugLine", (1.0, 0.64, 0.08, 1.0)),
+        "diagnostic.line": material("Quantum.DebugLine", (1.0, 0.64, 0.08, 1.0)),
         "box": material("Quantum.BoxPlaceholder", (1.0, 0.72, 0.16, 0.82)),
     }
 

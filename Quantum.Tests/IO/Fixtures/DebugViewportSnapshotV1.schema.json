@@ -1,0 +1,658 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quantumcoasterworks.dev/schemas/debug_viewport_snapshot_v1.schema.json",
+  "title": "DebugViewportSnapshotV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract",
+    "version",
+    "metadata",
+    "centerlinePoints",
+    "frames",
+    "lines",
+    "boxes"
+  ],
+  "properties": {
+    "contract": {
+      "type": "string",
+      "const": "quantum.debug_viewport_snapshot"
+    },
+    "version": {
+      "type": "integer",
+      "const": 1
+    },
+    "metadata": {
+      "$ref": "#/$defs/debugViewportMetadata"
+    },
+    "centerlinePoints": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/debugViewportCenterlinePoint"
+      }
+    },
+    "frames": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/debugViewportFrame"
+      }
+    },
+    "lines": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/debugViewportLineSegment"
+      }
+    },
+    "boxes": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/debugViewportBox"
+      }
+    },
+    "trainPose": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/trainPoseExport"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "$defs": {
+    "debugViewportMetadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "units",
+        "sourceFixtureName",
+        "sampleCount"
+      ],
+      "properties": {
+        "units": {
+          "type": "string"
+        },
+        "sourceFixtureName": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "sampleCount": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "debugViewportCenterlinePoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "distance",
+        "position"
+      ],
+      "properties": {
+        "distance": {
+          "type": "number",
+          "minimum": 0
+        },
+        "position": {
+          "$ref": "#/$defs/debugViewportVector3d"
+        }
+      }
+    },
+    "debugViewportFrame": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "distance",
+        "position",
+        "tangent",
+        "normal",
+        "binormal"
+      ],
+      "properties": {
+        "distance": {
+          "type": "number",
+          "minimum": 0
+        },
+        "position": {
+          "$ref": "#/$defs/debugViewportVector3d"
+        },
+        "tangent": {
+          "$ref": "#/$defs/debugViewportVector3d"
+        },
+        "normal": {
+          "$ref": "#/$defs/debugViewportVector3d"
+        },
+        "binormal": {
+          "$ref": "#/$defs/debugViewportVector3d"
+        }
+      }
+    },
+    "debugViewportLineSegment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "start",
+        "end"
+      ],
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/debugViewportLineKind"
+        },
+        "start": {
+          "$ref": "#/$defs/debugViewportVector3d"
+        },
+        "end": {
+          "$ref": "#/$defs/debugViewportVector3d"
+        }
+      }
+    },
+    "debugViewportLineKind": {
+      "type": "string",
+      "enum": [
+        "frame.axis.tangent",
+        "frame.axis.normal",
+        "frame.axis.binormal",
+        "diagnostic.line"
+      ]
+    },
+    "debugViewportBox": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "role",
+        "label",
+        "frame",
+        "size"
+      ],
+      "properties": {
+        "role": {
+          "$ref": "#/$defs/debugViewportBoxRole"
+        },
+        "label": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "frame": {
+          "$ref": "#/$defs/debugViewportFrame"
+        },
+        "size": {
+          "$ref": "#/$defs/debugViewportBoxSize"
+        }
+      }
+    },
+    "debugViewportBoxRole": {
+      "type": "string",
+      "enum": [
+        "train.body",
+        "train.body.banking-profile",
+        "train.bogie",
+        "train.wheel"
+      ]
+    },
+    "debugViewportBoxSize": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "length",
+        "width",
+        "height"
+      ],
+      "properties": {
+        "length": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "width": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "height": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      }
+    },
+    "debugViewportVector3d": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "x",
+        "y",
+        "z"
+      ],
+      "properties": {
+        "x": {
+          "type": "number"
+        },
+        "y": {
+          "type": "number"
+        },
+        "z": {
+          "type": "number"
+        }
+      }
+    },
+    "trainPoseExport": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract",
+        "version",
+        "leadDistance",
+        "definition",
+        "cars"
+      ],
+      "properties": {
+        "contract": {
+          "type": "string",
+          "const": "quantum.train_pose"
+        },
+        "version": {
+          "type": "integer",
+          "const": 1
+        },
+        "leadDistance": {
+          "type": "number"
+        },
+        "definition": {
+          "$ref": "#/$defs/trainConsistDefinition"
+        },
+        "cars": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/articulatedTrainCarWithWheels"
+          }
+        }
+      }
+    },
+    "trainConsistDefinition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "carCount",
+        "carSpacing",
+        "carGeometry",
+        "bogieLayout",
+        "wheelLayout"
+      ],
+      "properties": {
+        "carCount": {
+          "type": "integer"
+        },
+        "carSpacing": {
+          "type": "number"
+        },
+        "carGeometry": {
+          "$ref": "#/$defs/trainCarGeometry"
+        },
+        "bogieLayout": {
+          "$ref": "#/$defs/trainBogieLayout"
+        },
+        "wheelLayout": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/trainWheelLayout"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "trainCarGeometry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "length",
+        "width",
+        "height"
+      ],
+      "properties": {
+        "length": {
+          "type": "number"
+        },
+        "width": {
+          "type": "number"
+        },
+        "height": {
+          "type": "number"
+        }
+      }
+    },
+    "trainBogieLayout": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "bogieSpacing"
+      ],
+      "properties": {
+        "bogieSpacing": {
+          "type": "number"
+        }
+      }
+    },
+    "trainWheelLayout": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "wheelCountPerBogie",
+        "wheelRadius",
+        "wheelWidth",
+        "axleSpacing"
+      ],
+      "properties": {
+        "wheelCountPerBogie": {
+          "type": "integer"
+        },
+        "wheelRadius": {
+          "type": "number"
+        },
+        "wheelWidth": {
+          "type": "number"
+        },
+        "axleSpacing": {
+          "type": "number"
+        }
+      }
+    },
+    "articulatedTrainCarWithWheels": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "body",
+        "frontBogie",
+        "rearBogie"
+      ],
+      "properties": {
+        "body": {
+          "$ref": "#/$defs/articulatedTrainCar"
+        },
+        "frontBogie": {
+          "$ref": "#/$defs/trainBogieWithWheels"
+        },
+        "rearBogie": {
+          "$ref": "#/$defs/trainBogieWithWheels"
+        }
+      }
+    },
+    "articulatedTrainCar": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "originalBody",
+        "frontBogie",
+        "rearBogie",
+        "articulatedFrame",
+        "articulatedMatrix",
+        "centerDistance"
+      ],
+      "properties": {
+        "originalBody": {
+          "$ref": "#/$defs/trainCarTransform"
+        },
+        "frontBogie": {
+          "$ref": "#/$defs/bogieTransform"
+        },
+        "rearBogie": {
+          "$ref": "#/$defs/bogieTransform"
+        },
+        "articulatedFrame": {
+          "$ref": "#/$defs/trainPoseTrackFrame"
+        },
+        "articulatedMatrix": {
+          "$ref": "#/$defs/matrix4x4"
+        },
+        "centerDistance": {
+          "type": "number"
+        }
+      }
+    },
+    "trainCarTransform": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "carIndex",
+        "distance",
+        "frame",
+        "matrix"
+      ],
+      "properties": {
+        "carIndex": {
+          "type": "integer"
+        },
+        "distance": {
+          "type": "number"
+        },
+        "frame": {
+          "$ref": "#/$defs/trainPoseTrackFrame"
+        },
+        "matrix": {
+          "$ref": "#/$defs/matrix4x4"
+        }
+      }
+    },
+    "trainBogieWithWheels": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "bogie",
+        "wheels"
+      ],
+      "properties": {
+        "bogie": {
+          "$ref": "#/$defs/bogieTransform"
+        },
+        "wheels": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/wheelTransform"
+          }
+        }
+      }
+    },
+    "bogieTransform": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "carIndex",
+        "bogieIndex",
+        "distance",
+        "frame",
+        "matrix"
+      ],
+      "properties": {
+        "carIndex": {
+          "type": "integer"
+        },
+        "bogieIndex": {
+          "type": "integer"
+        },
+        "distance": {
+          "type": "number"
+        },
+        "frame": {
+          "$ref": "#/$defs/trainPoseTrackFrame"
+        },
+        "matrix": {
+          "$ref": "#/$defs/matrix4x4"
+        }
+      }
+    },
+    "wheelTransform": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "carIndex",
+        "bogieIndex",
+        "wheelIndex",
+        "localOffsetX",
+        "localOffsetY",
+        "localOffsetZ",
+        "frame",
+        "matrix"
+      ],
+      "properties": {
+        "carIndex": {
+          "type": "integer"
+        },
+        "bogieIndex": {
+          "type": "integer"
+        },
+        "wheelIndex": {
+          "type": "integer"
+        },
+        "localOffsetX": {
+          "type": "number"
+        },
+        "localOffsetY": {
+          "type": "number"
+        },
+        "localOffsetZ": {
+          "type": "number"
+        },
+        "frame": {
+          "$ref": "#/$defs/trainPoseTrackFrame"
+        },
+        "matrix": {
+          "$ref": "#/$defs/matrix4x4"
+        }
+      }
+    },
+    "trainPoseTrackFrame": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "distance",
+        "position",
+        "tangent",
+        "normal",
+        "binormal"
+      ],
+      "properties": {
+        "distance": {
+          "type": "number"
+        },
+        "position": {
+          "$ref": "#/$defs/trainPoseVector3d"
+        },
+        "tangent": {
+          "$ref": "#/$defs/trainPoseVector3d"
+        },
+        "normal": {
+          "$ref": "#/$defs/trainPoseVector3d"
+        },
+        "binormal": {
+          "$ref": "#/$defs/trainPoseVector3d"
+        }
+      }
+    },
+    "trainPoseVector3d": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "x",
+        "y",
+        "z"
+      ],
+      "properties": {
+        "x": {
+          "type": "number"
+        },
+        "y": {
+          "type": "number"
+        },
+        "z": {
+          "type": "number"
+        }
+      }
+    },
+    "matrix4x4": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "m11",
+        "m12",
+        "m13",
+        "m14",
+        "m21",
+        "m22",
+        "m23",
+        "m24",
+        "m31",
+        "m32",
+        "m33",
+        "m34",
+        "m41",
+        "m42",
+        "m43",
+        "m44"
+      ],
+      "properties": {
+        "m11": {
+          "type": "number"
+        },
+        "m12": {
+          "type": "number"
+        },
+        "m13": {
+          "type": "number"
+        },
+        "m14": {
+          "type": "number"
+        },
+        "m21": {
+          "type": "number"
+        },
+        "m22": {
+          "type": "number"
+        },
+        "m23": {
+          "type": "number"
+        },
+        "m24": {
+          "type": "number"
+        },
+        "m31": {
+          "type": "number"
+        },
+        "m32": {
+          "type": "number"
+        },
+        "m33": {
+          "type": "number"
+        },
+        "m34": {
+          "type": "number"
+        },
+        "m41": {
+          "type": "number"
+        },
+        "m42": {
+          "type": "number"
+        },
+        "m43": {
+          "type": "number"
+        },
+        "m44": {
+          "type": "number"
+        }
+      }
+    }
+  }
+}
