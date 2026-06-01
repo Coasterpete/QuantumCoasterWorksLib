@@ -1017,6 +1017,34 @@ public sealed class TrainCarTransformProviderTests
     }
 
     [Fact]
+    public void EvaluateTrainPose_MultiSegmentTrack_FrameDistancesUseGlobalStationDistances()
+    {
+        TrackDocument document = BuildTwoSegmentSplineTrack();
+        var evaluator = new TrackEvaluator(document);
+        var provider = new TrainCarTransformProvider(evaluator);
+        TrainConsistDefinition definition = BuildConsistDefinitionWithWheels(
+            carCount: 2,
+            wheelCountPerBogie: 4);
+        const double leadDistance = 12.0;
+
+        TrainPoseResult result = provider.EvaluateTrainPose(
+            leadDistance: leadDistance,
+            definition: definition);
+
+        Assert.Equal(definition.CarCount, result.CarsReadOnly.Count);
+        AssertTrainPoseFrameDistances(
+            result.CarsReadOnly[0],
+            bodyDistance: 12.0,
+            frontBogieDistance: 13.0,
+            rearBogieDistance: 11.0);
+        AssertTrainPoseFrameDistances(
+            result.CarsReadOnly[1],
+            bodyDistance: 10.0,
+            frontBogieDistance: 11.0,
+            rearBogieDistance: 9.0);
+    }
+
+    [Fact]
     public void EvaluateTrainPose_CarsMatchEvaluateArticulatedTrainWithWheels()
     {
         TrackDocument document = BuildSplineTrack(length: 52.0);
@@ -1197,6 +1225,25 @@ public sealed class TrainCarTransformProviderTests
         });
     }
 
+    private static TrackDocument BuildTwoSegmentSplineTrack()
+    {
+        return new TrackDocument(new TrackSegment[]
+        {
+            new StraightSegment(
+                length: 10.0,
+                id: "first",
+                spline: new Quantum.Splines.LineCurve(
+                    new Vector3d(0.0, 0.0, 0.0),
+                    new Vector3d(10.0, 0.0, 0.0))),
+            new StraightSegment(
+                length: 10.0,
+                id: "second",
+                spline: new Quantum.Splines.LineCurve(
+                    new Vector3d(100.0, 5.0, 0.0),
+                    new Vector3d(110.0, 5.0, 0.0)))
+        });
+    }
+
     private static void AssertFiniteMatrix(Matrix4x4 matrix)
     {
         AssertFinite(matrix.M11);
@@ -1349,6 +1396,37 @@ public sealed class TrainCarTransformProviderTests
         AssertMatrixNear(expected.Matrix, actual.Matrix);
     }
 
+    private static void AssertTrainPoseFrameDistances(
+        ArticulatedTrainCarWithWheelsTransform car,
+        double bodyDistance,
+        double frontBogieDistance,
+        double rearBogieDistance)
+    {
+        AssertDoubleNear(bodyDistance, car.Body.OriginalBody.Distance);
+        AssertDoubleNear(bodyDistance, car.Body.OriginalBody.Frame.Distance);
+        AssertDoubleNear(bodyDistance, car.Body.CenterDistance);
+        AssertDoubleNear(bodyDistance, car.Body.ArticulatedFrame.Distance);
+
+        AssertBogieFrameDistances(car.Body.FrontBogie, car.FrontBogie, frontBogieDistance);
+        AssertBogieFrameDistances(car.Body.RearBogie, car.RearBogie, rearBogieDistance);
+    }
+
+    private static void AssertBogieFrameDistances(
+        BogieTransform articulatedBogie,
+        TrainBogieWithWheelsTransform bogieWithWheels,
+        double expectedDistance)
+    {
+        AssertDoubleNear(expectedDistance, articulatedBogie.Distance);
+        AssertDoubleNear(expectedDistance, articulatedBogie.Frame.Distance);
+        AssertDoubleNear(expectedDistance, bogieWithWheels.Bogie.Distance);
+        AssertDoubleNear(expectedDistance, bogieWithWheels.Bogie.Frame.Distance);
+
+        for (int i = 0; i < bogieWithWheels.WheelsReadOnly.Count; i++)
+        {
+            AssertDoubleNear(expectedDistance, bogieWithWheels.WheelsReadOnly[i].Frame.Distance);
+        }
+    }
+
     private static void AssertWheelIndicesMatchBogie(TrainBogieWithWheelsTransform bogieWithWheels)
     {
         BogieTransform bogie = bogieWithWheels.Bogie;
@@ -1414,6 +1492,7 @@ public sealed class TrainCarTransformProviderTests
 
     private static void AssertTrackFrameNear(ExportTrackFrame expected, ExportTrackFrame actual)
     {
+        AssertDoubleNear(expected.Distance, actual.Distance);
         AssertVectorNear(expected.Position, actual.Position);
         AssertVectorNear(expected.Tangent, actual.Tangent);
         AssertVectorNear(expected.Normal, actual.Normal);

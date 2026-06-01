@@ -3,10 +3,15 @@ using Quantum.Math;
 namespace Quantum.Splines
 {
     /// <summary>
-    /// Orthonormal frame sampled along a track.
+    /// Orthonormal support-layer frame sampled along a curve or track segment.
     /// </summary>
     public readonly struct TrackFrame : ITrackFrameBasis
     {
+        /// <summary>
+        /// Support-layer arc-length coordinate supplied by the producer. When this
+        /// frame is produced from TrackEvaluator compatibility overloads, this value
+        /// is segment-local distance rather than public global station distance.
+        /// </summary>
         public double S { get; }
 
         public Vector3d Position { get; }

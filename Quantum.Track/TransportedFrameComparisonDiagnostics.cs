@@ -245,17 +245,18 @@ namespace Quantum.Track
             IReadOnlyList<double> distances)
         {
             SplineTrackFrame[] splineFrames = evaluator.EvaluateSplineFramesAtDistances(document, distances);
+            double[] stationDistances = ClampStationDistances(document, distances);
             var frames = new TrackFrame[splineFrames.Length];
 
             for (int i = 0; i < splineFrames.Length; i++)
             {
-                frames[i] = BuildExportFrame(splineFrames[i]);
+                frames[i] = BuildExportFrame(splineFrames[i], stationDistances[i]);
             }
 
             return frames;
         }
 
-        private static TrackFrame BuildExportFrame(SplineTrackFrame sourceFrame)
+        private static TrackFrame BuildExportFrame(SplineTrackFrame sourceFrame, double stationDistance)
         {
             Vector3d tangent = NormalizeOrThrow(sourceFrame.Tangent, "tangent");
             Vector3d projectedNormal = sourceFrame.Normal - (tangent * Vector3d.Dot(sourceFrame.Normal, tangent));
@@ -263,7 +264,26 @@ namespace Quantum.Track
             Vector3d binormal = NormalizeOrThrow(Vector3d.Cross(tangent, normal), "binormal");
             normal = NormalizeOrThrow(Vector3d.Cross(binormal, tangent), "normal");
 
-            return new TrackFrame(sourceFrame.S, sourceFrame.Position, tangent, normal, binormal);
+            return new TrackFrame(stationDistance, sourceFrame.Position, tangent, normal, binormal);
+        }
+
+        private static double[] ClampStationDistances(TrackDocument document, IReadOnlyList<double> distances)
+        {
+            int distanceCount = distances.Count;
+            if (distanceCount == 0)
+            {
+                return Array.Empty<double>();
+            }
+
+            double totalLength = document.TotalLength;
+            var stationDistances = new double[distanceCount];
+
+            for (int i = 0; i < distanceCount; i++)
+            {
+                stationDistances[i] = SystemMath.Max(0.0, SystemMath.Min(distances[i], totalLength));
+            }
+
+            return stationDistances;
         }
 
         private static TransportedFrameComparisonSample[] BuildComparisonSamples(

@@ -110,12 +110,12 @@ namespace Quantum.Track
         /// public coaster-domain frame contract.
         /// </summary>
         /// <param name="distance">Station distance along the bound track document. Current behavior clamps finite out-of-range values to the track extents.</param>
-        /// <returns>A <see cref="TrackFrame"/> with finite, orthonormalized axes.</returns>
+        /// <returns>A <see cref="TrackFrame"/> with finite, orthonormalized axes and <see cref="TrackFrame.Distance"/> equal to the requested clamped global station distance.</returns>
         public TrackFrame EvaluateFrameAtDistance(double distance)
         {
             TrackDocument doc = ResolveBoundDocument();
             SplineTrackFrame splineFrame = EvaluateSplineFrameAtDistance(doc, distance);
-            return BuildExportFrame(splineFrame);
+            return BuildExportFrame(splineFrame, ClampStationDistance(doc, distance));
         }
 
         /// <summary>
@@ -133,6 +133,8 @@ namespace Quantum.Track
         /// </summary>
         /// <remarks>
         /// This method intentionally returns <see cref="Quantum.Splines.TrackFrame"/>.
+        /// Its <c>S</c> value follows support-layer semantics and may be
+        /// segment-local. It is not the public global station-distance contract.
         /// New coaster-facing code should prefer a bound evaluator and
         /// <see cref="EvaluateFrameAtDistance(double)"/>, which returns
         /// <see cref="TrackFrame"/>.
@@ -215,7 +217,8 @@ namespace Quantum.Track
         /// </summary>
         /// <remarks>
         /// This method intentionally returns <see cref="Quantum.Splines.TrackFrame"/>
-        /// values. New coaster-facing code should prefer a bound evaluator and
+        /// values. Their <c>S</c> values follow support-layer semantics and may be
+        /// segment-local. New coaster-facing code should prefer a bound evaluator and
         /// <see cref="EvaluateFramesAtDistances(IReadOnlyList{double})"/>, which
         /// returns <see cref="TrackFrame"/> values.
         /// </remarks>
@@ -301,18 +304,20 @@ namespace Quantum.Track
 
         /// <summary>
         /// Samples the bound track document at station distances and returns public
-        /// coaster-domain frame contracts.
+        /// coaster-domain frame contracts whose <see cref="TrackFrame.Distance"/>
+        /// values are the requested clamped global station distances.
         /// </summary>
         /// <param name="distances">Finite station distances. Current behavior clamps finite out-of-range values to the track extents.</param>
         public TrackFrame[] EvaluateFramesAtDistances(IReadOnlyList<double> distances)
         {
             TrackDocument doc = ResolveBoundDocument();
             SplineTrackFrame[] splineFrames = EvaluateSplineFramesAtDistances(doc, distances);
+            double[] stationDistances = ClampStationDistances(doc, distances);
             var exportFrames = new TrackFrame[splineFrames.Length];
 
             for (int i = 0; i < splineFrames.Length; i++)
             {
-                exportFrames[i] = BuildExportFrame(splineFrames[i]);
+                exportFrames[i] = BuildExportFrame(splineFrames[i], stationDistances[i]);
             }
 
             return exportFrames;
@@ -363,7 +368,7 @@ namespace Quantum.Track
                 new Vector3d(distanceAlongTrack, 0.0, 0.0));
         }
 
-        private static TrackFrame BuildExportFrame(SplineTrackFrame sourceFrame)
+        private static TrackFrame BuildExportFrame(SplineTrackFrame sourceFrame, double stationDistance)
         {
             Vector3d tangent = NormalizeOrThrow(sourceFrame.Tangent, "tangent");
             Vector3d projectedNormal = sourceFrame.Normal - (tangent * Vector3d.Dot(sourceFrame.Normal, tangent));
@@ -371,7 +376,36 @@ namespace Quantum.Track
             Vector3d binormal = NormalizeOrThrow(Vector3d.Cross(tangent, normal), "binormal");
             normal = NormalizeOrThrow(Vector3d.Cross(binormal, tangent), "normal");
 
-            return new TrackFrame(sourceFrame.S, sourceFrame.Position, tangent, normal, binormal);
+            return new TrackFrame(stationDistance, sourceFrame.Position, tangent, normal, binormal);
+        }
+
+        private static double ClampStationDistance(TrackDocument doc, double distance)
+        {
+            return System.Math.Max(0.0, System.Math.Min(distance, doc.TotalLength));
+        }
+
+        private static double[] ClampStationDistances(TrackDocument doc, IReadOnlyList<double> distances)
+        {
+            if (distances is null)
+            {
+                throw new System.ArgumentNullException(nameof(distances));
+            }
+
+            int distanceCount = distances.Count;
+            if (distanceCount == 0)
+            {
+                return System.Array.Empty<double>();
+            }
+
+            double totalLength = doc.TotalLength;
+            var stationDistances = new double[distanceCount];
+
+            for (int i = 0; i < distanceCount; i++)
+            {
+                stationDistances[i] = System.Math.Max(0.0, System.Math.Min(distances[i], totalLength));
+            }
+
+            return stationDistances;
         }
 
         private static SplineTrackFrame EvaluateFallbackFrame(

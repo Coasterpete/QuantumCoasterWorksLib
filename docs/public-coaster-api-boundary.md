@@ -11,7 +11,7 @@ train placement behavior.
 `TrackFrame` is the public pose basis for sampled coaster track and train
 transforms.
 
-- `Distance`: station distance associated with the frame.
+- `Distance`: clamped global station distance associated with the frame.
 - `Position`: centerline position.
 - `Tangent`: forward axis.
 - `Normal`: up axis.
@@ -33,14 +33,16 @@ The public station-distance lane is:
 `EvaluateAtDistance(TrackDocument, double)` remains the stable resolver for
 station distance to `TrackEvaluationPoint` (`TrackSegment` + local `t`).
 
-Current distance behavior is preserved:
+Current public distance behavior:
 
-- finite out-of-range distances clamp to the track extents
+- finite out-of-range distances clamp to the track extents, and public
+  `Quantum.Track.TrackFrame.Distance` stores that clamped global station value
 - non-finite distances are rejected
 - empty documents are rejected for sampling
 
 Document overloads that return `Quantum.Splines.TrackFrame` are compatibility
-support-layer APIs, not the preferred consumer boundary.
+support-layer APIs, not the preferred consumer boundary. Their `S` value may be
+segment-local and must not be treated as the public frame distance contract.
 
 ### 3) `TrackDocument` / `TrackSegment` Centerline Evaluation
 
@@ -68,7 +70,8 @@ This lane owns coaster train placement semantics:
 
 - car 0 is evaluated at `leadDistance`
 - following cars are placed by station-distance spacing
-- bogie, wheel, and articulated transforms preserve the existing hierarchy
+- body, bogie, wheel, and articulated public frames preserve global station
+  distance semantics
 
 ### 5) `TrainPoseExportV1`
 

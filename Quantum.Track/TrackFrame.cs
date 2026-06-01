@@ -16,9 +16,9 @@ namespace Quantum.Track
     public readonly struct TrackFrame
     {
         /// <summary>
-        /// Creates a track frame at the provided station distance.
+        /// Creates a track frame at the provided clamped global station distance.
         /// </summary>
-        /// <param name="distance">Station distance associated with this frame.</param>
+        /// <param name="distance">Clamped global station distance associated with this frame.</param>
         /// <param name="position">Centerline position at the sampled station.</param>
         /// <param name="tangent">Forward axis. Producer output is expected to be unit length.</param>
         /// <param name="normal">Up axis. Producer output is expected to be unit length and orthogonal to <paramref name="tangent"/>.</param>
@@ -53,7 +53,7 @@ namespace Quantum.Track
         }
 
         /// <summary>
-        /// Station distance associated with this frame.
+        /// Clamped global station distance associated with this frame.
         /// </summary>
         public double Distance { get; }
 
