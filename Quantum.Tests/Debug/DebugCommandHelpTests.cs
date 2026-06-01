@@ -29,6 +29,7 @@ public sealed class DebugCommandHelpTests
         Assert.Contains("transported-frame-comparison [outputPath]", output);
         Assert.Contains("transported-frame-comparison-browser [comparisonJsonPath] [outputHtmlPath]", output);
         Assert.Contains("banking-profile-diagnostics [outputPath]", output);
+        Assert.Contains("banking-profile-browser [diagnosticsJsonPath] [outputHtmlPath]", output);
         Assert.Contains("Examples:", output);
         Assert.Contains(DebugCommandHelp.GeneratedArtifactsNote, output);
         Assert.Contains("Geometry Interchange Roadmap:", output);
@@ -224,6 +225,31 @@ public sealed class DebugCommandHelpTests
     }
 
     [Fact]
+    public void TryWriteRequestedHelp_BankingProfileBrowser_PrintsViewerDetails()
+    {
+        var writer = new StringWriter(CultureInfo.InvariantCulture);
+
+        bool handled = DebugCommandHelp.TryWriteRequestedHelp(
+            new[] { "help", "banking-profile-browser" },
+            writer,
+            out int exitCode);
+
+        Assert.True(handled);
+        Assert.Equal(0, exitCode);
+
+        string output = writer.ToString();
+        Assert.Contains("banking-profile-browser [diagnosticsJsonPath] [outputHtmlPath]", output);
+        Assert.Contains("BankingProfileDiagnosticsExportV1 JSON", output);
+        Assert.Contains("profile metadata", output);
+        Assert.Contains("sample count, min/max roll, maximum roll slope", output);
+        Assert.Contains("SVG graphs for roll angle and roll slope", output);
+        Assert.Contains("source key markers", output);
+        Assert.Contains("roll slope severity indicators", output);
+        Assert.Contains("local-file-friendly HTML/SVG/vanilla JavaScript", output);
+        Assert.Contains("does not change TrackFrame", output);
+    }
+
+    [Fact]
     public void WriteUnknownCommand_PrintsUnknownCommandAndSupportedCommands()
     {
         var writer = new StringWriter(CultureInfo.InvariantCulture);
@@ -241,5 +267,6 @@ public sealed class DebugCommandHelpTests
         Assert.Contains("transported-frame-comparison [outputPath]", output);
         Assert.Contains("transported-frame-comparison-browser [comparisonJsonPath] [outputHtmlPath]", output);
         Assert.Contains("banking-profile-diagnostics [outputPath]", output);
+        Assert.Contains("banking-profile-browser [diagnosticsJsonPath] [outputHtmlPath]", output);
     }
 }

@@ -58,6 +58,21 @@ This is inspection infrastructure only. It does not change default
 `TrackEvaluator` behavior, `TrackFrame`, `DebugViewportSnapshotV1`, or
 `TrainPoseExportV1`.
 
+## Milestone 50 Browser Viewer Update
+
+Milestone 50 adds the `banking-profile-browser` debug command. It reads the
+Milestone 49 `quantum.banking_profile_diagnostics` JSON artifact, validates it
+through the versioned IO contract, and writes a self-contained local HTML file
+with embedded JSON, inline CSS, inline vanilla JavaScript, and SVG graphs.
+
+The viewer displays profile metadata, sample count, min/max roll, maximum
+absolute roll slope, per-sample roll radians/degrees, interpolation modes,
+source key interval markers, interpolation transition markers, and simple
+severity indicators for unusually high roll slopes. This remains inspection
+infrastructure only and does not change default `TrackEvaluator` behavior,
+`TrackFrame`, `DebugViewportSnapshotV1`, `TrainPoseExportV1`, or runtime
+banking behavior.
+
 ## Current Baseline
 
 Today `TrackSegment.RollRadians` is the only authored roll angle on
@@ -254,8 +269,8 @@ interpolation as separate concerns that can be tested independently.
 
 ## Browser Debug Viewer Diagnostics
 
-The browser debug viewer can eventually display banking diagnostics as a thin
-adapter over backend data. Useful views include:
+The BankingProfile browser debug viewer displays banking diagnostics as a thin
+adapter over backend data. Useful current and future views include:
 
 - Roll angle versus station distance.
 - Banking keys and interpolation mode markers.

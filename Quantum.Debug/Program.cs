@@ -209,6 +209,19 @@ namespace Quantum.Debug
                 return BankingProfileDiagnosticsCommand.Run(outputPath);
             }
 
+            if (command == DebugCommandKind.BankingProfileBrowser)
+            {
+                if (args.Length > 3)
+                {
+                    Console.WriteLine("Usage: banking-profile-browser [diagnosticsJsonPath] [outputHtmlPath]");
+                    return 1;
+                }
+
+                string? diagnosticsJsonPath = args.Length >= 2 ? args[1] : null;
+                string? outputHtmlPath = args.Length == 3 ? args[2] : null;
+                return BankingProfileBrowserCommand.Run(diagnosticsJsonPath, outputHtmlPath);
+            }
+
             RunValidation();
             return 0;
         }
