@@ -25,6 +25,7 @@ public sealed class DebugCommandHelpTests
         Assert.Contains("debug-viewport-snapshot-v1-from-csv <inputCsvPath> [outputJsonPath]", output);
         Assert.Contains("debug-viewport-snapshot-v1-gallery [artifactDirectory] [outputHtmlPath]", output);
         Assert.Contains("debug-viewport-snapshot-v1-browser [artifactDirectory] [outputHtmlPath]", output);
+        Assert.Contains("debug-viewport-snapshot-v1-banking-profile [outputPath]", output);
         Assert.Contains("centerline-frame-continuity [outputPath]", output);
         Assert.Contains("transported-frame-comparison [outputPath]", output);
         Assert.Contains("transported-frame-comparison-browser [comparisonJsonPath] [outputHtmlPath]", output);
@@ -137,6 +138,27 @@ public sealed class DebugCommandHelpTests
         Assert.Contains("deterministic TrainPoseExportV1 regression sample", output);
         Assert.Contains("Quantum.Tests/IO/Fixtures/TrainPoseExportV1.golden.json", output);
         Assert.Contains("backend-only JSON", output);
+    }
+
+    [Fact]
+    public void TryWriteRequestedHelp_DebugViewportBankingProfile_PrintsFixtureDetails()
+    {
+        var writer = new StringWriter(CultureInfo.InvariantCulture);
+
+        bool handled = DebugCommandHelp.TryWriteRequestedHelp(
+            new[] { "help", "debug-viewport-snapshot-v1-banking-profile" },
+            writer,
+            out int exitCode);
+
+        Assert.True(handled);
+        Assert.Equal(0, exitCode);
+
+        string output = writer.ToString();
+        Assert.Contains("debug-viewport-snapshot-v1-banking-profile [outputPath]", output);
+        Assert.Contains("opt-in BankingProfile train-pose path", output);
+        Assert.Contains("EvaluateTrainPose(..., BankingProfile)", output);
+        Assert.Contains("TrainPoseExportV1Mapper.Export", output);
+        Assert.Contains("default TrackEvaluator", output);
     }
 
     [Fact]
@@ -262,6 +284,7 @@ public sealed class DebugCommandHelpTests
         Assert.Contains("debug-viewport-snapshot-v1 [outputPath]", output);
         Assert.Contains("debug-viewport-snapshot-v1-gallery [artifactDirectory] [outputHtmlPath]", output);
         Assert.Contains("debug-viewport-snapshot-v1-browser [artifactDirectory] [outputHtmlPath]", output);
+        Assert.Contains("debug-viewport-snapshot-v1-banking-profile [outputPath]", output);
         Assert.Contains("longitudinal-speed-preview [preset] [outputPath] [initialSpeedMps]", output);
         Assert.Contains("centerline-frame-continuity [outputPath]", output);
         Assert.Contains("transported-frame-comparison [outputPath]", output);

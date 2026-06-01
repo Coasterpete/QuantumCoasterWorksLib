@@ -9,6 +9,7 @@ These fixtures are synthetic and self-authored. They are built in test code rath
 - `Quantum.Tests/Track/TrainPoseDeterministicRegressionFixtureTests.cs` validates the in-memory `TrainPoseResult` produced by `TrainCarTransformProvider`.
 - `Quantum.Tests/IO/TrainPoseExportV1RegressionTests.cs` validates the same representative pose after it crosses the public `TrainPoseExportV1` DTO and JSON boundary.
 - `Quantum.Tests/IO/TrainPoseExportV1CompositeDocumentBoundaryTests.cs` validates a composite-section train pose export round trip from the public geometric-section builder path.
+- `Quantum.Tests/IO/BankingProfileTrainPoseContractTests.cs` validates the opt-in `EvaluateTrainPose(..., BankingProfile)` path through runtime pose, `TrainPoseExportV1`, validation, JSON roundtrip, and `DebugViewportSnapshotV1`.
 - `Quantum.Tests/Debug/TrainPoseExportV1CommandTests.cs` validates that the `train-pose-export-v1` sample command writes deterministic JSON matching `Quantum.Tests/IO/Fixtures/TrainPoseExportV1.golden.json`.
 
 ## Straight Synthetic Layout
@@ -46,6 +47,14 @@ This catches regressions that the straight control case cannot see, especially f
 The export tests also serialize and deserialize the DTO, run the backend validator, assert canonical matrix bottom rows, and confirm that duplicated hierarchy views agree with each other. That makes accidental drift visible when a change would alter the public JSON shape or semantics, even if the in-memory train pose still looks plausible.
 
 The composite document boundary test adds coverage for `GeometricSectionTrackDocumentBuilder` output so the export contract is protected through a second backend construction path.
+
+The BankingProfile train-pose contract test adds coverage for the runtime opt-in
+roll source introduced after the original export fixture. It uses a
+self-authored fixture from `Quantum.Debug/BankingProfileTrainPoseFixtures.cs`,
+verifies the profile-backed body, bogie, wheel, and articulated frame hierarchy,
+and confirms that the same pose remains valid through `TrainPoseExportV1` JSON
+and the nested debug snapshot path. This does not change default
+`TrackEvaluator`, default `EvaluateTrainPose(...)`, or `TrackDocument` behavior.
 
 For field-level contract details, see `docs/train_pose_export_v1_contract.md`.
 

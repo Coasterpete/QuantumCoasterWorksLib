@@ -1,7 +1,9 @@
 # BankingProfile Fixtures
 
 Milestone 51 adds a small backend-only BankingProfile fixture catalog in
-`Quantum.Debug/BankingProfileFixtures.cs`.
+`Quantum.Debug/BankingProfileFixtures.cs`. Milestone 54 adds one deterministic
+BankingProfile train-pose fixture in
+`Quantum.Debug/BankingProfileTrainPoseFixtures.cs`.
 
 The fixtures are self-authored deterministic roll profiles for diagnostics,
 browser-viewer payloads, and compatibility tests. They do not change
@@ -23,6 +25,18 @@ Each fixture provides a validated `BankingProfile` plus reusable uniform sample
 distances. The `banking-profile-diagnostics` command uses the catalog default
 fixture instead of carrying its own private sample profile.
 
+## Train Pose Fixture
+
+- `banking-profile-train-pose`: self-authored track, consist, and
+  `BankingProfile` fixture for the opt-in
+  `EvaluateTrainPose(..., BankingProfile)` path.
+
+The train-pose fixture is used to verify runtime body/bogie/wheel/articulated
+frames, global station distances, matrix/frame consistency, `TrainPoseExportV1`
+validation, JSON roundtrip stability, and `DebugViewportSnapshotV1` inspection.
+It exports through the existing v1 contracts and does not add
+`TrackDocument.BankingProfile`.
+
 ## What The Tests Validate
 
 `BankingProfileFixtureTests` verifies that every fixture:
@@ -35,6 +49,9 @@ fixture instead of carrying its own private sample profile.
 
 Existing banking diagnostics tests now reuse the catalog where practical so the
 diagnostics and browser commands stay aligned with shared backend fixtures.
+`BankingProfileTrainPoseContractTests` verifies the train-pose fixture through
+runtime pose evaluation, export, validation, JSON roundtrip, and debug snapshot
+inspection.
 
 ## Non-Goals
 

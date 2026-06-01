@@ -17,7 +17,7 @@ Quantum CoasterWorks is an early-stage coaster design and simulation backend. Th
 - `Quantum.Tests` contains automated tests and contract fixtures.
 - `Assets` contains the current Unity debug visualizer/prototype assets.
 
-Testing fixture notes live under `docs/testing/`, including `docs/testing/train-pose-regression-fixtures.md` for the deterministic train pose and `TrainPoseExportV1` regression fixtures and `docs/testing/banking-profile-fixtures.md` for reusable backend-only `BankingProfile` diagnostics fixtures.
+Testing fixture notes live under `docs/testing/`, including `docs/testing/train-pose-regression-fixtures.md` for the deterministic train pose and `TrainPoseExportV1` regression fixtures and `docs/testing/banking-profile-fixtures.md` for reusable backend-only `BankingProfile` diagnostics and train-pose fixtures.
 
 ## Geometry Interchange Roadmap
 
@@ -75,6 +75,8 @@ Generated debug viewport outputs include:
 
 - `artifacts/debug-viewport/DebugViewportSnapshotV1.sample.json`
 - `artifacts/debug-viewport/DebugViewportSnapshotV1.sample.svg`
+- `artifacts/debug-viewport/DebugViewportSnapshotV1.banking-profile.sample.json`
+- `artifacts/debug-viewport/DebugViewportSnapshotV1.banking-profile.sample.svg`
 - `artifacts/debug-viewport/Milestone7.synthetic.straight_line.snapshot.json`
 - `artifacts/debug-viewport/Milestone7.synthetic.straight_line.snapshot.svg`
 - `artifacts/debug-viewport/Milestone7.synthetic.simple_hill.snapshot.json`
@@ -95,6 +97,12 @@ Generate the built-in debug viewport snapshot:
 
 ```powershell
 dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1 artifacts/debug-viewport/DebugViewportSnapshotV1.sample.json
+```
+
+Generate the opt-in BankingProfile train-pose debug viewport snapshot:
+
+```powershell
+dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1-banking-profile artifacts/debug-viewport/DebugViewportSnapshotV1.banking-profile.sample.json
 ```
 
 Generate a snapshot from a self-authored sampled-frame CSV fixture:
@@ -161,6 +169,7 @@ The SVG previews, Markdown preview index, generated gallery, and browser inspect
 The transported-frame comparison browser viewer is a separate static HTML/SVG/vanilla JavaScript artifact for inspecting `quantum.transported_frame_comparison_diagnostics` JSON. It embeds the comparison JSON, shows report summary metrics, renders a per-sample delta table, and marks normal/binormal/frame/matrix delta severity without changing `DebugViewportSnapshotV1`, `TrainPoseExportV1`, `TrackFrame`, or runtime banking behavior.
 The BankingProfile diagnostics artifact is a backend-only JSON export for inspecting `quantum.banking_profile_diagnostics` roll samples before changing any default frame evaluation behavior. It uses the reusable backend-only BankingProfile fixture catalog, reports station distance, roll radians/degrees, interpolation mode and source interval, approximate roll slope in radians per meter when practical, and min/max/slope summary metrics under `artifacts/banking-profile/`.
 The BankingProfile browser viewer is a self-contained static HTML/SVG/vanilla JavaScript artifact for the same diagnostics JSON. It embeds the `BankingProfileDiagnosticsExportV1` payload, shows profile metadata and roll/slope summary metrics, graphs roll angle and roll slope against station distance, and marks source key intervals, interpolation transitions, and high roll slope severity without changing runtime banking behavior.
+The BankingProfile train-pose snapshot is a `DebugViewportSnapshotV1` sample with a nested `TrainPoseExportV1` payload produced by the opt-in `EvaluateTrainPose(..., BankingProfile)` overload. It is for inspecting body, bogie, wheel, and articulated frames in existing debug/browser tooling; default `TrackEvaluator`, default `EvaluateTrainPose(...)`, and `TrackDocument` behavior remain unchanged.
 
 Generated JSON, SVG, Markdown, and HTML under `artifacts/` are local output by default and should not be committed unless there is a clear release reason.
 
@@ -175,6 +184,7 @@ Generated JSON, SVG, Markdown, and HTML under `artifacts/` are local output by d
 - `dotnet run --project Quantum.Debug -- sampling-perf`: run deterministic sampling performance diagnostics.
 - `dotnet run --project Quantum.Debug -- train-pose-export-v1 [outputPath]`: write a deterministic `TrainPoseExportV1` sample JSON matching `Quantum.Tests/IO/Fixtures/TrainPoseExportV1.golden.json`.
 - `dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1 [outputPath]`: write the built-in `DebugViewportSnapshotV1` sample JSON.
+- `dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1-banking-profile [outputPath]`: write a `DebugViewportSnapshotV1` sample from the opt-in BankingProfile train-pose path.
 - `dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1-from-csv <inputCsvPath> [outputJsonPath]`: bridge a sampled-frame CSV fixture to `DebugViewportSnapshotV1` JSON.
 - `dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1-validate <snapshotJsonPath>`: validate and summarize a snapshot JSON file.
 - `dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1-svg <snapshotJsonPath> [outputSvgPath]`: write a multi-panel backend-only SVG preview from snapshot JSON.
