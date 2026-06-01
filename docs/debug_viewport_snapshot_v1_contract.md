@@ -56,7 +56,7 @@ dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1-banking-profile
 
 The default output path is `artifacts/debug-viewport/DebugViewportSnapshotV1.banking-profile.sample.json`. This sample nests a `TrainPoseExportV1` payload produced by the opt-in `EvaluateTrainPose(..., BankingProfile)` runtime path. It does not add `BankingProfile` state to `TrackDocument`, change default `TrackEvaluator` sampling, or change the default train-pose overload.
 
-When `Quantum.Debug` writes debug viewport JSON or SVG output under `artifacts/debug-viewport`, it also refreshes `artifacts/debug-viewport/snapshot-preview-index.md`. The generated Markdown index lists snapshot JSON files and matching SVG previews with repository-relative paths, last-written timestamps, nested train-pose presence, and train-pose car counts so local demo output is easier to inspect.
+When `Quantum.Debug` writes debug viewport JSON or SVG output under `artifacts/debug-viewport`, it also refreshes `artifacts/debug-viewport/snapshot-preview-index.md`. The generated Markdown index lists snapshot JSON files and matching SVG previews with repository-relative paths, last-written timestamps, nested train-pose presence, and train-pose car counts so local demo output is easier to find and inspect.
 
 Validate or inspect a generated snapshot with:
 
