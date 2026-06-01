@@ -107,11 +107,14 @@ public sealed class BankingProfileBrowserCommandTests
             Assert.Equal(
                 BankingProfileDiagnosticsExportV1Dto.ContractVersion,
                 artifact.GetProperty("version").GetInt32());
-            Assert.Equal("deterministic-banking-profile-roll-ramp", metadata.GetProperty("sourceName").GetString());
+            Assert.Equal(
+                BankingProfileFixtures.RollHoldWithMultipleKeysName,
+                metadata.GetProperty("sourceName").GetString());
             Assert.Equal(11, summary.GetProperty("sampleCount").GetInt32());
             Assert.Equal(11, samples.GetArrayLength());
-            Assert.Equal("Linear", samples[3].GetProperty("interpolationMode").GetString());
-            Assert.True(samples[3].TryGetProperty("approximateRollSlopeRadPerMeter", out _));
+            Assert.Equal("Linear", samples[1].GetProperty("interpolationMode").GetString());
+            Assert.Equal("Constant", samples[3].GetProperty("interpolationMode").GetString());
+            Assert.True(samples[1].TryGetProperty("approximateRollSlopeRadPerMeter", out _));
             Assert.Contains("banking-profile-diagnostics.sample.json", root.GetProperty("sourcePath").GetString());
         }
         finally
