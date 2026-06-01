@@ -226,6 +226,25 @@ namespace Quantum.Debug
                     "dotnet run --project Quantum.Debug -- banking-profile-diagnostics artifacts/banking-profile/banking-profile-diagnostics.sample.json"
                 }),
             new DebugCommandHelpEntry(
+                name: BankingProfileBrowserCommand.CommandName,
+                usage: "banking-profile-browser [diagnosticsJsonPath] [outputHtmlPath]",
+                summary: "Write a self-contained browser viewer for BankingProfile diagnostics JSON.",
+                arguments: new[]
+                {
+                    "diagnosticsJsonPath: Optional JSON input path. Defaults to " +
+                    BankingProfileDiagnosticsCommand.DefaultRelativeOutputPath + ".",
+                    "outputHtmlPath: Optional HTML output path. Defaults next to the input JSON as " +
+                    BankingProfileBrowserCommand.DefaultFileName + ".",
+                    "The viewer embeds BankingProfileDiagnosticsExportV1 JSON, shows profile metadata, sample count, min/max roll, maximum roll slope, roll radians/degrees, and interpolation modes.",
+                    "The viewer renders SVG graphs for roll angle and roll slope versus station distance, with source key markers, interpolation transition markers, and simple roll slope severity indicators.",
+                    "This is a local-file-friendly HTML/SVG/vanilla JavaScript debug artifact and does not change TrackFrame, TrackEvaluator, DebugViewportSnapshotV1, TrainPoseExportV1, or runtime banking behavior."
+                },
+                examples: new[]
+                {
+                    "dotnet run --project Quantum.Debug -- banking-profile-browser",
+                    "dotnet run --project Quantum.Debug -- banking-profile-browser artifacts/banking-profile/banking-profile-diagnostics.sample.json artifacts/banking-profile/banking-profile.browser.html"
+                }),
+            new DebugCommandHelpEntry(
                 name: TransportedFrameComparisonBrowserCommand.CommandName,
                 usage: "transported-frame-comparison-browser [comparisonJsonPath] [outputHtmlPath]",
                 summary: "Write a self-contained browser viewer for transported frame comparison JSON.",
