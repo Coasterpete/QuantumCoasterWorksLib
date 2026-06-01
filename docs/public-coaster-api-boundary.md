@@ -73,6 +73,12 @@ This lane owns coaster train placement semantics:
 - body, bogie, wheel, and articulated public frames preserve global station
   distance semantics
 
+`EvaluateTrainPose(double leadDistance, TrainConsistDefinition definition,
+BankingProfile bankingProfile)` is an explicit opt-in variant for callers that
+want runtime train poses evaluated with a separate `BankingProfile` roll source.
+The default overload remains segment/evaluator-backed, and `TrackDocument` does
+not own a `BankingProfile`.
+
 ### 5) `TrainPoseExportV1`
 
 `TrainPoseExportV1` is the public JSON snapshot contract:

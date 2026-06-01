@@ -38,6 +38,8 @@ $repoRoot = Get-RepoRoot
 $artifactDirectory = Join-Path $repoRoot "artifacts\debug-viewport"
 $builtInSnapshotPath = Join-Path $artifactDirectory "DebugViewportSnapshotV1.sample.json"
 $builtInSvgPath = Join-Path $artifactDirectory "DebugViewportSnapshotV1.sample.svg"
+$bankingProfileSnapshotPath = Join-Path $artifactDirectory "DebugViewportSnapshotV1.banking-profile.sample.json"
+$bankingProfileSvgPath = Join-Path $artifactDirectory "DebugViewportSnapshotV1.banking-profile.sample.svg"
 $galleryPath = Join-Path $artifactDirectory "index.html"
 $browserPath = Join-Path $artifactDirectory "browser.html"
 $previewIndexPath = Join-Path $artifactDirectory "snapshot-preview-index.md"
@@ -118,11 +120,44 @@ try {
         $builtInSvgPath
     )
 
+    Invoke-DotNetChecked -Arguments @(
+        "run",
+        "--project",
+        "Quantum.Debug",
+        "--",
+        "debug-viewport-snapshot-v1-banking-profile",
+        $bankingProfileSnapshotPath
+    )
+
+    Invoke-DotNetChecked -Arguments @(
+        "run",
+        "--project",
+        "Quantum.Debug",
+        "--",
+        "debug-viewport-snapshot-v1-validate",
+        $bankingProfileSnapshotPath
+    )
+
+    Invoke-DotNetChecked -Arguments @(
+        "run",
+        "--project",
+        "Quantum.Debug",
+        "--",
+        "debug-viewport-snapshot-v1-svg",
+        $bankingProfileSnapshotPath,
+        $bankingProfileSvgPath
+    )
+
     $generatedPreviews = @(
         [PSCustomObject]@{
             Label = "Built-in sample"
             SnapshotPath = $builtInSnapshotPath
             SvgPath = $builtInSvgPath
+        },
+        [PSCustomObject]@{
+            Label = "BankingProfile train pose"
+            SnapshotPath = $bankingProfileSnapshotPath
+            SvgPath = $bankingProfileSvgPath
         }
     )
 
@@ -207,6 +242,8 @@ try {
     Write-Host "  Browser debug viewer:    $browserPath"
     Write-Host "  Built-in sample JSON:    $builtInSnapshotPath"
     Write-Host "  Built-in sample SVG:     $builtInSvgPath"
+    Write-Host "  BankingProfile JSON:     $bankingProfileSnapshotPath"
+    Write-Host "  BankingProfile SVG:      $bankingProfileSvgPath"
 
     Write-Host ""
     Write-Host "Generated JSON snapshots (renderer-neutral DebugViewportSnapshotV1 data):"

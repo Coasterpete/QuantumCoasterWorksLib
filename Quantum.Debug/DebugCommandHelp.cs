@@ -145,6 +145,24 @@ namespace Quantum.Debug
                     "dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1-browser artifacts/debug-viewport artifacts/debug-viewport/browser.html"
                 }),
             new DebugCommandHelpEntry(
+                name: DebugViewportSnapshotV1BankingProfileSampleCommand.CommandName,
+                usage: "debug-viewport-snapshot-v1-banking-profile [outputPath]",
+                summary: "Write a DebugViewportSnapshotV1 sample from the opt-in BankingProfile train-pose path.",
+                arguments: new[]
+                {
+                    "outputPath: Optional JSON output path. Defaults to " +
+                    DebugViewportSnapshotV1BankingProfileSampleCommand.DefaultRelativeOutputPath + ".",
+                    "The sample uses a self-authored backend-only track, BankingProfile, and train consist fixture.",
+                    "The nested trainPose is produced by EvaluateTrainPose(..., BankingProfile) and TrainPoseExportV1Mapper.Export.",
+                    "This command leaves default TrackEvaluator, default EvaluateTrainPose(...), TrackDocument, and renderer behavior unchanged.",
+                    DebugViewportPreviewIndexNote
+                },
+                examples: new[]
+                {
+                    "dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1-banking-profile",
+                    "dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1-banking-profile artifacts/debug-viewport/DebugViewportSnapshotV1.banking-profile.sample.json"
+                }),
+            new DebugCommandHelpEntry(
                 name: "longitudinal-force-preview",
                 usage: "longitudinal-force-preview [preset] [outputPath]",
                 summary: "Write longitudinal force preview diagnostics.",

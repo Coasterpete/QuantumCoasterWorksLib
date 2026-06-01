@@ -15,6 +15,7 @@ namespace Quantum.Debug
         DebugViewportSnapshotV1Svg,
         DebugViewportSnapshotV1Gallery,
         DebugViewportSnapshotV1Browser,
+        DebugViewportSnapshotV1BankingProfile,
         LongitudinalForcePreview,
         LongitudinalSpeedPreview,
         CenterlineFrameContinuity,
@@ -92,6 +93,12 @@ namespace Quantum.Debug
             if (string.Equals(args[0], DebugViewportSnapshotBrowserCommand.CommandName, StringComparison.OrdinalIgnoreCase))
             {
                 command = DebugCommandKind.DebugViewportSnapshotV1Browser;
+                return true;
+            }
+
+            if (string.Equals(args[0], DebugViewportSnapshotV1BankingProfileSampleCommand.CommandName, StringComparison.OrdinalIgnoreCase))
+            {
+                command = DebugCommandKind.DebugViewportSnapshotV1BankingProfile;
                 return true;
             }
 

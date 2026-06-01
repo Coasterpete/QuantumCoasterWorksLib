@@ -49,9 +49,12 @@ What breaks if changed:
 What it owns:
 - Distance-based car placement orchestration over sampled track frames.
 - Composition of body/bogie/wheel/articulated transforms into one pose result.
+- The default train-pose path plus the explicit opt-in
+  `EvaluateTrainPose(..., BankingProfile)` roll-source path.
 
 What it assumes:
 - `TrackEvaluator` frame and distance semantics are stable.
+- `BankingProfile` remains runtime opt-in and is not stored on `TrackDocument`.
 - Train definition inputs (counts/spacing/layout) are valid and deterministic.
 
 What breaks if changed:

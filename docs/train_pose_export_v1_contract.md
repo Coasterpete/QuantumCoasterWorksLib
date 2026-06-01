@@ -12,6 +12,17 @@
 - `definition` (object, required): train consist definition snapshot.
 - `cars` (array, required): articulated car pose hierarchy.
 
+## Runtime Roll Source
+
+`TrainPoseExportV1` serializes the `TrainPoseResult` it is given. The default
+runtime producer remains `EvaluateTrainPose(double leadDistance,
+TrainConsistDefinition definition)`, which uses the bound `TrackEvaluator`
+behavior. A caller may opt in to `EvaluateTrainPose(..., BankingProfile)` when
+it wants train-pose frames sampled with an explicit `BankingProfile` roll source.
+That opt-in path uses the same DTO, JSON contract, validator, and roundtrip
+rules; v1 does not add a `BankingProfile` field and `TrackDocument` does not own
+profile state.
+
 ## `definition` Fields
 - `carCount` (integer, required)
 - `carSpacing` (number, required)
