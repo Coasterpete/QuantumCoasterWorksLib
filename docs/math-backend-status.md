@@ -96,7 +96,7 @@ Frame sampling and distance semantics:
 - `Quantum.Tests/Splines/TrackFrameSamplerTests.cs`: sampled frame orthonormality.
 - `Quantum.Tests/Track/TrackEvaluatorFrameTests.cs`: frame orthonormality, tangent alignment, roll behavior, fallback behavior.
 - `Quantum.Tests/Track/TrackEvaluatorSplineTransformTests.cs`: transform position and rotation behavior for spline/fallback paths.
-- `Quantum.Tests/Track/TrackEvaluatorDistanceSemanticsContractTests.cs`: global distance resolves to segment-local semantics.
+- `Quantum.Tests/Track/TrackEvaluatorDistanceSemanticsContractTests.cs`: public frame distances remain clamped global station distances while support-layer spline frames preserve local `S`.
 - `Quantum.Tests/Track/TrackEvaluatorEvaluateAtDistanceCharacterizationTests.cs`: edge-case behavior (negative, non-finite, empty document, zero-length segment).
 - `Quantum.Tests/Track/TrackEvaluatorBatchSamplingParityTests.cs`: batch APIs preserve scalar semantics and ordering.
 - `Quantum.Tests/Track/TrackEvaluatorTrackFrameOutputTests.cs`: bound evaluator frame output finite + orthonormal.
@@ -107,7 +107,7 @@ Train placement and matrix policy:
 
 Physics/adapter transform parity:
 - `Quantum.Tests/Physics/TrackPhysicsAdapterTests.cs`: adapter frame/transform parity with `TrackEvaluator`, curvature stability.
-- `Quantum.Tests/Physics/TrackFrameProviderDistanceSemanticsContractTests.cs`: provider preserves segment-local frame semantics for global distance queries.
+- `Quantum.Tests/Physics/TrackFrameProviderDistanceSemanticsContractTests.cs`: physics provider preserves support-layer segment-local spline frame semantics for global distance queries.
 
 ## What Should Not Be Deleted Yet
 

@@ -127,6 +127,11 @@ These overloads are easy to confuse:
 - `EvaluateFramesAtDistances(IReadOnlyList<double>)` returns `Quantum.Track.TrackFrame[]`
 - `EvaluateFramesAtDistances(TrackDocument, IReadOnlyList<double>)` returns `Quantum.Splines.TrackFrame[]`
 
+The `Quantum.Track.TrackFrame` overloads expose the public coaster-domain
+contract: `Distance` is the requested clamped global station distance. The
+`Quantum.Splines.TrackFrame` overloads are support-layer compatibility APIs;
+their `S` value may be segment-local.
+
 The XML remarks explain this, but the overload shape still asks callers to know the support-layer distinction. A future polish pass could rename support-layer overloads, move them behind an adapter, or mark them as compatibility APIs.
 
 ### `TrackDocument` Is Mutable At The Core Boundary
@@ -190,7 +195,7 @@ This is documented in code and `docs/math-backend-status.md`, but downstream con
 
 ## 3. Naming Inconsistencies
 
-- `Quantum.Splines.TrackFrame.S` vs `Quantum.Track.TrackFrame.Distance`.
+- `Quantum.Splines.TrackFrame.S` vs `Quantum.Track.TrackFrame.Distance`; `S` is support-layer producer distance, while public `Distance` is clamped global station distance.
 - `LocalT`, `t`, `U`, `EvaluationX`, `StartX`, `EndX`, `distance`, and `station` all appear as coordinate names. They mean different things, but the distinctions are not always discoverable from API names alone.
 - `FVD` namespace vs `Fvd*` type prefix is acceptable C# casing, but it still reads slightly mixed.
 - `GetFrameAtDistance`, `EvaluateFrameAtDistance`, `Sample`, `TryGetForceTargets`, and `Build*` are all present. Most are defensible individually, but new APIs should follow a documented convention:

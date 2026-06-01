@@ -99,17 +99,19 @@ namespace Quantum.Track
 
             TrackEvaluationPoint[] evaluationPoints = evaluator.EvaluateAtDistances(document, distances);
             SplineTrackFrame[] scalarFrames = evaluator.EvaluateSplineFramesAtDistances(document, distances);
+            double[] stationDistances = ClampStationDistances(document, distances);
             var transportedFrames = new TrackFrame[scalarFrames.Length];
 
             TrackFrame firstFrame = BuildExportFrame(
-                evaluator.EvaluateSplineFrameAtDistance(document, distances[0]));
+                evaluator.EvaluateSplineFrameAtDistance(document, distances[0]),
+                stationDistances[0]);
             Vector3d previousTangent = NormalizeOrThrow(firstFrame.Tangent, "tangent");
             double firstRollRadians = ResolveRollRadians(evaluationPoints[0]);
             Vector3d previousBaseNormal = ResolveInitialBaseNormal(firstFrame, previousTangent, firstRollRadians);
 
             for (int i = 0; i < scalarFrames.Length; i++)
             {
-                TrackFrame scalarFrame = BuildExportFrame(scalarFrames[i]);
+                TrackFrame scalarFrame = BuildExportFrame(scalarFrames[i], stationDistances[i]);
                 Vector3d tangent = NormalizeOrThrow(scalarFrame.Tangent, "tangent");
 
                 if (i > 0)
@@ -171,7 +173,7 @@ namespace Quantum.Track
             }
         }
 
-        private static TrackFrame BuildExportFrame(SplineTrackFrame sourceFrame)
+        private static TrackFrame BuildExportFrame(SplineTrackFrame sourceFrame, double stationDistance)
         {
             Vector3d tangent = NormalizeOrThrow(sourceFrame.Tangent, "tangent");
             Vector3d projectedNormal = sourceFrame.Normal - (tangent * Vector3d.Dot(sourceFrame.Normal, tangent));
@@ -179,7 +181,26 @@ namespace Quantum.Track
             Vector3d binormal = NormalizeOrThrow(Vector3d.Cross(tangent, normal), "binormal");
             normal = NormalizeOrThrow(Vector3d.Cross(binormal, tangent), "normal");
 
-            return new TrackFrame(sourceFrame.S, sourceFrame.Position, tangent, normal, binormal);
+            return new TrackFrame(stationDistance, sourceFrame.Position, tangent, normal, binormal);
+        }
+
+        private static double[] ClampStationDistances(TrackDocument document, IReadOnlyList<double> distances)
+        {
+            int distanceCount = distances.Count;
+            if (distanceCount == 0)
+            {
+                return Array.Empty<double>();
+            }
+
+            double totalLength = document.TotalLength;
+            var stationDistances = new double[distanceCount];
+
+            for (int i = 0; i < distanceCount; i++)
+            {
+                stationDistances[i] = SystemMath.Max(0.0, SystemMath.Min(distances[i], totalLength));
+            }
+
+            return stationDistances;
         }
 
         private static Vector3d ResolveInitialBaseNormal(

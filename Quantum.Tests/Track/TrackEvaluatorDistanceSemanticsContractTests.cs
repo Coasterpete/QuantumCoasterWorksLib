@@ -12,6 +12,7 @@ public sealed class TrackEvaluatorDistanceSemanticsContractTests
     private const double Tolerance = 1e-6;
 
     [Theory]
+    [InlineData(-2.0, 0, 0.0, 0.0)]
     [InlineData(2.0, 0, 0.25, 2.0)]
     [InlineData(8.0, 1, 0.0, 0.0)]
     [InlineData(9.0, 1, 0.25, 1.0)]
@@ -34,11 +35,12 @@ public sealed class TrackEvaluatorDistanceSemanticsContractTests
     }
 
     [Theory]
+    [InlineData(-2.0, 0, 0.0, 0.0)]
     [InlineData(2.0, 0, 0.25, 2.0)]
     [InlineData(8.0, 1, 0.0, 0.0)]
     [InlineData(9.0, 1, 0.25, 1.0)]
     [InlineData(99.0, 1, 1.0, 4.0)]
-    public void TrackEvaluator_EvaluateFrameAtDistance_DocumentOverload_UsesSegmentLocalFrameDistanceAndPosition(
+    public void TrackEvaluator_EvaluateFrameAtDistance_DocumentOverload_PreservesSupportLayerLocalFrameDistance(
         double globalDistance,
         int expectedSegmentIndex,
         double expectedLocalT,
@@ -57,15 +59,16 @@ public sealed class TrackEvaluatorDistanceSemanticsContractTests
     }
 
     [Theory]
+    [InlineData(-2.0, 0, 0.0, 0.0)]
     [InlineData(2.0, 0, 0.25, 2.0)]
-    [InlineData(8.0, 1, 0.0, 0.0)]
-    [InlineData(9.0, 1, 0.25, 1.0)]
-    [InlineData(99.0, 1, 1.0, 4.0)]
-    public void TrackEvaluator_EvaluateFrameAtDistance_BoundOverload_UsesSegmentLocalFrameDistanceAndPosition(
+    [InlineData(8.0, 1, 0.0, 8.0)]
+    [InlineData(9.0, 1, 0.25, 9.0)]
+    [InlineData(99.0, 1, 1.0, 12.0)]
+    public void TrackEvaluator_EvaluateFrameAtDistance_BoundOverload_UsesClampedGlobalStationDistanceAndPosition(
         double globalDistance,
         int expectedSegmentIndex,
         double expectedLocalT,
-        double expectedLocalDistance)
+        double expectedStationDistance)
     {
         (TrackDocument document, TrackSegment first, TrackSegment second) = CreateDistanceSemanticsDocument();
         var boundEvaluator = new TrackEvaluator(document);
@@ -75,8 +78,25 @@ public sealed class TrackEvaluatorDistanceSemanticsContractTests
         TrackSegment expectedSegment = expectedSegmentIndex == 0 ? first : second;
         Vector3d expectedPosition = expectedSegment.Spline!.Evaluate(expectedLocalT);
 
-        AssertDoubleNear(expectedLocalDistance, frame.Distance);
+        AssertDoubleNear(expectedStationDistance, frame.Distance);
         AssertVectorNear(frame.Position, expectedPosition);
+    }
+
+    [Fact]
+    public void TrackEvaluator_EvaluateFramesAtDistances_BoundOverload_UsesClampedGlobalStationDistancesAcrossSegments()
+    {
+        (TrackDocument document, _, _) = CreateDistanceSemanticsDocument();
+        var boundEvaluator = new TrackEvaluator(document);
+        double[] requestedDistances = { -1.0, 2.0, 8.0, 9.0, 12.0, 99.0 };
+        double[] expectedStationDistances = { 0.0, 2.0, 8.0, 9.0, 12.0, 12.0 };
+
+        ExportTrackFrame[] frames = boundEvaluator.EvaluateFramesAtDistances(requestedDistances);
+
+        Assert.Equal(expectedStationDistances.Length, frames.Length);
+        for (int i = 0; i < frames.Length; i++)
+        {
+            AssertDoubleNear(expectedStationDistances[i], frames[i].Distance);
+        }
     }
 
     private static (TrackDocument Document, TrackSegment First, TrackSegment Second) CreateDistanceSemanticsDocument()
