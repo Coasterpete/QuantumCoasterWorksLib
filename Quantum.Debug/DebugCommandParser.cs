@@ -19,7 +19,8 @@ namespace Quantum.Debug
         LongitudinalSpeedPreview,
         CenterlineFrameContinuity,
         TransportedFrameComparison,
-        TransportedFrameComparisonBrowser
+        TransportedFrameComparisonBrowser,
+        BankingProfileDiagnostics
     }
 
     public static class DebugCommandParser
@@ -120,6 +121,12 @@ namespace Quantum.Debug
             if (string.Equals(args[0], TransportedFrameComparisonBrowserCommand.CommandName, StringComparison.OrdinalIgnoreCase))
             {
                 command = DebugCommandKind.TransportedFrameComparisonBrowser;
+                return true;
+            }
+
+            if (string.Equals(args[0], BankingProfileDiagnosticsCommand.CommandName, StringComparison.OrdinalIgnoreCase))
+            {
+                command = DebugCommandKind.BankingProfileDiagnostics;
                 return true;
             }
 

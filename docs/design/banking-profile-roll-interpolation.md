@@ -38,6 +38,26 @@ This keeps authored banking separate from the default evaluator path. Existing
 segment `RollRadians` behavior remains the compatibility baseline unless a
 caller explicitly chooses the BankingProfile sampler.
 
+## Milestone 49 Diagnostics Update
+
+Milestone 49 adds backend-only BankingProfile sampling diagnostics and a
+versioned JSON export:
+
+```text
+quantum.banking_profile_diagnostics
+```
+
+The `banking-profile-diagnostics` debug command writes a deterministic sample
+artifact under `artifacts/banking-profile/`. Each sample reports station
+distance, roll radians, roll degrees, interpolation mode, source key interval,
+and approximate roll slope in radians per meter when the neighboring station
+distances make that practical. The summary reports sample count, min/max roll,
+and maximum absolute roll slope.
+
+This is inspection infrastructure only. It does not change default
+`TrackEvaluator` behavior, `TrackFrame`, `DebugViewportSnapshotV1`, or
+`TrainPoseExportV1`.
+
 ## Current Baseline
 
 Today `TrackSegment.RollRadians` is the only authored roll angle on

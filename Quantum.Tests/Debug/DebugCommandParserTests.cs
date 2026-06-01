@@ -143,6 +143,15 @@ public sealed class DebugCommandParserTests
     }
 
     [Fact]
+    public void TryParse_BankingProfileDiagnosticsCommand_ParsesCaseInsensitive()
+    {
+        bool parsed = DebugCommandParser.TryParse(new[] { "BaNkInG-PrOfIlE-DiAgNoStIcS" }, out DebugCommandKind command);
+
+        Assert.True(parsed);
+        Assert.Equal(DebugCommandKind.BankingProfileDiagnostics, command);
+    }
+
+    [Fact]
     public void TryParse_UnknownCommand_ReturnsFalse()
     {
         bool parsed = DebugCommandParser.TryParse(new[] { "unknown-command" }, out DebugCommandKind command);
