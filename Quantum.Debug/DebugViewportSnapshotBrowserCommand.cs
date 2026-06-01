@@ -270,9 +270,9 @@ namespace Quantum.Debug
             builder.AppendLine("    .frame-binormal { stroke: #7c3aed; }");
             builder.AppendLine("    .frame-axis { stroke-width: 1.6; stroke-linecap: round; }");
             builder.AppendLine("    .debug-line { stroke: #475569; stroke-width: 1.8; stroke-dasharray: 5 4; stroke-linecap: round; }");
-            builder.AppendLine("    .debug-line.tangent { stroke: #2563eb; }");
-            builder.AppendLine("    .debug-line.normal { stroke: #d97706; }");
-            builder.AppendLine("    .debug-line.binormal { stroke: #7c3aed; }");
+            builder.AppendLine("    .debug-line.frame-axis-tangent { stroke: #2563eb; }");
+            builder.AppendLine("    .debug-line.frame-axis-normal { stroke: #d97706; }");
+            builder.AppendLine("    .debug-line.frame-axis-binormal { stroke: #7c3aed; }");
             builder.AppendLine("    .train-box { fill: rgba(15, 118, 110, 0.14); stroke: #0f766e; stroke-width: 2; }");
             builder.AppendLine("    .train-label { fill: #0f766e; font: 12px Segoe UI, Arial, sans-serif; }");
             builder.AppendLine("    .bogie-marker { fill: #ffffff; stroke: #be123c; stroke-width: 2; }");
@@ -311,6 +311,7 @@ namespace Quantum.Debug
             builder.AppendLine();
             builder.AppendLine("      function asArray(value) { return Array.isArray(value) ? value : []; }");
             builder.AppendLine("      function finite(value, fallback) { const number = Number(value); return Number.isFinite(number) ? number : fallback; }");
+            builder.AppendLine("      function cssToken(value) { return String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'unknown'; }");
             builder.AppendLine("      function optionalNumber(value) { if (value === null || value === undefined || value === '') { return null; } const number = Number(value); return Number.isFinite(number) ? number : null; }");
             builder.AppendLine("      function vec(value) { return { x: finite(value && value.x, 0), y: finite(value && value.y, 0), z: finite(value && value.z, 0) }; }");
             builder.AppendLine("      function hasPosition(value) { return !!value && optionalNumber(value.x) !== null && optionalNumber(value.y) !== null && optionalNumber(value.z) !== null; }");
@@ -692,7 +693,7 @@ namespace Quantum.Debug
             builder.AppendLine("        asArray(snapshot.lines).forEach(function (line) {");
             builder.AppendLine("          const start = project.point(line.start);");
             builder.AppendLine("          const end = project.point(line.end);");
-            builder.AppendLine("          const kind = String(line.kind || '').toLowerCase();");
+            builder.AppendLine("          const kind = cssToken(line.kind || 'diagnostic.line');");
             builder.AppendLine("          group.appendChild(svg('line', { class: 'debug-line ' + kind, x1: start.x.toFixed(1), y1: start.y.toFixed(1), x2: end.x.toFixed(1), y2: end.y.toFixed(1) }));");
             builder.AppendLine("        });");
             builder.AppendLine("      }");

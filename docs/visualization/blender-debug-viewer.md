@@ -57,7 +57,7 @@ Inside the collection, you should see:
 
 - `centerline`: a renderable curve through `centerlinePoints`.
 - `frames`: tangent, normal, and binormal tick curves sampled from `frames`.
-- `debug_lines`: renderer-neutral `lines` from the snapshot, grouped by line kind when present.
+- `debug_lines`: renderer-neutral `lines` from the snapshot, grouped by stable line kind such as `frame.axis.tangent`, `frame.axis.normal`, `frame.axis.binormal`, or `diagnostic.line`.
 - `boxes`: placeholder cube boxes for snapshot `boxes`, oriented by frame tangent, binormal, and normal.
 - `scene`: `Quantum.debug_camera` and `Quantum.debug_key_light`.
 

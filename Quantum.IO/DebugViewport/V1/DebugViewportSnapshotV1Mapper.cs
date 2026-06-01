@@ -228,13 +228,13 @@ namespace Quantum.IO.DebugViewport.V1
             switch (axisType)
             {
                 case TrackFrameAxisType.Tangent:
-                    return "tangent";
+                    return DebugViewportSnapshotV1Vocabulary.FrameAxisTangentKind;
                 case TrackFrameAxisType.Normal:
-                    return "normal";
+                    return DebugViewportSnapshotV1Vocabulary.FrameAxisNormalKind;
                 case TrackFrameAxisType.Binormal:
-                    return "binormal";
+                    return DebugViewportSnapshotV1Vocabulary.FrameAxisBinormalKind;
                 default:
-                    return axisType.ToString();
+                    return DebugViewportSnapshotV1Vocabulary.DiagnosticLineKind;
             }
         }
     }

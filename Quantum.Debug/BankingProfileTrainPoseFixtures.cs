@@ -105,7 +105,7 @@ namespace Quantum.Debug
             {
                 ArticulatedTrainCarTransform body = cars[i].Body;
                 boxes[i] = new DebugViewportBoxSource(
-                    role: "train.body.banking-profile",
+                    role: DebugViewportSnapshotV1Vocabulary.TrainBodyBankingProfileRole,
                     label: "bp-car-" + i,
                     frame: body.ArticulatedFrame,
                     length: geometry.Length,

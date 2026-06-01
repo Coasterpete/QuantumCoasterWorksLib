@@ -3,6 +3,7 @@
 - Contract name: `quantum.debug_viewport_snapshot`
 - Version: `1`
 - Serialization naming: camelCase JSON properties
+- Machine-readable schema: `Quantum.Tests/IO/Fixtures/DebugViewportSnapshotV1.schema.json`
 - Intended consumers: Unity, Unreal, standalone editors, test tools, and other thin visualization adapters.
 
 This contract is a backend export boundary for debug viewport data. It describes sampled coaster-domain data and simple debug primitives only; it does not describe cameras, meshes, materials, draw calls, editor widgets, or renderer resources.
@@ -18,6 +19,26 @@ This contract is a backend export boundary for debug viewport data. It describes
 - `boxes` (array, required): renderer-neutral oriented debug boxes for placeholders such as bodies, bogies, or wheels.
 - `trainPose` (object or null, optional): nested `TrainPoseExportV1` payload when a complete train pose snapshot is available.
 
+## Stable Visualization Vocabulary
+
+Snapshot consumers should treat role/kind strings as stable semantic tokens, not renderer object names.
+
+Box roles:
+
+- `train.body`: normal placeholder train body box.
+- `train.body.banking-profile`: train body box from the opt-in BankingProfile sample path.
+- `train.bogie`: bogie placeholder box when a snapshot includes bogie boxes.
+- `train.wheel`: wheel placeholder box when a snapshot includes wheel boxes.
+
+Line kinds:
+
+- `frame.axis.tangent`: frame tangent/forward debug line.
+- `frame.axis.normal`: frame normal/up debug line.
+- `frame.axis.binormal`: frame binormal/right debug line.
+- `diagnostic.line`: generic diagnostic line when the line is not one frame axis.
+
+The JSON schema and backend validator reject unknown role/kind values so importer code can map them deliberately.
+
 ## Coordinate Convention
 
 Frame convention matches `Quantum.Track.TrackFrame`:
@@ -26,6 +47,7 @@ Frame convention matches `Quantum.Track.TrackFrame`:
 - `tangent` = forward axis.
 - `normal` = up axis.
 - `binormal` = right/lateral axis.
+- basis handedness = right-handed, with `binormal ~= tangent x normal`.
 - `distance` = backend station distance `s`.
 
 Box dimensions are coaster-domain dimensions:
@@ -64,7 +86,7 @@ Validate or inspect a generated snapshot with:
 dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1-validate artifacts/debug-viewport/DebugViewportSnapshotV1.sample.json
 ```
 
-The validation command is backend-only and prints a concise summary of contract/version, units, source fixture name, centerline/frame/line/box counts, train pose presence, and pass/fail status. It checks identity metadata, finite numeric values, centerline distance ordering, sample/frame count consistency, non-zero frame vectors, positive box dimensions, finite line endpoints, and nested train pose validation when `trainPose` is present.
+The validation command is backend-only and prints a concise summary of contract/version, units, source fixture name, centerline/frame/line/box counts, train pose presence, and pass/fail status. It checks identity metadata, finite numeric values, centerline distance ordering, sample/frame count consistency, frame orthonormality and handedness, positive box dimensions, known role/kind vocabulary, finite and non-degenerate line endpoints, and nested train pose validation when `trainPose` is present. Nested train pose validation uses the existing `TrainPoseExportV1` validator and enables matrix bottom-row and matrix/frame consistency checks for visualization handoff readiness.
 
 The sample is intentionally small and frontend-neutral. It is built from the existing deterministic debug smoke scenario and includes:
 

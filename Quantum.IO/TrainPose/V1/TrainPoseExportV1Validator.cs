@@ -12,7 +12,9 @@ namespace Quantum.IO.TrainPose.V1
         InvalidMatrixBottomRow = 3,
         NegativeGeometryDimension = 4,
         NegativeWheelRadius = 5,
-        NegativeWheelWidth = 6
+        NegativeWheelWidth = 6,
+        MatrixFrameMismatch = 7,
+        InvalidBasisHandedness = 8
     }
 
     public sealed class TrainPoseExportV1ValidationDiagnostic
@@ -54,9 +56,15 @@ namespace Quantum.IO.TrainPose.V1
 
         public double OrthogonalityTolerance { get; set; } = 1e-6;
 
+        public double HandednessTolerance { get; set; } = 1e-6;
+
         public bool ValidateMatrixBottomRow { get; set; } = false;
 
         public double MatrixBottomRowTolerance { get; set; } = 1e-6;
+
+        public bool ValidateMatrixFrameConsistency { get; set; } = false;
+
+        public double MatrixFrameTolerance { get; set; } = 1e-5;
     }
 
     public static class TrainPoseExportV1Validator
@@ -117,12 +125,28 @@ namespace Quantum.IO.TrainPose.V1
                     "Orthogonality tolerance must be finite and non-negative.");
             }
 
+            if (!IsFinite(options.HandednessTolerance) || options.HandednessTolerance < 0.0)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(options),
+                    options.HandednessTolerance,
+                    "Handedness tolerance must be finite and non-negative.");
+            }
+
             if (!IsFinite(options.MatrixBottomRowTolerance) || options.MatrixBottomRowTolerance < 0.0)
             {
                 throw new ArgumentOutOfRangeException(
                     nameof(options),
                     options.MatrixBottomRowTolerance,
                     "Matrix bottom-row tolerance must be finite and non-negative.");
+            }
+
+            if (!IsFinite(options.MatrixFrameTolerance) || options.MatrixFrameTolerance < 0.0)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(options),
+                    options.MatrixFrameTolerance,
+                    "Matrix/frame consistency tolerance must be finite and non-negative.");
             }
         }
 
@@ -259,6 +283,12 @@ namespace Quantum.IO.TrainPose.V1
             ValidateBogieTransform(body.RearBogie, path + ".rearBogie", diagnostics, options);
             ValidateTrackFrame(body.ArticulatedFrame, path + ".articulatedFrame", diagnostics, options);
             ValidateMatrix(body.ArticulatedMatrix, path + ".articulatedMatrix", diagnostics, options);
+            ValidateMatrixFrameConsistency(
+                body.ArticulatedFrame,
+                body.ArticulatedMatrix,
+                path + ".articulatedMatrix",
+                diagnostics,
+                options);
             ValidateFinite(body.CenterDistance, path + ".centerDistance", diagnostics);
         }
 
@@ -276,6 +306,7 @@ namespace Quantum.IO.TrainPose.V1
             ValidateFinite(transform.Distance, path + ".distance", diagnostics);
             ValidateTrackFrame(transform.Frame, path + ".frame", diagnostics, options);
             ValidateMatrix(transform.Matrix, path + ".matrix", diagnostics, options);
+            ValidateMatrixFrameConsistency(transform.Frame, transform.Matrix, path + ".matrix", diagnostics, options);
         }
 
         private static void ValidateTrainBogieWithWheels(
@@ -317,6 +348,7 @@ namespace Quantum.IO.TrainPose.V1
             ValidateFinite(transform.Distance, path + ".distance", diagnostics);
             ValidateTrackFrame(transform.Frame, path + ".frame", diagnostics, options);
             ValidateMatrix(transform.Matrix, path + ".matrix", diagnostics, options);
+            ValidateMatrixFrameConsistency(transform.Frame, transform.Matrix, path + ".matrix", diagnostics, options);
         }
 
         private static void ValidateWheelTransform(
@@ -335,6 +367,7 @@ namespace Quantum.IO.TrainPose.V1
             ValidateFinite(transform.LocalOffsetZ, path + ".localOffsetZ", diagnostics);
             ValidateTrackFrame(transform.Frame, path + ".frame", diagnostics, options);
             ValidateMatrix(transform.Matrix, path + ".matrix", diagnostics, options);
+            ValidateMatrixFrameConsistency(transform.Frame, transform.Matrix, path + ".matrix", diagnostics, options);
         }
 
         private static void ValidateTrackFrame(
@@ -430,6 +463,20 @@ namespace Quantum.IO.TrainPose.V1
                 path + ".normalBinormalDot",
                 diagnostics,
                 options.OrthogonalityTolerance);
+
+            double handedness = Dot(Cross(frame.Tangent, frame.Normal), frame.Binormal);
+            double handednessDelta = System.Math.Abs(handedness - 1.0);
+            if (handednessDelta > options.HandednessTolerance)
+            {
+                diagnostics.Add(
+                    new TrainPoseExportV1ValidationDiagnostic(
+                        TrainPoseExportV1ValidationCode.InvalidBasisHandedness,
+                        path + ".handedness",
+                        "Basis must satisfy binormal ~= tangent x normal.",
+                        handedness,
+                        1.0,
+                        options.HandednessTolerance));
+            }
         }
 
         private static void ValidateUnitLength(
@@ -529,6 +576,66 @@ namespace Quantum.IO.TrainPose.V1
             }
         }
 
+        private static void ValidateMatrixFrameConsistency(
+            TrackFrameV1Dto? frame,
+            Matrix4x4V1Dto? matrix,
+            string path,
+            List<TrainPoseExportV1ValidationDiagnostic> diagnostics,
+            TrainPoseExportV1ValidationOptions options)
+        {
+            if (!options.ValidateMatrixFrameConsistency || frame == null || matrix == null)
+            {
+                return;
+            }
+
+            if (!IsFiniteFrame(frame) || !IsFiniteMatrix(matrix))
+            {
+                return;
+            }
+
+            double tolerance = options.MatrixFrameTolerance;
+
+            ValidateMatrixFrameValue(matrix.M11, frame.Tangent.X, path + ".m11", diagnostics, tolerance);
+            ValidateMatrixFrameValue(matrix.M12, frame.Normal.X, path + ".m12", diagnostics, tolerance);
+            ValidateMatrixFrameValue(matrix.M13, frame.Binormal.X, path + ".m13", diagnostics, tolerance);
+            ValidateMatrixFrameValue(matrix.M14, frame.Position.X, path + ".m14", diagnostics, tolerance);
+
+            ValidateMatrixFrameValue(matrix.M21, frame.Tangent.Y, path + ".m21", diagnostics, tolerance);
+            ValidateMatrixFrameValue(matrix.M22, frame.Normal.Y, path + ".m22", diagnostics, tolerance);
+            ValidateMatrixFrameValue(matrix.M23, frame.Binormal.Y, path + ".m23", diagnostics, tolerance);
+            ValidateMatrixFrameValue(matrix.M24, frame.Position.Y, path + ".m24", diagnostics, tolerance);
+
+            ValidateMatrixFrameValue(matrix.M31, frame.Tangent.Z, path + ".m31", diagnostics, tolerance);
+            ValidateMatrixFrameValue(matrix.M32, frame.Normal.Z, path + ".m32", diagnostics, tolerance);
+            ValidateMatrixFrameValue(matrix.M33, frame.Binormal.Z, path + ".m33", diagnostics, tolerance);
+            ValidateMatrixFrameValue(matrix.M34, frame.Position.Z, path + ".m34", diagnostics, tolerance);
+
+            ValidateMatrixFrameValue(matrix.M41, 0.0, path + ".m41", diagnostics, tolerance);
+            ValidateMatrixFrameValue(matrix.M42, 0.0, path + ".m42", diagnostics, tolerance);
+            ValidateMatrixFrameValue(matrix.M43, 0.0, path + ".m43", diagnostics, tolerance);
+            ValidateMatrixFrameValue(matrix.M44, 1.0, path + ".m44", diagnostics, tolerance);
+        }
+
+        private static void ValidateMatrixFrameValue(
+            double value,
+            double expected,
+            string path,
+            List<TrainPoseExportV1ValidationDiagnostic> diagnostics,
+            double tolerance)
+        {
+            if (System.Math.Abs(value - expected) > tolerance)
+            {
+                diagnostics.Add(
+                    new TrainPoseExportV1ValidationDiagnostic(
+                        TrainPoseExportV1ValidationCode.MatrixFrameMismatch,
+                        path,
+                        "Matrix component must match the associated track frame.",
+                        value,
+                        expected,
+                        tolerance));
+            }
+        }
+
         private static bool ValidateFiniteVector(
             Vector3dV1Dto? vector,
             string path,
@@ -570,6 +677,43 @@ namespace Quantum.IO.TrainPose.V1
             return !(double.IsNaN(value) || double.IsInfinity(value));
         }
 
+        private static bool IsFiniteFrame(TrackFrameV1Dto frame)
+        {
+            return IsFinite(frame.Distance) &&
+                   IsFiniteVector(frame.Position) &&
+                   IsFiniteVector(frame.Tangent) &&
+                   IsFiniteVector(frame.Normal) &&
+                   IsFiniteVector(frame.Binormal);
+        }
+
+        private static bool IsFiniteVector(Vector3dV1Dto? vector)
+        {
+            return vector != null &&
+                   IsFinite(vector.X) &&
+                   IsFinite(vector.Y) &&
+                   IsFinite(vector.Z);
+        }
+
+        private static bool IsFiniteMatrix(Matrix4x4V1Dto matrix)
+        {
+            return IsFinite(matrix.M11) &&
+                   IsFinite(matrix.M12) &&
+                   IsFinite(matrix.M13) &&
+                   IsFinite(matrix.M14) &&
+                   IsFinite(matrix.M21) &&
+                   IsFinite(matrix.M22) &&
+                   IsFinite(matrix.M23) &&
+                   IsFinite(matrix.M24) &&
+                   IsFinite(matrix.M31) &&
+                   IsFinite(matrix.M32) &&
+                   IsFinite(matrix.M33) &&
+                   IsFinite(matrix.M34) &&
+                   IsFinite(matrix.M41) &&
+                   IsFinite(matrix.M42) &&
+                   IsFinite(matrix.M43) &&
+                   IsFinite(matrix.M44);
+        }
+
         private static double Length(Vector3dV1Dto vector)
         {
             return System.Math.Sqrt(vector.X * vector.X + vector.Y * vector.Y + vector.Z * vector.Z);
@@ -578,6 +722,16 @@ namespace Quantum.IO.TrainPose.V1
         private static double Dot(Vector3dV1Dto a, Vector3dV1Dto b)
         {
             return (a.X * b.X) + (a.Y * b.Y) + (a.Z * b.Z);
+        }
+
+        private static Vector3dV1Dto Cross(Vector3dV1Dto a, Vector3dV1Dto b)
+        {
+            return new Vector3dV1Dto
+            {
+                X = (a.Y * b.Z) - (a.Z * b.Y),
+                Y = (a.Z * b.X) - (a.X * b.Z),
+                Z = (a.X * b.Y) - (a.Y * b.X)
+            };
         }
     }
 }

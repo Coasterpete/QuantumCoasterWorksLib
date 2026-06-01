@@ -22,7 +22,12 @@ namespace Quantum.IO.DebugViewport.V1
         NonPositiveBoxDimension = 12,
         InvalidNestedTrainPoseContract = 13,
         InvalidNestedTrainPoseVersion = 14,
-        NestedTrainPoseValidationError = 15
+        NestedTrainPoseValidationError = 15,
+        NonOrthonormalFrame = 16,
+        InvalidFrameHandedness = 17,
+        DegenerateLineSegment = 18,
+        UnknownLineKind = 19,
+        UnknownBoxRole = 20
     }
 
     public sealed class DebugViewportSnapshotV1ValidationDiagnostic
@@ -61,6 +66,16 @@ namespace Quantum.IO.DebugViewport.V1
         public double ZeroVectorLengthTolerance { get; set; } = MathUtil.Epsilon;
 
         public double DistanceTolerance { get; set; } = 1e-9;
+
+        public double UnitVectorLengthTolerance { get; set; } = 1e-6;
+
+        public double OrthogonalityTolerance { get; set; } = 1e-6;
+
+        public double HandednessTolerance { get; set; } = 1e-6;
+
+        public double LineEndpointTolerance { get; set; } = 1e-9;
+
+        public double NestedTrainPoseMatrixFrameTolerance { get; set; } = 1e-5;
 
         public bool ValidateNestedTrainPose { get; set; } = true;
     }
@@ -124,7 +139,7 @@ namespace Quantum.IO.DebugViewport.V1
             }
             else
             {
-                ValidateLines(lines, diagnostics);
+                ValidateLines(lines, diagnostics, effectiveOptions);
             }
 
             DebugViewportBoxV1Dto[]? boxes = dto.Boxes;
@@ -167,6 +182,47 @@ namespace Quantum.IO.DebugViewport.V1
                     nameof(options),
                     options.DistanceTolerance,
                     "Distance tolerance must be finite and non-negative.");
+            }
+
+            if (!IsFinite(options.UnitVectorLengthTolerance) || options.UnitVectorLengthTolerance < 0.0)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(options),
+                    options.UnitVectorLengthTolerance,
+                    "Unit vector length tolerance must be finite and non-negative.");
+            }
+
+            if (!IsFinite(options.OrthogonalityTolerance) || options.OrthogonalityTolerance < 0.0)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(options),
+                    options.OrthogonalityTolerance,
+                    "Orthogonality tolerance must be finite and non-negative.");
+            }
+
+            if (!IsFinite(options.HandednessTolerance) || options.HandednessTolerance < 0.0)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(options),
+                    options.HandednessTolerance,
+                    "Handedness tolerance must be finite and non-negative.");
+            }
+
+            if (!IsFinite(options.LineEndpointTolerance) || options.LineEndpointTolerance < 0.0)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(options),
+                    options.LineEndpointTolerance,
+                    "Line endpoint tolerance must be finite and non-negative.");
+            }
+
+            if (!IsFinite(options.NestedTrainPoseMatrixFrameTolerance) ||
+                options.NestedTrainPoseMatrixFrameTolerance < 0.0)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(options),
+                    options.NestedTrainPoseMatrixFrameTolerance,
+                    "Nested train pose matrix/frame tolerance must be finite and non-negative.");
             }
         }
 
@@ -315,7 +371,8 @@ namespace Quantum.IO.DebugViewport.V1
 
         private static void ValidateLines(
             DebugViewportLineSegmentV1Dto[] lines,
-            List<DebugViewportSnapshotV1ValidationDiagnostic> diagnostics)
+            List<DebugViewportSnapshotV1ValidationDiagnostic> diagnostics,
+            DebugViewportSnapshotV1ValidationOptions options)
         {
             for (int i = 0; i < lines.Length; i++)
             {
@@ -327,8 +384,25 @@ namespace Quantum.IO.DebugViewport.V1
                     continue;
                 }
 
-                ValidateFiniteVector(line.Start, linePath + ".start", diagnostics);
-                ValidateFiniteVector(line.End, linePath + ".end", diagnostics);
+                ValidateKnownLineKind(line.Kind, linePath + ".kind", diagnostics);
+
+                bool startFinite = ValidateFiniteVector(line.Start, linePath + ".start", diagnostics);
+                bool endFinite = ValidateFiniteVector(line.End, linePath + ".end", diagnostics);
+                if (startFinite && endFinite)
+                {
+                    double length = Distance(line.Start, line.End);
+                    if (length <= options.LineEndpointTolerance)
+                    {
+                        diagnostics.Add(
+                            new DebugViewportSnapshotV1ValidationDiagnostic(
+                                DebugViewportSnapshotV1ValidationCode.DegenerateLineSegment,
+                                linePath,
+                                "Line segment endpoints must be distinct.",
+                                length,
+                                options.LineEndpointTolerance,
+                                options.LineEndpointTolerance));
+                    }
+                }
             }
         }
 
@@ -347,6 +421,7 @@ namespace Quantum.IO.DebugViewport.V1
                     continue;
                 }
 
+                ValidateKnownBoxRole(box.Role, boxPath + ".role", diagnostics);
                 ValidateFrame(box.Frame, boxPath + ".frame", diagnostics, options);
 
                 if (box.Size == null)
@@ -397,7 +472,19 @@ namespace Quantum.IO.DebugViewport.V1
             }
 
             IReadOnlyList<TrainPoseExportV1ValidationDiagnostic> nestedDiagnostics =
-                TrainPoseExportV1Validator.Validate(trainPose);
+                TrainPoseExportV1Validator.Validate(
+                    trainPose,
+                    new TrainPoseExportV1ValidationOptions
+                    {
+                        ZeroVectorLengthTolerance = options.ZeroVectorLengthTolerance,
+                        UnitVectorLengthTolerance = options.UnitVectorLengthTolerance,
+                        OrthogonalityTolerance = options.OrthogonalityTolerance,
+                        HandednessTolerance = options.HandednessTolerance,
+                        ValidateMatrixBottomRow = true,
+                        MatrixBottomRowTolerance = options.NestedTrainPoseMatrixFrameTolerance,
+                        ValidateMatrixFrameConsistency = true,
+                        MatrixFrameTolerance = options.NestedTrainPoseMatrixFrameTolerance
+                    });
             foreach (TrainPoseExportV1ValidationDiagnostic nestedDiagnostic in nestedDiagnostics)
             {
                 diagnostics.Add(
@@ -425,9 +512,14 @@ namespace Quantum.IO.DebugViewport.V1
 
             bool distanceFinite = ValidateFinite(frame.Distance, path + ".distance", diagnostics);
             ValidateFiniteVector(frame.Position, path + ".position", diagnostics);
-            ValidateNonZeroVector(frame.Tangent, path + ".tangent", diagnostics, options);
-            ValidateNonZeroVector(frame.Normal, path + ".normal", diagnostics, options);
-            ValidateNonZeroVector(frame.Binormal, path + ".binormal", diagnostics, options);
+            bool tangentValid = ValidateNonZeroVector(frame.Tangent, path + ".tangent", diagnostics, options);
+            bool normalValid = ValidateNonZeroVector(frame.Normal, path + ".normal", diagnostics, options);
+            bool binormalValid = ValidateNonZeroVector(frame.Binormal, path + ".binormal", diagnostics, options);
+
+            if (tangentValid && normalValid && binormalValid)
+            {
+                ValidateOrthonormalFrame(frame, path, diagnostics, options);
+            }
 
             return distanceFinite;
         }
@@ -486,6 +578,40 @@ namespace Quantum.IO.DebugViewport.V1
             }
         }
 
+        private static void ValidateKnownLineKind(
+            string? kind,
+            string path,
+            List<DebugViewportSnapshotV1ValidationDiagnostic> diagnostics)
+        {
+            if (DebugViewportSnapshotV1Vocabulary.IsKnownLineKind(kind))
+            {
+                return;
+            }
+
+            diagnostics.Add(
+                new DebugViewportSnapshotV1ValidationDiagnostic(
+                    DebugViewportSnapshotV1ValidationCode.UnknownLineKind,
+                    path,
+                    "Line kind must use the DebugViewportSnapshotV1 stable vocabulary."));
+        }
+
+        private static void ValidateKnownBoxRole(
+            string? role,
+            string path,
+            List<DebugViewportSnapshotV1ValidationDiagnostic> diagnostics)
+        {
+            if (DebugViewportSnapshotV1Vocabulary.IsKnownBoxRole(role))
+            {
+                return;
+            }
+
+            diagnostics.Add(
+                new DebugViewportSnapshotV1ValidationDiagnostic(
+                    DebugViewportSnapshotV1ValidationCode.UnknownBoxRole,
+                    path,
+                    "Box role must use the DebugViewportSnapshotV1 stable vocabulary."));
+        }
+
         private static bool ValidateNonZeroVector(
             DebugViewportVector3dV1Dto? vector,
             string path,
@@ -512,6 +638,75 @@ namespace Quantum.IO.DebugViewport.V1
             }
 
             return true;
+        }
+
+        private static void ValidateOrthonormalFrame(
+            DebugViewportFrameV1Dto frame,
+            string path,
+            List<DebugViewportSnapshotV1ValidationDiagnostic> diagnostics,
+            DebugViewportSnapshotV1ValidationOptions options)
+        {
+            ValidateUnitLength(Length(frame.Tangent), path + ".tangent", diagnostics, options.UnitVectorLengthTolerance);
+            ValidateUnitLength(Length(frame.Normal), path + ".normal", diagnostics, options.UnitVectorLengthTolerance);
+            ValidateUnitLength(Length(frame.Binormal), path + ".binormal", diagnostics, options.UnitVectorLengthTolerance);
+
+            ValidateOrthogonality(Dot(frame.Tangent, frame.Normal), path + ".tangentNormalDot", diagnostics, options.OrthogonalityTolerance);
+            ValidateOrthogonality(Dot(frame.Tangent, frame.Binormal), path + ".tangentBinormalDot", diagnostics, options.OrthogonalityTolerance);
+            ValidateOrthogonality(Dot(frame.Normal, frame.Binormal), path + ".normalBinormalDot", diagnostics, options.OrthogonalityTolerance);
+
+            double handedness = Dot(Cross(frame.Tangent, frame.Normal), frame.Binormal);
+            double handednessDelta = System.Math.Abs(handedness - 1.0);
+            if (handednessDelta > options.HandednessTolerance)
+            {
+                diagnostics.Add(
+                    new DebugViewportSnapshotV1ValidationDiagnostic(
+                        DebugViewportSnapshotV1ValidationCode.InvalidFrameHandedness,
+                        path + ".handedness",
+                        "Frame basis must satisfy binormal ~= tangent x normal.",
+                        handedness,
+                        1.0,
+                        options.HandednessTolerance));
+            }
+        }
+
+        private static void ValidateUnitLength(
+            double length,
+            string path,
+            List<DebugViewportSnapshotV1ValidationDiagnostic> diagnostics,
+            double tolerance)
+        {
+            double delta = System.Math.Abs(length - 1.0);
+            if (delta > tolerance)
+            {
+                diagnostics.Add(
+                    new DebugViewportSnapshotV1ValidationDiagnostic(
+                        DebugViewportSnapshotV1ValidationCode.NonOrthonormalFrame,
+                        path,
+                        "Frame basis vector length must be approximately 1.",
+                        length,
+                        1.0,
+                        tolerance));
+            }
+        }
+
+        private static void ValidateOrthogonality(
+            double dot,
+            string path,
+            List<DebugViewportSnapshotV1ValidationDiagnostic> diagnostics,
+            double tolerance)
+        {
+            double absoluteDot = System.Math.Abs(dot);
+            if (absoluteDot > tolerance)
+            {
+                diagnostics.Add(
+                    new DebugViewportSnapshotV1ValidationDiagnostic(
+                        DebugViewportSnapshotV1ValidationCode.NonOrthonormalFrame,
+                        path,
+                        "Frame basis vectors must be approximately orthogonal.",
+                        dot,
+                        0.0,
+                        tolerance));
+            }
         }
 
         private static bool ValidateFiniteVector(
@@ -581,6 +776,29 @@ namespace Quantum.IO.DebugViewport.V1
         private static double Length(DebugViewportVector3dV1Dto vector)
         {
             return System.Math.Sqrt(vector.X * vector.X + vector.Y * vector.Y + vector.Z * vector.Z);
+        }
+
+        private static double Distance(DebugViewportVector3dV1Dto a, DebugViewportVector3dV1Dto b)
+        {
+            double dx = a.X - b.X;
+            double dy = a.Y - b.Y;
+            double dz = a.Z - b.Z;
+            return System.Math.Sqrt(dx * dx + dy * dy + dz * dz);
+        }
+
+        private static double Dot(DebugViewportVector3dV1Dto a, DebugViewportVector3dV1Dto b)
+        {
+            return (a.X * b.X) + (a.Y * b.Y) + (a.Z * b.Z);
+        }
+
+        private static DebugViewportVector3dV1Dto Cross(DebugViewportVector3dV1Dto a, DebugViewportVector3dV1Dto b)
+        {
+            return new DebugViewportVector3dV1Dto
+            {
+                X = (a.Y * b.Z) - (a.Z * b.Y),
+                Y = (a.Z * b.X) - (a.X * b.Z),
+                Z = (a.X * b.Y) - (a.Y * b.X)
+            };
         }
     }
 }

@@ -382,6 +382,28 @@ public sealed class TrainPoseExportV1Tests
                  d.Path == "cars[0].body.originalBody.matrix.m41");
     }
 
+    [Fact]
+    public void Validation_MatrixFrameConsistency_WhenEnabled_ProducesDiagnostic()
+    {
+        TrainPoseExportV1Dto dto = TrainPoseExportV1Mapper.Export(CreateSourcePoseResult());
+        SetAllMatricesFromFrames(dto);
+        dto.Cars[0].Body.OriginalBody.Matrix.M14 += 0.25;
+
+        var options = new TrainPoseExportV1ValidationOptions
+        {
+            ValidateMatrixFrameConsistency = true,
+            MatrixFrameTolerance = 1e-6
+        };
+
+        IReadOnlyList<TrainPoseExportV1ValidationDiagnostic> diagnostics =
+            TrainPoseExportV1Validator.Validate(dto, options);
+
+        Assert.Contains(
+            diagnostics,
+            d => d.Code == TrainPoseExportV1ValidationCode.MatrixFrameMismatch &&
+                 d.Path == "cars[0].body.originalBody.matrix.m14");
+    }
+
     private static TrainPoseResult CreateSourcePoseResult()
     {
         var definition = new TrainConsistDefinition(
@@ -611,6 +633,56 @@ public sealed class TrainPoseExportV1Tests
             seed + 5.0, seed + 6.0, seed + 7.0, seed + 8.0,
             seed + 9.0, seed + 10.0, seed + 11.0, seed + 12.0,
             seed + 13.0, seed + 14.0, seed + 15.0, seed + 16.0);
+    }
+
+    private static void SetAllMatricesFromFrames(TrainPoseExportV1Dto dto)
+    {
+        for (int i = 0; i < dto.Cars.Length; i++)
+        {
+            ArticulatedTrainCarWithWheelsV1Dto car = dto.Cars[i];
+
+            SetMatrixFromFrame(car.Body.OriginalBody.Frame, car.Body.OriginalBody.Matrix);
+            SetMatrixFromFrame(car.Body.FrontBogie.Frame, car.Body.FrontBogie.Matrix);
+            SetMatrixFromFrame(car.Body.RearBogie.Frame, car.Body.RearBogie.Matrix);
+            SetMatrixFromFrame(car.Body.ArticulatedFrame, car.Body.ArticulatedMatrix);
+            SetMatrixFromFrame(car.FrontBogie.Bogie.Frame, car.FrontBogie.Bogie.Matrix);
+            SetMatrixFromFrame(car.RearBogie.Bogie.Frame, car.RearBogie.Bogie.Matrix);
+
+            for (int frontWheelIndex = 0; frontWheelIndex < car.FrontBogie.Wheels.Length; frontWheelIndex++)
+            {
+                WheelTransformV1Dto wheel = car.FrontBogie.Wheels[frontWheelIndex];
+                SetMatrixFromFrame(wheel.Frame, wheel.Matrix);
+            }
+
+            for (int rearWheelIndex = 0; rearWheelIndex < car.RearBogie.Wheels.Length; rearWheelIndex++)
+            {
+                WheelTransformV1Dto wheel = car.RearBogie.Wheels[rearWheelIndex];
+                SetMatrixFromFrame(wheel.Frame, wheel.Matrix);
+            }
+        }
+    }
+
+    private static void SetMatrixFromFrame(TrackFrameV1Dto frame, Matrix4x4V1Dto matrix)
+    {
+        matrix.M11 = frame.Tangent.X;
+        matrix.M12 = frame.Normal.X;
+        matrix.M13 = frame.Binormal.X;
+        matrix.M14 = frame.Position.X;
+
+        matrix.M21 = frame.Tangent.Y;
+        matrix.M22 = frame.Normal.Y;
+        matrix.M23 = frame.Binormal.Y;
+        matrix.M24 = frame.Position.Y;
+
+        matrix.M31 = frame.Tangent.Z;
+        matrix.M32 = frame.Normal.Z;
+        matrix.M33 = frame.Binormal.Z;
+        matrix.M34 = frame.Position.Z;
+
+        matrix.M41 = 0.0;
+        matrix.M42 = 0.0;
+        matrix.M43 = 0.0;
+        matrix.M44 = 1.0;
     }
 
     private static void SetAllMatrixBottomRowsCanonical(TrainPoseExportV1Dto dto)

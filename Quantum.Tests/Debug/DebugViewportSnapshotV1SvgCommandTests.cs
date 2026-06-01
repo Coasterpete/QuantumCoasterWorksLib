@@ -45,9 +45,9 @@ public sealed class DebugViewportSnapshotV1SvgCommandTests
             Assert.Contains("class=\"smooth-preview elevation-smooth-preview\"", svg);
             Assert.Contains("class=\"raw-sample-point sample-point top-down-sample-point\"", svg);
             Assert.Contains("class=\"raw-sample-point sample-point elevation-sample-point\"", svg);
-            Assert.Contains("class=\"debug-line debug-line-kind-tangent\"", svg);
-            Assert.Contains("class=\"debug-line debug-line-kind-normal\"", svg);
-            Assert.Contains("class=\"debug-line debug-line-kind-binormal\"", svg);
+            Assert.Contains("class=\"debug-line debug-line-kind-frame-axis-tangent\"", svg);
+            Assert.Contains("class=\"debug-line debug-line-kind-frame-axis-normal\"", svg);
+            Assert.Contains("class=\"debug-line debug-line-kind-frame-axis-binormal\"", svg);
             Assert.Contains("class=\"train-box train-box-role-train-body\"", svg);
             Assert.Contains("class=\"train-box-forward\"", svg);
             Assert.Contains("class=\"train-box-label\"", svg);
@@ -119,7 +119,7 @@ public sealed class DebugViewportSnapshotV1SvgCommandTests
         var boxes = new[]
         {
             new DebugViewportBoxSource(
-                role: "train.body",
+                role: DebugViewportSnapshotV1Vocabulary.TrainBodyRole,
                 label: "car-0",
                 frame: frames[1],
                 length: 4.0,
