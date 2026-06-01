@@ -28,6 +28,7 @@ public sealed class DebugCommandHelpTests
         Assert.Contains("centerline-frame-continuity [outputPath]", output);
         Assert.Contains("transported-frame-comparison [outputPath]", output);
         Assert.Contains("transported-frame-comparison-browser [comparisonJsonPath] [outputHtmlPath]", output);
+        Assert.Contains("banking-profile-diagnostics [outputPath]", output);
         Assert.Contains("Examples:", output);
         Assert.Contains(DebugCommandHelp.GeneratedArtifactsNote, output);
         Assert.Contains("Geometry Interchange Roadmap:", output);
@@ -202,6 +203,27 @@ public sealed class DebugCommandHelpTests
     }
 
     [Fact]
+    public void TryWriteRequestedHelp_BankingProfileDiagnostics_PrintsDiagnosticDetails()
+    {
+        var writer = new StringWriter(CultureInfo.InvariantCulture);
+
+        bool handled = DebugCommandHelp.TryWriteRequestedHelp(
+            new[] { "help", "banking-profile-diagnostics" },
+            writer,
+            out int exitCode);
+
+        Assert.True(handled);
+        Assert.Equal(0, exitCode);
+
+        string output = writer.ToString();
+        Assert.Contains("banking-profile-diagnostics [outputPath]", output);
+        Assert.Contains("BankingProfile roll sampling diagnostics", output);
+        Assert.Contains("roll radians, roll degrees", output);
+        Assert.Contains("approximate roll slope", output);
+        Assert.Contains("does not change TrackEvaluator", output);
+    }
+
+    [Fact]
     public void WriteUnknownCommand_PrintsUnknownCommandAndSupportedCommands()
     {
         var writer = new StringWriter(CultureInfo.InvariantCulture);
@@ -218,5 +240,6 @@ public sealed class DebugCommandHelpTests
         Assert.Contains("centerline-frame-continuity [outputPath]", output);
         Assert.Contains("transported-frame-comparison [outputPath]", output);
         Assert.Contains("transported-frame-comparison-browser [comparisonJsonPath] [outputHtmlPath]", output);
+        Assert.Contains("banking-profile-diagnostics [outputPath]", output);
     }
 }

@@ -197,6 +197,18 @@ namespace Quantum.Debug
                 return TransportedFrameComparisonBrowserCommand.Run(comparisonJsonPath, outputHtmlPath);
             }
 
+            if (command == DebugCommandKind.BankingProfileDiagnostics)
+            {
+                if (args.Length > 2)
+                {
+                    Console.WriteLine("Usage: banking-profile-diagnostics [outputPath]");
+                    return 1;
+                }
+
+                string? outputPath = args.Length == 2 ? args[1] : null;
+                return BankingProfileDiagnosticsCommand.Run(outputPath);
+            }
+
             RunValidation();
             return 0;
         }

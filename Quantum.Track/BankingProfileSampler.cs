@@ -10,6 +10,11 @@ namespace Quantum.Track
     {
         public static double SampleRollRadians(BankingProfile profile, double distance)
         {
+            return SampleRollInfo(profile, distance).RollRadians;
+        }
+
+        internal static BankingProfileSampleInfo SampleRollInfo(BankingProfile profile, double distance)
+        {
             if (profile is null)
             {
                 throw new ArgumentNullException(nameof(profile));
@@ -22,15 +27,42 @@ namespace Quantum.Track
 
             IReadOnlyList<BankingProfileKey> keys = profile.Keys;
             BankingProfileKey firstKey = keys[0];
+            if (keys.Count == 1)
+            {
+                return new BankingProfileSampleInfo(
+                    firstKey.RollRadians,
+                    BankingProfileInterpolationMode.Constant,
+                    BankingProfileSampleSourceKind.SingleKey,
+                    0,
+                    0,
+                    firstKey.Distance,
+                    firstKey.Distance);
+            }
+
             if (distance <= firstKey.Distance)
             {
-                return firstKey.RollRadians;
+                return new BankingProfileSampleInfo(
+                    firstKey.RollRadians,
+                    BankingProfileInterpolationMode.Constant,
+                    BankingProfileSampleSourceKind.ClampBeforeFirstKey,
+                    0,
+                    0,
+                    firstKey.Distance,
+                    firstKey.Distance);
             }
 
             BankingProfileKey lastKey = keys[keys.Count - 1];
             if (distance >= lastKey.Distance)
             {
-                return lastKey.RollRadians;
+                int lastKeyIndex = keys.Count - 1;
+                return new BankingProfileSampleInfo(
+                    lastKey.RollRadians,
+                    BankingProfileInterpolationMode.Constant,
+                    BankingProfileSampleSourceKind.ClampAfterLastKey,
+                    lastKeyIndex,
+                    lastKeyIndex,
+                    lastKey.Distance,
+                    lastKey.Distance);
             }
 
             for (int i = 0; i < keys.Count - 1; i++)
@@ -44,14 +76,36 @@ namespace Quantum.Track
 
                 if (distance == right.Distance)
                 {
-                    return right.RollRadians;
+                    return new BankingProfileSampleInfo(
+                        right.RollRadians,
+                        left.InterpolationToNext,
+                        BankingProfileSampleSourceKind.KeyInterval,
+                        i,
+                        i + 1,
+                        left.Distance,
+                        right.Distance);
                 }
 
                 double t = (distance - left.Distance) / (right.Distance - left.Distance);
-                return Interpolate(left.RollRadians, right.RollRadians, t, left.InterpolationToNext);
+                return new BankingProfileSampleInfo(
+                    Interpolate(left.RollRadians, right.RollRadians, t, left.InterpolationToNext),
+                    left.InterpolationToNext,
+                    BankingProfileSampleSourceKind.KeyInterval,
+                    i,
+                    i + 1,
+                    left.Distance,
+                    right.Distance);
             }
 
-            return lastKey.RollRadians;
+            int fallbackLastKeyIndex = keys.Count - 1;
+            return new BankingProfileSampleInfo(
+                lastKey.RollRadians,
+                BankingProfileInterpolationMode.Constant,
+                BankingProfileSampleSourceKind.ClampAfterLastKey,
+                fallbackLastKeyIndex,
+                fallbackLastKeyIndex,
+                lastKey.Distance,
+                lastKey.Distance);
         }
 
         public static TrackFrame[] SampleFramesAtDistances(

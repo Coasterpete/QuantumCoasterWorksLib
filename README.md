@@ -139,6 +139,12 @@ Generate transported frame comparison diagnostics for the built-in diagnostic fi
 dotnet run --project Quantum.Debug -- transported-frame-comparison artifacts/frame-comparison/transported-frame-comparison.sample.json
 ```
 
+Generate backend-only BankingProfile roll sampling diagnostics:
+
+```powershell
+dotnet run --project Quantum.Debug -- banking-profile-diagnostics artifacts/banking-profile/banking-profile-diagnostics.sample.json
+```
+
 Generate the static transported-frame comparison browser viewer:
 
 ```powershell
@@ -147,6 +153,7 @@ dotnet run --project Quantum.Debug -- transported-frame-comparison-browser artif
 
 The SVG previews, Markdown preview index, generated gallery, and browser inspector are backend-only debug aids for quick inspection. Current previews include top-down X/Z and elevation/profile panels so flat plan views can still show hills and drops. Raw exported centerline samples are shown as small markers with a faint raw polyline, and a Catmull-Rom smooth-preview path is drawn only as a visual approximation for readability. The browser inspector is a small local-file-friendly HTML/SVG/vanilla JavaScript artifact for checking backend output layers, distance ticks, curvature/radius diagnostics, and selected centerline sample station/X/Y/Z/curvature/radius values; it is not a production renderer or frontend. Curvature/radius diagnostics use optional per-sample curvature or radius fields when present and otherwise derive deterministic approximate curvature from neighboring centerline samples. The smoothing and browser inspection view do not change the JSON contract, backend spline behavior, track physics, or sampled data. The previews are not a renderer, editor, frontend scaffold, polished viewer, authoritative spline interpolation, or commitment to any visualization stack.
 The transported-frame comparison browser viewer is a separate static HTML/SVG/vanilla JavaScript artifact for inspecting `quantum.transported_frame_comparison_diagnostics` JSON. It embeds the comparison JSON, shows report summary metrics, renders a per-sample delta table, and marks normal/binormal/frame/matrix delta severity without changing `DebugViewportSnapshotV1`, `TrainPoseExportV1`, `TrackFrame`, or runtime banking behavior.
+The BankingProfile diagnostics artifact is a backend-only JSON export for inspecting `quantum.banking_profile_diagnostics` roll samples before changing any default frame evaluation behavior. It reports station distance, roll radians/degrees, interpolation mode and source interval, approximate roll slope in radians per meter when practical, and min/max/slope summary metrics under `artifacts/banking-profile/`.
 
 Generated JSON, SVG, Markdown, and HTML under `artifacts/` are local output by default and should not be committed unless there is a clear release reason.
 
@@ -170,6 +177,7 @@ Generated JSON, SVG, Markdown, and HTML under `artifacts/` are local output by d
 - `dotnet run --project Quantum.Debug -- longitudinal-speed-preview [preset] [outputPath] [initialSpeedMps]`: write speed preview diagnostics with `soft`, `balanced`, or `punchy` presets.
 - `dotnet run --project Quantum.Debug -- centerline-frame-continuity [outputPath]`: write backend-only JSON diagnostics for frame continuity on a deterministic sample centerline.
 - `dotnet run --project Quantum.Debug -- transported-frame-comparison [outputPath]`: write backend-only JSON diagnostics comparing stateless and transported frames over the diagnostic fixture set.
+- `dotnet run --project Quantum.Debug -- banking-profile-diagnostics [outputPath]`: write backend-only JSON diagnostics for deterministic `BankingProfile` roll samples under `artifacts/banking-profile/`.
 - `dotnet run --project Quantum.Debug -- transported-frame-comparison-browser [comparisonJsonPath] [outputHtmlPath]`: write a self-contained local browser viewer for transported-frame comparison JSON summary metrics, per-sample deltas, and severity indicators.
 
 See `ROADMAP.md`, `docs/release/v0.1.0-preview.md`, `docs/release/technical-preview-0.1-scope.md`, `docs/release/technical-preview-0.1-release-gate.md`, and `docs/architecture/frontend-strategy.md` for the current architecture direction and first public preview checklist.

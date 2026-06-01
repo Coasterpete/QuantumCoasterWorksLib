@@ -210,6 +210,22 @@ namespace Quantum.Debug
                     "dotnet run --project Quantum.Debug -- transported-frame-comparison artifacts/frame-comparison/transported-frame-comparison.sample.json"
                 }),
             new DebugCommandHelpEntry(
+                name: BankingProfileDiagnosticsCommand.CommandName,
+                usage: "banking-profile-diagnostics [outputPath]",
+                summary: "Write deterministic BankingProfile roll sampling diagnostics.",
+                arguments: new[]
+                {
+                    "outputPath: Optional JSON output path. Defaults to " +
+                    BankingProfileDiagnosticsCommand.DefaultRelativeOutputPath + ".",
+                    "The command samples a self-authored BankingProfile over station distances and reports roll radians, roll degrees, interpolation source intervals, approximate roll slope, and summary metrics.",
+                    "The output is backend-only JSON and does not change TrackEvaluator, TrackFrame, DebugViewportSnapshotV1, or TrainPoseExportV1 behavior."
+                },
+                examples: new[]
+                {
+                    "dotnet run --project Quantum.Debug -- banking-profile-diagnostics",
+                    "dotnet run --project Quantum.Debug -- banking-profile-diagnostics artifacts/banking-profile/banking-profile-diagnostics.sample.json"
+                }),
+            new DebugCommandHelpEntry(
                 name: TransportedFrameComparisonBrowserCommand.CommandName,
                 usage: "transported-frame-comparison-browser [comparisonJsonPath] [outputHtmlPath]",
                 summary: "Write a self-contained browser viewer for transported frame comparison JSON.",
