@@ -1094,6 +1094,277 @@ public sealed class TrainCarTransformProviderTests
     }
 
     [Fact]
+    public void EvaluateCarTransforms_WithConstantBankingProfile_AppliesExpectedRoll()
+    {
+        TrackDocument document = BuildStraightTrack(length: 30.0);
+        var evaluator = new TrackEvaluator(document);
+        var provider = new TrainCarTransformProvider(evaluator);
+        BankingProfile profile = CreateConstantBankingProfile(
+            document.TotalLength,
+            System.Math.PI * 0.5);
+
+        IReadOnlyList<TrainCarTransform> cars = provider.EvaluateCarTransforms(
+            leadDistance: 12.0,
+            carSpacing: 2.0,
+            carCount: 2,
+            bankingProfile: profile);
+
+        Assert.Equal(2, cars.Count);
+        AssertQuarterRollStraightFrame(cars[0].Frame);
+        AssertMatrixNear(cars[0].Frame.ToMatrix4x4(), cars[0].Matrix);
+    }
+
+    [Fact]
+    public void EvaluateCarTransforms_WithBankingProfileZeroRoll_IgnoresSegmentRoll()
+    {
+        TrackDocument document = BuildStraightTrackWithRoll(
+            length: 30.0,
+            rollRadians: System.Math.PI * 0.5);
+        var evaluator = new TrackEvaluator(document);
+        var provider = new TrainCarTransformProvider(evaluator);
+        BankingProfile profile = CreateConstantBankingProfile(
+            document.TotalLength,
+            rollRadians: 0.0);
+
+        IReadOnlyList<TrainCarTransform> cars = provider.EvaluateCarTransforms(
+            leadDistance: 12.0,
+            carSpacing: 2.0,
+            carCount: 1,
+            bankingProfile: profile);
+
+        Assert.Single(cars);
+        AssertUnrolledStraightFrame(cars[0].Frame);
+    }
+
+    [Fact]
+    public void EvaluateTrainPose_DefaultOverload_RemainsSegmentRollBackedAfterProfileEvaluation()
+    {
+        TrackDocument document = BuildStraightTrackWithRoll(
+            length: 40.0,
+            rollRadians: System.Math.PI * 0.5);
+        var evaluator = new TrackEvaluator(document);
+        var provider = new TrainCarTransformProvider(evaluator);
+        TrainConsistDefinition definition = BuildConsistDefinitionWithWheels(
+            carCount: 2,
+            wheelCountPerBogie: 4);
+        BankingProfile profile = CreateConstantBankingProfile(
+            document.TotalLength,
+            rollRadians: 0.0);
+        const double leadDistance = 20.0;
+
+        TrainPoseResult beforeProfileEvaluation = provider.EvaluateTrainPose(
+            leadDistance: leadDistance,
+            definition: definition);
+        _ = provider.EvaluateTrainPose(
+            leadDistance: leadDistance,
+            definition: definition,
+            bankingProfile: profile);
+        TrainPoseResult afterProfileEvaluation = provider.EvaluateTrainPose(
+            leadDistance: leadDistance,
+            definition: definition);
+
+        Assert.Equal(beforeProfileEvaluation.CarsReadOnly.Count, afterProfileEvaluation.CarsReadOnly.Count);
+        for (int i = 0; i < beforeProfileEvaluation.CarsReadOnly.Count; i++)
+        {
+            AssertArticulatedTrainCarWithWheelsTransformNear(
+                beforeProfileEvaluation.CarsReadOnly[i],
+                afterProfileEvaluation.CarsReadOnly[i]);
+        }
+
+        AssertQuarterRollStraightFrame(afterProfileEvaluation.CarsReadOnly[0].Body.OriginalBody.Frame);
+    }
+
+    [Fact]
+    public void EvaluateTrainPose_WithBankingProfile_PreservesLeadToTailCarOrder()
+    {
+        TrackDocument document = BuildStraightTrack(length: 40.0);
+        var evaluator = new TrackEvaluator(document);
+        var provider = new TrainCarTransformProvider(evaluator);
+        TrainConsistDefinition definition = BuildConsistDefinitionWithWheels(
+            carCount: 4,
+            wheelCountPerBogie: 4);
+        BankingProfile profile = CreateConstantBankingProfile(
+            document.TotalLength,
+            rollRadians: 0.25);
+        const double leadDistance = 24.0;
+
+        TrainPoseResult result = provider.EvaluateTrainPose(
+            leadDistance: leadDistance,
+            definition: definition,
+            bankingProfile: profile);
+
+        Assert.Equal(definition.CarCount, result.CarsReadOnly.Count);
+        for (int i = 0; i < result.CarsReadOnly.Count; i++)
+        {
+            ArticulatedTrainCarWithWheelsTransform car = result.CarsReadOnly[i];
+            double expectedBodyDistance = leadDistance - (i * definition.CarSpacing);
+
+            Assert.Equal(i, car.Body.OriginalBody.CarIndex);
+            AssertDoubleNear(expectedBodyDistance, car.Body.OriginalBody.Distance);
+            AssertDoubleNear(expectedBodyDistance, car.Body.OriginalBody.Frame.Distance);
+        }
+    }
+
+    [Fact]
+    public void EvaluateTrainPose_WithBankingProfile_AppliesFramesToFullHierarchy()
+    {
+        TrackDocument document = BuildStraightTrack(length: 40.0);
+        var evaluator = new TrackEvaluator(document);
+        var provider = new TrainCarTransformProvider(evaluator);
+        TrainConsistDefinition definition = BuildConsistDefinitionWithWheels(
+            carCount: 1,
+            wheelCountPerBogie: 4);
+        BankingProfile profile = CreateConstantBankingProfile(
+            document.TotalLength,
+            System.Math.PI * 0.5);
+
+        TrainPoseResult result = provider.EvaluateTrainPose(
+            leadDistance: 20.0,
+            definition: definition,
+            bankingProfile: profile);
+
+        ArticulatedTrainCarWithWheelsTransform car = Assert.Single(result.CarsReadOnly);
+
+        AssertQuarterRollStraightFrame(car.Body.OriginalBody.Frame);
+        AssertMatrixNear(car.Body.OriginalBody.Frame.ToMatrix4x4(), car.Body.OriginalBody.Matrix);
+
+        AssertQuarterRollStraightFrame(car.Body.FrontBogie.Frame);
+        AssertMatrixNear(
+            Matrix4x4d.FromMatrix4x4(car.Body.FrontBogie.Frame.ToMatrix4x4()),
+            car.Body.FrontBogie.Matrix);
+        AssertQuarterRollStraightFrame(car.Body.RearBogie.Frame);
+        AssertMatrixNear(
+            Matrix4x4d.FromMatrix4x4(car.Body.RearBogie.Frame.ToMatrix4x4()),
+            car.Body.RearBogie.Matrix);
+
+        AssertQuarterRollStraightFrame(car.FrontBogie.Bogie.Frame);
+        AssertQuarterRollStraightFrame(car.RearBogie.Bogie.Frame);
+        AssertWheelFrameAndMatrixMatchBogie(car.FrontBogie);
+        AssertWheelFrameAndMatrixMatchBogie(car.RearBogie);
+        AssertQuarterRollStraightFrame(car.FrontBogie.WheelsReadOnly[0].Frame);
+        AssertQuarterRollStraightFrame(car.RearBogie.WheelsReadOnly[0].Frame);
+
+        AssertQuarterRollStraightFrame(car.Body.ArticulatedFrame);
+        AssertMatrixNear(
+            Matrix4x4d.FromMatrix4x4(car.Body.ArticulatedFrame.ToMatrix4x4()),
+            car.Body.ArticulatedMatrix);
+    }
+
+    [Theory]
+    [InlineData(BankingProfileInterpolationMode.Linear)]
+    [InlineData(BankingProfileInterpolationMode.SmoothStep)]
+    public void EvaluateTrainPose_WithInterpolatedBankingProfile_ChangesRollOnly(
+        BankingProfileInterpolationMode interpolationMode)
+    {
+        TrackDocument document = BuildStraightTrack(length: 40.0);
+        var evaluator = new TrackEvaluator(document);
+        var provider = new TrainCarTransformProvider(evaluator);
+        TrainConsistDefinition definition = BuildConsistDefinitionWithWheels(
+            carCount: 1,
+            wheelCountPerBogie: 4);
+        BankingProfile profile = CreateProfile(
+            new BankingProfileKey(0.0, 0.0, interpolationMode),
+            new BankingProfileKey(40.0, System.Math.PI * 0.5, interpolationMode));
+        const double leadDistance = 20.0;
+
+        TrainPoseResult defaultPose = provider.EvaluateTrainPose(
+            leadDistance: leadDistance,
+            definition: definition);
+        TrainPoseResult profilePose = provider.EvaluateTrainPose(
+            leadDistance: leadDistance,
+            definition: definition,
+            bankingProfile: profile);
+
+        ArticulatedTrainCarWithWheelsTransform defaultCar = Assert.Single(defaultPose.CarsReadOnly);
+        ArticulatedTrainCarWithWheelsTransform profileCar = Assert.Single(profilePose.CarsReadOnly);
+
+        AssertCenterlineSamplePreserved(
+            defaultCar.Body.OriginalBody.Frame,
+            profileCar.Body.OriginalBody.Frame);
+        AssertVectorNotNear(defaultCar.Body.OriginalBody.Frame.Normal, profileCar.Body.OriginalBody.Frame.Normal);
+        AssertVectorNotNear(defaultCar.Body.OriginalBody.Frame.Binormal, profileCar.Body.OriginalBody.Frame.Binormal);
+        AssertMatrixNotNear(defaultCar.Body.OriginalBody.Matrix, profileCar.Body.OriginalBody.Matrix);
+
+        AssertCenterlineSamplePreserved(
+            defaultCar.FrontBogie.Bogie.Frame,
+            profileCar.FrontBogie.Bogie.Frame);
+        AssertVectorNotNear(defaultCar.FrontBogie.Bogie.Frame.Normal, profileCar.FrontBogie.Bogie.Frame.Normal);
+        AssertVectorNotNear(defaultCar.FrontBogie.Bogie.Frame.Binormal, profileCar.FrontBogie.Bogie.Frame.Binormal);
+        AssertMatrixNotNear(defaultCar.FrontBogie.Bogie.Matrix, profileCar.FrontBogie.Bogie.Matrix);
+    }
+
+    [Fact]
+    public void EvaluateTrainPose_WithBankingProfile_DuplicateDistancesAreDeterministic()
+    {
+        TrackDocument document = BuildStraightTrack(length: 40.0);
+        var evaluator = new TrackEvaluator(document);
+        var provider = new TrainCarTransformProvider(evaluator);
+        var definition = new TrainConsistDefinition(
+            carCount: 2,
+            carSpacing: 2.0,
+            carLength: 4.0,
+            carWidth: 1.4,
+            carHeight: 1.8,
+            bogieSpacing: 2.0,
+            wheelLayout: new TrainWheelLayout(
+                wheelCountPerBogie: 4,
+                wheelRadius: 0.45,
+                wheelWidth: 0.5,
+                axleSpacing: 1.0));
+        BankingProfile profile = CreateConstantBankingProfile(
+            document.TotalLength,
+            rollRadians: 0.35);
+        const double leadDistance = 10.0;
+
+        TrainPoseResult first = provider.EvaluateTrainPose(
+            leadDistance: leadDistance,
+            definition: definition,
+            bankingProfile: profile);
+        TrainPoseResult second = provider.EvaluateTrainPose(
+            leadDistance: leadDistance,
+            definition: definition,
+            bankingProfile: profile);
+
+        Assert.Equal(first.CarsReadOnly.Count, second.CarsReadOnly.Count);
+        for (int i = 0; i < first.CarsReadOnly.Count; i++)
+        {
+            AssertArticulatedTrainCarWithWheelsTransformNear(first.CarsReadOnly[i], second.CarsReadOnly[i]);
+        }
+
+        AssertDoubleNear(9.0, first.CarsReadOnly[0].Body.RearBogie.Distance);
+        AssertDoubleNear(9.0, first.CarsReadOnly[1].Body.FrontBogie.Distance);
+        AssertTrackFrameNear(
+            first.CarsReadOnly[0].Body.RearBogie.Frame,
+            first.CarsReadOnly[1].Body.FrontBogie.Frame);
+    }
+
+    [Fact]
+    public void BankingProfileOverloads_WhenProfileIsNull_ThrowArgumentNullException()
+    {
+        TrackDocument document = BuildStraightTrack(length: 20.0);
+        var evaluator = new TrackEvaluator(document);
+        var provider = new TrainCarTransformProvider(evaluator);
+        TrainConsistDefinition definition = BuildConsistDefinitionWithWheels(
+            carCount: 1,
+            wheelCountPerBogie: 4);
+
+        ArgumentNullException carTransformsException = Assert.Throws<ArgumentNullException>(
+            () => provider.EvaluateCarTransforms(
+                leadDistance: 10.0,
+                carSpacing: 2.0,
+                carCount: 1,
+                bankingProfile: null!));
+        ArgumentNullException poseException = Assert.Throws<ArgumentNullException>(
+            () => provider.EvaluateTrainPose(
+                leadDistance: 10.0,
+                definition: definition,
+                bankingProfile: null!));
+
+        Assert.Equal("bankingProfile", carTransformsException.ParamName);
+        Assert.Equal("bankingProfile", poseException.ParamName);
+    }
+
+    [Fact]
     public void TrainPoseResult_WhenDefinitionIsNull_ThrowsArgumentNullException()
     {
         var cars = Array.Empty<ArticulatedTrainCarWithWheelsTransform>();
@@ -1210,6 +1481,14 @@ public sealed class TrainCarTransformProviderTests
         });
     }
 
+    private static TrackDocument BuildStraightTrackWithRoll(double length, double rollRadians)
+    {
+        return new TrackDocument(new TrackSegment[]
+        {
+            new StraightSegment(length: length, rollRadians: rollRadians)
+        });
+    }
+
     private static TrackDocument BuildSplineTrack(double length)
     {
         return new TrackDocument(new TrackSegment[]
@@ -1242,6 +1521,18 @@ public sealed class TrainCarTransformProviderTests
                     new Vector3d(100.0, 5.0, 0.0),
                     new Vector3d(110.0, 5.0, 0.0)))
         });
+    }
+
+    private static BankingProfile CreateProfile(params BankingProfileKey[] keys)
+    {
+        return new BankingProfile(keys);
+    }
+
+    private static BankingProfile CreateConstantBankingProfile(double totalLength, double rollRadians)
+    {
+        return CreateProfile(
+            new BankingProfileKey(0.0, rollRadians, BankingProfileInterpolationMode.Constant),
+            new BankingProfileKey(totalLength, rollRadians, BankingProfileInterpolationMode.Constant));
     }
 
     private static void AssertFiniteMatrix(Matrix4x4 matrix)
@@ -1452,6 +1743,41 @@ public sealed class TrainCarTransformProviderTests
         }
     }
 
+    private static void AssertQuarterRollStraightFrame(ExportTrackFrame frame)
+    {
+        AssertVectorNear(Vector3d.UnitX, frame.Tangent);
+        AssertVectorNear(Vector3d.UnitZ, frame.Normal);
+        AssertVectorNear(new Vector3d(0.0, -1.0, 0.0), frame.Binormal);
+    }
+
+    private static void AssertUnrolledStraightFrame(ExportTrackFrame frame)
+    {
+        AssertVectorNear(Vector3d.UnitX, frame.Tangent);
+        AssertVectorNear(Vector3d.UnitY, frame.Normal);
+        AssertVectorNear(Vector3d.UnitZ, frame.Binormal);
+    }
+
+    private static void AssertCenterlineSamplePreserved(
+        ExportTrackFrame expected,
+        ExportTrackFrame actual)
+    {
+        AssertDoubleNear(expected.Distance, actual.Distance);
+        AssertVectorNear(expected.Position, actual.Position);
+        AssertVectorNear(expected.Tangent, actual.Tangent);
+    }
+
+    private static void AssertVectorNotNear(Vector3d notExpected, Vector3d actual)
+    {
+        bool near =
+            System.Math.Abs(notExpected.X - actual.X) <= Tolerance &&
+            System.Math.Abs(notExpected.Y - actual.Y) <= Tolerance &&
+            System.Math.Abs(notExpected.Z - actual.Z) <= Tolerance;
+
+        Assert.False(
+            near,
+            $"Expected vectors to differ, but both were near ({actual.X}, {actual.Y}, {actual.Z}).");
+    }
+
     private static void AssertWheelOffsetsFiniteAndDeterministic(WheelTransform[] expected, WheelTransform[] actual)
     {
         Assert.Equal(expected.Length, actual.Length);
@@ -1519,6 +1845,13 @@ public sealed class TrainCarTransformProviderTests
         AssertDoubleNear(expected.M44, actual.M44);
     }
 
+    private static void AssertMatrixNotNear(Matrix4x4 expected, Matrix4x4 actual)
+    {
+        Assert.True(
+            MaxMatrixDifference(expected, actual) > Tolerance,
+            "Expected matrices to differ.");
+    }
+
     private static void AssertMatrixNear(Matrix4x4d expected, Matrix4x4d actual)
     {
         AssertDoubleNear(expected.M11, actual.M11);
@@ -1537,6 +1870,57 @@ public sealed class TrainCarTransformProviderTests
         AssertDoubleNear(expected.M42, actual.M42);
         AssertDoubleNear(expected.M43, actual.M43);
         AssertDoubleNear(expected.M44, actual.M44);
+    }
+
+    private static void AssertMatrixNotNear(Matrix4x4d expected, Matrix4x4d actual)
+    {
+        Assert.True(
+            MaxMatrixDifference(expected, actual) > Tolerance,
+            "Expected matrices to differ.");
+    }
+
+    private static double MaxMatrixDifference(Matrix4x4 expected, Matrix4x4 actual)
+    {
+        double max = 0.0;
+        max = System.Math.Max(max, System.Math.Abs(expected.M11 - actual.M11));
+        max = System.Math.Max(max, System.Math.Abs(expected.M12 - actual.M12));
+        max = System.Math.Max(max, System.Math.Abs(expected.M13 - actual.M13));
+        max = System.Math.Max(max, System.Math.Abs(expected.M14 - actual.M14));
+        max = System.Math.Max(max, System.Math.Abs(expected.M21 - actual.M21));
+        max = System.Math.Max(max, System.Math.Abs(expected.M22 - actual.M22));
+        max = System.Math.Max(max, System.Math.Abs(expected.M23 - actual.M23));
+        max = System.Math.Max(max, System.Math.Abs(expected.M24 - actual.M24));
+        max = System.Math.Max(max, System.Math.Abs(expected.M31 - actual.M31));
+        max = System.Math.Max(max, System.Math.Abs(expected.M32 - actual.M32));
+        max = System.Math.Max(max, System.Math.Abs(expected.M33 - actual.M33));
+        max = System.Math.Max(max, System.Math.Abs(expected.M34 - actual.M34));
+        max = System.Math.Max(max, System.Math.Abs(expected.M41 - actual.M41));
+        max = System.Math.Max(max, System.Math.Abs(expected.M42 - actual.M42));
+        max = System.Math.Max(max, System.Math.Abs(expected.M43 - actual.M43));
+        max = System.Math.Max(max, System.Math.Abs(expected.M44 - actual.M44));
+        return max;
+    }
+
+    private static double MaxMatrixDifference(Matrix4x4d expected, Matrix4x4d actual)
+    {
+        double max = 0.0;
+        max = System.Math.Max(max, System.Math.Abs(expected.M11 - actual.M11));
+        max = System.Math.Max(max, System.Math.Abs(expected.M12 - actual.M12));
+        max = System.Math.Max(max, System.Math.Abs(expected.M13 - actual.M13));
+        max = System.Math.Max(max, System.Math.Abs(expected.M14 - actual.M14));
+        max = System.Math.Max(max, System.Math.Abs(expected.M21 - actual.M21));
+        max = System.Math.Max(max, System.Math.Abs(expected.M22 - actual.M22));
+        max = System.Math.Max(max, System.Math.Abs(expected.M23 - actual.M23));
+        max = System.Math.Max(max, System.Math.Abs(expected.M24 - actual.M24));
+        max = System.Math.Max(max, System.Math.Abs(expected.M31 - actual.M31));
+        max = System.Math.Max(max, System.Math.Abs(expected.M32 - actual.M32));
+        max = System.Math.Max(max, System.Math.Abs(expected.M33 - actual.M33));
+        max = System.Math.Max(max, System.Math.Abs(expected.M34 - actual.M34));
+        max = System.Math.Max(max, System.Math.Abs(expected.M41 - actual.M41));
+        max = System.Math.Max(max, System.Math.Abs(expected.M42 - actual.M42));
+        max = System.Math.Max(max, System.Math.Abs(expected.M43 - actual.M43));
+        max = System.Math.Max(max, System.Math.Abs(expected.M44 - actual.M44));
+        return max;
     }
 
     private static void AssertVectorNear(Vector3d expected, Vector3d actual)

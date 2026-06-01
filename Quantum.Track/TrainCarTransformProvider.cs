@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Quantum.Math;
 using Quantum.Track.Internal;
 
 namespace Quantum.Track
@@ -38,6 +39,28 @@ namespace Quantum.Track
         }
 
         /// <summary>
+        /// Computes per-car frames and body transform matrices using an explicit
+        /// <see cref="BankingProfile"/> as the roll source.
+        /// </summary>
+        public IReadOnlyList<TrainCarTransform> GetCarTransforms(
+            double leadDistance,
+            double carSpacing,
+            int carCount,
+            BankingProfile bankingProfile)
+        {
+            if (bankingProfile == null)
+            {
+                throw new ArgumentNullException(nameof(bankingProfile));
+            }
+
+            return SampleProfileBackedBodies(
+                leadDistance,
+                carSpacing,
+                carCount,
+                bankingProfile);
+        }
+
+        /// <summary>
         /// Alias for <see cref="GetCarTransforms(double, double, int)"/> to align naming with other
         /// <c>Evaluate*</c> provider APIs.
         /// </summary>
@@ -47,6 +70,19 @@ namespace Quantum.Track
             int carCount)
         {
             return GetCarTransforms(leadDistance, carSpacing, carCount);
+        }
+
+        /// <summary>
+        /// Alias for <see cref="GetCarTransforms(double, double, int, BankingProfile)"/> to align naming with other
+        /// <c>Evaluate*</c> provider APIs.
+        /// </summary>
+        public IReadOnlyList<TrainCarTransform> EvaluateCarTransforms(
+            double leadDistance,
+            double carSpacing,
+            int carCount,
+            BankingProfile bankingProfile)
+        {
+            return GetCarTransforms(leadDistance, carSpacing, carCount, bankingProfile);
         }
 
         public IReadOnlyList<TrainCarWithBogiesTransform> EvaluateTrainWithBogies(
@@ -149,6 +185,48 @@ namespace Quantum.Track
             return _poseAssembler.BuildPoseResult(leadDistance, definition, evaluatedCars);
         }
 
+        /// <summary>
+        /// Public train-pose entrypoint that explicitly uses a
+        /// <see cref="BankingProfile"/> as the roll source.
+        /// </summary>
+        /// <remarks>
+        /// This opt-in overload leaves the default segment-roll path unchanged.
+        /// It samples all body and bogie frames as one transported-frame batch so
+        /// BankingProfile roll is applied consistently across the evaluated train.
+        /// Wheel transforms inherit their bogie frames, and articulated body
+        /// transforms are assembled from those same profile-backed frames.
+        /// </remarks>
+        public TrainPoseResult EvaluateTrainPose(
+            double leadDistance,
+            TrainConsistDefinition definition,
+            BankingProfile bankingProfile)
+        {
+            if (definition == null)
+            {
+                throw new ArgumentNullException(nameof(definition));
+            }
+
+            if (bankingProfile == null)
+            {
+                throw new ArgumentNullException(nameof(bankingProfile));
+            }
+
+            TrainWheelLayout? wheelLayout = definition.WheelLayout;
+            if (wheelLayout == null)
+            {
+                throw new InvalidOperationException("Wheel layout is required to evaluate wheel transforms.");
+            }
+
+            IReadOnlyList<ArticulatedTrainCarWithWheelsTransform> evaluatedCars =
+                EvaluateProfileBackedArticulatedTrainWithWheels(
+                    leadDistance,
+                    definition,
+                    wheelLayout,
+                    bankingProfile);
+
+            return _poseAssembler.BuildPoseResult(leadDistance, definition, evaluatedCars);
+        }
+
         public IReadOnlyList<TrainCarWithBogiesTransform> EvaluateTrainWithBogies(
             double leadDistance,
             int carCount,
@@ -171,5 +249,254 @@ namespace Quantum.Track
             return _bogieSolver.SolveBogies(bodyTransforms, bogieSpacing);
         }
 
+        private IReadOnlyList<TrainCarTransform> SampleProfileBackedBodies(
+            double leadDistance,
+            double carSpacing,
+            int carCount,
+            BankingProfile bankingProfile)
+        {
+            TrackDocument document = ResolveDocumentAndValidateBodyInputs(
+                leadDistance,
+                carSpacing,
+                carCount);
+            double[] distances = BuildBodyDistances(
+                leadDistance,
+                carSpacing,
+                carCount,
+                document.TotalLength);
+            TrackFrame[] frames = SampleProfileFramesInInputOrder(
+                document,
+                bankingProfile,
+                distances);
+            var transforms = new List<TrainCarTransform>(carCount);
+
+            for (int i = 0; i < carCount; i++)
+            {
+                TrackFrame frame = frames[i];
+                transforms.Add(new TrainCarTransform(
+                    i,
+                    distances[i],
+                    frame,
+                    frame.ToMatrix4x4()));
+            }
+
+            return transforms;
+        }
+
+        private IReadOnlyList<ArticulatedTrainCarWithWheelsTransform> EvaluateProfileBackedArticulatedTrainWithWheels(
+            double leadDistance,
+            TrainConsistDefinition definition,
+            TrainWheelLayout wheelLayout,
+            BankingProfile bankingProfile)
+        {
+            TrackDocument document = ResolveDocumentAndValidateBodyInputs(
+                leadDistance,
+                definition.CarSpacing,
+                definition.CarCount);
+            double totalLength = document.TotalLength;
+            double[] bodyDistances = BuildBodyDistances(
+                leadDistance,
+                definition.CarSpacing,
+                definition.CarCount,
+                totalLength);
+            double bogieHalfSpacing = definition.BogieSpacing * 0.5;
+            var sampleDistances = new double[definition.CarCount * 3];
+
+            for (int i = 0; i < definition.CarCount; i++)
+            {
+                int sampleIndex = i * 3;
+                double bodyDistance = bodyDistances[i];
+                sampleDistances[sampleIndex] = bodyDistance;
+
+                double frontDistance = bodyDistance + bogieHalfSpacing;
+                ValidateDistanceInRange(
+                    frontDistance,
+                    totalLength,
+                    $"Computed front bogie distance for car {i} is out of range.");
+                sampleDistances[sampleIndex + 1] = frontDistance;
+
+                double rearDistance = bodyDistance - bogieHalfSpacing;
+                ValidateDistanceInRange(
+                    rearDistance,
+                    totalLength,
+                    $"Computed rear bogie distance for car {i} is out of range.");
+                sampleDistances[sampleIndex + 2] = rearDistance;
+            }
+
+            TrackFrame[] frames = SampleProfileFramesInInputOrder(
+                document,
+                bankingProfile,
+                sampleDistances);
+            var carsWithBogies = new List<TrainCarWithBogiesTransform>(definition.CarCount);
+
+            for (int i = 0; i < definition.CarCount; i++)
+            {
+                int sampleIndex = i * 3;
+                TrackFrame bodyFrame = frames[sampleIndex];
+                var body = new TrainCarTransform(
+                    i,
+                    sampleDistances[sampleIndex],
+                    bodyFrame,
+                    bodyFrame.ToMatrix4x4());
+
+                TrackFrame frontFrame = frames[sampleIndex + 1];
+                var frontBogie = new BogieTransform(
+                    i,
+                    bogieIndex: 0,
+                    sampleDistances[sampleIndex + 1],
+                    frontFrame,
+                    Matrix4x4d.FromMatrix4x4(frontFrame.ToMatrix4x4()));
+
+                TrackFrame rearFrame = frames[sampleIndex + 2];
+                var rearBogie = new BogieTransform(
+                    i,
+                    bogieIndex: 1,
+                    sampleDistances[sampleIndex + 2],
+                    rearFrame,
+                    Matrix4x4d.FromMatrix4x4(rearFrame.ToMatrix4x4()));
+
+                carsWithBogies.Add(new TrainCarWithBogiesTransform(
+                    body,
+                    frontBogie,
+                    rearBogie));
+            }
+
+            IReadOnlyList<ArticulatedTrainCarTransform> articulatedCars =
+                _articulationSolver.SolveArticulatedBodies(carsWithBogies);
+            IReadOnlyList<TrainCarWithBogiesAndWheelsTransform> carsWithWheels =
+                _wheelLayoutSolver.AttachWheels(carsWithBogies, wheelLayout);
+
+            return _poseAssembler.AssembleArticulatedWithWheels(articulatedCars, carsWithWheels);
+        }
+
+        private TrackFrame[] SampleProfileFramesInInputOrder(
+            TrackDocument document,
+            BankingProfile bankingProfile,
+            IReadOnlyList<double> distances)
+        {
+            if (distances.Count == 0)
+            {
+                return Array.Empty<TrackFrame>();
+            }
+
+            var sortedSamples = new IndexedDistance[distances.Count];
+            for (int i = 0; i < distances.Count; i++)
+            {
+                sortedSamples[i] = new IndexedDistance(distances[i], i);
+            }
+
+            Array.Sort(
+                sortedSamples,
+                (left, right) =>
+                {
+                    int distanceComparison = left.Distance.CompareTo(right.Distance);
+                    return distanceComparison != 0
+                        ? distanceComparison
+                        : left.OriginalIndex.CompareTo(right.OriginalIndex);
+                });
+
+            var sortedDistances = new double[sortedSamples.Length];
+            for (int i = 0; i < sortedSamples.Length; i++)
+            {
+                sortedDistances[i] = sortedSamples[i].Distance;
+            }
+
+            TrackFrame[] sortedFrames = BankingProfileSampler.SampleFramesAtDistances(
+                document,
+                _evaluator,
+                bankingProfile,
+                sortedDistances);
+            var frames = new TrackFrame[sortedFrames.Length];
+
+            for (int i = 0; i < sortedFrames.Length; i++)
+            {
+                frames[sortedSamples[i].OriginalIndex] = sortedFrames[i];
+            }
+
+            return frames;
+        }
+
+        private TrackDocument ResolveDocumentAndValidateBodyInputs(
+            double leadDistance,
+            double carSpacing,
+            int carCount)
+        {
+            if (double.IsNaN(leadDistance) || double.IsInfinity(leadDistance))
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(leadDistance),
+                    leadDistance,
+                    "Lead distance must be finite.");
+            }
+
+            if (double.IsNaN(carSpacing) || double.IsInfinity(carSpacing) || carSpacing < 0.0)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(carSpacing),
+                    carSpacing,
+                    "Car spacing must be finite and non-negative.");
+            }
+
+            if (carCount < 0)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(carCount),
+                    carCount,
+                    "Car count must be non-negative.");
+            }
+
+            TrackDocument document = _evaluator.GetBoundTrackDocument();
+            ValidateDistanceInRange(
+                leadDistance,
+                document.TotalLength,
+                "Lead car distance is out of range.");
+            return document;
+        }
+
+        private static double[] BuildBodyDistances(
+            double leadDistance,
+            double carSpacing,
+            int carCount,
+            double totalLength)
+        {
+            var distances = new double[carCount];
+
+            for (int i = 0; i < carCount; i++)
+            {
+                double distance = leadDistance - (i * carSpacing);
+                ValidateDistanceInRange(
+                    distance,
+                    totalLength,
+                    $"Computed distance for car {i} is out of range.");
+
+                distances[i] = distance;
+            }
+
+            return distances;
+        }
+
+        private static void ValidateDistanceInRange(double distance, double maxDistance, string message)
+        {
+            if (distance < 0.0 || distance > maxDistance)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(distance),
+                    distance,
+                    $"{message} Valid range is [0.0, {maxDistance}].");
+            }
+        }
+
+        private readonly struct IndexedDistance
+        {
+            public IndexedDistance(double distance, int originalIndex)
+            {
+                Distance = distance;
+                OriginalIndex = originalIndex;
+            }
+
+            public double Distance { get; }
+
+            public int OriginalIndex { get; }
+        }
     }
 }

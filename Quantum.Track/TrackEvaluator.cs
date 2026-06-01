@@ -127,6 +127,11 @@ namespace Quantum.Track
             return doc.TotalLength;
         }
 
+        internal TrackDocument GetBoundTrackDocument()
+        {
+            return ResolveBoundDocument();
+        }
+
         /// <summary>
         /// Explicit support-layer frame sampling method for callers that still need
         /// the spline frame contract.

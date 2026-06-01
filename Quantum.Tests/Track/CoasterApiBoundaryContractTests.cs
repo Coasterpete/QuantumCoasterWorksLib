@@ -107,6 +107,21 @@ public sealed class CoasterApiBoundaryContractTests
             typeof(TrainPoseResult),
             typeof(double),
             typeof(TrainConsistDefinition));
+        AssertMethod(
+            typeof(TrainCarTransformProvider),
+            nameof(TrainCarTransformProvider.EvaluateTrainPose),
+            typeof(TrainPoseResult),
+            typeof(double),
+            typeof(TrainConsistDefinition),
+            typeof(BankingProfile));
+        AssertMethod(
+            typeof(TrainCarTransformProvider),
+            nameof(TrainCarTransformProvider.EvaluateCarTransforms),
+            typeof(IReadOnlyList<TrainCarTransform>),
+            typeof(double),
+            typeof(double),
+            typeof(int),
+            typeof(BankingProfile));
 
         AssertProperty(typeof(TrainPoseResult), nameof(TrainPoseResult.LeadDistance), typeof(double));
         AssertProperty(typeof(TrainPoseResult), nameof(TrainPoseResult.Definition), typeof(TrainConsistDefinition));
@@ -161,6 +176,13 @@ public sealed class CoasterApiBoundaryContractTests
                 typeof(TrainPoseResult),
                 typeof(double),
                 typeof(TrainConsistDefinition)),
+            AssertMethod(
+                typeof(TrainCarTransformProvider),
+                nameof(TrainCarTransformProvider.EvaluateTrainPose),
+                typeof(TrainPoseResult),
+                typeof(double),
+                typeof(TrainConsistDefinition),
+                typeof(BankingProfile)),
             AssertMethod(
                 typeof(TrainPoseExportV1Mapper),
                 nameof(TrainPoseExportV1Mapper.Export),
