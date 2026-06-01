@@ -27,6 +27,7 @@ public sealed class DebugCommandHelpTests
         Assert.Contains("debug-viewport-snapshot-v1-browser [artifactDirectory] [outputHtmlPath]", output);
         Assert.Contains("centerline-frame-continuity [outputPath]", output);
         Assert.Contains("transported-frame-comparison [outputPath]", output);
+        Assert.Contains("transported-frame-comparison-browser [comparisonJsonPath] [outputHtmlPath]", output);
         Assert.Contains("Examples:", output);
         Assert.Contains(DebugCommandHelp.GeneratedArtifactsNote, output);
         Assert.Contains("Geometry Interchange Roadmap:", output);
@@ -178,6 +179,29 @@ public sealed class DebugCommandHelpTests
     }
 
     [Fact]
+    public void TryWriteRequestedHelp_TransportedFrameComparisonBrowser_PrintsViewerDetails()
+    {
+        var writer = new StringWriter(CultureInfo.InvariantCulture);
+
+        bool handled = DebugCommandHelp.TryWriteRequestedHelp(
+            new[] { "help", "transported-frame-comparison-browser" },
+            writer,
+            out int exitCode);
+
+        Assert.True(handled);
+        Assert.Equal(0, exitCode);
+
+        string output = writer.ToString();
+        Assert.Contains("transported-frame-comparison-browser [comparisonJsonPath] [outputHtmlPath]", output);
+        Assert.Contains("TransportedFrameComparisonDiagnosticsExportV1 JSON", output);
+        Assert.Contains("summary metrics", output);
+        Assert.Contains("per-sample delta table", output);
+        Assert.Contains("normal/binormal/frame/matrix delta severity", output);
+        Assert.Contains("local-file-friendly HTML/SVG/vanilla JavaScript", output);
+        Assert.Contains("does not change DebugViewportSnapshotV1", output);
+    }
+
+    [Fact]
     public void WriteUnknownCommand_PrintsUnknownCommandAndSupportedCommands()
     {
         var writer = new StringWriter(CultureInfo.InvariantCulture);
@@ -193,5 +217,6 @@ public sealed class DebugCommandHelpTests
         Assert.Contains("longitudinal-speed-preview [preset] [outputPath] [initialSpeedMps]", output);
         Assert.Contains("centerline-frame-continuity [outputPath]", output);
         Assert.Contains("transported-frame-comparison [outputPath]", output);
+        Assert.Contains("transported-frame-comparison-browser [comparisonJsonPath] [outputHtmlPath]", output);
     }
 }

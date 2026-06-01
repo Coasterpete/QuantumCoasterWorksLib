@@ -52,6 +52,17 @@ contains one report per fixture, with per-sample deltas, summary metrics,
 smoothness metrics, and continuity metrics for both stateless and transported
 frame sets.
 
+The JSON can also be embedded into a self-contained local browser viewer:
+
+```powershell
+dotnet run --project Quantum.Debug -- transported-frame-comparison-browser artifacts/frame-comparison/transported-frame-comparison.sample.json artifacts/frame-comparison/transported-frame-comparison.browser.html
+```
+
+The viewer is a static HTML/SVG/vanilla JavaScript debug artifact. It shows
+summary metrics, a per-sample delta table, and normal/binormal/frame/matrix
+delta severity indicators without changing `DebugViewportSnapshotV1`,
+`TrainPoseExportV1`, `TrackFrame`, or runtime banking behavior.
+
 Straight fixtures intentionally have zero curvature, so their mathematical radius
 is not finite. Curved fixtures provide non-zero curvature probes with finite
 radius diagnostics.
@@ -66,4 +77,4 @@ These fixtures and exports do not:
 - change `DebugViewportSnapshotV1`
 - change `TrainPoseExportV1`
 - add dependencies
-- add Unity, browser, frontend, or renderer code
+- add Unity, frontend package, runtime browser, or renderer dependencies

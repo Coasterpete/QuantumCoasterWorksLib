@@ -18,7 +18,8 @@ namespace Quantum.Debug
         LongitudinalForcePreview,
         LongitudinalSpeedPreview,
         CenterlineFrameContinuity,
-        TransportedFrameComparison
+        TransportedFrameComparison,
+        TransportedFrameComparisonBrowser
     }
 
     public static class DebugCommandParser
@@ -113,6 +114,12 @@ namespace Quantum.Debug
             if (string.Equals(args[0], "transported-frame-comparison", StringComparison.OrdinalIgnoreCase))
             {
                 command = DebugCommandKind.TransportedFrameComparison;
+                return true;
+            }
+
+            if (string.Equals(args[0], TransportedFrameComparisonBrowserCommand.CommandName, StringComparison.OrdinalIgnoreCase))
+            {
+                command = DebugCommandKind.TransportedFrameComparisonBrowser;
                 return true;
             }
 
