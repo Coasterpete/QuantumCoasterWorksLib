@@ -184,6 +184,19 @@ namespace Quantum.Debug
                 return TransportedFrameComparisonCommand.Run(outputPath);
             }
 
+            if (command == DebugCommandKind.TransportedFrameComparisonBrowser)
+            {
+                if (args.Length > 3)
+                {
+                    Console.WriteLine("Usage: transported-frame-comparison-browser [comparisonJsonPath] [outputHtmlPath]");
+                    return 1;
+                }
+
+                string? comparisonJsonPath = args.Length >= 2 ? args[1] : null;
+                string? outputHtmlPath = args.Length == 3 ? args[2] : null;
+                return TransportedFrameComparisonBrowserCommand.Run(comparisonJsonPath, outputHtmlPath);
+            }
+
             RunValidation();
             return 0;
         }

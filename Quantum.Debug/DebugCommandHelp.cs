@@ -208,6 +208,24 @@ namespace Quantum.Debug
                 {
                     "dotnet run --project Quantum.Debug -- transported-frame-comparison",
                     "dotnet run --project Quantum.Debug -- transported-frame-comparison artifacts/frame-comparison/transported-frame-comparison.sample.json"
+                }),
+            new DebugCommandHelpEntry(
+                name: TransportedFrameComparisonBrowserCommand.CommandName,
+                usage: "transported-frame-comparison-browser [comparisonJsonPath] [outputHtmlPath]",
+                summary: "Write a self-contained browser viewer for transported frame comparison JSON.",
+                arguments: new[]
+                {
+                    "comparisonJsonPath: Optional JSON input path. Defaults to " +
+                    TransportedFrameComparisonCommand.DefaultRelativeOutputPath + ".",
+                    "outputHtmlPath: Optional HTML output path. Defaults next to the input JSON as " +
+                    TransportedFrameComparisonBrowserCommand.DefaultFileName + ".",
+                    "The viewer embeds TransportedFrameComparisonDiagnosticsExportV1 JSON, shows summary metrics, renders a per-sample delta table, and marks normal/binormal/frame/matrix delta severity.",
+                    "This is a local-file-friendly HTML/SVG/vanilla JavaScript debug artifact and does not change DebugViewportSnapshotV1, TrainPoseExportV1, TrackFrame, or runtime banking behavior."
+                },
+                examples: new[]
+                {
+                    "dotnet run --project Quantum.Debug -- transported-frame-comparison-browser",
+                    "dotnet run --project Quantum.Debug -- transported-frame-comparison-browser artifacts/frame-comparison/transported-frame-comparison.sample.json artifacts/frame-comparison/transported-frame-comparison.browser.html"
                 })
         };
 
