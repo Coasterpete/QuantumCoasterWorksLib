@@ -1,6 +1,6 @@
 # Unity Visualizer Inventory
 
-Last updated: 2026-05-14
+Last updated: 2026-06-01
 
 Scope audited:
 - Current repo: `Assets/Scripts/QuantumVisualizer`
@@ -27,6 +27,7 @@ Reference implementation: `Assets/Scripts/QuantumVisualizer/BackendTrainPipeline
 | Script | Backend System Visualized | Status | Required DLLs | Overlap with `BackendTrainPipelineGizmoVisualizer` | Recommended |
 |---|---|---|---|---|---|
 | `Assets/Scripts/QuantumVisualizer/BackendTrainPipelineGizmoVisualizer.cs` | Live backend wireframe viewer on deterministic `TrackDocument` -> `TrackEvaluator` -> `TrainCarTransformProvider`; renders rails, cross ties, banking ribbon, heartline, distance-based train placement, train hierarchy debug markers, and playback/HUD diagnostics. | Current | `UnityEngine.CoreModule.dll`; `Quantum.Math.dll`; `Quantum.Splines.dll`; `Quantum.Track.dll`; `UnityEditor.dll` (editor-only code path). | Baseline script (self). | Keep |
+| `Assets/Scripts/QuantumVisualizer/DebugViewportSnapshotV1GizmoVisualizer.cs` | File-based Scene-view gizmo visualizer for `quantum.debug_viewport_snapshot` JSON; renders centerline polyline, frame axes, stable-kind debug lines, stable-role oriented boxes, and logs nested train-pose presence/car count only. | Current | `UnityEngine.CoreModule.dll` (plus local support scripts in same folder). | Complements the live backend viewer: consumes renderer-neutral artifacts instead of evaluating backend code in Unity. | Keep |
 | `Assets/Scripts/QuantumVisualizer/TrainPoseGizmoVisualizer.cs` | Replay visualizer for exported `quantum.train_pose` JSON (`TrainPoseExportV1Dto`), including body/bogie/wheel frames and sampled centerline channels. | Current | `UnityEngine.CoreModule.dll` (plus local support scripts in same folder). | Partial overlap: same train/body/bogie/wheel debug surfaces, but input is exported JSON instead of live backend evaluation. | Keep |
 | Legacy external `Assets/Scripts/QuantumVisualizer/TrainPoseGizmoVisualizer.cs` | Older replay visualizer for `TrainPoseExportV1` JSON, includes legacy gizmo layers plus primitive car/bogie/wheel overlay. | Legacy | `UnityEngine.CoreModule.dll` (plus local DTO/loader scripts in same folder). | High overlap: draws many of the same train debug primitives as pipeline visualizer, but from file-based replay. | Deprecate (after confirming no active scene dependency) |
 | Legacy external `Assets/Scripts/QuantumVisualizer/BackendDebugTrackGizmo.cs` | Simple sampled track from local control points (`LineCurve` segments), optional force overlay from longitudinal-force preview JSON, sample frame axes. | Experimental | `UnityEngine.CoreModule.dll`; `Quantum.Math.dll`; `Quantum.Splines.dll`. | Partial overlap: centerline and frame debugging overlap; force-overlay coloring is unique. | Merge (retain useful force-overlay behavior, then retire duplicate track drawing path) |
@@ -40,6 +41,8 @@ These are not gizmo visualizers themselves, but are dependencies for visualizer 
 
 - `Assets/Scripts/QuantumVisualizer/TrainPoseExportV1Dtos.cs`
 - `Assets/Scripts/QuantumVisualizer/TrainPoseJsonLoader.cs`
+- `Assets/Scripts/QuantumVisualizer/DebugViewportSnapshotV1Dtos.cs`
+- `Assets/Scripts/QuantumVisualizer/DebugViewportSnapshotV1JsonLoader.cs`
 - Legacy external `Assets/Scripts/QuantumVisualizer/TrainPoseExportV1Dto.cs`
 - Legacy external `Assets/Scripts/QuantumVisualizer/TrainPoseExportV1Loader.cs`
 
