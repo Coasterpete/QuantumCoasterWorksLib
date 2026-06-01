@@ -2,9 +2,11 @@
 
 Date: 2026-05-31
 
-Status: design note only. This document proposes future coaster-domain behavior
-for banking and roll interpolation. It does not change runtime evaluation,
-`TrackFrame`, `DebugViewportSnapshotV1`, `TrainPoseExportV1`, or dependencies.
+Status: design note plus Milestone 48 backend prototype. This document proposes
+coaster-domain behavior for banking and roll interpolation. Milestone 48 adds
+an opt-in backend-only `BankingProfile` model and sampler; it does not change
+default `TrackEvaluator` behavior, `TrackFrame`, `DebugViewportSnapshotV1`,
+`TrainPoseExportV1`, or dependencies.
 
 ## Context
 
@@ -20,6 +22,21 @@ contract. Its job is to answer one stable question:
 
 > At station distance `s`, what roll angle should be applied around the
 > centerline tangent?
+
+## Milestone 48 Prototype Update
+
+Milestone 48 introduces the first backend-only runtime prototype:
+
+- `BankingProfile`: validated ordered distance keys with roll radians and
+  interval interpolation modes.
+- `BankingProfileSampler`: scalar roll sampling for constant, linear, and
+  smoothstep intervals.
+- An explicit profile-aware frame sampling path that reuses transported base
+  frames and applies profile roll only when callers opt in.
+
+This keeps authored banking separate from the default evaluator path. Existing
+segment `RollRadians` behavior remains the compatibility baseline unless a
+caller explicitly chooses the BankingProfile sampler.
 
 ## Current Baseline
 
@@ -251,7 +268,7 @@ When runtime behavior is intentionally added, tests should cover:
 
 ## Non-Goals
 
-- No runtime behavior in this milestone.
+- No default `TrackEvaluator` runtime behavior change in this milestone.
 - No changes to `TrackFrame`.
 - No changes to `DebugViewportSnapshotV1`.
 - No changes to `TrainPoseExportV1`.

@@ -44,6 +44,37 @@ namespace Quantum.Track
             TrackEvaluator evaluator,
             IReadOnlyList<double> distances)
         {
+            return SampleFramesAtDistancesCore(
+                document,
+                evaluator,
+                distances,
+                (_, evaluationPoint) => ResolveRollRadians(evaluationPoint));
+        }
+
+        internal static TrackFrame[] SampleFramesAtDistances(
+            TrackDocument document,
+            TrackEvaluator evaluator,
+            IReadOnlyList<double> distances,
+            Func<int, TrackEvaluationPoint, double> rollRadiansResolver)
+        {
+            if (rollRadiansResolver is null)
+            {
+                throw new ArgumentNullException(nameof(rollRadiansResolver));
+            }
+
+            return SampleFramesAtDistancesCore(
+                document,
+                evaluator,
+                distances,
+                rollRadiansResolver);
+        }
+
+        private static TrackFrame[] SampleFramesAtDistancesCore(
+            TrackDocument document,
+            TrackEvaluator evaluator,
+            IReadOnlyList<double> distances,
+            Func<int, TrackEvaluationPoint, double> rollRadiansResolver)
+        {
             if (document is null)
             {
                 throw new ArgumentNullException(nameof(document));
@@ -91,7 +122,7 @@ namespace Quantum.Track
                 baseNormal = NormalizeOrThrow(Vector3d.Cross(binormal, tangent), "normal");
                 Vector3d normal = baseNormal;
 
-                double rollRadians = ResolveRollRadians(evaluationPoints[i]);
+                double rollRadians = ResolveRollRadians(rollRadiansResolver(i, evaluationPoints[i]));
                 if (rollRadians != 0.0)
                 {
                     normal = RotateAroundAxis(normal, tangent, rollRadians);
@@ -243,7 +274,11 @@ namespace Quantum.Track
 
         private static double ResolveRollRadians(TrackEvaluationPoint evaluationPoint)
         {
-            double rollRadians = evaluationPoint.Segment.RollRadians;
+            return ResolveRollRadians(evaluationPoint.Segment.RollRadians);
+        }
+
+        private static double ResolveRollRadians(double rollRadians)
+        {
             if (double.IsNaN(rollRadians) || double.IsInfinity(rollRadians))
             {
                 throw new InvalidOperationException("Track segment roll must be finite.");
