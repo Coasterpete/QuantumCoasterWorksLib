@@ -33,7 +33,9 @@ public sealed class BankingProfileDiagnosticsCommandTests
 
             JsonElement metadata = root.GetProperty("metadata");
             Assert.Equal("meters,radians", metadata.GetProperty("units").GetString());
-            Assert.Equal("deterministic-banking-profile-roll-ramp", metadata.GetProperty("sourceName").GetString());
+            Assert.Equal(
+                BankingProfileFixtures.RollHoldWithMultipleKeysName,
+                metadata.GetProperty("sourceName").GetString());
             Assert.Equal(5, metadata.GetProperty("profileKeyCount").GetInt32());
             Assert.Equal("radians_per_meter", metadata.GetProperty("rollSlopeUnit").GetString());
 
@@ -51,13 +53,20 @@ public sealed class BankingProfileDiagnosticsCommandTests
 
             JsonElement linearSample = Assert.Single(
                 samples.EnumerateArray(),
-                sample => sample.GetProperty("distance").GetDouble() == 30.0);
+                sample => sample.GetProperty("distance").GetDouble() == 10.0);
 
             Assert.Equal("Linear", linearSample.GetProperty("interpolationMode").GetString());
             Assert.Equal("KeyInterval", linearSample.GetProperty("sourceKind").GetString());
-            Assert.Equal(1, linearSample.GetProperty("sourceInterval").GetProperty("startKeyIndex").GetInt32());
-            Assert.Equal(2, linearSample.GetProperty("sourceInterval").GetProperty("endKeyIndex").GetInt32());
+            Assert.Equal(0, linearSample.GetProperty("sourceInterval").GetProperty("startKeyIndex").GetInt32());
+            Assert.Equal(1, linearSample.GetProperty("sourceInterval").GetProperty("endKeyIndex").GetInt32());
             Assert.True(linearSample.TryGetProperty("approximateRollSlopeRadPerMeter", out _));
+
+            JsonElement holdSample = Assert.Single(
+                samples.EnumerateArray(),
+                sample => sample.GetProperty("distance").GetDouble() == 30.0);
+
+            Assert.Equal("Constant", holdSample.GetProperty("interpolationMode").GetString());
+            Assert.Equal("KeyInterval", holdSample.GetProperty("sourceKind").GetString());
 
             JsonElement smoothStepSample = Assert.Single(
                 samples.EnumerateArray(),

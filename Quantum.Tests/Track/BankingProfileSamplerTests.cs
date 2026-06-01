@@ -85,38 +85,35 @@ public sealed class BankingProfileSamplerTests
     [Fact]
     public void Diagnostics_SamplesRollMetadataAndSummaryMetrics()
     {
-        BankingProfile profile = CreateProfile(
-            new BankingProfileKey(0.0, 0.0, BankingProfileInterpolationMode.Constant),
-            new BankingProfileKey(10.0, 1.0, BankingProfileInterpolationMode.Linear),
-            new BankingProfileKey(20.0, 3.0, BankingProfileInterpolationMode.Linear));
+        BankingProfileFixture fixture = BankingProfileFixtures.RollHoldWithMultipleKeys();
 
         BankingProfileDiagnosticsReport report = BankingProfileDiagnostics.Sample(
-            profile,
-            new[] { 0.0, 5.0, 10.0, 15.0, 20.0 });
+            fixture.Profile,
+            fixture.SampleDistances);
 
-        Assert.Equal(5, report.Summary.SampleCount);
-        AssertNear(0.0, report.Summary.MinRollRadians);
-        AssertNear(3.0, report.Summary.MaxRollRadians);
+        Assert.Equal(fixture.SampleDistances.Count, report.Summary.SampleCount);
+        AssertNear(-15.0 * SystemMath.PI / 180.0, report.Summary.MinRollRadians);
+        AssertNear(30.0 * SystemMath.PI / 180.0, report.Summary.MaxRollRadians);
         Assert.True(report.Summary.MaxAbsoluteRollSlopeRadPerMeter > 0.0);
 
-        BankingProfileDiagnosticsSample constantSample = report.Samples[1];
-        Assert.Equal(1, constantSample.SampleIndex);
-        AssertNear(5.0, constantSample.Distance);
-        AssertNear(0.0, constantSample.RollRadians);
+        BankingProfileDiagnosticsSample constantSample = report.Samples[3];
+        Assert.Equal(3, constantSample.SampleIndex);
+        AssertNear(30.0, constantSample.Distance);
+        AssertNear(30.0 * SystemMath.PI / 180.0, constantSample.RollRadians);
         Assert.Equal(BankingProfileInterpolationMode.Constant, constantSample.InterpolationMode);
         Assert.Equal(BankingProfileSampleSourceKind.KeyInterval, constantSample.SourceKind);
-        Assert.Equal(0, constantSample.SourceStartKeyIndex);
-        Assert.Equal(1, constantSample.SourceEndKeyIndex);
-        AssertNear(0.0, constantSample.SourceStartDistance);
-        AssertNear(10.0, constantSample.SourceEndDistance);
+        Assert.Equal(1, constantSample.SourceStartKeyIndex);
+        Assert.Equal(2, constantSample.SourceEndKeyIndex);
+        AssertNear(20.0, constantSample.SourceStartDistance);
+        AssertNear(50.0, constantSample.SourceEndDistance);
         Assert.True(constantSample.ApproximateRollSlopeRadPerMeter.HasValue);
 
-        BankingProfileDiagnosticsSample linearSample = report.Samples[3];
-        AssertNear(15.0, linearSample.Distance);
-        AssertNear(2.0, linearSample.RollRadians);
-        AssertNear(2.0 * 180.0 / SystemMath.PI, linearSample.RollDegrees);
+        BankingProfileDiagnosticsSample linearSample = report.Samples[1];
+        AssertNear(10.0, linearSample.Distance);
+        AssertNear(15.0 * SystemMath.PI / 180.0, linearSample.RollRadians);
+        AssertNear(15.0, linearSample.RollDegrees);
         Assert.Equal(BankingProfileInterpolationMode.Linear, linearSample.InterpolationMode);
-        AssertNear(0.2, linearSample.ApproximateRollSlopeRadPerMeter!.Value);
+        AssertNear(1.5 * SystemMath.PI / 180.0, linearSample.ApproximateRollSlopeRadPerMeter!.Value);
     }
 
     [Fact]
