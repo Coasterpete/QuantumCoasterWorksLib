@@ -7,9 +7,20 @@ on `DebugViewportSnapshotV1GizmoVisualizer`.
 
 ## Setup
 
+Editor window path:
+
+1. Open `Window > Quantum > Snapshot Browser`.
+2. Select a `DebugViewportSnapshotV1` JSON `TextAsset`, or quick-load a known
+   generated snapshot if it has been copied into Unity `Assets`.
+3. Click `Create Viewer GameObject`.
+4. Click `Rebuild Generated Boxes` or `Clear Generated Boxes`.
+
+Manual component path:
+
 1. Add `DebugViewportSnapshotV1GizmoVisualizer` and
    `DebugViewportSnapshotV1TransformVisualizer` to the same empty GameObject.
-2. Assign the same snapshot `TextAsset` to both components.
+2. Assign the same snapshot `TextAsset` to both components, or use the snapshot
+   browser to apply the selected asset to both components.
 3. Use the transform visualizer context menu actions:
    - `Rebuild`
    - `Clear`
@@ -91,13 +102,18 @@ commit that Unity project into this repository.
    them as `TextAsset`s.
 4. Add `DebugViewportSnapshotV1GizmoVisualizer` and
    `DebugViewportSnapshotV1TransformVisualizer` to the same empty GameObject and
-   assign the same snapshot `TextAsset` to both.
-5. Leave the relevant prefab slot empty, rebuild, and confirm generated boxes have
+   assign the same snapshot `TextAsset` to both, or open
+   `Window > Quantum > Snapshot Browser` and click `Create Viewer GameObject`.
+5. In the snapshot browser, confirm the built-in sample reports 9 centerline
+   points, 9 frames, 3 lines, 2 boxes, trainPose present, and 2 cars.
+6. In the snapshot browser, confirm the BankingProfile sample reports 10
+   centerline points, 10 frames, 3 lines, 3 boxes, trainPose present, and 3 cars.
+7. Leave the relevant prefab slot empty, rebuild, and confirm generated boxes have
    `FallbackCube` children at local identity.
-6. Assign a simple self-authored cube prefab with its pivot at the cube center to
+8. Assign a simple self-authored cube prefab with its pivot at the cube center to
    the relevant role slot, rebuild, and confirm generated boxes have `Prefab`
    children at local identity.
-7. Confirm every generated wrapper local scale equals the snapshot dimensions in
+9. Confirm every generated wrapper local scale equals the snapshot dimensions in
    Unity order: `x = length`, `y = height`, `z = width`.
 
 Expected sample counts:

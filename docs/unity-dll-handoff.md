@@ -77,12 +77,13 @@ This keeps the Unity side focused on the current backend pipeline visualizer wit
 
 ## DebugViewportSnapshotV1 Unity Handoff
 
-`DebugViewportSnapshotV1` is the preferred renderer-neutral artifact for Unity snapshot inspection. The thin Unity path lives entirely in `Assets/Scripts/QuantumVisualizer`:
+`DebugViewportSnapshotV1` is the preferred renderer-neutral artifact for Unity snapshot inspection. The thin Unity runtime path lives in `Assets/Scripts/QuantumVisualizer`, with an optional Editor window under `Assets/Editor/QuantumVisualizer`:
 
 - `DebugViewportSnapshotV1Dtos.cs`
 - `DebugViewportSnapshotV1JsonLoader.cs`
 - `DebugViewportSnapshotV1GizmoVisualizer.cs`
 - `DebugViewportSnapshotV1TransformVisualizer.cs`
+- `Assets/Editor/QuantumVisualizer/DebugViewportSnapshotBrowserWindow.cs`
 
 The loader accepts a Unity `TextAsset`, checks `contract == "quantum.debug_viewport_snapshot"` and `version == 1`, then maps the data into Unity-local DTOs. It does not require `GShark.dll`, `Quantum.Math.dll`, `Quantum.Splines.dll`, `Quantum.Track.dll`, `Quantum.IO.dll`, `Quantum.Debug.dll`, or schema validation inside Unity. The gizmo visualizer draws centerline points, frames, stable-kind lines, and stable-role oriented boxes. It only logs nested `TrainPoseExportV1` presence and car count; it does not render the nested train pose hierarchy.
 
@@ -128,6 +129,34 @@ Material ownership belongs entirely to Unity. Map the stable vocabulary to Unity
 
 Placeholder sizing stays literal: snapshot box length follows tangent, height follows normal, and width follows binormal. If a snapshot only has nested `TrainPoseExportV1` and no bogie/wheel boxes, this milestone intentionally does not draw the nested pose; it reports only nested pose presence and car count.
 
+## Snapshot Browser Editor Window
+
+`Window > Quantum > Snapshot Browser` opens a Unity Editor-only control surface for
+the snapshot visualizers. It lets a user assign a `DebugViewportSnapshotV1` JSON
+`TextAsset`, parse it, inspect snapshot stats, create or update a scene viewer
+GameObject named `Quantum Snapshot Viewer`, and call the transform visualizer
+`Rebuild` and `Clear` actions.
+
+The created viewer GameObject receives:
+
+- `DebugViewportSnapshotV1GizmoVisualizer`
+- `DebugViewportSnapshotV1TransformVisualizer`
+
+The selected snapshot is applied to both components. The window also searches
+Unity `Assets` for these known generated snapshot filenames and shows quick-load
+buttons when any are present:
+
+- `DebugViewportSnapshotV1.sample.json`
+- `DebugViewportSnapshotV1.banking-profile.sample.json`
+- `Milestone7.synthetic.straight_line.snapshot.json`
+- `Milestone7.synthetic.simple_hill.snapshot.json`
+- `Milestone7.synthetic.banked_turn.snapshot.json`
+- `Milestone7.synthetic.descending_ascending_curve.snapshot.json`
+
+The editor window is a Unity adapter only. It does not add backend dependencies,
+does not change the `DebugViewportSnapshotV1` contract, and does not introduce
+runtime animation or render-pipeline requirements.
+
 ## Manual Built-In Unity Validation
 
 Use `C:\Dev4\TestingGrounds1` only as a local manual validation project. Do not commit that project into this repository.
@@ -138,7 +167,7 @@ Use `C:\Dev4\TestingGrounds1` only as a local manual validation project. Do not 
 .\tools\demo-technical-preview-0.1.cmd
 ```
 
-2. In `TestingGrounds1`, copy the snapshot-only scripts into the Unity project's `Assets/Scripts/QuantumVisualizer`: `DebugViewportSnapshotV1Dtos.cs`, `DebugViewportSnapshotV1JsonLoader.cs`, `DebugViewportSnapshotV1GizmoVisualizer.cs`, `DebugViewportSnapshotV1TransformVisualizer.cs`, and `TrainPoseExportV1Dtos.cs`. Do not copy `BackendTrainPipelineGizmoVisualizer.cs` unless the backend DLLs from the earlier handoff section are also installed.
+2. In `TestingGrounds1`, copy the snapshot-only runtime scripts into the Unity project's `Assets/Scripts/QuantumVisualizer`: `DebugViewportSnapshotV1Dtos.cs`, `DebugViewportSnapshotV1JsonLoader.cs`, `DebugViewportSnapshotV1GizmoVisualizer.cs`, `DebugViewportSnapshotV1TransformVisualizer.cs`, and `TrainPoseExportV1Dtos.cs`. Copy `Assets/Editor/QuantumVisualizer/DebugViewportSnapshotBrowserWindow.cs` into the Unity project's `Assets/Editor/QuantumVisualizer`. Do not copy `BackendTrainPipelineGizmoVisualizer.cs` unless the backend DLLs from the earlier handoff section are also installed.
 3. Copy the generated JSON snapshots you want to inspect into a Unity `Assets` folder so Unity imports them as `TextAsset`s. Typical sources:
 
 ```text
@@ -150,14 +179,20 @@ C:\Dev4\QuantumCoasterWorksLib\artifacts\debug-viewport\Milestone7.synthetic.ban
 C:\Dev4\QuantumCoasterWorksLib\artifacts\debug-viewport\Milestone7.synthetic.descending_ascending_curve.snapshot.json
 ```
 
-4. Create an empty GameObject, add `DebugViewportSnapshotV1GizmoVisualizer` and `DebugViewportSnapshotV1TransformVisualizer`, assign the same snapshot `TextAsset` to both components, and enable Gizmos in Scene view.
-5. Verify the visual layers with the component toggles:
+4. Open `Window > Quantum > Snapshot Browser`.
+5. Select or quick-load `DebugViewportSnapshotV1.sample.json`, click `Load / Refresh`, and confirm the stats show `centerline points = 9`, `frames = 9`, `lines = 3`, `boxes = 2`, `trainPose = present`, and `trainPose car count = 2`.
+6. Click `Create Viewer GameObject` and confirm the scene has `Quantum Snapshot Viewer` with both `DebugViewportSnapshotV1GizmoVisualizer` and `DebugViewportSnapshotV1TransformVisualizer`.
+7. Click `Rebuild Generated Boxes` and confirm two wrappers appear under `GeneratedSnapshot/train.body`.
+8. Select or quick-load `DebugViewportSnapshotV1.banking-profile.sample.json`, click `Load / Refresh`, and confirm the stats show `centerline points = 10`, `frames = 10`, `lines = 3`, `boxes = 3`, `trainPose = present`, and `trainPose car count = 3`.
+9. Click `Rebuild Generated Boxes` and confirm three wrappers appear under `GeneratedSnapshot/train.body.banking-profile`.
+10. Click `Clear Generated Boxes` and confirm the `GeneratedSnapshot` child root is removed.
+11. Verify the visual layers with the component toggles:
 
 - Built-in sample: console summary should report `centerlinePoints=9`, `frames=9`, `lines=3`, `boxes=2`, `trainPose=present`, `trainPoseCars=2`.
 - BankingProfile sample: console summary should report `centerlinePoints=10`, `frames=10`, `lines=3`, `boxes=3`, `trainPose=present`, `trainPoseCars=3`.
 - CSV fixture snapshots: centerline and frame axes should render, with `boxes=0`, `trainPose=absent`, and `trainPoseCars=0`.
 
-6. Validate prefab placement through the transform visualizer:
+12. Validate prefab placement through the transform visualizer:
 
 - With the `train.body` prefab slot empty, rebuild the built-in sample and confirm two wrappers under `GeneratedSnapshot/train.body`, each with one `FallbackCube` child at local identity.
 - Assign a simple self-authored cube prefab with center pivot to `train.body`, rebuild the built-in sample, and confirm two `Prefab` children under the same wrappers. The console summary should report `prefabInstances=2` and `fallbackCubes=0`.
@@ -172,4 +207,4 @@ Optional GLB readiness check:
 - Check only pivot, orientation, and import scale against the same center-pivot/local-identity convention.
 - Record whether the imported prefab can stay at root scale `1,1,1`; do not add GLB, material, mesh, or prefab fields to `DebugViewportSnapshotV1`.
 
-No HDRP/URP setup, materials, editor windows, runtime animation, live backend evaluation, `GShark.dll`, or backend DLL copy is required for this snapshot-only gizmo and transform path. Prefabs are optional Unity-side visuals only.
+No HDRP/URP setup, materials, runtime animation, live backend evaluation, `GShark.dll`, or backend DLL copy is required for this snapshot-only gizmo, transform, and browser-window path. Prefabs are optional Unity-side visuals only.

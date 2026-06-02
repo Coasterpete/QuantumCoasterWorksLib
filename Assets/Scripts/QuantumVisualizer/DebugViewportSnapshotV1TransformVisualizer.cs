@@ -55,6 +55,17 @@ namespace QuantumVisualizer
         private string _builtJsonText;
         private string _lastError;
 
+        public TextAsset SnapshotJson
+        {
+            get { return snapshotJson; }
+        }
+
+        public void ApplySnapshot(TextAsset jsonAsset)
+        {
+            snapshotJson = jsonAsset;
+            QueueRebuild();
+        }
+
         private void OnEnable()
         {
             QueueRebuild();

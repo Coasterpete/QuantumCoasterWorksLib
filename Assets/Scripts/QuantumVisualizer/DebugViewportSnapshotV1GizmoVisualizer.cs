@@ -58,6 +58,17 @@ namespace QuantumVisualizer
         private string _lastError;
         private string _lastSummary;
 
+        public TextAsset SnapshotJson
+        {
+            get { return snapshotJson; }
+        }
+
+        public void ApplySnapshot(TextAsset jsonAsset)
+        {
+            snapshotJson = jsonAsset;
+            ClearCachedParse();
+        }
+
         private void OnValidate()
         {
             frameAxisLength = Mathf.Max(0.01f, frameAxisLength);
