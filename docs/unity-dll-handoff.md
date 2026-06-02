@@ -57,7 +57,7 @@ powershell -ExecutionPolicy Bypass -File .\tools\copy-quantum-unity-dlls.ps1 -Ta
 Example for the local manual validation project from the repository root:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\tools\copy-quantum-unity-dlls.ps1 -Target "C:\Dev4\TestingGrounds1\Assets\Plugins\Quantum"
+powershell -ExecutionPolicy Bypass -File .\tools\copy-quantum-unity-dlls.ps1 -Target "C:\Dev4\TestingGrounds\Assets\Plugins\Quantum"
 ```
 
 Example (include `Quantum.IO.dll`):
@@ -157,9 +157,46 @@ The editor window is a Unity adapter only. It does not add backend dependencies,
 does not change the `DebugViewportSnapshotV1` contract, and does not introduce
 runtime animation or render-pipeline requirements.
 
+## Unity Debug Artifact Sync
+
+Use `tools/sync-unity-debug-data.ps1` to copy generated debug viewport artifacts
+into a local Unity project without manual copy commands.
+
+Default source:
+- `artifacts/debug-viewport`
+
+Default target Unity project:
+- `C:\Dev4\TestingGrounds`
+
+Default target asset folder:
+- `C:\Dev4\TestingGrounds\Assets\DebugData`
+
+Examples from the repository root:
+
+```powershell
+.\tools\sync-unity-debug-data.ps1
+.\tools\sync-unity-debug-data.ps1 -Target "C:\Dev4\TestingGrounds"
+.\tools\sync-unity-debug-data.ps1 -Source "artifacts\debug-viewport" -Target "C:\Dev4\TestingGrounds" -Clean
+```
+
+If local PowerShell execution policy blocks direct script execution, use:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\tools\sync-unity-debug-data.ps1 -Target "C:\Dev4\TestingGrounds"
+```
+
+The script creates `Assets\DebugData` when needed, copies generated `*.json`,
+`*.svg`, and `*.html` files, and overwrites existing files with matching names.
+Use `-Clean` to remove existing copied JSON, SVG, and HTML files from
+`Assets\DebugData` before copying the current artifacts.
+
+Unity imports copied JSON files under `Assets\DebugData` as `TextAsset`s. After
+sync, the Snapshot Browser quick-load buttons work for the known generated
+snapshot filenames because they are present under Unity `Assets`.
+
 ## Manual Built-In Unity Validation
 
-Use `C:\Dev4\TestingGrounds1` only as a local manual validation project. Do not commit that project into this repository.
+Use `C:\Dev4\TestingGrounds` only as a local manual validation project. Do not commit that project into this repository.
 
 1. Generate current artifacts from the repository root:
 
@@ -167,17 +204,16 @@ Use `C:\Dev4\TestingGrounds1` only as a local manual validation project. Do not 
 .\tools\demo-technical-preview-0.1.cmd
 ```
 
-2. In `TestingGrounds1`, copy the snapshot-only runtime scripts into the Unity project's `Assets/Scripts/QuantumVisualizer`: `DebugViewportSnapshotV1Dtos.cs`, `DebugViewportSnapshotV1JsonLoader.cs`, `DebugViewportSnapshotV1GizmoVisualizer.cs`, `DebugViewportSnapshotV1TransformVisualizer.cs`, and `TrainPoseExportV1Dtos.cs`. Copy `Assets/Editor/QuantumVisualizer/DebugViewportSnapshotBrowserWindow.cs` into the Unity project's `Assets/Editor/QuantumVisualizer`. Do not copy `BackendTrainPipelineGizmoVisualizer.cs` unless the backend DLLs from the earlier handoff section are also installed.
-3. Copy the generated JSON snapshots you want to inspect into a Unity `Assets` folder so Unity imports them as `TextAsset`s. Typical sources:
+2. In `TestingGrounds`, copy the snapshot-only runtime scripts into the Unity project's `Assets/Scripts/QuantumVisualizer`: `DebugViewportSnapshotV1Dtos.cs`, `DebugViewportSnapshotV1JsonLoader.cs`, `DebugViewportSnapshotV1GizmoVisualizer.cs`, `DebugViewportSnapshotV1TransformVisualizer.cs`, and `TrainPoseExportV1Dtos.cs`. Copy `Assets/Editor/QuantumVisualizer/DebugViewportSnapshotBrowserWindow.cs` into the Unity project's `Assets/Editor/QuantumVisualizer`. Do not copy `BackendTrainPipelineGizmoVisualizer.cs` unless the backend DLLs from the earlier handoff section are also installed.
+3. Sync the generated debug viewport artifacts into Unity:
 
-```text
-C:\Dev4\QuantumCoasterWorksLib\artifacts\debug-viewport\DebugViewportSnapshotV1.sample.json
-C:\Dev4\QuantumCoasterWorksLib\artifacts\debug-viewport\DebugViewportSnapshotV1.banking-profile.sample.json
-C:\Dev4\QuantumCoasterWorksLib\artifacts\debug-viewport\Milestone7.synthetic.straight_line.snapshot.json
-C:\Dev4\QuantumCoasterWorksLib\artifacts\debug-viewport\Milestone7.synthetic.simple_hill.snapshot.json
-C:\Dev4\QuantumCoasterWorksLib\artifacts\debug-viewport\Milestone7.synthetic.banked_turn.snapshot.json
-C:\Dev4\QuantumCoasterWorksLib\artifacts\debug-viewport\Milestone7.synthetic.descending_ascending_curve.snapshot.json
+```powershell
+.\tools\sync-unity-debug-data.ps1 -Target "C:\Dev4\TestingGrounds"
 ```
+
+Unity imports the copied JSON files from `Assets\DebugData` as `TextAsset`s.
+The Snapshot Browser quick-load buttons should appear after Unity refreshes
+those assets.
 
 4. Open `Window > Quantum > Snapshot Browser`.
 5. Select or quick-load `DebugViewportSnapshotV1.sample.json`, click `Load / Refresh`, and confirm the stats show `centerline points = 9`, `frames = 9`, `lines = 3`, `boxes = 2`, `trainPose = present`, and `trainPose car count = 2`.
