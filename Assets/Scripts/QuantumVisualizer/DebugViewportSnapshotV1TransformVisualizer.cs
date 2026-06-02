@@ -32,15 +32,15 @@ namespace QuantumVisualizer
         [SerializeField] private bool logGeneratedSummary = true;
 
         [Header("Optional Prefab Slots")]
-        [SerializeField, Tooltip("Optional visual prefab for train.body boxes. The generated box wrapper remains driven by the snapshot frame and size; this prefab is instantiated below it at local identity.")]
+        [SerializeField, Tooltip("Optional visual prefab for train.body boxes. The generated box wrapper remains driven by the snapshot frame and size; this prefab is instantiated below it at local identity with scale 1,1,1.")]
         private GameObject trainBodyPrefab;
-        [SerializeField, Tooltip("Optional visual prefab for train.body.banking-profile boxes. The generated box wrapper remains driven by the snapshot frame and size; this prefab is instantiated below it at local identity.")]
+        [SerializeField, Tooltip("Optional visual prefab for train.body.banking-profile boxes. The generated box wrapper remains driven by the snapshot frame and size; this prefab is instantiated below it at local identity with scale 1,1,1.")]
         private GameObject bankingProfileBodyPrefab;
-        [SerializeField, Tooltip("Optional visual prefab for train.bogie boxes. The generated box wrapper remains driven by the snapshot frame and size; this prefab is instantiated below it at local identity.")]
+        [SerializeField, Tooltip("Optional visual prefab for train.bogie boxes. The generated box wrapper remains driven by the snapshot frame and size; this prefab is instantiated below it at local identity with scale 1,1,1.")]
         private GameObject bogiePrefab;
-        [SerializeField, Tooltip("Optional visual prefab for train.wheel boxes. The generated box wrapper remains driven by the snapshot frame and size; this prefab is instantiated below it at local identity.")]
+        [SerializeField, Tooltip("Optional visual prefab for train.wheel boxes. The generated box wrapper remains driven by the snapshot frame and size; this prefab is instantiated below it at local identity with scale 1,1,1.")]
         private GameObject wheelPrefab;
-        [SerializeField, Tooltip("Optional visual prefab for unknown-role boxes. The generated box wrapper remains driven by the snapshot frame and size; this prefab is instantiated below it at local identity.")]
+        [SerializeField, Tooltip("Optional visual prefab for unknown-role boxes. The generated box wrapper remains driven by the snapshot frame and size; this prefab is instantiated below it at local identity with scale 1,1,1.")]
         private GameObject unknownPrefab;
 
         [Header("Fallback Colors")]
@@ -190,11 +190,14 @@ namespace QuantumVisualizer
                 if (prefab == null)
                 {
                     CreateFallbackCube(boxWrapper.transform, fallbackMaterials[groupIndex]);
+                    summary.FallbackCubes++;
+                    summary.RoleFallbackCounts[groupIndex]++;
                 }
                 else
                 {
                     InstantiatePrefabVisual(prefab, boxWrapper.transform);
                     summary.PrefabInstances++;
+                    summary.RolePrefabCounts[groupIndex]++;
                 }
 
                 summary.Total++;
@@ -532,20 +535,32 @@ namespace QuantumVisualizer
         private sealed class GeneratedSnapshotSummary
         {
             public readonly int[] RoleCounts = new int[RoleGroupNames.Length];
+            public readonly int[] RolePrefabCounts = new int[RoleGroupNames.Length];
+            public readonly int[] RoleFallbackCounts = new int[RoleGroupNames.Length];
             public int Total;
             public int PrefabInstances;
+            public int FallbackCubes;
             public int Skipped;
 
             public string ToLogText()
             {
                 return "generated boxes=" + Total +
-                    " (train.body=" + RoleCounts[0] +
-                    ", train.body.banking-profile=" + RoleCounts[1] +
-                    ", train.bogie=" + RoleCounts[2] +
-                    ", train.wheel=" + RoleCounts[3] +
-                    ", unknown=" + RoleCounts[4] +
-                    "), prefabInstances=" + PrefabInstances +
+                    " " + FormatRoleCounts(RoleCounts) +
+                    ", prefabInstances=" + PrefabInstances +
+                    " " + FormatRoleCounts(RolePrefabCounts) +
+                    ", fallbackCubes=" + FallbackCubes +
+                    " " + FormatRoleCounts(RoleFallbackCounts) +
                     ", skipped=" + Skipped + ".";
+            }
+
+            private static string FormatRoleCounts(int[] counts)
+            {
+                return "(train.body=" + counts[0] +
+                    ", train.body.banking-profile=" + counts[1] +
+                    ", train.bogie=" + counts[2] +
+                    ", train.wheel=" + counts[3] +
+                    ", unknown=" + counts[4] +
+                    ")";
             }
         }
     }
