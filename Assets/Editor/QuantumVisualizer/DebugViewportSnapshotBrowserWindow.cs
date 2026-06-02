@@ -501,6 +501,8 @@ namespace QuantumVisualizer.Editor
 
             EditorGUILayout.EndHorizontal();
 
+            DrawViewerPrefabStatus();
+
             using (new EditorGUI.DisabledScope(Application.isPlaying))
             {
                 EditorGUILayout.BeginHorizontal();
@@ -528,6 +530,86 @@ namespace QuantumVisualizer.Editor
 
                 EditorGUILayout.EndHorizontal();
             }
+
+            DrawGeneratedSelectionActions();
+        }
+
+        private void DrawViewerPrefabStatus()
+        {
+            DebugViewportSnapshotV1TransformVisualizer transformVisualizer =
+                FindViewerTransformVisualizerForDisplay();
+
+            EditorGUILayout.Space(6f);
+            EditorGUILayout.LabelField("Prefab Status", EditorStyles.boldLabel);
+
+            using (new EditorGUI.DisabledScope(transformVisualizer == null))
+            {
+                EditorGUILayout.LabelField(
+                    "Body Prefab",
+                    FormatAssignedStatus(transformVisualizer != null && transformVisualizer.HasTrainBodyPrefab));
+                EditorGUILayout.LabelField(
+                    "Banking Profile Prefab",
+                    FormatAssignedStatus(
+                        transformVisualizer != null && transformVisualizer.HasBankingProfileBodyPrefab));
+                EditorGUILayout.LabelField(
+                    "Bogie Prefab",
+                    FormatAssignedStatus(transformVisualizer != null && transformVisualizer.HasBogiePrefab));
+                EditorGUILayout.LabelField(
+                    "Wheel Prefab",
+                    FormatAssignedStatus(transformVisualizer != null && transformVisualizer.HasWheelPrefab));
+            }
+
+            if (transformVisualizer == null)
+            {
+                EditorGUILayout.HelpBox(
+                    "Assign or create a viewer to inspect DebugViewportSnapshotV1 prefab slots.",
+                    MessageType.Info);
+            }
+        }
+
+        private void DrawGeneratedSelectionActions()
+        {
+            DebugViewportSnapshotV1TransformVisualizer transformVisualizer =
+                FindViewerTransformVisualizerForDisplay();
+            Transform generatedRoot = transformVisualizer != null
+                ? transformVisualizer.FindGeneratedHierarchy()
+                : null;
+            Transform bodyInstances = transformVisualizer != null
+                ? transformVisualizer.FindTrainBodyInstances()
+                : null;
+            Transform bankingProfileInstances = transformVisualizer != null
+                ? transformVisualizer.FindBankingProfileBodyInstances()
+                : null;
+
+            EditorGUILayout.Space(6f);
+            EditorGUILayout.BeginHorizontal();
+
+            using (new EditorGUI.DisabledScope(generatedRoot == null))
+            {
+                if (GUILayout.Button("Select Generated Hierarchy", GUILayout.Height(28f)))
+                {
+                    SelectGeneratedHierarchy();
+                }
+            }
+
+            using (new EditorGUI.DisabledScope(bodyInstances == null || bodyInstances.childCount == 0))
+            {
+                if (GUILayout.Button("Select Body Instances", GUILayout.Height(28f)))
+                {
+                    SelectBodyInstances();
+                }
+            }
+
+            using (new EditorGUI.DisabledScope(
+                bankingProfileInstances == null || bankingProfileInstances.childCount == 0))
+            {
+                if (GUILayout.Button("Select Banking Profile Instances", GUILayout.Height(28f)))
+                {
+                    SelectBankingProfileInstances();
+                }
+            }
+
+            EditorGUILayout.EndHorizontal();
         }
 
         private bool LoadSelectedSnapshot()
@@ -996,6 +1078,114 @@ namespace QuantumVisualizer.Editor
             _statusType = MessageType.Info;
         }
 
+        private void SelectGeneratedHierarchy()
+        {
+            DebugViewportSnapshotV1TransformVisualizer transformVisualizer =
+                ResolveTransformVisualizerForAction();
+            if (transformVisualizer == null)
+            {
+                return;
+            }
+
+            Transform generatedRoot = transformVisualizer.FindGeneratedHierarchy();
+            if (generatedRoot == null)
+            {
+                _statusText = "No GeneratedSnapshot hierarchy was found. Rebuild generated boxes first.";
+                _statusType = MessageType.Warning;
+                return;
+            }
+
+            Selection.activeGameObject = generatedRoot.gameObject;
+            EditorGUIUtility.PingObject(generatedRoot.gameObject);
+            _statusText = "Selected " + generatedRoot.name + ".";
+            _statusType = MessageType.Info;
+        }
+
+        private void SelectBodyInstances()
+        {
+            SelectGeneratedRoleInstances(
+                DebugViewportSnapshotV1Vocabulary.TrainBodyRole,
+                "body");
+        }
+
+        private void SelectBankingProfileInstances()
+        {
+            SelectGeneratedRoleInstances(
+                DebugViewportSnapshotV1Vocabulary.TrainBodyBankingProfileRole,
+                "banking profile");
+        }
+
+        private void SelectGeneratedRoleInstances(string role, string label)
+        {
+            DebugViewportSnapshotV1TransformVisualizer transformVisualizer =
+                ResolveTransformVisualizerForAction();
+            if (transformVisualizer == null)
+            {
+                return;
+            }
+
+            Transform group = transformVisualizer.FindGeneratedRoleGroup(role);
+            if (group == null || group.childCount == 0)
+            {
+                _statusText = "No generated " + label + " instances were found. Rebuild generated boxes first.";
+                _statusType = MessageType.Warning;
+                return;
+            }
+
+            var selectedObjects = new UnityEngine.Object[group.childCount];
+            for (int i = 0; i < group.childCount; i++)
+            {
+                selectedObjects[i] = group.GetChild(i).gameObject;
+            }
+
+            Selection.objects = selectedObjects;
+            Selection.activeGameObject = group.GetChild(0).gameObject;
+            EditorGUIUtility.PingObject(group.GetChild(0).gameObject);
+            _statusText = "Selected " + group.childCount + " generated " + label + " instance(s).";
+            _statusType = MessageType.Info;
+        }
+
+        private DebugViewportSnapshotV1TransformVisualizer ResolveTransformVisualizerForAction()
+        {
+            GameObject viewer = ResolveViewerGameObject(createIfMissing: false);
+            if (viewer == null)
+            {
+                _statusText = "No Quantum Snapshot Viewer is assigned or found.";
+                _statusType = MessageType.Warning;
+                return null;
+            }
+
+            _viewerGameObject = viewer;
+            DebugViewportSnapshotV1TransformVisualizer transformVisualizer =
+                viewer.GetComponent<DebugViewportSnapshotV1TransformVisualizer>();
+            if (transformVisualizer == null)
+            {
+                _statusText = viewer.name + " does not have a DebugViewportSnapshotV1TransformVisualizer.";
+                _statusType = MessageType.Warning;
+                return null;
+            }
+
+            return transformVisualizer;
+        }
+
+        private DebugViewportSnapshotV1TransformVisualizer FindViewerTransformVisualizerForDisplay()
+        {
+            GameObject viewer = GetAssignedViewer();
+            if (viewer == null)
+            {
+                viewer = FindViewerOnSelection();
+            }
+
+            if (viewer == null)
+            {
+                viewer = FindViewerInOpenScenes();
+            }
+
+            return viewer != null
+                ? viewer.GetComponent<DebugViewportSnapshotV1TransformVisualizer>()
+                : null;
+        }
+
         private bool EnsureSelectedSnapshotIsLoaded()
         {
             if (_snapshotJson == null)
@@ -1375,6 +1565,11 @@ namespace QuantumVisualizer.Editor
         private static string DisplayText(string value)
         {
             return string.IsNullOrWhiteSpace(value) ? "<none>" : value;
+        }
+
+        private static string FormatAssignedStatus(bool assigned)
+        {
+            return assigned ? "Assigned" : "Missing";
         }
 
         private static void MarkSceneObjectDirty(GameObject gameObject)

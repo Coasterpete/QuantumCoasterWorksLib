@@ -60,10 +60,56 @@ namespace QuantumVisualizer
             get { return snapshotJson; }
         }
 
+        public bool HasTrainBodyPrefab
+        {
+            get { return trainBodyPrefab != null; }
+        }
+
+        public bool HasBankingProfileBodyPrefab
+        {
+            get { return bankingProfileBodyPrefab != null; }
+        }
+
+        public bool HasBogiePrefab
+        {
+            get { return bogiePrefab != null; }
+        }
+
+        public bool HasWheelPrefab
+        {
+            get { return wheelPrefab != null; }
+        }
+
         public void ApplySnapshot(TextAsset jsonAsset)
         {
             snapshotJson = jsonAsset;
             QueueRebuild();
+        }
+
+        public Transform FindGeneratedHierarchy()
+        {
+            return FindDirectChild(transform, GeneratedRootName);
+        }
+
+        public Transform FindGeneratedRoleGroup(string role)
+        {
+            Transform generatedRoot = FindGeneratedHierarchy();
+            if (generatedRoot == null)
+            {
+                return null;
+            }
+
+            return FindDirectChild(generatedRoot, ResolveRoleGroupName(role));
+        }
+
+        public Transform FindTrainBodyInstances()
+        {
+            return FindGeneratedRoleGroup(DebugViewportSnapshotV1Vocabulary.TrainBodyRole);
+        }
+
+        public Transform FindBankingProfileBodyInstances()
+        {
+            return FindGeneratedRoleGroup(DebugViewportSnapshotV1Vocabulary.TrainBodyBankingProfileRole);
         }
 
         private void OnEnable()
@@ -288,6 +334,30 @@ namespace QuantumVisualizer
             }
 
             return RoleGroupNames.Length - 1;
+        }
+
+        private static string ResolveRoleGroupName(string role)
+        {
+            return RoleGroupNames[ResolveRoleGroupIndex(role)];
+        }
+
+        private static Transform FindDirectChild(Transform parent, string childName)
+        {
+            if (parent == null)
+            {
+                return null;
+            }
+
+            for (int i = 0; i < parent.childCount; i++)
+            {
+                Transform child = parent.GetChild(i);
+                if (string.Equals(child.name, childName, StringComparison.Ordinal))
+                {
+                    return child;
+                }
+            }
+
+            return null;
         }
 
         private static string BuildBoxName(int localIndex, string label)
