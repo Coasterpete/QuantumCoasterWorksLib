@@ -82,6 +82,7 @@ This keeps the Unity side focused on the current backend pipeline visualizer wit
 - `DebugViewportSnapshotV1Dtos.cs`
 - `DebugViewportSnapshotV1JsonLoader.cs`
 - `DebugViewportSnapshotV1GizmoVisualizer.cs`
+- `DebugViewportSnapshotV1TransformVisualizer.cs`
 
 The loader accepts a Unity `TextAsset`, checks `contract == "quantum.debug_viewport_snapshot"` and `version == 1`, then maps the data into Unity-local DTOs. It does not require `GShark.dll`, `Quantum.Math.dll`, `Quantum.Splines.dll`, `Quantum.Track.dll`, `Quantum.IO.dll`, `Quantum.Debug.dll`, or schema validation inside Unity. The gizmo visualizer draws centerline points, frames, stable-kind lines, and stable-role oriented boxes. It only logs nested `TrainPoseExportV1` presence and car count; it does not render the nested train pose hierarchy.
 
@@ -92,6 +93,15 @@ Coordinate mapping expectations:
 - Backend frames are right-handed: `binormal ~= tangent x normal`.
 - Unity uses `Vector3` plus `Quaternion`; perform any handedness or axis remapping at the importer boundary and keep that policy out of `Quantum.*`.
 - Box `length` follows tangent, `height` follows normal, and `width` follows binormal.
+- Transform visualizer wrappers map local +X to backend tangent/length, local +Y to backend normal/height, and local +Z to backend binormal/width.
+
+Prefab placement expectations for `DebugViewportSnapshotV1TransformVisualizer`:
+
+- Author the prefab pivot at the visual box center.
+- The prefab is instantiated as the only visual child under each generated box wrapper.
+- The prefab child local position, rotation, and scale stay at identity (`0,0,0`, identity rotation, `1,1,1`).
+- The generated wrapper owns snapshot pose and dimensions; wrapper local scale is `length,height,width`.
+- If the role prefab slot is empty, the visualizer creates a unit `FallbackCube` child at local identity instead.
 
 Suggested imported hierarchy:
 
@@ -128,7 +138,7 @@ Use `C:\Dev4\TestingGrounds1` only as a local manual validation project. Do not 
 .\tools\demo-technical-preview-0.1.cmd
 ```
 
-2. In `TestingGrounds1`, copy the snapshot-only scripts into the Unity project's `Assets/Scripts/QuantumVisualizer`: `DebugViewportSnapshotV1Dtos.cs`, `DebugViewportSnapshotV1JsonLoader.cs`, `DebugViewportSnapshotV1GizmoVisualizer.cs`, and `TrainPoseExportV1Dtos.cs`. Do not copy `BackendTrainPipelineGizmoVisualizer.cs` unless the backend DLLs from the earlier handoff section are also installed.
+2. In `TestingGrounds1`, copy the snapshot-only scripts into the Unity project's `Assets/Scripts/QuantumVisualizer`: `DebugViewportSnapshotV1Dtos.cs`, `DebugViewportSnapshotV1JsonLoader.cs`, `DebugViewportSnapshotV1GizmoVisualizer.cs`, `DebugViewportSnapshotV1TransformVisualizer.cs`, and `TrainPoseExportV1Dtos.cs`. Do not copy `BackendTrainPipelineGizmoVisualizer.cs` unless the backend DLLs from the earlier handoff section are also installed.
 3. Copy the generated JSON snapshots you want to inspect into a Unity `Assets` folder so Unity imports them as `TextAsset`s. Typical sources:
 
 ```text
@@ -140,11 +150,26 @@ C:\Dev4\QuantumCoasterWorksLib\artifacts\debug-viewport\Milestone7.synthetic.ban
 C:\Dev4\QuantumCoasterWorksLib\artifacts\debug-viewport\Milestone7.synthetic.descending_ascending_curve.snapshot.json
 ```
 
-4. Create an empty GameObject, add `DebugViewportSnapshotV1GizmoVisualizer`, assign a snapshot `TextAsset`, and enable Gizmos in Scene view.
+4. Create an empty GameObject, add `DebugViewportSnapshotV1GizmoVisualizer` and `DebugViewportSnapshotV1TransformVisualizer`, assign the same snapshot `TextAsset` to both components, and enable Gizmos in Scene view.
 5. Verify the visual layers with the component toggles:
 
 - Built-in sample: console summary should report `centerlinePoints=9`, `frames=9`, `lines=3`, `boxes=2`, `trainPose=present`, `trainPoseCars=2`.
 - BankingProfile sample: console summary should report `centerlinePoints=10`, `frames=10`, `lines=3`, `boxes=3`, `trainPose=present`, `trainPoseCars=3`.
 - CSV fixture snapshots: centerline and frame axes should render, with `boxes=0`, `trainPose=absent`, and `trainPoseCars=0`.
 
-No HDRP/URP setup, materials, prefabs, editor windows, runtime animation, live backend evaluation, `GShark.dll`, or backend DLL copy is required for this snapshot-only gizmo path.
+6. Validate prefab placement through the transform visualizer:
+
+- With the `train.body` prefab slot empty, rebuild the built-in sample and confirm two wrappers under `GeneratedSnapshot/train.body`, each with one `FallbackCube` child at local identity.
+- Assign a simple self-authored cube prefab with center pivot to `train.body`, rebuild the built-in sample, and confirm two `Prefab` children under the same wrappers. The console summary should report `prefabInstances=2` and `fallbackCubes=0`.
+- With the `train.body.banking-profile` prefab slot empty, rebuild the BankingProfile sample and confirm three wrappers under `GeneratedSnapshot/train.body.banking-profile`, each with one `FallbackCube` child at local identity.
+- Assign the same self-authored cube prefab to `train.body.banking-profile`, rebuild the BankingProfile sample, and confirm three `Prefab` children. The console summary should report `prefabInstances=3` and `fallbackCubes=0`.
+- In both samples, confirm each wrapper local scale is `x = snapshot length`, `y = snapshot height`, `z = snapshot width`, while each prefab or fallback child remains local position `0,0,0`, local rotation identity, and local scale `1,1,1`.
+
+Optional GLB readiness check:
+
+- Import only a self-authored cube-like GLB.
+- Do not introduce third-party or production model assets.
+- Check only pivot, orientation, and import scale against the same center-pivot/local-identity convention.
+- Record whether the imported prefab can stay at root scale `1,1,1`; do not add GLB, material, mesh, or prefab fields to `DebugViewportSnapshotV1`.
+
+No HDRP/URP setup, materials, editor windows, runtime animation, live backend evaluation, `GShark.dll`, or backend DLL copy is required for this snapshot-only gizmo and transform path. Prefabs are optional Unity-side visuals only.

@@ -129,3 +129,10 @@ Future viewers should keep this as a thin adapter boundary:
 - Unity: load the JSON as a text asset or file, verify `contract` and `version`, convert backend vectors at the Unity adapter edge, then draw gizmos or placeholder cubes.
 - Unreal: parse the same JSON into Unreal-side structs, verify identity/version, convert coordinates in the plugin/module boundary, then draw debug lines or transient actors.
 - Standalone viewer: parse the JSON in the app shell, keep camera/input/rendering state outside the payload, and render the arrays with whichever viewport technology is selected later.
+
+Unity prefab/model placement is adapter-owned and must stay outside this contract.
+For the current Unity `DebugViewportSnapshotV1TransformVisualizer`, generated box
+wrappers own pose and scale, wrapper local +X/+Y/+Z map to backend
+tangent/normal/binormal, and any assigned prefab is only a local-identity child.
+Do not add prefab, mesh, material, import-scale, or GLB metadata fields to
+`DebugViewportSnapshotV1`.
