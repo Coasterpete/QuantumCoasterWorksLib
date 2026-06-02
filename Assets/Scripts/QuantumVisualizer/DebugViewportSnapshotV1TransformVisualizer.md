@@ -70,8 +70,17 @@ Each stable role has an optional prefab slot:
 - `train.wheel`
 - `unknown`
 
-When a prefab is assigned, the generated wrapper still drives pose and scale, and
-the prefab is instantiated below it at local identity. The prefab convention is:
+The inspector and Snapshot Browser show a prefab status section:
+
+- Body Prefab: `Assigned` or `Missing`
+- Banking Profile Prefab: `Assigned` or `Missing`
+- Bogie Prefab: `Assigned` or `Missing`
+- Wheel Prefab: `Assigned` or `Missing`
+
+For Milestone 64, `train.body` uses the Body Prefab slot and
+`train.body.banking-profile` uses the Banking Profile Prefab slot. When a prefab
+is assigned, the generated wrapper still drives pose and scale, and the prefab is
+instantiated below it at local identity. The prefab convention is:
 
 - Author the prefab pivot at the visual box center.
 - Keep the prefab root local position at `0,0,0` under the generated wrapper.
@@ -81,6 +90,53 @@ the prefab is instantiated below it at local identity. The prefab convention is:
 
 When no prefab is assigned, a unit fallback cube is created below the wrapper at
 local identity and inherits the wrapper scale.
+
+### Simple Train-Body Prototype Prefab
+
+Use only self-authored Unity objects for validation:
+
+1. Create an empty GameObject named `PrototypeTrainBody`.
+2. Reset its transform to local position `0,0,0`, rotation `0,0,0`, and scale
+   `1,1,1`.
+3. Add one or more child cubes to make a train-like body. Keep the visible body
+   centered on the root pivot and roughly inside normalized `-0.5..0.5` local
+   bounds on X, Y, and Z. Child cubes may have their own local offsets or scales;
+   the prefab root must stay identity.
+4. Save the root as a prefab in the Unity project.
+5. Assign it to Body Prefab for `train.body` samples, or Banking Profile Prefab
+   for `train.body.banking-profile` samples.
+6. Rebuild generated boxes.
+
+After rebuild, each generated wrapper should contain one child named `Prefab`.
+The wrapper owns snapshot placement and dimensions:
+
+```text
+GeneratedSnapshot
+  train.body
+    Box_000_Car_0
+      Prefab
+```
+
+Inspect a generated instance and confirm:
+
+- wrapper local position and rotation match the snapshot frame
+- wrapper local scale is `length,height,width`
+- `Prefab` local position is `0,0,0`
+- `Prefab` local rotation is identity
+- `Prefab` local scale is `1,1,1`
+
+### Selection Actions
+
+The visualizer inspector and Snapshot Browser expose:
+
+- `Select Generated Hierarchy`
+- `Select Body Instances`
+- `Select Banking Profile Instances`
+
+These actions select `GeneratedSnapshot`, all generated `train.body` wrappers, or
+all generated `train.body.banking-profile` wrappers. They select wrapper objects,
+not prefab children, because wrappers are the objects that own snapshot pose and
+scale.
 
 ## Validation Notes
 
