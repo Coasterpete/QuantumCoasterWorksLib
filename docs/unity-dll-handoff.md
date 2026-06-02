@@ -133,18 +133,18 @@ Placeholder sizing stays literal: snapshot box length follows tangent, height fo
 
 `Window > Quantum > Snapshot Browser` opens a Unity Editor-only control surface for
 the snapshot visualizers. It lets a user assign a `DebugViewportSnapshotV1` JSON
-`TextAsset`, parse it, inspect snapshot stats, create or update a scene viewer
-GameObject named `Quantum Snapshot Viewer`, and call the transform visualizer
-`Rebuild` and `Clear` actions.
+`TextAsset`, browse discovered snapshots under `Assets`, parse the selected
+snapshot, inspect metadata and role counts, create or update a scene viewer
+GameObject named `Quantum Snapshot Viewer`, select that viewer, and call the
+transform visualizer `Rebuild` and `Clear` actions.
 
 The created viewer GameObject receives:
 
 - `DebugViewportSnapshotV1GizmoVisualizer`
 - `DebugViewportSnapshotV1TransformVisualizer`
 
-The selected snapshot is applied to both components. The window also searches
-Unity `Assets` for these known generated snapshot filenames and shows quick-load
-buttons when any are present:
+The selected snapshot is applied to both components. The window searches Unity
+`Assets` for snapshots and shows known generated files first:
 
 - `DebugViewportSnapshotV1.sample.json`
 - `DebugViewportSnapshotV1.banking-profile.sample.json`
@@ -152,6 +152,33 @@ buttons when any are present:
 - `Milestone7.synthetic.simple_hill.snapshot.json`
 - `Milestone7.synthetic.banked_turn.snapshot.json`
 - `Milestone7.synthetic.descending_ascending_curve.snapshot.json`
+
+After the known generated files, the browser lists any other valid
+`DebugViewportSnapshotV1` JSON `TextAsset` under `Assets`. Each row shows the
+snapshot name and asset path, with `Load`, `Apply`, and `Ping` actions. Known
+generated files are shown even if their current content is invalid, so corrupted
+or stale synced files surface readable contract/version/JSON warnings instead of
+quietly disappearing.
+
+The browser refreshes its discovered list when Unity project assets change, such
+as after running the debug data sync script. If the selected `TextAsset` content
+changes while the window is open, the browser reloads that snapshot and updates
+the parsed panels.
+
+The parsed panels include:
+
+- basic counts for centerline points, frames, lines, boxes, and nested train pose
+- `metadata.units`
+- `metadata.sourceFixtureName`
+- `metadata.sampleCount`
+- role counts for `train.body`, `train.body.banking-profile`, `train.bogie`,
+  `train.wheel`, and `unknown`
+
+The status panel calls out no snapshot selected, invalid JSON, wrong
+contract/version, no known synced artifacts under `Assets/DebugData`, no viewer
+assigned/found, and Play Mode scene-editing lockout. The DebugData artifact
+buttons open `Assets/DebugData/index.html` and `Assets/DebugData/browser.html`
+when those generated files are present.
 
 The editor window is a Unity adapter only. It does not add backend dependencies,
 does not change the `DebugViewportSnapshotV1` contract, and does not introduce
@@ -191,8 +218,10 @@ Use `-Clean` to remove existing copied JSON, SVG, and HTML files from
 `Assets\DebugData` before copying the current artifacts.
 
 Unity imports copied JSON files under `Assets\DebugData` as `TextAsset`s. After
-sync, the Snapshot Browser quick-load buttons work for the known generated
-snapshot filenames because they are present under Unity `Assets`.
+sync, the Snapshot Browser refreshes its discovered list when Unity reports the
+asset changes. The known generated filenames appear at the top, valid additional
+snapshot JSON files appear after them, and the local gallery/browser HTML buttons
+enable when `index.html` and `browser.html` are present.
 
 ## Manual Built-In Unity Validation
 
@@ -212,23 +241,42 @@ Use `C:\Dev4\TestingGrounds` only as a local manual validation project. Do not c
 ```
 
 Unity imports the copied JSON files from `Assets\DebugData` as `TextAsset`s.
-The Snapshot Browser quick-load buttons should appear after Unity refreshes
-those assets.
+The Snapshot Browser discovered list should update after Unity refreshes those
+assets, without closing and reopening the window.
 
 4. Open `Window > Quantum > Snapshot Browser`.
-5. Select or quick-load `DebugViewportSnapshotV1.sample.json`, click `Load / Refresh`, and confirm the stats show `centerline points = 9`, `frames = 9`, `lines = 3`, `boxes = 2`, `trainPose = present`, and `trainPose car count = 2`.
-6. Click `Create Viewer GameObject` and confirm the scene has `Quantum Snapshot Viewer` with both `DebugViewportSnapshotV1GizmoVisualizer` and `DebugViewportSnapshotV1TransformVisualizer`.
-7. Click `Rebuild Generated Boxes` and confirm two wrappers appear under `GeneratedSnapshot/train.body`.
-8. Select or quick-load `DebugViewportSnapshotV1.banking-profile.sample.json`, click `Load / Refresh`, and confirm the stats show `centerline points = 10`, `frames = 10`, `lines = 3`, `boxes = 3`, `trainPose = present`, and `trainPose car count = 3`.
-9. Click `Rebuild Generated Boxes` and confirm three wrappers appear under `GeneratedSnapshot/train.body.banking-profile`.
-10. Click `Clear Generated Boxes` and confirm the `GeneratedSnapshot` child root is removed.
-11. Verify the visual layers with the component toggles:
+5. Confirm `DebugViewportSnapshotV1.sample.json`,
+   `DebugViewportSnapshotV1.banking-profile.sample.json`, and synced fixture
+   snapshots appear in the discovered list with names and asset paths.
+6. Click the `Open Gallery index.html` and `Open Browser browser.html` buttons
+   when present and confirm the local pages open.
+7. Load `DebugViewportSnapshotV1.sample.json` from its row and confirm the stats
+   show `centerline points = 9`, `frames = 9`, `lines = 3`, `boxes = 2`,
+   `trainPose = present`, and `trainPose car count = 2`. Confirm metadata fields
+   are populated and role counts show `train.body = 2`.
+8. Click `Create / Update Viewer` and confirm the scene has `Quantum Snapshot
+   Viewer` with both `DebugViewportSnapshotV1GizmoVisualizer` and
+   `DebugViewportSnapshotV1TransformVisualizer`.
+9. Click `Select Viewer` and confirm `Quantum Snapshot Viewer` is selected.
+10. Click `Rebuild Generated Boxes` and confirm two wrappers appear under
+    `GeneratedSnapshot/train.body`.
+11. Load `DebugViewportSnapshotV1.banking-profile.sample.json` and confirm the
+    stats show `centerline points = 10`, `frames = 10`, `lines = 3`, `boxes = 3`,
+    `trainPose = present`, and `trainPose car count = 3`. Confirm role counts show
+    `train.body.banking-profile = 3`.
+12. Click `Rebuild Generated Boxes` and confirm three wrappers appear under
+    `GeneratedSnapshot/train.body.banking-profile`.
+13. Select invalid, empty, or wrong-contract JSON `TextAsset`s through the object
+    field and confirm the status panel shows readable warnings.
+14. Click `Clear Generated Boxes` and confirm the `GeneratedSnapshot` child root
+    is removed.
+15. Verify the visual layers with the component toggles:
 
 - Built-in sample: console summary should report `centerlinePoints=9`, `frames=9`, `lines=3`, `boxes=2`, `trainPose=present`, `trainPoseCars=2`.
 - BankingProfile sample: console summary should report `centerlinePoints=10`, `frames=10`, `lines=3`, `boxes=3`, `trainPose=present`, `trainPoseCars=3`.
 - CSV fixture snapshots: centerline and frame axes should render, with `boxes=0`, `trainPose=absent`, and `trainPoseCars=0`.
 
-12. Validate prefab placement through the transform visualizer:
+16. Validate prefab placement through the transform visualizer:
 
 - With the `train.body` prefab slot empty, rebuild the built-in sample and confirm two wrappers under `GeneratedSnapshot/train.body`, each with one `FallbackCube` child at local identity.
 - Assign a simple self-authored cube prefab with center pivot to `train.body`, rebuild the built-in sample, and confirm two `Prefab` children under the same wrappers. The console summary should report `prefabInstances=2` and `fallbackCubes=0`.
