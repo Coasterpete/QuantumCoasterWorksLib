@@ -84,6 +84,7 @@ This keeps the Unity side focused on the current backend pipeline visualizer wit
 - `DebugViewportSnapshotV1GizmoVisualizer.cs`
 - `DebugViewportSnapshotV1TransformVisualizer.cs`
 - `Assets/Editor/QuantumVisualizer/DebugViewportSnapshotBrowserWindow.cs`
+- `Assets/Editor/QuantumVisualizer/DebugViewportSnapshotV1TransformVisualizerEditor.cs`
 
 The loader accepts a Unity `TextAsset`, checks `contract == "quantum.debug_viewport_snapshot"` and `version == 1`, then maps the data into Unity-local DTOs. It does not require `GShark.dll`, `Quantum.Math.dll`, `Quantum.Splines.dll`, `Quantum.Track.dll`, `Quantum.IO.dll`, `Quantum.Debug.dll`, or schema validation inside Unity. The gizmo visualizer draws centerline points, frames, stable-kind lines, and stable-role oriented boxes. It only logs nested `TrainPoseExportV1` presence and car count; it does not render the nested train pose hierarchy.
 
@@ -99,10 +100,33 @@ Coordinate mapping expectations:
 Prefab placement expectations for `DebugViewportSnapshotV1TransformVisualizer`:
 
 - Author the prefab pivot at the visual box center.
+- Use the Body Prefab slot for `train.body` boxes.
+- Use the Banking Profile Prefab slot for `train.body.banking-profile` boxes.
 - The prefab is instantiated as the only visual child under each generated box wrapper.
 - The prefab child local position, rotation, and scale stay at identity (`0,0,0`, identity rotation, `1,1,1`).
 - The generated wrapper owns snapshot pose and dimensions; wrapper local scale is `length,height,width`.
 - If the role prefab slot is empty, the visualizer creates a unit `FallbackCube` child at local identity instead.
+- The visualizer inspector and Snapshot Browser report Body, Banking Profile, Bogie, and Wheel prefab slots as `Assigned` or `Missing`.
+
+Simple train-body prototype prefab:
+
+1. Create an empty GameObject named `PrototypeTrainBody`.
+2. Reset the root transform to local position `0,0,0`, rotation `0,0,0`, and scale `1,1,1`.
+3. Add one or more self-authored child cubes centered around the root pivot and roughly inside normalized `-0.5..0.5` local X/Y/Z bounds.
+4. Save the root as a prefab.
+5. Assign that prefab to Body Prefab for the built-in sample or Banking Profile Prefab for the BankingProfile sample.
+6. Rebuild generated boxes and confirm each generated wrapper has one `Prefab` child at local identity.
+
+Generated transform hierarchy:
+
+```text
+GeneratedSnapshot
+  train.body
+  train.body.banking-profile
+  train.bogie
+  train.wheel
+  unknown
+```
 
 Suggested imported hierarchy:
 
@@ -136,10 +160,19 @@ the snapshot visualizers. It lets a user assign a `DebugViewportSnapshotV1` JSON
 `TextAsset`, browse discovered snapshots under `Assets`, parse the selected
 snapshot, inspect metadata and role counts, create or update a scene viewer
 GameObject named `Quantum Snapshot Viewer`, select that viewer, and call the
+
 transform visualizer `Rebuild` and `Clear` actions. It also has a Generated
 Artifacts workflow that copies backend output from `artifacts/debug-viewport`
 into `Assets/DebugData` without adding CSV parsing or backend dependencies to
 Unity.
+=======
+transform visualizer `Rebuild` and `Clear` actions. It also reports transform
+visualizer prefab slot status and exposes selection actions for
+`GeneratedSnapshot`, generated `train.body` wrappers, and generated
+`train.body.banking-profile` wrappers. It also has a Generated Artifacts workflow
+that copies backend output from `artifacts/debug-viewport` into
+`Assets/DebugData` without adding CSV parsing or backend dependencies to Unity.
+
 
 The created viewer GameObject receives:
 
@@ -197,6 +230,7 @@ The parsed panels include:
 - `metadata.sampleCount`
 - role counts for `train.body`, `train.body.banking-profile`, `train.bogie`,
   `train.wheel`, and `unknown`
+- prefab status for Body, Banking Profile, Bogie, and Wheel slots
 
 The status panel calls out no snapshot selected, invalid JSON, wrong
 contract/version, no generated artifacts under `Assets/DebugData`, no viewer
@@ -259,7 +293,11 @@ Use `C:\Dev4\TestingGrounds` only as a local manual validation project. Do not c
 .\tools\demo-technical-preview-0.1.cmd
 ```
 
+<<<<<<< HEAD
 2. In `TestingGrounds`, copy the snapshot-only runtime scripts into the Unity project's `Assets/Scripts/QuantumVisualizer`: `DebugViewportSnapshotV1Dtos.cs`, `DebugViewportSnapshotV1JsonLoader.cs`, `DebugViewportSnapshotV1GizmoVisualizer.cs`, `DebugViewportSnapshotV1TransformVisualizer.cs`, and `TrainPoseExportV1Dtos.cs`. Copy `Assets/Editor/QuantumVisualizer/DebugViewportSnapshotBrowserWindow.cs` into the Unity project's `Assets/Editor/QuantumVisualizer`. Do not copy `BackendTrainPipelineGizmoVisualizer.cs` unless the backend DLLs from the earlier handoff section are also installed.
+=======
+2. In `TestingGrounds`, copy the snapshot-only runtime scripts into the Unity project's `Assets/Scripts/QuantumVisualizer`: `DebugViewportSnapshotV1Dtos.cs`, `DebugViewportSnapshotV1JsonLoader.cs`, `DebugViewportSnapshotV1GizmoVisualizer.cs`, `DebugViewportSnapshotV1TransformVisualizer.cs`, and `TrainPoseExportV1Dtos.cs`. Copy `Assets/Editor/QuantumVisualizer/DebugViewportSnapshotBrowserWindow.cs` and `Assets/Editor/QuantumVisualizer/DebugViewportSnapshotV1TransformVisualizerEditor.cs` into the Unity project's `Assets/Editor/QuantumVisualizer`. Do not copy `BackendTrainPipelineGizmoVisualizer.cs` unless the backend DLLs from the earlier handoff section are also installed.
+>>>>>>> milestone-63-unity-csv-snapshot-workflow
 3. Import the generated debug viewport artifacts into Unity. In the Snapshot
    Browser, use the Generated Artifacts source folder `artifacts/debug-viewport`
    when the folder is under the Unity project root, or browse to the repository
@@ -293,12 +331,16 @@ assets, without closing and reopening the window.
 9. Click `Select Viewer` and confirm `Quantum Snapshot Viewer` is selected.
 10. Click `Rebuild Generated Boxes` and confirm two wrappers appear under
     `GeneratedSnapshot/train.body`.
+    Click `Select Generated Hierarchy`, then `Select Body Instances`, and confirm
+    the generated root and two body wrappers are selected as expected.
 11. Load `DebugViewportSnapshotV1.banking-profile.sample.json` and confirm the
     stats show `centerline points = 10`, `frames = 10`, `lines = 3`, `boxes = 3`,
     `trainPose = present`, and `trainPose car count = 3`. Confirm role counts show
     `train.body.banking-profile = 3`.
 12. Click `Rebuild Generated Boxes` and confirm three wrappers appear under
     `GeneratedSnapshot/train.body.banking-profile`.
+    Click `Select Banking Profile Instances` and confirm the three generated
+    banking-profile wrappers are selected.
 13. Select invalid, empty, or wrong-contract JSON `TextAsset`s through the object
     field and confirm the status panel shows readable warnings.
 14. While the browser is open, run a clean import from the Generated Artifacts
@@ -315,9 +357,11 @@ assets, without closing and reopening the window.
 17. Validate prefab placement through the transform visualizer:
 
 - With the `train.body` prefab slot empty, rebuild the built-in sample and confirm two wrappers under `GeneratedSnapshot/train.body`, each with one `FallbackCube` child at local identity.
-- Assign a simple self-authored cube prefab with center pivot to `train.body`, rebuild the built-in sample, and confirm two `Prefab` children under the same wrappers. The console summary should report `prefabInstances=2` and `fallbackCubes=0`.
+- Confirm the Prefab Status section reports Body Prefab as `Missing`, then assign a simple self-authored cube-based train-body prefab with center pivot to the Body Prefab slot.
+- Rebuild the built-in sample and confirm two `Prefab` children under the same wrappers. The console summary should report `prefabInstances=2` and `fallbackCubes=0`, and Body Prefab should report `Assigned`.
 - With the `train.body.banking-profile` prefab slot empty, rebuild the BankingProfile sample and confirm three wrappers under `GeneratedSnapshot/train.body.banking-profile`, each with one `FallbackCube` child at local identity.
-- Assign the same self-authored cube prefab to `train.body.banking-profile`, rebuild the BankingProfile sample, and confirm three `Prefab` children. The console summary should report `prefabInstances=3` and `fallbackCubes=0`.
+- Confirm Banking Profile Prefab reports `Missing`, then assign the same self-authored cube-based train-body prefab to the Banking Profile Prefab slot.
+- Rebuild the BankingProfile sample and confirm three `Prefab` children. The console summary should report `prefabInstances=3` and `fallbackCubes=0`, and Banking Profile Prefab should report `Assigned`.
 - In both samples, confirm each wrapper local scale is `x = snapshot length`, `y = snapshot height`, `z = snapshot width`, while each prefab or fallback child remains local position `0,0,0`, local rotation identity, and local scale `1,1,1`.
 
 Optional GLB readiness check:
