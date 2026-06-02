@@ -10,14 +10,19 @@ on `DebugViewportSnapshotV1GizmoVisualizer`.
 Editor window path:
 
 1. Open `Window > Quantum > Snapshot Browser`.
-2. Select a `DebugViewportSnapshotV1` JSON `TextAsset`, or use the discovered
-   snapshot list. Known generated files appear first, followed by other valid
-   snapshot JSON files under `Assets`.
-3. Click a row `Load` action to inspect stats, metadata, and role counts, or
+2. Use Generated Artifacts to copy backend output from `artifacts/debug-viewport`
+   into `Assets/DebugData`, or select an existing `DebugViewportSnapshotV1` JSON
+   `TextAsset`.
+3. Use the discovered snapshot list. Rows are grouped as Built-in,
+   BankingProfile, CSV fixtures, Other valid snapshots, and invalid/unknown
+   DebugData JSON warnings. Valid rows show `metadata.sourceFixtureName`,
+   `metadata.sampleCount`, centerline, frame, box, train pose, and train pose car
+   counts.
+4. Click a row `Load` action to inspect stats, metadata, and role counts, or
    click row `Apply` to load the snapshot and apply it to the scene viewer.
-4. Click `Create / Update Viewer`.
-5. Click `Select Viewer` to select `Quantum Snapshot Viewer` in the scene.
-6. Click `Rebuild Generated Boxes` or `Clear Generated Boxes`.
+5. Click `Create / Update Viewer`.
+6. Click `Select Viewer` to select `Quantum Snapshot Viewer` in the scene.
+7. Click `Rebuild Generated Boxes` or `Clear Generated Boxes`.
 
 Manual component path:
 
@@ -107,9 +112,10 @@ commit that Unity project into this repository.
 
 2. Copy the snapshot visualizer scripts into
    `C:\Dev4\TestingGrounds1\Assets\Scripts\QuantumVisualizer`.
-3. Copy generated snapshot JSON files into a Unity `Assets` folder so Unity imports
-   them as `TextAsset`s, or run `tools/sync-unity-debug-data.ps1` to copy JSON,
-   SVG, and HTML artifacts into `Assets/DebugData`.
+3. In `Window > Quantum > Snapshot Browser`, use Generated Artifacts to import
+   JSON, SVG, and HTML output from `artifacts/debug-viewport` into
+   `Assets/DebugData`. You can also run `tools/sync-unity-debug-data.ps1` from
+   the repository if you are copying into a separate Unity project.
 4. Add `DebugViewportSnapshotV1GizmoVisualizer` and
    `DebugViewportSnapshotV1TransformVisualizer` to the same empty GameObject and
    assign the same snapshot `TextAsset` to both, or open
@@ -128,11 +134,16 @@ commit that Unity project into this repository.
 10. In the snapshot browser, click `Select Viewer` and confirm the viewer is
     selected. If `Assets/DebugData/index.html` or `Assets/DebugData/browser.html`
     exist, confirm the artifact launch buttons open the local pages.
+11. Clean and reimport generated artifacts while the browser is open, then confirm
+    the grouped snapshot rows refresh and the current selection reloads or clears
+    without a stale-selection exception.
 
 Expected sample counts:
 
 - Built-in sample: `train.body` has 2 wrappers.
 - BankingProfile sample: `train.body.banking-profile` has 3 wrappers.
+- CSV fixture snapshots: centerline and frame counts match
+  `metadata.sampleCount`, with no generated boxes and no nested train pose.
 
 ## Optional GLB Readiness
 

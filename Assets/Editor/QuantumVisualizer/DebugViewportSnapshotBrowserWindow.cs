@@ -14,15 +14,45 @@ namespace QuantumVisualizer.Editor
         private const string DebugDataFolderAssetPath = "Assets/DebugData";
         private const string GalleryHtmlAssetPath = DebugDataFolderAssetPath + "/index.html";
         private const string BrowserHtmlAssetPath = DebugDataFolderAssetPath + "/browser.html";
+        private const string GeneratedArtifactDefaultSourcePath = "artifacts/debug-viewport";
+        private const string ArtifactSourceEditorPrefsKey =
+            "QuantumVisualizer.DebugViewportSnapshotBrowserWindow.ArtifactSourceFolder";
 
         private static readonly KnownSnapshotSample[] KnownSamples =
         {
-            new KnownSnapshotSample("Built-in", "DebugViewportSnapshotV1.sample.json"),
-            new KnownSnapshotSample("BankingProfile", "DebugViewportSnapshotV1.banking-profile.sample.json"),
-            new KnownSnapshotSample("Straight Line", "Milestone7.synthetic.straight_line.snapshot.json"),
-            new KnownSnapshotSample("Simple Hill", "Milestone7.synthetic.simple_hill.snapshot.json"),
-            new KnownSnapshotSample("Banked Turn", "Milestone7.synthetic.banked_turn.snapshot.json"),
-            new KnownSnapshotSample("Desc/Asc Curve", "Milestone7.synthetic.descending_ascending_curve.snapshot.json")
+            new KnownSnapshotSample(
+                "Built-in",
+                "DebugViewportSnapshotV1.sample.json",
+                SnapshotSourceGroup.BuiltIn),
+            new KnownSnapshotSample(
+                "BankingProfile",
+                "DebugViewportSnapshotV1.banking-profile.sample.json",
+                SnapshotSourceGroup.BankingProfile),
+            new KnownSnapshotSample(
+                "Straight Line",
+                "Milestone7.synthetic.straight_line.snapshot.json",
+                SnapshotSourceGroup.CsvFixtures),
+            new KnownSnapshotSample(
+                "Simple Hill",
+                "Milestone7.synthetic.simple_hill.snapshot.json",
+                SnapshotSourceGroup.CsvFixtures),
+            new KnownSnapshotSample(
+                "Banked Turn",
+                "Milestone7.synthetic.banked_turn.snapshot.json",
+                SnapshotSourceGroup.CsvFixtures),
+            new KnownSnapshotSample(
+                "Desc/Asc Curve",
+                "Milestone7.synthetic.descending_ascending_curve.snapshot.json",
+                SnapshotSourceGroup.CsvFixtures)
+        };
+
+        private static readonly SnapshotSourceGroup[] SnapshotGroupOrder =
+        {
+            SnapshotSourceGroup.BuiltIn,
+            SnapshotSourceGroup.BankingProfile,
+            SnapshotSourceGroup.CsvFixtures,
+            SnapshotSourceGroup.OtherValidSnapshots,
+            SnapshotSourceGroup.InvalidDebugDataJson
         };
 
         private readonly List<SnapshotListItem> _snapshotListItems = new List<SnapshotListItem>();
@@ -37,7 +67,11 @@ namespace QuantumVisualizer.Editor
         private string _selectedSnapshotAssetPath;
         private string _lastObservedSnapshotText;
         private bool _hasObservedSnapshotText;
-        private bool _hasKnownSyncedArtifacts;
+        private bool _hasDebugDataArtifacts;
+        private string _artifactSourceFolder;
+        private bool _cleanBeforeImport;
+        private string _lastArtifactImportText = "No generated artifacts imported in this window session.";
+        private MessageType _lastArtifactImportType = MessageType.Info;
 
         [MenuItem(MenuPath)]
         public static void Open()
@@ -51,6 +85,7 @@ namespace QuantumVisualizer.Editor
         private void OnEnable()
         {
             minSize = new Vector2(680f, 720f);
+            InitializeArtifactSourceFolder();
             RefreshSnapshotList();
             TryUseSelectionAsViewer();
             TryUseExistingViewer();
@@ -83,6 +118,7 @@ namespace QuantumVisualizer.Editor
             DrawHeader();
             DrawStatusPanel();
             DrawSnapshotPicker();
+            DrawGeneratedArtifactWorkflow();
             DrawArtifactButtons();
             DrawSnapshotList();
             DrawStats();
@@ -140,10 +176,10 @@ namespace QuantumVisualizer.Editor
                 wroteStatus = true;
             }
 
-            if (!_hasKnownSyncedArtifacts)
+            if (!_hasDebugDataArtifacts)
             {
                 EditorGUILayout.HelpBox(
-                    "No known synced DebugViewportSnapshotV1 artifacts were found under Assets/DebugData.",
+                    "No generated JSON, SVG, or HTML artifacts were found under Assets/DebugData.",
                     MessageType.Info);
                 wroteStatus = true;
             }
@@ -202,6 +238,49 @@ namespace QuantumVisualizer.Editor
             EditorGUILayout.EndHorizontal();
         }
 
+        private void DrawGeneratedArtifactWorkflow()
+        {
+            EditorGUILayout.Space(10f);
+            EditorGUILayout.LabelField("Generated Artifacts", EditorStyles.boldLabel);
+            EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+
+            EditorGUILayout.LabelField("Copy backend-generated JSON, SVG, and HTML into Assets/DebugData.");
+            EditorGUILayout.LabelField("Target", DebugDataFolderAssetPath);
+
+            EditorGUILayout.BeginHorizontal();
+            EditorGUI.BeginChangeCheck();
+            _artifactSourceFolder = EditorGUILayout.TextField("Source Folder", _artifactSourceFolder);
+            if (EditorGUI.EndChangeCheck())
+            {
+                EditorPrefs.SetString(ArtifactSourceEditorPrefsKey, _artifactSourceFolder ?? string.Empty);
+            }
+
+            if (GUILayout.Button("Browse", GUILayout.Width(72f)))
+            {
+                BrowseArtifactSourceFolder();
+            }
+
+            if (GUILayout.Button("Default", GUILayout.Width(72f)))
+            {
+                _artifactSourceFolder = GeneratedArtifactDefaultSourcePath;
+                EditorPrefs.SetString(ArtifactSourceEditorPrefsKey, _artifactSourceFolder);
+            }
+
+            EditorGUILayout.EndHorizontal();
+
+            _cleanBeforeImport = EditorGUILayout.ToggleLeft(
+                "Clean Assets/DebugData JSON, SVG, and HTML before import",
+                _cleanBeforeImport);
+
+            if (GUILayout.Button("Import / Refresh Generated Artifacts", GUILayout.Height(30f)))
+            {
+                ImportGeneratedArtifacts();
+            }
+
+            EditorGUILayout.HelpBox(_lastArtifactImportText, _lastArtifactImportType);
+            EditorGUILayout.EndVertical();
+        }
+
         private void DrawArtifactButtons()
         {
             EditorGUILayout.Space(10f);
@@ -249,14 +328,31 @@ namespace QuantumVisualizer.Editor
             if (_snapshotListItems.Count == 0)
             {
                 EditorGUILayout.HelpBox(
-                    "No known generated snapshot files or other valid DebugViewportSnapshotV1 JSON TextAssets were found under Assets.",
+                    "No generated snapshot files, valid DebugViewportSnapshotV1 JSON TextAssets, or invalid DebugData JSON warnings were found under Assets.",
                     MessageType.Info);
                 return;
             }
 
-            for (int i = 0; i < _snapshotListItems.Count; i++)
+            for (int groupIndex = 0; groupIndex < SnapshotGroupOrder.Length; groupIndex++)
             {
-                DrawSnapshotListRow(_snapshotListItems[i]);
+                SnapshotSourceGroup group = SnapshotGroupOrder[groupIndex];
+                int groupCount = CountSnapshotListItems(group);
+                if (groupCount == 0)
+                {
+                    continue;
+                }
+
+                EditorGUILayout.Space(4f);
+                EditorGUILayout.LabelField(GetGroupLabel(group) + " (" + groupCount + ")", EditorStyles.boldLabel);
+
+                for (int i = 0; i < _snapshotListItems.Count; i++)
+                {
+                    SnapshotListItem item = _snapshotListItems[i];
+                    if (item.Group == group)
+                    {
+                        DrawSnapshotListRow(item);
+                    }
+                }
             }
         }
 
@@ -265,9 +361,10 @@ namespace QuantumVisualizer.Editor
             EditorGUILayout.BeginVertical(EditorStyles.helpBox);
             EditorGUILayout.BeginHorizontal();
 
+            string assetName = item.Asset != null ? item.Asset.name : Path.GetFileNameWithoutExtension(item.AssetPath);
             string title = item.IsKnown
-                ? item.KnownLabel + " - " + item.Asset.name
-                : item.Asset.name;
+                ? item.KnownLabel + " - " + assetName
+                : assetName;
 
             EditorGUILayout.LabelField(title, EditorStyles.boldLabel);
             GUILayout.FlexibleSpace();
@@ -310,8 +407,28 @@ namespace QuantumVisualizer.Editor
             {
                 EditorGUILayout.HelpBox(item.Error, MessageType.Warning);
             }
+            else
+            {
+                DrawSnapshotListRowStats(item.Stats);
+            }
 
             EditorGUILayout.EndVertical();
+        }
+
+        private static void DrawSnapshotListRowStats(SnapshotStats stats)
+        {
+            EditorGUILayout.LabelField(
+                "metadata.sourceFixtureName",
+                DisplayText(stats.SourceFixtureName));
+            EditorGUILayout.LabelField(
+                "metadata.sampleCount",
+                stats.MetadataSampleCount.ToString());
+            EditorGUILayout.LabelField(
+                "centerline / frames / boxes",
+                stats.CenterlinePointCount + " / " + stats.FrameCount + " / " + stats.BoxCount);
+            EditorGUILayout.LabelField(
+                "trainPose / cars",
+                (stats.HasTrainPose ? "present" : "absent") + " / " + stats.TrainPoseCarCount);
         }
 
         private void DrawStats()
@@ -621,10 +738,121 @@ namespace QuantumVisualizer.Editor
             return new ViewerComponents(gizmoVisualizer, transformVisualizer);
         }
 
+        private void InitializeArtifactSourceFolder()
+        {
+            if (!string.IsNullOrWhiteSpace(_artifactSourceFolder))
+            {
+                return;
+            }
+
+            string savedSourceFolder = EditorPrefs.GetString(ArtifactSourceEditorPrefsKey, string.Empty);
+            _artifactSourceFolder = string.IsNullOrWhiteSpace(savedSourceFolder)
+                ? GeneratedArtifactDefaultSourcePath
+                : savedSourceFolder;
+        }
+
+        private void BrowseArtifactSourceFolder()
+        {
+            string startFolder;
+            try
+            {
+                startFolder = ResolveFolderInput(_artifactSourceFolder);
+            }
+            catch (Exception)
+            {
+                startFolder = GetProjectRootPath();
+            }
+
+            if (!Directory.Exists(startFolder))
+            {
+                startFolder = GetProjectRootPath();
+            }
+
+            string selectedFolder = EditorUtility.OpenFolderPanel(
+                "Generated DebugViewport Artifacts",
+                startFolder,
+                string.Empty);
+            if (string.IsNullOrWhiteSpace(selectedFolder))
+            {
+                return;
+            }
+
+            _artifactSourceFolder = selectedFolder;
+            EditorPrefs.SetString(ArtifactSourceEditorPrefsKey, _artifactSourceFolder);
+        }
+
+        private void ImportGeneratedArtifacts()
+        {
+            try
+            {
+                string sourcePath = ResolveFolderInput(_artifactSourceFolder);
+                if (!Directory.Exists(sourcePath))
+                {
+                    throw new DirectoryNotFoundException(
+                        "Generated artifact source folder was not found at '" + sourcePath +
+                        "'. Run .\\tools\\demo-technical-preview-0.1.cmd first, or choose a folder containing generated JSON, SVG, and HTML artifacts.");
+                }
+
+                string targetPath = AssetPathToFullPath(DebugDataFolderAssetPath);
+                if (AreSameDirectory(sourcePath, targetPath))
+                {
+                    throw new InvalidOperationException(
+                        "Source folder and target folder are both '" + targetPath +
+                        "'. Choose the backend artifact folder outside Assets/DebugData.");
+                }
+
+                Directory.CreateDirectory(targetPath);
+
+                int cleanedFileCount = _cleanBeforeImport
+                    ? CleanDebugDataArtifacts(targetPath)
+                    : 0;
+
+                ArtifactImportResult result = CopyGeneratedArtifacts(sourcePath, targetPath, cleanedFileCount);
+                AssetDatabase.Refresh();
+                RefreshSnapshotList();
+                RefreshSelectedSnapshotReference();
+
+                if (_snapshotJson != null)
+                {
+                    LoadSelectedSnapshot();
+                }
+
+                string copiedSummary =
+                    "JSON copied: " + result.JsonCopied +
+                    ", SVG copied: " + result.SvgCopied +
+                    ", HTML copied: " + result.HtmlCopied +
+                    ", cleaned: " + result.CleanedFileCount + ".";
+
+                if (result.TotalCopied == 0)
+                {
+                    _lastArtifactImportText =
+                        "No matching *.json, *.svg, or *.html files were found in '" + sourcePath + "'. " +
+                        copiedSummary;
+                    _lastArtifactImportType = MessageType.Warning;
+                    _statusText = _lastArtifactImportText;
+                    _statusType = MessageType.Warning;
+                    return;
+                }
+
+                _lastArtifactImportText =
+                    "Imported generated artifacts into " + DebugDataFolderAssetPath + ". " + copiedSummary;
+                _lastArtifactImportType = MessageType.Info;
+                _statusText = _lastArtifactImportText;
+                _statusType = MessageType.Info;
+            }
+            catch (Exception ex)
+            {
+                _lastArtifactImportText = "Generated artifact import failed: " + ex.Message;
+                _lastArtifactImportType = MessageType.Warning;
+                _statusText = _lastArtifactImportText;
+                _statusType = MessageType.Warning;
+            }
+        }
+
         private void RefreshSnapshotList()
         {
             _snapshotListItems.Clear();
-            _hasKnownSyncedArtifacts = false;
+            _hasDebugDataArtifacts = HasGeneratedDebugDataArtifacts();
 
             var jsonAssetPaths = new List<string>();
             string[] guids = AssetDatabase.FindAssets("t:TextAsset", new[] { "Assets" });
@@ -658,20 +886,17 @@ namespace QuantumVisualizer.Editor
                         continue;
                     }
 
-                    SnapshotValidationResult validation = ValidateSnapshot(asset);
+                    SnapshotInspectionResult inspection = InspectSnapshot(asset);
                     _snapshotListItems.Add(new SnapshotListItem(
                         asset,
                         path,
                         knownSample.Label,
                         true,
-                        validation.IsValid,
-                        validation.Error));
+                        inspection.IsValid,
+                        inspection.Error,
+                        knownSample.Group,
+                        inspection.Stats));
                     includedPaths.Add(path);
-
-                    if (IsDebugDataAssetPath(path))
-                    {
-                        _hasKnownSyncedArtifacts = true;
-                    }
                 }
             }
 
@@ -689,9 +914,22 @@ namespace QuantumVisualizer.Editor
                     continue;
                 }
 
-                SnapshotValidationResult validation = ValidateSnapshot(asset);
-                if (!validation.IsValid)
+                SnapshotInspectionResult inspection = InspectSnapshot(asset);
+                if (!inspection.IsValid)
                 {
+                    if (IsDebugDataAssetPath(path))
+                    {
+                        _snapshotListItems.Add(new SnapshotListItem(
+                            asset,
+                            path,
+                            string.Empty,
+                            false,
+                            false,
+                            inspection.Error,
+                            SnapshotSourceGroup.InvalidDebugDataJson,
+                            SnapshotStats.Empty));
+                    }
+
                     continue;
                 }
 
@@ -701,7 +939,9 @@ namespace QuantumVisualizer.Editor
                     string.Empty,
                     false,
                     true,
-                    string.Empty));
+                    string.Empty,
+                    ResolveValidSnapshotGroup(path, inspection.Stats),
+                    inspection.Stats));
             }
         }
 
@@ -833,17 +1073,166 @@ namespace QuantumVisualizer.Editor
             _hasObservedSnapshotText = _snapshotJson != null;
         }
 
-        private static SnapshotValidationResult ValidateSnapshot(TextAsset asset)
+        private static SnapshotInspectionResult InspectSnapshot(TextAsset asset)
         {
             if (DebugViewportSnapshotV1JsonLoader.TryLoad(
                 asset,
-                out DebugViewportSnapshotV1Dto _,
+                out DebugViewportSnapshotV1Dto snapshot,
                 out string error))
             {
-                return SnapshotValidationResult.Valid;
+                return new SnapshotInspectionResult(true, string.Empty, SnapshotStats.From(snapshot));
             }
 
-            return new SnapshotValidationResult(false, error);
+            return new SnapshotInspectionResult(false, error, SnapshotStats.Empty);
+        }
+
+        private int CountSnapshotListItems(SnapshotSourceGroup group)
+        {
+            int count = 0;
+            for (int i = 0; i < _snapshotListItems.Count; i++)
+            {
+                if (_snapshotListItems[i].Group == group)
+                {
+                    count++;
+                }
+            }
+
+            return count;
+        }
+
+        private static SnapshotSourceGroup ResolveValidSnapshotGroup(string assetPath, SnapshotStats stats)
+        {
+            return IsCsvFixtureSnapshot(assetPath, stats)
+                ? SnapshotSourceGroup.CsvFixtures
+                : SnapshotSourceGroup.OtherValidSnapshots;
+        }
+
+        private static bool IsCsvFixtureSnapshot(string assetPath, SnapshotStats stats)
+        {
+            if (!string.IsNullOrWhiteSpace(stats.SourceFixtureName) &&
+                stats.SourceFixtureName.EndsWith(".csv", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            string fileName = Path.GetFileName(assetPath);
+            return fileName.StartsWith("Milestone7.synthetic.", StringComparison.OrdinalIgnoreCase) &&
+                fileName.EndsWith(".snapshot.json", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static string GetGroupLabel(SnapshotSourceGroup group)
+        {
+            switch (group)
+            {
+                case SnapshotSourceGroup.BuiltIn:
+                    return "Built-in";
+                case SnapshotSourceGroup.BankingProfile:
+                    return "BankingProfile";
+                case SnapshotSourceGroup.CsvFixtures:
+                    return "CSV fixtures";
+                case SnapshotSourceGroup.OtherValidSnapshots:
+                    return "Other valid snapshots";
+                case SnapshotSourceGroup.InvalidDebugDataJson:
+                    return "Invalid/unknown DebugData JSON";
+                default:
+                    return "Snapshots";
+            }
+        }
+
+        private static ArtifactImportResult CopyGeneratedArtifacts(
+            string sourcePath,
+            string targetPath,
+            int cleanedFileCount)
+        {
+            return new ArtifactImportResult(
+                CopyGeneratedArtifacts(sourcePath, targetPath, "*.json"),
+                CopyGeneratedArtifacts(sourcePath, targetPath, "*.svg"),
+                CopyGeneratedArtifacts(sourcePath, targetPath, "*.html"),
+                cleanedFileCount);
+        }
+
+        private static int CopyGeneratedArtifacts(string sourcePath, string targetPath, string searchPattern)
+        {
+            string[] files = Directory.GetFiles(sourcePath, searchPattern, SearchOption.TopDirectoryOnly);
+            Array.Sort(files, StringComparer.OrdinalIgnoreCase);
+
+            int count = 0;
+            for (int i = 0; i < files.Length; i++)
+            {
+                string targetFilePath = Path.Combine(targetPath, Path.GetFileName(files[i]));
+                File.Copy(files[i], targetFilePath, true);
+                count++;
+            }
+
+            return count;
+        }
+
+        private static int CleanDebugDataArtifacts(string targetPath)
+        {
+            int count = 0;
+            count += DeleteFiles(targetPath, "*.json");
+            count += DeleteFiles(targetPath, "*.svg");
+            count += DeleteFiles(targetPath, "*.html");
+            return count;
+        }
+
+        private static int DeleteFiles(string folderPath, string searchPattern)
+        {
+            if (!Directory.Exists(folderPath))
+            {
+                return 0;
+            }
+
+            string[] files = Directory.GetFiles(folderPath, searchPattern, SearchOption.TopDirectoryOnly);
+            int count = 0;
+            for (int i = 0; i < files.Length; i++)
+            {
+                File.Delete(files[i]);
+                count++;
+            }
+
+            return count;
+        }
+
+        private static bool HasGeneratedDebugDataArtifacts()
+        {
+            string debugDataPath = AssetPathToFullPath(DebugDataFolderAssetPath);
+            if (!Directory.Exists(debugDataPath))
+            {
+                return false;
+            }
+
+            return Directory.GetFiles(debugDataPath, "*.json", SearchOption.TopDirectoryOnly).Length > 0 ||
+                Directory.GetFiles(debugDataPath, "*.svg", SearchOption.TopDirectoryOnly).Length > 0 ||
+                Directory.GetFiles(debugDataPath, "*.html", SearchOption.TopDirectoryOnly).Length > 0;
+        }
+
+        private static string ResolveFolderInput(string folderInput)
+        {
+            if (string.IsNullOrWhiteSpace(folderInput))
+            {
+                throw new InvalidOperationException("Source folder is empty.");
+            }
+
+            if (Path.IsPathRooted(folderInput))
+            {
+                return Path.GetFullPath(folderInput);
+            }
+
+            return Path.GetFullPath(Path.Combine(GetProjectRootPath(), folderInput));
+        }
+
+        private static bool AreSameDirectory(string firstPath, string secondPath)
+        {
+            string firstFullPath = NormalizeDirectoryPath(firstPath);
+            string secondFullPath = NormalizeDirectoryPath(secondPath);
+            return string.Equals(firstFullPath, secondFullPath, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static string NormalizeDirectoryPath(string path)
+        {
+            return Path.GetFullPath(path)
+                .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
         }
 
         private GameObject GetAssignedViewer()
@@ -973,9 +1362,14 @@ namespace QuantumVisualizer.Editor
 
         private static string AssetPathToFullPath(string assetPath)
         {
-            string projectRoot = Directory.GetParent(Application.dataPath).FullName;
             string normalizedAssetPath = assetPath.Replace('/', Path.DirectorySeparatorChar);
-            return Path.GetFullPath(Path.Combine(projectRoot, normalizedAssetPath));
+            return Path.GetFullPath(Path.Combine(GetProjectRootPath(), normalizedAssetPath));
+        }
+
+        private static string GetProjectRootPath()
+        {
+            DirectoryInfo projectRoot = Directory.GetParent(Application.dataPath);
+            return projectRoot != null ? projectRoot.FullName : Application.dataPath;
         }
 
         private static string DisplayText(string value)
@@ -997,6 +1391,15 @@ namespace QuantumVisualizer.Editor
             }
         }
 
+        private enum SnapshotSourceGroup
+        {
+            BuiltIn,
+            BankingProfile,
+            CsvFixtures,
+            OtherValidSnapshots,
+            InvalidDebugDataJson
+        }
+
         private readonly struct ViewerComponents
         {
             public ViewerComponents(
@@ -1014,15 +1417,18 @@ namespace QuantumVisualizer.Editor
 
         private readonly struct KnownSnapshotSample
         {
-            public KnownSnapshotSample(string label, string fileName)
+            public KnownSnapshotSample(string label, string fileName, SnapshotSourceGroup group)
             {
                 Label = label;
                 FileName = fileName;
+                Group = group;
             }
 
             public string Label { get; }
 
             public string FileName { get; }
+
+            public SnapshotSourceGroup Group { get; }
         }
 
         private readonly struct SnapshotListItem
@@ -1033,7 +1439,9 @@ namespace QuantumVisualizer.Editor
                 string knownLabel,
                 bool isKnown,
                 bool isValid,
-                string error)
+                string error,
+                SnapshotSourceGroup group,
+                SnapshotStats stats)
             {
                 Asset = asset;
                 AssetPath = assetPath;
@@ -1041,6 +1449,8 @@ namespace QuantumVisualizer.Editor
                 IsKnown = isKnown;
                 IsValid = isValid;
                 Error = error;
+                Group = group;
+                Stats = stats;
             }
 
             public TextAsset Asset { get; }
@@ -1054,21 +1464,54 @@ namespace QuantumVisualizer.Editor
             public bool IsValid { get; }
 
             public string Error { get; }
+
+            public SnapshotSourceGroup Group { get; }
+
+            public SnapshotStats Stats { get; }
         }
 
-        private readonly struct SnapshotValidationResult
+        private readonly struct SnapshotInspectionResult
         {
-            public static readonly SnapshotValidationResult Valid = new SnapshotValidationResult(true, string.Empty);
-
-            public SnapshotValidationResult(bool isValid, string error)
+            public SnapshotInspectionResult(bool isValid, string error, SnapshotStats stats)
             {
                 IsValid = isValid;
                 Error = error;
+                Stats = stats;
             }
 
             public bool IsValid { get; }
 
             public string Error { get; }
+
+            public SnapshotStats Stats { get; }
+        }
+
+        private readonly struct ArtifactImportResult
+        {
+            public ArtifactImportResult(
+                int jsonCopied,
+                int svgCopied,
+                int htmlCopied,
+                int cleanedFileCount)
+            {
+                JsonCopied = jsonCopied;
+                SvgCopied = svgCopied;
+                HtmlCopied = htmlCopied;
+                CleanedFileCount = cleanedFileCount;
+            }
+
+            public int JsonCopied { get; }
+
+            public int SvgCopied { get; }
+
+            public int HtmlCopied { get; }
+
+            public int CleanedFileCount { get; }
+
+            public int TotalCopied
+            {
+                get { return JsonCopied + SvgCopied + HtmlCopied; }
+            }
         }
 
         private readonly struct SnapshotStats

@@ -91,6 +91,16 @@ Generated debug viewport outputs include:
 
 Open `artifacts/debug-viewport/snapshot-preview-index.md` first for the generated artifact index/README, including what the JSON, SVG, and HTML files represent. Open `artifacts/debug-viewport/index.html` locally for a static gallery of the generated SVG previews, source JSON/SVG links, and key snapshot metadata. Open `artifacts/debug-viewport/browser.html` locally for a tiny artifact-first browser inspector that embeds `DebugViewportSnapshotV1` JSON and draws centerline samples, distance labels/ticks, curvature/radius diagnostics, frame axes, debug lines, train boxes, bogie markers, wheel markers, metadata, and centerline sample measurement readouts with inline style/script only.
 
+For Unity inspection, generate the backend artifacts first, then open
+`Window > Quantum > Snapshot Browser` and use Generated Artifacts to copy
+`*.json`, `*.svg`, and `*.html` from `artifacts/debug-viewport` into
+`Assets/DebugData`. The Unity browser consumes generated snapshot JSON
+`TextAsset`s only; CSV-to-snapshot conversion remains backend-side through
+`debug-viewport-snapshot-v1-from-csv`. The browser groups Built-in,
+BankingProfile, CSV fixture, and other valid snapshots, shows row metadata and
+counts, refreshes the Unity AssetDatabase after import, and keeps local generated
+artifacts uncommitted by default.
+
 For optional Blender screenshots or renders from the same JSON snapshots, see `docs/visualization/blender-debug-viewer.md`.
 
 Generate the built-in debug viewport snapshot:
