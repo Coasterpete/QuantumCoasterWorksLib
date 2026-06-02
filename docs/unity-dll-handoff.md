@@ -136,7 +136,10 @@ the snapshot visualizers. It lets a user assign a `DebugViewportSnapshotV1` JSON
 `TextAsset`, browse discovered snapshots under `Assets`, parse the selected
 snapshot, inspect metadata and role counts, create or update a scene viewer
 GameObject named `Quantum Snapshot Viewer`, select that viewer, and call the
-transform visualizer `Rebuild` and `Clear` actions.
+transform visualizer `Rebuild` and `Clear` actions. It also has a Generated
+Artifacts workflow that copies backend output from `artifacts/debug-viewport`
+into `Assets/DebugData` without adding CSV parsing or backend dependencies to
+Unity.
 
 The created viewer GameObject receives:
 
@@ -144,7 +147,15 @@ The created viewer GameObject receives:
 - `DebugViewportSnapshotV1TransformVisualizer`
 
 The selected snapshot is applied to both components. The window searches Unity
-`Assets` for snapshots and shows known generated files first:
+`Assets` for snapshots and groups discovered rows by source:
+
+- Built-in
+- BankingProfile
+- CSV fixtures
+- Other valid snapshots
+- Invalid/unknown DebugData JSON warnings
+
+Known generated files include:
 
 - `DebugViewportSnapshotV1.sample.json`
 - `DebugViewportSnapshotV1.banking-profile.sample.json`
@@ -153,17 +164,30 @@ The selected snapshot is applied to both components. The window searches Unity
 - `Milestone7.synthetic.banked_turn.snapshot.json`
 - `Milestone7.synthetic.descending_ascending_curve.snapshot.json`
 
-After the known generated files, the browser lists any other valid
-`DebugViewportSnapshotV1` JSON `TextAsset` under `Assets`. Each row shows the
-snapshot name and asset path, with `Load`, `Apply`, and `Ping` actions. Known
-generated files are shown even if their current content is invalid, so corrupted
-or stale synced files surface readable contract/version/JSON warnings instead of
-quietly disappearing.
+Each row shows the snapshot name and asset path, with `Load`, `Apply`, and
+`Ping` actions. Valid rows also show row-level metadata:
 
-The browser refreshes its discovered list when Unity project assets change, such
-as after running the debug data sync script. If the selected `TextAsset` content
-changes while the window is open, the browser reloads that snapshot and updates
-the parsed panels.
+- `metadata.sourceFixtureName`
+- `metadata.sampleCount`
+- centerline count
+- frame count
+- box count
+- nested train pose present/absent
+- nested train pose car count
+
+Known generated files are shown even if their current content is invalid, so
+corrupted or stale synced files surface readable contract/version/JSON warnings
+instead of quietly disappearing. Unknown invalid JSON is shown when it lives
+under `Assets/DebugData`, where generated artifact import problems are most
+useful to see.
+
+The browser refreshes its discovered list when Unity project assets change. The
+Generated Artifacts panel has a source folder field, defaults to
+`artifacts/debug-viewport`, optionally cleans existing JSON/SVG/HTML files under
+`Assets/DebugData`, copies current `*.json`, `*.svg`, and `*.html` files, calls
+`AssetDatabase.Refresh()`, rescans the snapshot list, and reports copied file
+counts. If the selected `TextAsset` content changes while the window is open,
+the browser reloads that snapshot and updates the parsed panels.
 
 The parsed panels include:
 
@@ -175,7 +199,7 @@ The parsed panels include:
   `train.wheel`, and `unknown`
 
 The status panel calls out no snapshot selected, invalid JSON, wrong
-contract/version, no known synced artifacts under `Assets/DebugData`, no viewer
+contract/version, no generated artifacts under `Assets/DebugData`, no viewer
 assigned/found, and Play Mode scene-editing lockout. The DebugData artifact
 buttons open `Assets/DebugData/index.html` and `Assets/DebugData/browser.html`
 when those generated files are present.
@@ -186,7 +210,8 @@ runtime animation or render-pipeline requirements.
 
 ## Unity Debug Artifact Sync
 
-Use `tools/sync-unity-debug-data.ps1` to copy generated debug viewport artifacts
+Use the Snapshot Browser Generated Artifacts panel, or
+`tools/sync-unity-debug-data.ps1`, to copy generated debug viewport artifacts
 into a local Unity project without manual copy commands.
 
 Default source:
@@ -218,10 +243,11 @@ Use `-Clean` to remove existing copied JSON, SVG, and HTML files from
 `Assets\DebugData` before copying the current artifacts.
 
 Unity imports copied JSON files under `Assets\DebugData` as `TextAsset`s. After
-sync, the Snapshot Browser refreshes its discovered list when Unity reports the
-asset changes. The known generated filenames appear at the top, valid additional
-snapshot JSON files appear after them, and the local gallery/browser HTML buttons
-enable when `index.html` and `browser.html` are present.
+sync or in-window import, the Snapshot Browser refreshes its discovered list when
+Unity reports the asset changes. Built-in, BankingProfile, CSV fixture, and other
+valid snapshot JSON files appear in their source groups, DebugData JSON problems
+surface as warnings, and the local gallery/browser HTML buttons enable when
+`index.html` and `browser.html` are present.
 
 ## Manual Built-In Unity Validation
 
@@ -234,7 +260,12 @@ Use `C:\Dev4\TestingGrounds` only as a local manual validation project. Do not c
 ```
 
 2. In `TestingGrounds`, copy the snapshot-only runtime scripts into the Unity project's `Assets/Scripts/QuantumVisualizer`: `DebugViewportSnapshotV1Dtos.cs`, `DebugViewportSnapshotV1JsonLoader.cs`, `DebugViewportSnapshotV1GizmoVisualizer.cs`, `DebugViewportSnapshotV1TransformVisualizer.cs`, and `TrainPoseExportV1Dtos.cs`. Copy `Assets/Editor/QuantumVisualizer/DebugViewportSnapshotBrowserWindow.cs` into the Unity project's `Assets/Editor/QuantumVisualizer`. Do not copy `BackendTrainPipelineGizmoVisualizer.cs` unless the backend DLLs from the earlier handoff section are also installed.
-3. Sync the generated debug viewport artifacts into Unity:
+3. Import the generated debug viewport artifacts into Unity. In the Snapshot
+   Browser, use the Generated Artifacts source folder `artifacts/debug-viewport`
+   when the folder is under the Unity project root, or browse to the repository
+   artifact folder. Click `Import / Refresh Generated Artifacts`; enable clean
+   before import when you want to replace stale local files. The older script
+   path is still available:
 
 ```powershell
 .\tools\sync-unity-debug-data.ps1 -Target "C:\Dev4\TestingGrounds"
@@ -247,7 +278,9 @@ assets, without closing and reopening the window.
 4. Open `Window > Quantum > Snapshot Browser`.
 5. Confirm `DebugViewportSnapshotV1.sample.json`,
    `DebugViewportSnapshotV1.banking-profile.sample.json`, and synced fixture
-   snapshots appear in the discovered list with names and asset paths.
+   snapshots appear in Built-in, BankingProfile, and CSV fixtures groups. CSV
+   rows should show `metadata.sourceFixtureName` values ending in `.csv`, plus
+   sample, centerline, frame, box, train pose, and train pose car counts.
 6. Click the `Open Gallery index.html` and `Open Browser browser.html` buttons
    when present and confirm the local pages open.
 7. Load `DebugViewportSnapshotV1.sample.json` from its row and confirm the stats
@@ -268,15 +301,18 @@ assets, without closing and reopening the window.
     `GeneratedSnapshot/train.body.banking-profile`.
 13. Select invalid, empty, or wrong-contract JSON `TextAsset`s through the object
     field and confirm the status panel shows readable warnings.
-14. Click `Clear Generated Boxes` and confirm the `GeneratedSnapshot` child root
+14. While the browser is open, run a clean import from the Generated Artifacts
+    panel and confirm the selected asset reloads or clears without a stale
+    selection exception.
+15. Click `Clear Generated Boxes` and confirm the `GeneratedSnapshot` child root
     is removed.
-15. Verify the visual layers with the component toggles:
+16. Verify the visual layers with the component toggles:
 
 - Built-in sample: console summary should report `centerlinePoints=9`, `frames=9`, `lines=3`, `boxes=2`, `trainPose=present`, `trainPoseCars=2`.
 - BankingProfile sample: console summary should report `centerlinePoints=10`, `frames=10`, `lines=3`, `boxes=3`, `trainPose=present`, `trainPoseCars=3`.
 - CSV fixture snapshots: centerline and frame axes should render, with `boxes=0`, `trainPose=absent`, and `trainPoseCars=0`.
 
-16. Validate prefab placement through the transform visualizer:
+17. Validate prefab placement through the transform visualizer:
 
 - With the `train.body` prefab slot empty, rebuild the built-in sample and confirm two wrappers under `GeneratedSnapshot/train.body`, each with one `FallbackCube` child at local identity.
 - Assign a simple self-authored cube prefab with center pivot to `train.body`, rebuild the built-in sample, and confirm two `Prefab` children under the same wrappers. The console summary should report `prefabInstances=2` and `fallbackCubes=0`.
