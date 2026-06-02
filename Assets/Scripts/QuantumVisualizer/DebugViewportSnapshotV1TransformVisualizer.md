@@ -10,10 +10,14 @@ on `DebugViewportSnapshotV1GizmoVisualizer`.
 Editor window path:
 
 1. Open `Window > Quantum > Snapshot Browser`.
-2. Select a `DebugViewportSnapshotV1` JSON `TextAsset`, or quick-load a known
-   generated snapshot if it has been copied into Unity `Assets`.
-3. Click `Create Viewer GameObject`.
-4. Click `Rebuild Generated Boxes` or `Clear Generated Boxes`.
+2. Select a `DebugViewportSnapshotV1` JSON `TextAsset`, or use the discovered
+   snapshot list. Known generated files appear first, followed by other valid
+   snapshot JSON files under `Assets`.
+3. Click a row `Load` action to inspect stats, metadata, and role counts, or
+   click row `Apply` to load the snapshot and apply it to the scene viewer.
+4. Click `Create / Update Viewer`.
+5. Click `Select Viewer` to select `Quantum Snapshot Viewer` in the scene.
+6. Click `Rebuild Generated Boxes` or `Clear Generated Boxes`.
 
 Manual component path:
 
@@ -85,6 +89,11 @@ The generated console summary reports total boxes, per-role counts, prefab
 instances, fallback cubes, and skipped boxes. Use it as a quick check when swapping
 between assigned prefabs and fallback cubes.
 
+The Snapshot Browser also reports role counts before generation. Expected rows
+include `train.body`, `train.body.banking-profile`, `train.bogie`, `train.wheel`,
+and `unknown`. Use those counts to confirm the generated hierarchy groups match
+the selected snapshot before inspecting the generated child objects.
+
 ## TestingGrounds1 Manual Recipe
 
 Use `C:\Dev4\TestingGrounds1` only as a local Unity validation project. Do not
@@ -99,11 +108,12 @@ commit that Unity project into this repository.
 2. Copy the snapshot visualizer scripts into
    `C:\Dev4\TestingGrounds1\Assets\Scripts\QuantumVisualizer`.
 3. Copy generated snapshot JSON files into a Unity `Assets` folder so Unity imports
-   them as `TextAsset`s.
+   them as `TextAsset`s, or run `tools/sync-unity-debug-data.ps1` to copy JSON,
+   SVG, and HTML artifacts into `Assets/DebugData`.
 4. Add `DebugViewportSnapshotV1GizmoVisualizer` and
    `DebugViewportSnapshotV1TransformVisualizer` to the same empty GameObject and
    assign the same snapshot `TextAsset` to both, or open
-   `Window > Quantum > Snapshot Browser` and click `Create Viewer GameObject`.
+   `Window > Quantum > Snapshot Browser` and click `Create / Update Viewer`.
 5. In the snapshot browser, confirm the built-in sample reports 9 centerline
    points, 9 frames, 3 lines, 2 boxes, trainPose present, and 2 cars.
 6. In the snapshot browser, confirm the BankingProfile sample reports 10
@@ -115,6 +125,9 @@ commit that Unity project into this repository.
    children at local identity.
 9. Confirm every generated wrapper local scale equals the snapshot dimensions in
    Unity order: `x = length`, `y = height`, `z = width`.
+10. In the snapshot browser, click `Select Viewer` and confirm the viewer is
+    selected. If `Assets/DebugData/index.html` or `Assets/DebugData/browser.html`
+    exist, confirm the artifact launch buttons open the local pages.
 
 Expected sample counts:
 
