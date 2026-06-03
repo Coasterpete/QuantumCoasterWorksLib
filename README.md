@@ -101,7 +101,7 @@ BankingProfile, CSV fixture, and other valid snapshots, shows row metadata and
 counts, refreshes the Unity AssetDatabase after import, and keeps local generated
 artifacts uncommitted by default.
 
-For optional Blender screenshots or renders from the same JSON snapshots, see `docs/visualization/blender-debug-viewer.md`.
+For optional Blender workflows, see `docs/visualization/blender-visualization-index.md`.
 
 Generate the built-in debug viewport snapshot:
 
