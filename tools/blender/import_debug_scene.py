@@ -197,7 +197,7 @@ def import_debug_scene(snapshot_path=None, pose_path=None):
 
     snapshot_result = SnapshotImportResult()
     if snapshot is not None:
-        snapshot_collection = child_collection(root_collection, "snapshot")
+        snapshot_collection = child_collection(root_collection, "snapshot", "COLOR_04")
         snapshot_result = build_snapshot_scene(
             snapshot,
             snapshot_collection,
@@ -207,7 +207,7 @@ def import_debug_scene(snapshot_path=None, pose_path=None):
 
     train_result = None
     if pose is not None:
-        train_collection = child_collection(root_collection, "train_pose")
+        train_collection = child_collection(root_collection, "train_pose", "COLOR_05")
         train_result = build_train_scene(
             pose,
             train_collection,
@@ -217,6 +217,7 @@ def import_debug_scene(snapshot_path=None, pose_path=None):
 
     camera_created, light_created = create_camera_and_light(
         root_collection,
+        combined_bounds,
         scene_dimensions(combined_bounds),
     )
 
@@ -270,41 +271,230 @@ def load_pose(pose_path, train_importer):
 
 def build_snapshot_scene(snapshot, root_collection, snapshot_importer, combined_bounds):
     result = SnapshotImportResult()
-    materials = snapshot_importer.create_materials()
+    materials = create_snapshot_scene_materials()
     snapshot_bounds = snapshot_importer.collect_bounds(snapshot)
+    include_snapshot_box_extents(snapshot_bounds, snapshot, snapshot_importer)
     combined_bounds.include_bounds(snapshot_bounds)
     dimensions = snapshot_importer.scene_dimensions(snapshot_bounds)
-    line_radius = snapshot_importer.clamp(dimensions["diagonal"] * 0.0008, 0.025, 0.08)
-    tick_length = snapshot_importer.clamp(dimensions["diagonal"] * 0.035, 0.75, 5.0)
+    line_radius = snapshot_importer.clamp(dimensions["diagonal"] * 0.001, 0.03, 0.1)
+    tick_length = snapshot_importer.clamp(dimensions["diagonal"] * 0.04, 1.0, 6.0)
+
+    geometry_collection = child_collection(root_collection, "track_geometry", "COLOR_04")
+    overlays_collection = child_collection(
+        root_collection,
+        "snapshot_inspection_overlays",
+        "COLOR_06",
+    )
 
     result.centerline_points = snapshot_importer.create_centerline(
         snapshot,
-        root_collection,
+        geometry_collection,
         materials,
-        line_radius * 1.4,
+        line_radius * 1.7,
     )
     result.frame_tick_objects = snapshot_importer.create_frame_ticks(
         snapshot,
-        root_collection,
+        overlays_collection,
         materials,
-        line_radius,
+        line_radius * 0.85,
         tick_length,
     )
     result.debug_line_objects = snapshot_importer.create_debug_lines(
         snapshot,
-        root_collection,
+        geometry_collection,
         materials,
-        line_radius,
+        line_radius * 1.15,
     )
-    result.box_count = snapshot_importer.create_boxes(snapshot, root_collection, materials)
+    result.box_count = snapshot_importer.create_boxes(snapshot, geometry_collection, materials)
     return result
 
 
 def build_train_scene(pose, root_collection, train_importer, combined_bounds):
-    materials = train_importer.create_materials()
+    materials = create_train_scene_materials()
     result = train_importer.build_train_pose_scene(pose, root_collection, materials)
+    organize_train_collections(root_collection)
     combined_bounds.include_bounds(result.bounds)
     return result
+
+
+def create_snapshot_scene_materials():
+    return {
+        "centerline": styled_material(
+            "Quantum.DebugScene.TrackCenterline",
+            (0.0, 0.82, 0.72, 1.0),
+            emission_strength=0.08,
+        ),
+        "sample": styled_material(
+            "Quantum.DebugScene.SamplePoint",
+            (0.0, 0.55, 0.5, 1.0),
+            emission_strength=0.04,
+        ),
+        "tangent": styled_material(
+            "Quantum.DebugScene.Frame.Tangent",
+            (0.05, 0.32, 1.0, 1.0),
+            emission_strength=0.06,
+        ),
+        "normal": styled_material(
+            "Quantum.DebugScene.Frame.Normal",
+            (0.04, 0.76, 0.28, 1.0),
+            emission_strength=0.05,
+        ),
+        "binormal": styled_material(
+            "Quantum.DebugScene.Frame.Binormal",
+            (0.72, 0.28, 1.0, 1.0),
+            emission_strength=0.05,
+        ),
+        "frame.axis.tangent": styled_material(
+            "Quantum.DebugScene.FrameAxis.Tangent",
+            (0.05, 0.32, 1.0, 1.0),
+            emission_strength=0.06,
+        ),
+        "frame.axis.normal": styled_material(
+            "Quantum.DebugScene.FrameAxis.Normal",
+            (0.04, 0.76, 0.28, 1.0),
+            emission_strength=0.05,
+        ),
+        "frame.axis.binormal": styled_material(
+            "Quantum.DebugScene.FrameAxis.Binormal",
+            (0.72, 0.28, 1.0, 1.0),
+            emission_strength=0.05,
+        ),
+        "line": styled_material(
+            "Quantum.DebugScene.DebugLine",
+            (1.0, 0.5, 0.06, 1.0),
+            emission_strength=0.08,
+        ),
+        "diagnostic.line": styled_material(
+            "Quantum.DebugScene.DiagnosticLine",
+            (1.0, 0.74, 0.12, 1.0),
+            emission_strength=0.08,
+        ),
+        "box": styled_material(
+            "Quantum.DebugScene.PlaceholderBox",
+            (1.0, 0.68, 0.12, 0.42),
+            roughness=0.45,
+        ),
+    }
+
+
+def create_train_scene_materials():
+    axis_materials = {
+        "tangent": styled_material(
+            "Quantum.DebugScene.TrainAxis.Tangent",
+            (0.05, 0.32, 1.0, 1.0),
+            emission_strength=0.06,
+        ),
+        "normal": styled_material(
+            "Quantum.DebugScene.TrainAxis.Normal",
+            (0.04, 0.76, 0.28, 1.0),
+            emission_strength=0.05,
+        ),
+        "binormal": styled_material(
+            "Quantum.DebugScene.TrainAxis.Binormal",
+            (0.72, 0.28, 1.0, 1.0),
+            emission_strength=0.05,
+        ),
+    }
+    return {
+        "body": styled_material(
+            "Quantum.DebugScene.TrainBody",
+            (0.18, 0.42, 0.82, 0.82),
+            roughness=0.5,
+        ),
+        "bogie": styled_material(
+            "Quantum.DebugScene.TrainBogie",
+            (0.98, 0.68, 0.16, 0.94),
+            roughness=0.55,
+        ),
+        "wheel": styled_material(
+            "Quantum.DebugScene.TrainWheel",
+            (0.035, 0.04, 0.05, 1.0),
+            roughness=0.7,
+        ),
+        "unknown": styled_material(
+            "Quantum.DebugScene.UnknownPlaceholder",
+            (0.9, 0.22, 0.28, 0.78),
+            roughness=0.5,
+        ),
+        **axis_materials,
+    }
+
+
+def styled_material(
+    name,
+    color,
+    *,
+    metallic=0.0,
+    roughness=0.62,
+    emission_strength=0.0,
+):
+    mat = bpy.data.materials.get(name)
+    if mat is None:
+        mat = bpy.data.materials.new(name)
+
+    mat.diffuse_color = color
+    mat.use_nodes = True
+    mat.blend_method = "BLEND" if color[3] < 1.0 else "OPAQUE"
+    try:
+        mat.show_transparent_back = False
+    except AttributeError:
+        pass
+
+    bsdf = mat.node_tree.nodes.get("Principled BSDF")
+    if bsdf is not None:
+        set_node_input(bsdf, "Base Color", color)
+        set_node_input(bsdf, "Alpha", color[3])
+        set_node_input(bsdf, "Metallic", metallic)
+        set_node_input(bsdf, "Roughness", roughness)
+        set_node_input(bsdf, "Emission Color", color)
+        set_node_input(bsdf, "Emission", color)
+        set_node_input(bsdf, "Emission Strength", emission_strength)
+
+    return mat
+
+
+def set_node_input(node, name, value):
+    if name not in node.inputs:
+        return
+
+    try:
+        node.inputs[name].default_value = value
+    except TypeError:
+        pass
+
+
+def include_snapshot_box_extents(bounds, snapshot, snapshot_importer):
+    for box in snapshot.get("boxes") or []:
+        box_world = snapshot_importer.box_matrix(box)
+        for local_x in (-0.5, 0.5):
+            for local_y in (-0.5, 0.5):
+                for local_z in (-0.5, 0.5):
+                    bounds.include(box_world @ Vector((local_x, local_y, local_z)))
+
+
+def organize_train_collections(train_collection):
+    geometry_collection = child_collection(train_collection, "train_geometry", "COLOR_05")
+    overlays_collection = child_collection(
+        train_collection,
+        "train_inspection_overlays",
+        "COLOR_06",
+    )
+
+    for name in ("bodies", "bogies", "wheels"):
+        move_child_collection(train_collection, geometry_collection, name)
+
+    for name in ("transforms", "axes"):
+        move_child_collection(train_collection, overlays_collection, name)
+
+
+def move_child_collection(source_parent, target_parent, name):
+    collection = source_parent.children.get(name)
+    if collection is None:
+        return
+
+    if target_parent.children.get(name) is None:
+        target_parent.children.link(collection)
+    source_parent.children.unlink(collection)
 
 
 def load_importer(module_name, file_name):
@@ -351,6 +541,7 @@ def prepare_generated_collection():
     clear_collection(collection)
     collection.name = GENERATED_COLLECTION_NAME
     collection[GENERATED_MARKER_PROPERTY] = True
+    set_collection_color_tag(collection, "COLOR_04")
     return collection
 
 
@@ -399,25 +590,35 @@ def remove_object_and_unused_data(obj):
         bpy.data.lights.remove(data)
 
 
-def child_collection(parent, name):
+def child_collection(parent, name, color_tag=None):
     collection = bpy.data.collections.new(name)
     collection[GENERATED_MARKER_PROPERTY] = True
+    set_collection_color_tag(collection, color_tag)
     parent.children.link(collection)
     return collection
 
 
-def create_camera_and_light(root_collection, dimensions):
-    collection = child_collection(root_collection, "scene")
+def set_collection_color_tag(collection, color_tag):
+    if not color_tag:
+        return
+
+    try:
+        collection.color_tag = color_tag
+    except (AttributeError, TypeError, ValueError):
+        pass
+
+
+def create_camera_and_light(root_collection, bounds, dimensions):
+    collection = child_collection(root_collection, "scene", "COLOR_02")
     center = dimensions["center"]
     diagonal = max(dimensions["diagonal"], 10.0)
-    span = dimensions["span"]
 
     camera_data = bpy.data.cameras.new("Quantum.debug_scene_camera")
     camera = bpy.data.objects.new("Quantum.debug_scene_camera", camera_data)
-    camera.location = center + Vector((-diagonal * 0.45, -diagonal * 0.72, diagonal * 0.42))
+    camera.location = center + Vector((-diagonal * 0.55, -diagonal * 0.82, diagonal * 0.46))
     look_at(camera, center)
     camera_data.type = "ORTHO"
-    camera_data.ortho_scale = max(span.x, span.y, span.z * 2.75, 10.0) * 1.25
+    camera_data.ortho_scale = camera_ortho_scale(camera, bounds, dimensions)
     mark_generated(camera)
     collection.objects.link(camera)
     bpy.context.scene.camera = camera
@@ -431,6 +632,47 @@ def create_camera_and_light(root_collection, dimensions):
     collection.objects.link(light)
 
     return True, True
+
+
+def camera_ortho_scale(camera, bounds, dimensions):
+    points = bounds_corners(bounds, dimensions)
+    if not points:
+        return 12.0
+
+    camera_orientation = camera.matrix_world.to_quaternion()
+    view_x = camera_orientation @ Vector((1.0, 0.0, 0.0))
+    view_y = camera_orientation @ Vector((0.0, 1.0, 0.0))
+    center = dimensions["center"]
+
+    projected_x = [(point - center).dot(view_x) for point in points]
+    projected_y = [(point - center).dot(view_y) for point in points]
+    width = max(projected_x) - min(projected_x)
+    height = max(projected_y) - min(projected_y)
+
+    render = bpy.context.scene.render
+    aspect = 16.0 / 9.0
+    if render.resolution_y > 0:
+        aspect = max(0.1, render.resolution_x / render.resolution_y)
+
+    return max(height, width / aspect, 10.0) * 1.22
+
+
+def bounds_corners(bounds, dimensions):
+    if bounds.is_empty:
+        span = dimensions["span"]
+        center = dimensions["center"]
+        minimum = center - span * 0.5
+        maximum = center + span * 0.5
+    else:
+        minimum = bounds.minimum
+        maximum = bounds.maximum
+
+    return [
+        Vector((x, y, z))
+        for x in (minimum.x, maximum.x)
+        for y in (minimum.y, maximum.y)
+        for z in (minimum.z, maximum.z)
+    ]
 
 
 def look_at(obj, target):
