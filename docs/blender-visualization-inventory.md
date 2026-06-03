@@ -26,10 +26,10 @@ Status labels used:
 |---|---|---|---|---|---|
 | `tools/blender/import_debug_viewport_snapshot_v1.py` | Imports `DebugViewportSnapshotV1` JSON into Blender as generated centerline, frame tick, debug line, placeholder box, camera, and light diagnostics. | Current | Blender Python only: `bpy`, `mathutils`, Python standard library. Must run inside Blender. | None. Consumes `quantum.debug_viewport_snapshot` v1 as an adapter. | Keep |
 | `tools/blender/import_train_pose_export_v1.py` | Imports `TrainPoseExportV1` JSON into Blender as generated body, bogie, wheel, transform-empty, and axis diagnostics. | Current | Blender Python only: `bpy`, `mathutils`, Python standard library. Must run inside Blender. | None. Consumes `quantum.train_pose` v1 as an adapter. | Keep |
-| `tools/blender/import_debug_scene.py` | Imports `DebugViewportSnapshotV1`, `TrainPoseExportV1`, or both into one generated `Quantum Debug Scene` diagnostic collection. Milestone 68 adds combined-scene styling, inspection-oriented collection grouping, and improved orthographic framing without changing contracts. | Current | Blender Python only: `bpy`, `mathutils`, Python standard library, and sibling scripts in `tools/blender/`. Must run inside Blender. | None. Coordinates existing v1 contracts as a Blender-side adapter only. | Keep |
+| `tools/blender/import_debug_scene.py` | Imports `DebugViewportSnapshotV1`, `TrainPoseExportV1`, or both into one generated `Quantum Debug Scene` diagnostic collection. Milestone 68 added combined-scene styling, inspection-oriented collection grouping, and improved orthographic framing; Milestone 69 adds combined train-on-track spatial validation without changing contracts. | Current | Blender Python only: `bpy`, `mathutils`, Python standard library, and sibling scripts in `tools/blender/`. Must run inside Blender. | None. Coordinates existing v1 contracts as a Blender-side adapter only. | Keep |
 | `docs/visualization/blender-debug-viewer.md` | Usage notes for generating snapshot artifacts and importing them into Blender from command line or Blender Scripting workspace. | Current | Documentation only. | None. | Keep |
 | `docs/visualization/blender-train-pose-viewer.md` | Usage notes for importing `TrainPoseExportV1` JSON into Blender for train hierarchy inspection. | Current | Documentation only. | None. | Keep |
-| `docs/visualization/blender-debug-scene-viewer.md` | Usage notes for the combined debug scene importer, including snapshot-only, train-only, combined import modes, collection toggles, and Milestone 68 styling. | Current | Documentation only. | None. | Keep |
+| `docs/visualization/blender-debug-scene-viewer.md` | Usage notes for the combined debug scene importer, including snapshot-only, train-only, combined import modes, collection toggles, Milestone 68 styling, and Milestone 69 train-on-track validation. | Current | Documentation only. | None. | Keep |
 | `docs/blender-handoff.md` | Milestone 65 handoff boundary for Blender as an optional visualization/import layer. | Current | Documentation only. | None. | Keep |
 | `docs/blender-visualization-inventory.md` | Inventory of current and future Blender-facing artifacts and boundaries. | Current | Documentation only. | None. | Keep |
 
@@ -112,6 +112,13 @@ placement contracts.
 - creates one orthographic debug camera and area light from the combined
   imported bounds, including snapshot placeholder box extents
 - prints combined import counts to Blender's console
+- in combined mode only, computes a Blender-side train-on-track validation
+  summary with track bounds, snapshot import bounds, train bounds, and
+  train-body-to-nearest-centerline-point distance stats
+- warns when expected imported geometry is missing or train body positions
+  appear far from the snapshot centerline samples
+- stores validation status and warning text as generated collection custom
+  properties, and creates a small `validation` text note when warnings exist
 
 It does not define a new Blender scene JSON contract, modify
 `DebugViewportSnapshotV1`, `TrainPoseExportV1`, `TrackFrame`, backend train
