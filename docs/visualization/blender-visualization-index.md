@@ -15,6 +15,8 @@ Use these pages for the detailed workflow notes:
 - Combined debug scene import, validation, and render smoke:
   [blender-debug-scene-viewer.md](blender-debug-scene-viewer.md)
 - Blender boundary and handoff rules: [blender-handoff.md](../blender-handoff.md)
+- Neutral mesh export investigation:
+  [neutral-mesh-export-investigation.md](neutral-mesh-export-investigation.md)
 - Current tooling and future candidates:
   [blender-visualization-inventory.md](../blender-visualization-inventory.md)
 
