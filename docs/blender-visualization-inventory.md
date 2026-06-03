@@ -18,6 +18,8 @@ Status labels used:
 - `Candidate`: plausible future Blender-facing handoff, but not implemented or
   not locked.
 - `Deferred`: explicitly later work.
+- `Investigated, still deferred`: architecture direction has been documented,
+  but implementation remains later work.
 - `Out of scope`: should not be added to the backend or current handoff.
 
 ## Current Blender-Facing Tooling
@@ -47,7 +49,7 @@ Status labels used:
 | Self-authored sampled-frame CSV fixtures | `Quantum.Tests/IO/Fixtures` plus `Quantum.Debug` CSV-to-snapshot command. | Fixture input only after backend conversion to `DebugViewportSnapshotV1` JSON. | Current | Blender should not parse NoLimits/project CSV directly for the current path. |
 | Generated SVG previews | `Quantum.Debug` SVG command and demo script. | Human reference only; Blender import should use JSON, not SVG as authoritative geometry. | Current | SVG smoothing/preview behavior is not backend geometry. |
 | Generated HTML gallery/browser | `Quantum.Debug` gallery/browser commands and demo script. | Human reference only. | Current | Local static debug aid, not a Blender dependency. |
-| Mesh export artifacts | Future export adapter. | Possible future source for Blender mesh inspection. | Deferred | Define a neutral export boundary first. Do not add mesh handles to current JSON contracts. |
+| Mesh export artifacts | Future export adapter. | Possible future source for Blender mesh inspection. | Investigated, still deferred | Milestone 73 documents the preferred separate neutral artifact path in `docs/visualization/neutral-mesh-export-investigation.md`. Do not add mesh handles to current JSON contracts. |
 | GLTF/GLB | Future export/import path. | Possible future interchange format for richer visualization. | Deferred | Keep scale, pivot, material, and import policy adapter-owned. |
 
 ## Current Importer Behavior
@@ -197,3 +199,7 @@ backend projects, or change any renderer-neutral JSON contracts.
 - Future GLTF/GLB work should start from a neutral Quantum export artifact and a
   documented adapter convention for units, pivots, and axes. It should not
   retrofit Blender or GLTF fields into existing snapshot contracts.
+- Milestone 73 investigated neutral mesh export and keeps it deferred. The
+  future path should be a separate `MeshExportV1`-style artifact consumed
+  through adapters, not an expansion of `DebugViewportSnapshotV1` or
+  `TrainPoseExportV1`.
