@@ -26,10 +26,15 @@ Status labels used:
 |---|---|---|---|---|---|
 | `tools/blender/import_debug_viewport_snapshot_v1.py` | Imports `DebugViewportSnapshotV1` JSON into Blender as generated collections, centerline curves, frame tick curves, debug line curves, placeholder boxes, camera, and light. | Current | Blender Python only: `bpy`, `mathutils`, Python standard library. Must run inside Blender. | None. Consumes `quantum.debug_viewport_snapshot` v1 as an adapter. | Keep |
 | `tools/blender/import_train_pose_export_v1.py` | Imports `TrainPoseExportV1` JSON into Blender as a generated train-pose collection with body, bogie, wheel, transform-empty, and axis placeholder diagnostics. | Current | Blender Python only: `bpy`, `mathutils`, Python standard library. Must run inside Blender. | None. Consumes `quantum.train_pose` v1 as an adapter. | Keep |
+
 | `tools/blender/import_debug_scene.py` | Imports `DebugViewportSnapshotV1`, `TrainPoseExportV1`, or both into one generated `Quantum Debug Scene` diagnostic collection by reusing the existing Blender importers. | Current | Blender Python only: `bpy`, `mathutils`, Python standard library, and sibling scripts in `tools/blender/`. Must run inside Blender. | None. Coordinates existing v1 contracts as a Blender-side adapter only. | Keep |
 | `docs/visualization/blender-debug-viewer.md` | Usage notes for generating snapshot artifacts and importing them into Blender from command line or Blender Scripting workspace. | Current | Documentation only. | None. | Keep |
 | `docs/visualization/blender-train-pose-viewer.md` | Usage notes for importing `TrainPoseExportV1` JSON into Blender for train hierarchy inspection. | Current | Documentation only. | None. | Keep |
 | `docs/visualization/blender-debug-scene-viewer.md` | Usage notes for the combined debug scene importer, including snapshot-only, train-only, and combined import modes. | Current | Documentation only. | None. | Keep |
+
+| `docs/visualization/blender-debug-viewer.md` | Usage notes for generating snapshot artifacts and importing them into Blender from command line or Blender Scripting workspace. | Current | Documentation only. | None. | Keep |
+| `docs/visualization/blender-train-pose-viewer.md` | Usage notes for importing `TrainPoseExportV1` JSON into Blender for train hierarchy inspection. | Current | Documentation only. | None. | Keep |
+
 | `docs/blender-handoff.md` | Milestone 65 handoff boundary for Blender as an optional visualization/import layer. | Current | Documentation only. | None. | Keep |
 | `docs/blender-visualization-inventory.md` | Milestone 65 inventory of current and future Blender-facing artifacts and boundaries. | Current | Documentation only. | None. | Keep |
 
@@ -37,8 +42,13 @@ Status labels used:
 
 | Artifact | Producer | Blender Use | Status | Notes |
 |---|---|---|---|---|
+
 | `DebugViewportSnapshotV1` JSON | `Quantum.Debug` commands and `Quantum.IO` mapping/serialization. | Primary current Blender input for centerline, frames, lines, placeholder boxes, and optional nested train-pose presence; can be paired with `TrainPoseExportV1` in the combined debug scene importer. | Current | Preferred handoff source. Keep camera, material, mesh, and scene concerns outside the contract. |
 | `TrainPoseExportV1` JSON | `Quantum.IO` train pose export path and debug commands. | Current input for full body/bogie/wheel hierarchy diagnostics when the flatter snapshot box layer is not enough; can be imported alone or alongside a snapshot in the combined debug scene importer. | Current | Remains a train pose snapshot contract, not a Blender scene format. |
+
+| `DebugViewportSnapshotV1` JSON | `Quantum.Debug` commands and `Quantum.IO` mapping/serialization. | Primary current Blender input for centerline, frames, lines, placeholder boxes, and optional nested train-pose presence. | Current | Preferred handoff source. Keep camera, material, mesh, and scene concerns outside the contract. |
+| `TrainPoseExportV1` JSON | `Quantum.IO` train pose export path and debug commands. | Current input for full body/bogie/wheel hierarchy diagnostics when the flatter snapshot box layer is not enough. | Current | Remains a train pose snapshot contract, not a Blender scene format. |
+
 | Self-authored sampled-frame CSV fixtures | `Quantum.Tests/IO/Fixtures` plus `Quantum.Debug` CSV-to-snapshot command. | Fixture input only after backend conversion to `DebugViewportSnapshotV1` JSON. | Current | Blender should not parse NoLimits/project CSV directly for the current path. |
 | Generated SVG previews | `Quantum.Debug` SVG command and demo script. | Human reference only; Blender import should use JSON, not SVG as authoritative geometry. | Current | SVG smoothing/preview behavior is not backend geometry. |
 | Generated HTML gallery/browser | `Quantum.Debug` gallery/browser commands and demo script. | Human reference only. | Current | Local static debug aid, not a Blender dependency. |
@@ -98,6 +108,7 @@ It does not:
 - change `TrainPoseExportV1`, `DebugViewportSnapshotV1`, `TrackFrame`, or
   backend train placement contracts
 
+
 `tools/blender/import_debug_scene.py` currently:
 
 - accepts `--snapshot`, `--pose`/`--train`, or one/two positional JSON paths
@@ -129,10 +140,16 @@ It does not:
 - unpack nested `TrainPoseExportV1` data from a snapshot as a substitute for a
   train-pose JSON import
 
+
+
 ## Future Blender Candidates
 
 | Candidate | Purpose | Status | Contract Boundary |
 |---|---|---|---|
+
+
+| `TrainPoseExportV1` Blender importer | Draw full train body, bogie, wheel, and articulated frame hierarchy for pose debugging. | Current | Consumes existing `quantum.train_pose` v1 JSON without changing the contract. |
+
 | Mesh export smoke path | Export simple backend-owned diagnostic meshes for Blender inspection. | Deferred | Add a separate neutral mesh/export artifact, not fields inside `DebugViewportSnapshotV1`. |
 | GLTF/GLB handoff | Use standard interchange for richer viewer or presentation assets. | Deferred | Keep GLTF/GLB as export/import adapter output. Do not add Blender or GLTF dependencies to core backend projects. |
 | Render preset helper | Optional Blender-side script for repeatable camera/render settings. | Candidate | Blender-only settings file or script under `tools/blender/`; no backend fields. |
@@ -157,6 +174,7 @@ It does not:
 - `TrainPoseExportV1` is now a current Blender input for focused train hierarchy
   inspection. It should stay diagnostic-only and should not grow renderer-owned
   fields.
+
 - `tools/blender/import_debug_scene.py` is the current combined inspection path
   when a centerline snapshot and detailed train pose need to be viewed together.
   It coordinates the existing Blender importers instead of creating a new
@@ -164,6 +182,11 @@ It does not:
 - The current Blender importers are intentionally thinner than the Unity debug
   viewer path. That remains acceptable because Blender is being used as an
   optional visualization/import surface, not a live backend host.
+
+- The current Blender importer is intentionally thinner than the Unity debug
+  viewer path. That is acceptable for Milestone 65 because Blender is being used
+  as an optional visualization/import surface, not a live backend host.
+
 - Future GLTF/GLB work should start from a neutral Quantum export artifact and a
   documented adapter convention for units, pivots, and axes. It should not
   retrofit Blender or GLTF fields into existing snapshot contracts.
