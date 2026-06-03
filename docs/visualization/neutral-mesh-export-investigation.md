@@ -2,15 +2,17 @@
 
 Last updated: 2026-06-03
 
-Milestone 73 documents a future renderer-neutral mesh export path only. It does
-not add a mesh contract, backend DTO, serializer, adapter, renderer dependency,
-or generated mesh fixture.
+Milestone 74 adds a small `MeshExportV1` contract sketch in `Quantum.IO` with
+DTOs, JSON serialization, and validation. It does not add a real mesh generator,
+export command, Blender importer, adapter, renderer dependency, or generated
+mesh fixture.
 
 ## Current Decision
 
-Mesh export should become a separate neutral artifact when Quantum needs it. The
-likely shape is a future `MeshExportV1` JSON or binary-adjacent payload produced
-by an export adapter and consumed by renderer-specific import adapters.
+Mesh export is now represented by a separate neutral `MeshExportV1` sketch. It
+is topology-only and intentionally small: contract identity, version, named
+meshes, vertices, flat triangle indices, optional normals, and neutral material
+slot labels.
 
 Do not add mesh fields to `DebugViewportSnapshotV1` or `TrainPoseExportV1`.
 Those contracts already have clear purposes:
@@ -45,24 +47,29 @@ pose snapshot can stay small and deterministic while a future mesh artifact can
 grow richer topology, optional normals, UVs, labels, and adapter notes without
 forcing every pose/debug consumer to parse unused geometry arrays.
 
-## Likely Future Artifact
+## Current Contract Sketch
 
-A future `MeshExportV1` should be renderer-neutral and Quantum-owned, but still
-minimal. A plausible early shape:
+`MeshExportV1` is renderer-neutral and Quantum-owned, but still only a sketch.
+The current DTO shape is:
 
-- `contract`: for example `quantum.mesh_export`.
-- `version`: likely `1` for the first real contract.
-- `metadata`: source name, exporter name, optional units note, and generation
-  timestamp policy if deterministic output can be preserved.
+- `contract`: `quantum.mesh_export`.
+- `version`: `1`.
 - `meshes[]`: one or more named mesh records.
+- `meshes[].name`: stable mesh name.
 - `meshes[].vertices`: positions in Quantum/backend space.
-- `meshes[].indices`: indexed triangles, with winding documented by the
-  contract.
-- `meshes[].normals`: optional or required once shading quality matters.
-- `meshes[].uvs`: deferred until textured assets are in scope.
-- `meshes[].materialSlots`: neutral labels only, such as `track.rail`,
+- `meshes[].triangleIndices`: flat indexed triangles.
+- `meshes[].normals`: optional per-vertex normals.
+- `meshes[].materialSlotLabels`: neutral labels only, such as `track.rail`,
   `track.spine`, `train.body`, or `support.column`.
-- `meshes[].submeshes`: optional grouping by material slot when needed.
+
+The validator rejects empty mesh collections, empty mesh topology, malformed
+triangle index counts, out-of-range triangle indices, non-finite vertex/normal
+values, mismatched normal counts, and empty material slot labels. Serialization
+uses the same camelCase `System.Text.Json` pattern as the existing v1 contracts.
+
+The sketch deliberately does not include metadata, UVs, submeshes, material
+objects, renderer handles, file paths, pivots, cameras, lights, or adapter
+policy. Those remain deferred until a real exporter and consumer need them.
 
 Material slots should be stable semantic labels, not Blender materials, Unity
 materials, Unreal materials, shader names, texture paths, or GLTF material
@@ -98,10 +105,11 @@ scene-graph decisions.
 ## Adapter Consumption
 
 Blender should consume a future mesh artifact through `tools/blender/` or an
-equivalent optional adapter. The adapter would parse `MeshExportV1`, verify
-contract/version, convert coordinates into Blender space, create Blender mesh
-objects, assign local materials from neutral labels, and keep `.blend`, render,
-and converted outputs out of committed source by default.
+equivalent optional adapter. No Blender `MeshExportV1` importer exists yet. A
+future adapter would parse `MeshExportV1`, verify contract/version, convert
+coordinates into Blender space, create Blender mesh objects, assign local
+materials from neutral labels, and keep `.blend`, render, and converted outputs
+out of committed source by default.
 
 Unity should consume the same artifact through Unity-side tooling only. A Unity
 adapter would parse the neutral payload, create transient or generated meshes,
@@ -121,17 +129,17 @@ boundary.
 
 ## Deferred Work
 
-The mesh export path remains deferred until a later milestone defines a real
-contract and tests. Likely next steps:
+The mesh export path remains a contract sketch until a later milestone defines a
+real generator/exporter and importer. Likely next steps:
 
-- Decide whether `MeshExportV1` is JSON-only, binary, or a JSON manifest plus
-  binary buffers.
-- Define numeric precision and deterministic serialization rules.
-- Define triangle winding, normal requirements, optional UV channels, and
-  validation diagnostics.
+- Decide whether the first real exporter writes JSON-only, binary, or a JSON
+  manifest plus binary buffers.
+- Define triangle winding, normal requirements, optional UV channels, and any
+  additional validation diagnostics.
 - Decide how mesh artifacts relate to track sections, generated supports, train
   placeholders, and production train art.
-- Add contract tests only when the DTO/serializer exists.
+- Add a backend mesh generator or export adapter.
+- Add a Blender importer only in optional tooling.
 - Add adapter smoke tests only in optional tooling, not core backend projects.
 
 Until then, current Blender, Unity, and browser diagnostics should continue to
