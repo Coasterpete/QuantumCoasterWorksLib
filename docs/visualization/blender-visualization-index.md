@@ -27,6 +27,20 @@ dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1 artifacts/debug
 dotnet run --project Quantum.Debug -- train-pose-export-v1 artifacts/train-pose/TrainPoseExportV1.sample.json
 ```
 
+## Smoke Script
+
+Use the wrapper for the common Blender visualization smoke path:
+
+```powershell
+.\tools\smoke-blender-visualization.ps1
+```
+
+The script refreshes the `DebugViewportSnapshotV1` and `TrainPoseExportV1`
+sample JSON files under ignored `artifacts/`, validates the snapshot, and then
+runs the snapshot import, train pose import, combined debug scene import, and
+temporary PNG render smoke when `blender` is available on `PATH`. If Blender is
+not available, the Blender-specific checks are skipped with a clear message.
+
 For the broader technical preview artifact refresh:
 
 ```powershell

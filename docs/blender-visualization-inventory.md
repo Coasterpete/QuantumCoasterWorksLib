@@ -27,6 +27,7 @@ Status labels used:
 | `tools/blender/import_debug_viewport_snapshot_v1.py` | Imports `DebugViewportSnapshotV1` JSON into Blender as generated centerline, frame tick, debug line, placeholder box, camera, and light diagnostics. | Current | Blender Python only: `bpy`, `mathutils`, Python standard library. Must run inside Blender. | None. Consumes `quantum.debug_viewport_snapshot` v1 as an adapter. | Keep |
 | `tools/blender/import_train_pose_export_v1.py` | Imports `TrainPoseExportV1` JSON into Blender as generated body, bogie, wheel, transform-empty, and axis diagnostics. | Current | Blender Python only: `bpy`, `mathutils`, Python standard library. Must run inside Blender. | None. Consumes `quantum.train_pose` v1 as an adapter. | Keep |
 | `tools/blender/import_debug_scene.py` | Imports `DebugViewportSnapshotV1`, `TrainPoseExportV1`, or both into one generated `Quantum Debug Scene` diagnostic collection. Milestone 68 added combined-scene styling, inspection-oriented collection grouping, and improved orthographic framing; Milestone 69 adds combined train-on-track spatial validation; Milestone 70 adds optional factory-startup-friendly PNG render smoke output without changing contracts. | Current | Blender Python only: `bpy`, `mathutils`, Python standard library, and sibling scripts in `tools/blender/`. Must run inside Blender. | None. Coordinates existing v1 contracts as a Blender-side adapter only. | Keep |
+| `tools/smoke-blender-visualization.ps1` | Runs the common Blender visualization smoke path: refreshes sample JSON artifacts, validates the snapshot, conditionally runs snapshot, train pose, combined debug scene, and temp PNG render checks when Blender is on `PATH`, and removes the render output afterward. | Current | PowerShell, `dotnet`, optional `blender` executable on `PATH`. | None. Tooling wrapper only; generated JSON and render outputs stay local under ignored paths or temp storage. | Keep |
 
 | `docs/visualization/blender-visualization-index.md` | Contributor on-ramp that links the current Blender snapshot, train pose, combined scene, handoff, inventory, validation, import, and render smoke workflows from one place. | Current | Documentation only. | None. | Keep |
 
@@ -140,6 +141,27 @@ backend project. It also does not import Unity assets, parse CSV fixtures
 directly, create production train art, or unpack nested train-pose data from a
 snapshot as a substitute for a train-pose JSON import. Generated PNG, `.blend`,
 and other render outputs remain local diagnostics and should not be committed.
+
+`tools/smoke-blender-visualization.ps1` currently:
+
+- resolves the repository root from the script location
+- writes the sample snapshot to
+  `artifacts/debug-viewport/DebugViewportSnapshotV1.sample.json`
+- writes the sample train pose to
+  `artifacts/train-pose/TrainPoseExportV1.sample.json`
+- validates the generated snapshot with `debug-viewport-snapshot-v1-validate`
+- fails clearly if either required JSON artifact is missing or empty after
+  generation
+- skips Blender-specific checks with a clear message when `blender` is not on
+  `PATH`
+- when Blender is available, runs the snapshot importer, train pose importer,
+  combined debug scene importer, and combined diagnostic PNG render smoke with
+  `--background --factory-startup`
+- writes the render smoke to a unique temp PNG path, verifies it exists, and
+  removes it afterward
+
+It does not save a `.blend` file, commit generated JSON or PNG artifacts, modify
+backend projects, or change any renderer-neutral JSON contracts.
 
 ## Future Blender Candidates
 
