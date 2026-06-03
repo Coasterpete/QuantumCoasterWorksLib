@@ -13,6 +13,7 @@ collection, camera, light, materials, curves, empties, and placeholder meshes.
 import argparse
 import importlib.util
 import json
+import math
 import sys
 from pathlib import Path
 
@@ -32,6 +33,8 @@ CONTRACT_VERSION = 1
 
 GENERATED_COLLECTION_NAME = "Quantum Debug Scene"
 GENERATED_MARKER_PROPERTY = "quantum_debug_scene"
+FAR_FROM_TRACK_MINIMUM_WARNING_DISTANCE = 10.0
+FAR_FROM_TRACK_SAMPLE_SPACING_MULTIPLIER = 1.5
 
 
 def main():
@@ -215,6 +218,23 @@ def import_debug_scene(snapshot_path=None, pose_path=None):
             combined_bounds,
         )
 
+    validation_result = None
+    validation_note_created = False
+    if snapshot is not None and pose is not None:
+        validation_result = validate_combined_scene(
+            snapshot,
+            pose,
+            snapshot_importer,
+            train_importer,
+            snapshot_result,
+            train_result,
+        )
+        validation_note_created = create_validation_note(
+            root_collection,
+            validation_result,
+            scene_dimensions(combined_bounds),
+        )
+
     camera_created, light_created = create_camera_and_light(
         root_collection,
         combined_bounds,
@@ -246,6 +266,9 @@ def import_debug_scene(snapshot_path=None, pose_path=None):
         print(f"  Train axis curve objects: {train_result.axis_curve_count}")
     else:
         print("  Train pose JSON: <none>")
+
+    if validation_result is not None:
+        print_combined_validation_summary(validation_result, validation_note_created)
 
     print(f"  Camera: {'yes' if camera_created else 'no'}")
     print(f"  Light: {'yes' if light_created else 'no'}")
@@ -315,6 +338,300 @@ def build_train_scene(pose, root_collection, train_importer, combined_bounds):
     organize_train_collections(root_collection)
     combined_bounds.include_bounds(result.bounds)
     return result
+
+
+def validate_combined_scene(
+    snapshot,
+    pose,
+    snapshot_importer,
+    train_importer,
+    snapshot_result,
+    train_result,
+):
+    result = CombinedValidationResult()
+    result.snapshot_bounds = collect_snapshot_bounds(snapshot, snapshot_importer)
+    result.track_bounds = collect_centerline_bounds(snapshot, snapshot_importer)
+    result.train_bounds = copy_bounds(
+        train_result.bounds if train_result is not None else None
+    )
+    result.centerline_points = collect_centerline_points(snapshot, snapshot_importer)
+    result.body_positions = collect_train_body_positions(pose, train_importer)
+    result.centerline_import_count = snapshot_result.centerline_points
+    result.train_body_import_count = train_result.body_count if train_result is not None else 0
+
+    if result.centerline_import_count < 2:
+        result.warnings.append(
+            "DebugViewportSnapshotV1 has fewer than two usable centerline points; "
+            "no centerline curve was created."
+        )
+
+    if result.track_bounds.is_empty:
+        result.warnings.append(
+            "DebugViewportSnapshotV1 did not expose usable track bounds from centerlinePoints."
+        )
+
+    if result.train_body_import_count <= 0:
+        result.warnings.append(
+            "TrainPoseExportV1 produced no train body placeholder geometry."
+        )
+
+    if not result.body_positions:
+        result.warnings.append(
+            "TrainPoseExportV1 did not expose usable train body positions."
+        )
+
+    if result.train_bounds.is_empty:
+        result.warnings.append("TrainPoseExportV1 produced empty train bounds.")
+
+    if result.centerline_points and result.body_positions:
+        result.distance_warning_threshold = train_track_warning_distance(
+            result.centerline_points
+        )
+        result.body_distances = nearest_centerline_distances(
+            result.body_positions,
+            result.centerline_points,
+        )
+        if result.body_distances:
+            worst = max(result.body_distances, key=lambda item: item.distance)
+            result.worst_body_distance = worst
+            if worst.distance > result.distance_warning_threshold:
+                result.warnings.append(
+                    "Train body positions appear far from the snapshot centerline: "
+                    f"{worst.label} is {format_number(worst.distance)} from the nearest "
+                    "centerline point "
+                    f"(warning threshold {format_number(result.distance_warning_threshold)})."
+                )
+
+    return result
+
+
+def collect_snapshot_bounds(snapshot, snapshot_importer):
+    bounds = copy_bounds(snapshot_importer.collect_bounds(snapshot))
+    include_snapshot_box_extents(bounds, snapshot, snapshot_importer)
+    return bounds
+
+
+def collect_centerline_bounds(snapshot, snapshot_importer):
+    bounds = Bounds()
+    for point in collect_centerline_points(snapshot, snapshot_importer):
+        bounds.include(point)
+
+    return bounds
+
+
+def collect_centerline_points(snapshot, snapshot_importer):
+    points = []
+    for point in snapshot.get("centerlinePoints") or []:
+        if not isinstance(point, dict):
+            continue
+
+        position = point.get("position")
+        if not isinstance(position, dict):
+            continue
+
+        vector = snapshot_importer.quantum_vector(position)
+        if is_finite_vector(vector):
+            points.append(vector)
+
+    return points
+
+
+def collect_train_body_positions(pose, train_importer):
+    positions = []
+    cars = pose.get("cars") or []
+    if not isinstance(cars, list):
+        return positions
+
+    for fallback_car_index, car in enumerate(cars):
+        if not isinstance(car, dict):
+            continue
+
+        body = car.get("body") or {}
+        if not isinstance(body, dict):
+            continue
+
+        original_body = body.get("originalBody")
+        original_pose = (
+            train_importer.extract_pose(original_body)
+            if isinstance(original_body, dict)
+            else None
+        )
+        body_pose = train_importer.extract_pose(
+            body,
+            "articulatedMatrix",
+            "articulatedFrame",
+        )
+        if body_pose is None:
+            body_pose = original_pose
+
+        if body_pose is None or not is_finite_vector(body_pose.position):
+            continue
+
+        car_index = train_importer.resolve_car_index(car, fallback_car_index)
+        positions.append(BodyPosition(f"car-{car_index}", body_pose.position))
+
+    return positions
+
+
+def nearest_centerline_distances(body_positions, centerline_points):
+    distances = []
+    for body in body_positions:
+        nearest = min((body.position - point).length for point in centerline_points)
+        distances.append(BodyDistance(body.label, nearest))
+
+    return distances
+
+
+def train_track_warning_distance(centerline_points):
+    segment_lengths = []
+    for index in range(1, len(centerline_points)):
+        length = (centerline_points[index] - centerline_points[index - 1]).length
+        if math.isfinite(length) and length > 1.0e-9:
+            segment_lengths.append(length)
+
+    if not segment_lengths:
+        return FAR_FROM_TRACK_MINIMUM_WARNING_DISTANCE
+
+    segment_lengths.sort()
+    middle = len(segment_lengths) // 2
+    if len(segment_lengths) % 2 == 1:
+        typical_spacing = segment_lengths[middle]
+    else:
+        typical_spacing = (segment_lengths[middle - 1] + segment_lengths[middle]) * 0.5
+
+    return max(
+        FAR_FROM_TRACK_MINIMUM_WARNING_DISTANCE,
+        typical_spacing * FAR_FROM_TRACK_SAMPLE_SPACING_MULTIPLIER,
+    )
+
+
+def create_validation_note(root_collection, validation_result, dimensions):
+    root_collection["train_on_track_validation_status"] = (
+        "warnings" if validation_result.warnings else "ok"
+    )
+    root_collection["train_on_track_validation_warning_count"] = len(
+        validation_result.warnings
+    )
+    root_collection["train_on_track_validation_summary"] = validation_result.summary_line()
+
+    if validation_result.warnings:
+        root_collection["train_on_track_validation_warnings"] = "\n".join(
+            validation_result.warnings
+        )
+    else:
+        return False
+
+    collection = child_collection(root_collection, "validation", "COLOR_01")
+    material = styled_material(
+        "Quantum.DebugScene.ValidationWarningText",
+        (1.0, 0.76, 0.16, 1.0),
+        emission_strength=0.18,
+    )
+    text_data = bpy.data.curves.new("Quantum.debug_scene_validation_warnings", "FONT")
+    text_data.body = "Train-on-track validation warnings:\n" + "\n".join(
+        f"- {warning}" for warning in validation_result.warnings
+    )
+    text_data.align_x = "LEFT"
+    text_data.align_y = "TOP"
+    text_data.size = max(min(dimensions["diagonal"] * 0.025, 1.8), 0.45)
+    text_data.materials.append(material)
+
+    text_obj = bpy.data.objects.new("Quantum.debug_scene.validation_warnings", text_data)
+    span = dimensions["span"]
+    text_obj.location = dimensions["center"] + Vector(
+        (
+            -span.x * 0.48,
+            -span.y * 0.58,
+            span.z * 0.62 + text_data.size,
+        )
+    )
+    text_obj.rotation_euler = (
+        math.radians(62.0),
+        0.0,
+        0.0,
+    )
+    mark_generated(text_obj)
+    collection.objects.link(text_obj)
+    return True
+
+
+def print_combined_validation_summary(validation_result, validation_note_created):
+    print("  Train-on-track validation:")
+    print(f"    Snapshot/track bounds: {format_bounds(validation_result.track_bounds)}")
+    print(f"    Snapshot import bounds: {format_bounds(validation_result.snapshot_bounds)}")
+    print(f"    Train bounds: {format_bounds(validation_result.train_bounds)}")
+    print(
+        "    Body positions checked: "
+        f"{len(validation_result.body_positions)}; "
+        f"centerline points checked: {len(validation_result.centerline_points)}"
+    )
+
+    if validation_result.body_distances:
+        distances = [item.distance for item in validation_result.body_distances]
+        average = sum(distances) / len(distances)
+        worst = validation_result.worst_body_distance or max(
+            validation_result.body_distances,
+            key=lambda item: item.distance,
+        )
+        print(
+            "    Body nearest-centerline distance: "
+            f"min {format_number(min(distances))}, "
+            f"avg {format_number(average)}, "
+            f"max {format_number(max(distances))} ({worst.label}), "
+            f"warning threshold {format_number(validation_result.distance_warning_threshold)}"
+        )
+    else:
+        print("    Body nearest-centerline distance: <not available>")
+
+    if validation_result.warnings:
+        print(f"    Warnings: {len(validation_result.warnings)}")
+        for warning in validation_result.warnings:
+            print(f"      - {warning}")
+        print(
+            "    Scene warning note: "
+            f"{'yes' if validation_note_created else 'no'}"
+        )
+    else:
+        print("    Warnings: none")
+
+
+def format_bounds(bounds):
+    if bounds is None or bounds.is_empty:
+        return "<empty>"
+
+    span = bounds.maximum - bounds.minimum
+    return (
+        f"min={format_vector(bounds.minimum)} "
+        f"max={format_vector(bounds.maximum)} "
+        f"span={format_vector(span)}"
+    )
+
+
+def format_vector(vector):
+    return (
+        "("
+        f"{format_number(vector.x)}, "
+        f"{format_number(vector.y)}, "
+        f"{format_number(vector.z)}"
+        ")"
+    )
+
+
+def format_number(value):
+    text = f"{value:.3f}"
+    if "." in text:
+        text = text.rstrip("0").rstrip(".")
+    return text
+
+
+def is_finite_vector(value):
+    return all(math.isfinite(component) for component in value)
+
+
+def copy_bounds(source_bounds):
+    bounds = Bounds()
+    bounds.include_bounds(source_bounds)
+    return bounds
 
 
 def create_snapshot_scene_materials():
@@ -720,6 +1037,40 @@ class SnapshotImportResult:
         self.frame_tick_objects = 0
         self.debug_line_objects = 0
         self.box_count = 0
+
+
+class CombinedValidationResult:
+    def __init__(self):
+        self.snapshot_bounds = Bounds()
+        self.track_bounds = Bounds()
+        self.train_bounds = Bounds()
+        self.centerline_points = []
+        self.body_positions = []
+        self.body_distances = []
+        self.centerline_import_count = 0
+        self.train_body_import_count = 0
+        self.distance_warning_threshold = FAR_FROM_TRACK_MINIMUM_WARNING_DISTANCE
+        self.worst_body_distance = None
+        self.warnings = []
+
+    def summary_line(self):
+        return (
+            f"bodyPositions={len(self.body_positions)}, "
+            f"centerlinePoints={len(self.centerline_points)}, "
+            f"warnings={len(self.warnings)}"
+        )
+
+
+class BodyPosition:
+    def __init__(self, label, position):
+        self.label = label
+        self.position = position
+
+
+class BodyDistance:
+    def __init__(self, label, distance):
+        self.label = label
+        self.distance = distance
 
 
 class Bounds:

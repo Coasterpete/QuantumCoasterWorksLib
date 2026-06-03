@@ -57,6 +57,31 @@ their `contract` and `version` fields:
 blender --python tools/blender/import_debug_scene.py -- artifacts/debug-viewport/DebugViewportSnapshotV1.sample.json artifacts/train-pose/TrainPoseExportV1.sample.json
 ```
 
+## Combined Validation Summary
+
+When both a `DebugViewportSnapshotV1` snapshot and a `TrainPoseExportV1` train
+pose are imported together, the script prints a small train-on-track validation
+summary to Blender's console. Snapshot-only and train-only imports still work as
+focused single-artifact views and do not run the combined spatial check.
+
+The combined validation reports:
+
+- snapshot/track bounds from usable `centerlinePoints`
+- broader snapshot import bounds, including frame, line, and placeholder box
+  extents
+- train bounds from the generated train pose placeholders
+- train body position count and centerline point count
+- min/average/max distance from imported train body positions to the nearest
+  centerline point
+- warnings when the snapshot has no usable centerline geometry, the train pose
+  has no usable body geometry, bounds are empty, or train bodies appear far from
+  the imported centerline samples
+
+Warnings are also stored as custom properties on the generated
+`Quantum Debug Scene` collection. If warnings are present, the importer creates a
+small `validation` child collection with a text object named
+`Quantum.debug_scene.validation_warnings` so the issue is visible in the scene.
+
 ## Run From Blender Script Runner
 
 1. Open Blender.
@@ -102,6 +127,10 @@ Inside `Quantum Debug Scene`, the script creates:
     - `transforms`: body, bogie, and wheel transform empties.
     - `axes`: tangent, normal, and binormal pose tick curves.
 - `scene`: `Quantum.debug_scene_camera` and `Quantum.debug_scene_key_light`.
+- `validation`: present only when combined train-on-track validation produces
+  warnings.
+  - `Quantum.debug_scene.validation_warnings`: small text note summarizing the
+    warnings.
 
 ## Styling
 
@@ -135,6 +164,8 @@ The combined importer does not modify `DebugViewportSnapshotV1`,
 `TrainPoseExportV1`, `Quantum.Core`, `Quantum.Track`, `Quantum.IO`, or backend
 train placement code. It does not import Unity prefabs, evaluate backend code
 inside Blender, parse CSV fixtures directly, or define production train art.
+The train-on-track validation is also Blender-side only; it compares imported
+artifact positions and does not change either JSON contract.
 
 The Blender scene owns only adapter-side artifacts: generated collections,
 curves, placeholder meshes, empties, materials, camera, and light.
