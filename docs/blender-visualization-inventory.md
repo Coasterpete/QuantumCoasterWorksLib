@@ -26,10 +26,14 @@ Status labels used:
 |---|---|---|---|---|---|
 | `tools/blender/import_debug_viewport_snapshot_v1.py` | Imports `DebugViewportSnapshotV1` JSON into Blender as generated centerline, frame tick, debug line, placeholder box, camera, and light diagnostics. | Current | Blender Python only: `bpy`, `mathutils`, Python standard library. Must run inside Blender. | None. Consumes `quantum.debug_viewport_snapshot` v1 as an adapter. | Keep |
 | `tools/blender/import_train_pose_export_v1.py` | Imports `TrainPoseExportV1` JSON into Blender as generated body, bogie, wheel, transform-empty, and axis diagnostics. | Current | Blender Python only: `bpy`, `mathutils`, Python standard library. Must run inside Blender. | None. Consumes `quantum.train_pose` v1 as an adapter. | Keep |
-| `tools/blender/import_debug_scene.py` | Imports `DebugViewportSnapshotV1`, `TrainPoseExportV1`, or both into one generated `Quantum Debug Scene` diagnostic collection. Milestone 68 added combined-scene styling, inspection-oriented collection grouping, and improved orthographic framing; Milestone 69 adds combined train-on-track spatial validation without changing contracts. | Current | Blender Python only: `bpy`, `mathutils`, Python standard library, and sibling scripts in `tools/blender/`. Must run inside Blender. | None. Coordinates existing v1 contracts as a Blender-side adapter only. | Keep |
+| `tools/blender/import_debug_scene.py` | Imports `DebugViewportSnapshotV1`, `TrainPoseExportV1`, or both into one generated `Quantum Debug Scene` diagnostic collection. Milestone 68 added combined-scene styling, inspection-oriented collection grouping, and improved orthographic framing; Milestone 69 adds combined train-on-track spatial validation; Milestone 70 adds optional factory-startup-friendly PNG render smoke output without changing contracts. | Current | Blender Python only: `bpy`, `mathutils`, Python standard library, and sibling scripts in `tools/blender/`. Must run inside Blender. | None. Coordinates existing v1 contracts as a Blender-side adapter only. | Keep |
+
+| `docs/visualization/blender-visualization-index.md` | Contributor on-ramp that links the current Blender snapshot, train pose, combined scene, handoff, inventory, validation, import, and render smoke workflows from one place. | Current | Documentation only. | None. | Keep |
+
+
 | `docs/visualization/blender-debug-viewer.md` | Usage notes for generating snapshot artifacts and importing them into Blender from command line or Blender Scripting workspace. | Current | Documentation only. | None. | Keep |
 | `docs/visualization/blender-train-pose-viewer.md` | Usage notes for importing `TrainPoseExportV1` JSON into Blender for train hierarchy inspection. | Current | Documentation only. | None. | Keep |
-| `docs/visualization/blender-debug-scene-viewer.md` | Usage notes for the combined debug scene importer, including snapshot-only, train-only, combined import modes, collection toggles, Milestone 68 styling, and Milestone 69 train-on-track validation. | Current | Documentation only. | None. | Keep |
+| `docs/visualization/blender-debug-scene-viewer.md` | Usage notes for the combined debug scene importer, including snapshot-only, train-only, combined import modes, collection toggles, Milestone 68 styling, Milestone 69 train-on-track validation, and Milestone 70 diagnostic PNG smoke rendering. | Current | Documentation only. | None. | Keep |
 | `docs/blender-handoff.md` | Milestone 65 handoff boundary for Blender as an optional visualization/import layer. | Current | Documentation only. | None. | Keep |
 | `docs/blender-visualization-inventory.md` | Inventory of current and future Blender-facing artifacts and boundaries. | Current | Documentation only. | None. | Keep |
 
@@ -95,6 +99,9 @@ placement contracts.
   after `--`
 - auto-classifies positional JSON inputs by `contract` and `version`
 - allows snapshot-only, train-only, and combined imports
+- optionally accepts `--render-output <path>`,
+  `--resolution-width <int>`, `--resolution-height <int>`, and
+  `--camera-mode default|diagnostic` after `--`
 - verifies the existing `quantum.debug_viewport_snapshot` v1 and
   `quantum.train_pose` v1 contract identities through the existing importers
 - creates or reuses a generated collection named `Quantum Debug Scene`
@@ -119,13 +126,20 @@ placement contracts.
   appear far from the snapshot centerline samples
 - stores validation status and warning text as generated collection custom
   properties, and creates a small `validation` text note when warnings exist
+- when `--render-output` is provided, configures a PNG still-render preset,
+  applies the requested resolution or a `1600x900` default, frames the generated
+  camera using the selected camera mode, renders the imported scene, and writes
+  the PNG to the requested local path
+- supports background `--factory-startup` smoke imports and renders without
+  saving a `.blend` file
 
 It does not define a new Blender scene JSON contract, modify
 `DebugViewportSnapshotV1`, `TrainPoseExportV1`, `TrackFrame`, backend train
 placement contracts, `Quantum.Core`, `Quantum.Track`, `Quantum.IO`, or any other
 backend project. It also does not import Unity assets, parse CSV fixtures
 directly, create production train art, or unpack nested train-pose data from a
-snapshot as a substitute for a train-pose JSON import.
+snapshot as a substitute for a train-pose JSON import. Generated PNG, `.blend`,
+and other render outputs remain local diagnostics and should not be committed.
 
 ## Future Blender Candidates
 
@@ -133,8 +147,7 @@ snapshot as a substitute for a train-pose JSON import.
 |---|---|---|---|
 | Mesh export smoke path | Export simple backend-owned diagnostic meshes for Blender inspection. | Deferred | Add a separate neutral mesh/export artifact, not fields inside `DebugViewportSnapshotV1`. |
 | GLTF/GLB handoff | Use standard interchange for richer viewer or presentation assets. | Deferred | Keep GLTF/GLB as export/import adapter output. Do not add Blender or GLTF dependencies to core backend projects. |
-| Render preset helper | Optional Blender-side script for repeatable camera/render settings. | Candidate | Blender-only settings file or script under `tools/blender/`; no backend fields. |
-| Screenshot smoke check | Optional manual or scripted validation that an imported snapshot is visible. | Candidate | Runs outside backend tests unless a future CI environment explicitly supports Blender. |
+| Automated Blender render comparison | Optional future CI check that compares rendered diagnostics against accepted image tolerances. | Candidate | Runs outside backend tests unless a future CI environment explicitly supports Blender. |
 
 ## Out-of-Scope Items
 

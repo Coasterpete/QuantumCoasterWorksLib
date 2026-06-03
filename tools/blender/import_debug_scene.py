@@ -4,6 +4,7 @@ Run from the repository root with any of these forms:
 blender --python tools/blender/import_debug_scene.py -- --snapshot artifacts/debug-viewport/DebugViewportSnapshotV1.sample.json
 blender --python tools/blender/import_debug_scene.py -- --pose artifacts/train-pose/TrainPoseExportV1.sample.json
 blender --python tools/blender/import_debug_scene.py -- --snapshot artifacts/debug-viewport/DebugViewportSnapshotV1.sample.json --pose artifacts/train-pose/TrainPoseExportV1.sample.json
+blender --background --factory-startup --python tools/blender/import_debug_scene.py -- --snapshot artifacts/debug-viewport/DebugViewportSnapshotV1.sample.json --pose artifacts/train-pose/TrainPoseExportV1.sample.json --render-output artifacts/blender-smoke/debug-scene.png
 
 The script is intentionally a thin optional visualization adapter. It consumes
 renderer-neutral Quantum JSON contracts and owns only the generated Blender
@@ -35,6 +36,11 @@ GENERATED_COLLECTION_NAME = "Quantum Debug Scene"
 GENERATED_MARKER_PROPERTY = "quantum_debug_scene"
 FAR_FROM_TRACK_MINIMUM_WARNING_DISTANCE = 10.0
 FAR_FROM_TRACK_SAMPLE_SPACING_MULTIPLIER = 1.5
+DEFAULT_RENDER_RESOLUTION_WIDTH = 1600
+DEFAULT_RENDER_RESOLUTION_HEIGHT = 900
+CAMERA_MODE_DEFAULT = "default"
+CAMERA_MODE_DIAGNOSTIC = "diagnostic"
+CAMERA_MODES = (CAMERA_MODE_DEFAULT, CAMERA_MODE_DIAGNOSTIC)
 
 
 def main():
@@ -44,8 +50,18 @@ def main():
     if not inputs.pose_path and TRAIN_POSE_PATH.strip():
         inputs.pose_path = TRAIN_POSE_PATH.strip()
 
+    if inputs.render_options.render_output and not inputs.has_any():
+        raise SystemExit(
+            "--render-output requires a snapshot path, train pose path, or both.\n"
+            f"{usage_text()}"
+        )
+
     if inputs.has_any():
-        import_debug_scene(inputs.snapshot_path, inputs.pose_path)
+        import_debug_scene(
+            inputs.snapshot_path,
+            inputs.pose_path,
+            inputs.render_options,
+        )
         return
 
     if bpy.app.background:
@@ -83,8 +99,44 @@ def find_input_arguments():
         dest="pose",
         help="TrainPoseExportV1 JSON path.",
     )
+    parser.add_argument(
+        "--render-output",
+        help="Optional PNG path to render after importing and framing the scene.",
+    )
+    parser.add_argument(
+        "--resolution-width",
+        type=positive_int,
+        help=(
+            "Optional still-render width in pixels. Defaults to "
+            f"{DEFAULT_RENDER_RESOLUTION_WIDTH} when --render-output is provided."
+        ),
+    )
+    parser.add_argument(
+        "--resolution-height",
+        type=positive_int,
+        help=(
+            "Optional still-render height in pixels. Defaults to "
+            f"{DEFAULT_RENDER_RESOLUTION_HEIGHT} when --render-output is provided."
+        ),
+    )
+    parser.add_argument(
+        "--camera-mode",
+        choices=CAMERA_MODES,
+        default=CAMERA_MODE_DEFAULT,
+        help=(
+            "Camera framing mode. 'default' preserves the viewport importer angle; "
+            "'diagnostic' uses a slightly higher oblique angle for smoke screenshots."
+        ),
+    )
     namespace = parser.parse_args(args)
-    return resolve_input_arguments(namespace.snapshot, namespace.pose, namespace.json_paths)
+    inputs = resolve_input_arguments(namespace.snapshot, namespace.pose, namespace.json_paths)
+    inputs.render_options = RenderOptions(
+        namespace.render_output,
+        namespace.resolution_width,
+        namespace.resolution_height,
+        namespace.camera_mode,
+    )
+    return inputs
 
 
 def resolve_input_arguments(snapshot_path, pose_path, json_paths):
@@ -115,8 +167,22 @@ def usage_text():
         "  blender --python tools/blender/import_debug_scene.py -- --snapshot <snapshot.json>\n"
         "  blender --python tools/blender/import_debug_scene.py -- --pose <train-pose.json>\n"
         "  blender --python tools/blender/import_debug_scene.py -- --snapshot <snapshot.json> --pose <train-pose.json>\n"
-        "  blender --python tools/blender/import_debug_scene.py -- <snapshot-or-pose.json> [other.json]"
+        "  blender --python tools/blender/import_debug_scene.py -- <snapshot-or-pose.json> [other.json]\n"
+        "  blender --background --factory-startup --python tools/blender/import_debug_scene.py -- "
+        "--snapshot <snapshot.json> --pose <train-pose.json> --render-output <image.png>"
     )
+
+
+def positive_int(value):
+    try:
+        parsed = int(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(f"{value!r} is not an integer.") from exc
+
+    if parsed <= 0:
+        raise argparse.ArgumentTypeError(f"{value!r} must be greater than zero.")
+
+    return parsed
 
 
 def classify_json_path(path_value):
@@ -161,7 +227,7 @@ def show_file_picker():
                 selected_paths = [self.filepath]
 
             inputs = resolve_input_arguments(None, None, selected_paths)
-            import_debug_scene(inputs.snapshot_path, inputs.pose_path)
+            import_debug_scene(inputs.snapshot_path, inputs.pose_path, inputs.render_options)
             return {"FINISHED"}
 
     try:
@@ -172,9 +238,11 @@ def show_file_picker():
     bpy.ops.quantum.import_debug_scene("INVOKE_DEFAULT")
 
 
-def import_debug_scene(snapshot_path=None, pose_path=None):
+def import_debug_scene(snapshot_path=None, pose_path=None, render_options=None):
     if not snapshot_path and not pose_path:
         raise ValueError("Provide a snapshot path, a train pose path, or both.")
+
+    render_options = render_options or RenderOptions()
 
     snapshot_importer = load_importer(
         "quantum_debug_viewport_snapshot_v1_importer",
@@ -235,10 +303,12 @@ def import_debug_scene(snapshot_path=None, pose_path=None):
             scene_dimensions(combined_bounds),
         )
 
+    configure_render_resolution(render_options)
     camera_created, light_created = create_camera_and_light(
         root_collection,
         combined_bounds,
         scene_dimensions(combined_bounds),
+        render_options.camera_mode,
     )
 
     if resolved_snapshot_path is not None:
@@ -272,6 +342,89 @@ def import_debug_scene(snapshot_path=None, pose_path=None):
 
     print(f"  Camera: {'yes' if camera_created else 'no'}")
     print(f"  Light: {'yes' if light_created else 'no'}")
+
+    rendered_path = render_still_if_requested(render_options)
+    if rendered_path is not None:
+        print(f"  Render output: {rendered_path}")
+
+
+def configure_render_resolution(render_options):
+    if not render_options.should_apply_resolution():
+        return
+
+    render = bpy.context.scene.render
+    render.resolution_x = render_options.resolution_width or (
+        DEFAULT_RENDER_RESOLUTION_WIDTH
+        if render_options.render_output
+        else render.resolution_x
+    )
+    render.resolution_y = render_options.resolution_height or (
+        DEFAULT_RENDER_RESOLUTION_HEIGHT
+        if render_options.render_output
+        else render.resolution_y
+    )
+    render.resolution_percentage = 100
+
+
+def render_still_if_requested(render_options):
+    if not render_options.render_output:
+        return None
+
+    output_path = resolve_path(render_options.render_output)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    scene = bpy.context.scene
+    if scene.camera is None:
+        raise ValueError("A scene camera is required before rendering.")
+
+    configure_png_render_preset(scene, output_path)
+    bpy.context.view_layer.update()
+    bpy.ops.render.render(write_still=True)
+    return output_path
+
+
+def configure_png_render_preset(scene, output_path):
+    set_render_engine(scene)
+    scene.render.filepath = str(output_path)
+    scene.render.use_file_extension = False
+    scene.render.film_transparent = False
+
+    image_settings = scene.render.image_settings
+    image_settings.file_format = "PNG"
+    image_settings.color_mode = "RGBA"
+    image_settings.color_depth = "8"
+
+    world = scene.world
+    if world is None:
+        world = bpy.data.worlds.new("Quantum.debug_scene_world")
+        scene.world = world
+    world.color = (0.035, 0.04, 0.045)
+
+    eevee = getattr(scene, "eevee", None)
+    if eevee is not None:
+        set_optional_property(eevee, "taa_render_samples", 16)
+        set_optional_property(eevee, "use_gtao", True)
+        set_optional_property(eevee, "gtao_distance", 3.0)
+        set_optional_property(eevee, "gtao_factor", 1.2)
+
+
+def set_render_engine(scene):
+    for engine in ("BLENDER_EEVEE_NEXT", "BLENDER_EEVEE"):
+        try:
+            scene.render.engine = engine
+            return
+        except (TypeError, ValueError):
+            continue
+
+
+def set_optional_property(target, name, value):
+    if not hasattr(target, name):
+        return
+
+    try:
+        setattr(target, name, value)
+    except (TypeError, ValueError):
+        pass
 
 
 def load_snapshot(snapshot_path, snapshot_importer):
@@ -925,17 +1078,20 @@ def set_collection_color_tag(collection, color_tag):
         pass
 
 
-def create_camera_and_light(root_collection, bounds, dimensions):
+def create_camera_and_light(root_collection, bounds, dimensions, camera_mode=CAMERA_MODE_DEFAULT):
     collection = child_collection(root_collection, "scene", "COLOR_02")
     center = dimensions["center"]
     diagonal = max(dimensions["diagonal"], 10.0)
 
     camera_data = bpy.data.cameras.new("Quantum.debug_scene_camera")
     camera = bpy.data.objects.new("Quantum.debug_scene_camera", camera_data)
-    camera.location = center + Vector((-diagonal * 0.55, -diagonal * 0.82, diagonal * 0.46))
+    camera.location = center + camera_offset(diagonal, camera_mode)
     look_at(camera, center)
     camera_data.type = "ORTHO"
     camera_data.ortho_scale = camera_ortho_scale(camera, bounds, dimensions)
+    camera_data.clip_end = max(diagonal * 8.0, 1000.0)
+    camera_data.clip_start = 0.01
+    camera["camera_mode"] = camera_mode
     mark_generated(camera)
     collection.objects.link(camera)
     bpy.context.scene.camera = camera
@@ -949,6 +1105,13 @@ def create_camera_and_light(root_collection, bounds, dimensions):
     collection.objects.link(light)
 
     return True, True
+
+
+def camera_offset(diagonal, camera_mode):
+    if camera_mode == CAMERA_MODE_DIAGNOSTIC:
+        return Vector((-diagonal * 0.6, -diagonal * 0.74, diagonal * 0.58))
+
+    return Vector((-diagonal * 0.55, -diagonal * 0.82, diagonal * 0.46))
 
 
 def camera_ortho_scale(camera, bounds, dimensions):
@@ -1023,12 +1186,34 @@ def mark_generated(obj):
 
 
 class ImportInputs:
-    def __init__(self, snapshot_path=None, pose_path=None):
+    def __init__(self, snapshot_path=None, pose_path=None, render_options=None):
         self.snapshot_path = snapshot_path
         self.pose_path = pose_path
+        self.render_options = render_options or RenderOptions()
 
     def has_any(self):
         return bool(self.snapshot_path or self.pose_path)
+
+
+class RenderOptions:
+    def __init__(
+        self,
+        render_output=None,
+        resolution_width=None,
+        resolution_height=None,
+        camera_mode=CAMERA_MODE_DEFAULT,
+    ):
+        self.render_output = render_output
+        self.resolution_width = resolution_width
+        self.resolution_height = resolution_height
+        self.camera_mode = (
+            camera_mode if camera_mode in CAMERA_MODES else CAMERA_MODE_DEFAULT
+        )
+
+    def should_apply_resolution(self):
+        return bool(
+            self.render_output or self.resolution_width or self.resolution_height
+        )
 
 
 class SnapshotImportResult:
