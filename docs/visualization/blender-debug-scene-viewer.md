@@ -57,6 +57,28 @@ their `contract` and `version` fields:
 blender --python tools/blender/import_debug_scene.py -- artifacts/debug-viewport/DebugViewportSnapshotV1.sample.json artifacts/train-pose/TrainPoseExportV1.sample.json
 ```
 
+## Render A Diagnostic PNG
+
+For repeatable screenshot smoke checks, run the combined importer from a clean
+factory-startup Blender session and pass `--render-output`. The importer still
+uses the same snapshot-only, train-only, and combined import modes; the render
+step is optional and runs after the generated camera frames the imported bounds.
+
+```powershell
+$render = Join-Path $env:TEMP "quantum-debug-scene-smoke.png"
+blender --background --factory-startup --python tools/blender/import_debug_scene.py -- --snapshot artifacts/debug-viewport/DebugViewportSnapshotV1.sample.json --pose Assets/DebugData/TrainPoseExportV1.sample.json --render-output $render --resolution-width 1280 --resolution-height 720 --camera-mode diagnostic
+```
+
+`--render-output <path>` writes a PNG still image and creates the parent
+directory when needed. `--resolution-width` and `--resolution-height` are
+optional; when a render output is requested and no resolution is provided, the
+script uses `1600x900`. `--camera-mode default` preserves the normal generated
+camera angle, while `--camera-mode diagnostic` uses a slightly higher oblique
+angle for smoke screenshots.
+
+Use temporary render paths for smoke checks. Generated PNG, `.blend`, and other
+render outputs are local diagnostics and should not be committed.
+
 ## Combined Validation Summary
 
 When both a `DebugViewportSnapshotV1` snapshot and a `TrainPoseExportV1` train
@@ -149,7 +171,8 @@ The generated materials are Blender-side diagnostics only. They are not part of
 The default camera is an orthographic generated camera named
 `Quantum.debug_scene_camera`. It frames the combined imported bounds, including
 snapshot placeholder box extents, and is intended as a convenient starting view
-rather than a production render camera.
+rather than a production render camera. When `--render-output` is used, this
+camera is also the still-render camera.
 
 Quantum track space is Y-up. The reused Blender adapters map positions and
 frame axes into Blender Z-up space as:
