@@ -22,6 +22,8 @@ Status labels used:
   but implementation remains later work.
 - `Sketched, no importer`: a neutral backend contract sketch exists, but no
   exporter or Blender importer exists yet.
+- `Sample command, no importer`: a deterministic sample artifact command exists,
+  but no real exporter or Blender importer exists yet.
 - `Out of scope`: should not be added to the backend or current handoff.
 
 ## Current Blender-Facing Tooling
@@ -51,7 +53,7 @@ Status labels used:
 | Self-authored sampled-frame CSV fixtures | `Quantum.Tests/IO/Fixtures` plus `Quantum.Debug` CSV-to-snapshot command. | Fixture input only after backend conversion to `DebugViewportSnapshotV1` JSON. | Current | Blender should not parse NoLimits/project CSV directly for the current path. |
 | Generated SVG previews | `Quantum.Debug` SVG command and demo script. | Human reference only; Blender import should use JSON, not SVG as authoritative geometry. | Current | SVG smoothing/preview behavior is not backend geometry. |
 | Generated HTML gallery/browser | `Quantum.Debug` gallery/browser commands and demo script. | Human reference only. | Current | Local static debug aid, not a Blender dependency. |
-| `MeshExportV1` JSON | No producer yet. The DTO, JSON helper, and validator are sketched in `Quantum.IO` only. | Possible future source for Blender mesh inspection. No Blender importer exists yet. | Sketched, no importer | Milestone 74 adds the separate neutral contract sketch documented in `docs/visualization/neutral-mesh-export-investigation.md`. Do not add mesh handles to current JSON contracts. |
+| `MeshExportV1` JSON | `Quantum.Debug` can write a deterministic `mesh-export-v1-sample` quad artifact. The DTO, JSON helper, and validator live in `Quantum.IO`; no real mesh exporter exists yet. | Possible future source for Blender mesh inspection. No Blender importer exists yet. | Sample command, no importer | Milestones 74-75 add the separate neutral contract sketch and sample artifact command documented in `docs/visualization/neutral-mesh-export-investigation.md`. Do not add mesh handles to current JSON contracts. |
 | GLTF/GLB | Future export/import path. | Possible future interchange format for richer visualization. | Deferred | Keep scale, pivot, material, and import policy adapter-owned. |
 
 ## Current Importer Behavior
@@ -171,7 +173,7 @@ backend projects, or change any renderer-neutral JSON contracts.
 
 | Candidate | Purpose | Status | Contract Boundary |
 |---|---|---|---|
-| Mesh export smoke path | Export simple backend-owned diagnostic meshes for Blender inspection. | Deferred | Build on the sketched `MeshExportV1` contract with a future exporter and Blender importer, not fields inside `DebugViewportSnapshotV1`. |
+| Mesh export smoke path | Export simple backend-owned diagnostic meshes for Blender inspection. | Deferred | A deterministic `MeshExportV1` sample artifact command exists, but a real exporter and Blender importer remain future work. Build on the separate contract, not fields inside `DebugViewportSnapshotV1`. |
 | GLTF/GLB handoff | Use standard interchange for richer viewer or presentation assets. | Deferred | Keep GLTF/GLB as export/import adapter output. Do not add Blender or GLTF dependencies to core backend projects. |
 | Automated Blender render comparison | Optional future CI check that compares rendered diagnostics against accepted image tolerances. | Candidate | Runs outside backend tests unless a future CI environment explicitly supports Blender. |
 
@@ -201,7 +203,8 @@ backend projects, or change any renderer-neutral JSON contracts.
 - Future GLTF/GLB work should start from a neutral Quantum export artifact and a
   documented adapter convention for units, pivots, and axes. It should not
   retrofit Blender or GLTF fields into existing snapshot contracts.
-- Milestone 74 sketches `MeshExportV1` as a separate neutral contract, but no
-  exporter or Blender importer exists yet. Future Blender work should consume
-  that separate artifact through an optional adapter, not expand
-  `DebugViewportSnapshotV1` or `TrainPoseExportV1`.
+- Milestones 74-75 sketch `MeshExportV1` as a separate neutral contract and add
+  a deterministic sample artifact command, but no real exporter or Blender
+  importer exists yet. Future Blender work should consume that separate artifact
+  through an optional adapter, not expand `DebugViewportSnapshotV1` or
+  `TrainPoseExportV1`.

@@ -49,6 +49,18 @@ namespace Quantum.Debug
                 return TrainPoseExportV1Command.Run(outputPath);
             }
 
+            if (command == DebugCommandKind.MeshExportV1Sample)
+            {
+                if (args.Length > 2)
+                {
+                    Console.WriteLine("Usage: mesh-export-v1-sample [outputPath]");
+                    return 1;
+                }
+
+                string? outputPath = args.Length == 2 ? args[1] : null;
+                return MeshExportV1SampleCommand.Run(outputPath);
+            }
+
             if (command == DebugCommandKind.DebugViewportSnapshotV1)
             {
                 if (args.Length > 2)

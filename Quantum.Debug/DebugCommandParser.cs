@@ -9,6 +9,7 @@ namespace Quantum.Debug
         Help,
         SamplingPerf,
         TrainPoseExportV1,
+        MeshExportV1Sample,
         DebugViewportSnapshotV1,
         DebugViewportSnapshotV1FromCsv,
         DebugViewportSnapshotV1Validate,
@@ -57,6 +58,12 @@ namespace Quantum.Debug
             if (string.Equals(args[0], "train-pose-export-v1", StringComparison.OrdinalIgnoreCase))
             {
                 command = DebugCommandKind.TrainPoseExportV1;
+                return true;
+            }
+
+            if (string.Equals(args[0], MeshExportV1SampleCommand.CommandName, StringComparison.OrdinalIgnoreCase))
+            {
+                command = DebugCommandKind.MeshExportV1Sample;
                 return true;
             }
 
