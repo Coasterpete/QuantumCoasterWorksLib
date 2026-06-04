@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quantumcoasterworks.dev/schemas/continuous_roll_diagnostics_export_v1.schema.json",
+  "title": "ContinuousRollDiagnosticsExportV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract",
+    "version",
+    "sampleCount",
+    "maxRollRateRadiansPerMeter",
+    "averageRollRateRadiansPerMeter",
+    "wrapHandlingEnabled",
+    "warningCount",
+    "samples"
+  ],
+  "properties": {
+    "contract": {
+      "type": "string",
+      "const": "quantum.continuous_roll_diagnostics"
+    },
+    "version": {
+      "type": "integer",
+      "const": 1
+    },
+    "sampleCount": {
+      "type": "integer"
+    },
+    "maxRollRateRadiansPerMeter": {
+      "type": "number"
+    },
+    "averageRollRateRadiansPerMeter": {
+      "type": "number"
+    },
+    "wrapHandlingEnabled": {
+      "type": "boolean"
+    },
+    "warningCount": {
+      "type": "integer"
+    },
+    "samples": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/continuousRollDiagnosticsSample"
+      }
+    }
+  },
+  "$defs": {
+    "continuousRollDiagnosticsSample": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "stationDistance",
+        "rollRadians",
+        "rollDegrees",
+        "deltaRadians",
+        "deltaDegrees",
+        "rollRateRadiansPerMeter"
+      ],
+      "properties": {
+        "stationDistance": {
+          "type": "number"
+        },
+        "rollRadians": {
+          "type": "number"
+        },
+        "rollDegrees": {
+          "type": "number"
+        },
+        "deltaRadians": {
+          "type": "number"
+        },
+        "deltaDegrees": {
+          "type": "number"
+        },
+        "rollRateRadiansPerMeter": {
+          "type": "number"
+        },
+        "warning": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    }
+  }
+}
