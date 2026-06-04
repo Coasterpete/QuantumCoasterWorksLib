@@ -193,23 +193,21 @@ Generated JSON, SVG, Markdown, and HTML under `artifacts/` are local output by d
 - `dotnet run --project Quantum.Debug`: run the default backend validation smoke checks.
 - `dotnet run --project Quantum.Debug -- sampling-perf`: run deterministic sampling performance diagnostics.
 - `dotnet run --project Quantum.Debug -- train-pose-export-v1 [outputPath]`: write a deterministic `TrainPoseExportV1` sample JSON matching `Quantum.Tests/IO/Fixtures/TrainPoseExportV1.golden.json`.
+- `dotnet run --project Quantum.Debug -- mesh-export-v1-sample [outputPath]`: write a deterministic `MeshExportV1` sample JSON file.
 - `dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1 [outputPath]`: write the built-in `DebugViewportSnapshotV1` sample JSON.
-- `dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1-banking-profile [outputPath]`: write a `DebugViewportSnapshotV1` sample from the opt-in BankingProfile train-pose path.
 - `dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1-from-csv <inputCsvPath> [outputJsonPath]`: bridge a sampled-frame CSV fixture to `DebugViewportSnapshotV1` JSON.
 - `dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1-validate <snapshotJsonPath>`: validate and summarize a snapshot JSON file.
 - `dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1-svg <snapshotJsonPath> [outputSvgPath]`: write a multi-panel backend-only SVG preview from snapshot JSON.
 - `dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1-gallery [artifactDirectory] [outputHtmlPath]`: write a static HTML gallery for generated DebugViewportSnapshotV1 JSON and SVG artifacts.
 - `dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1-browser [artifactDirectory] [outputHtmlPath]`: write a self-contained browser inspector with layer toggles, curvature/radius diagnostics, and centerline sample measurement readouts for generated `DebugViewportSnapshotV1` JSON artifacts.
+- `dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1-banking-profile [outputPath]`: write a `DebugViewportSnapshotV1` sample from the opt-in BankingProfile train-pose path.
 - `dotnet run --project Quantum.Debug -- longitudinal-force-preview [preset] [outputPath]`: write force preview diagnostics with `soft`, `balanced`, or `punchy` presets.
 - `dotnet run --project Quantum.Debug -- longitudinal-speed-preview [preset] [outputPath] [initialSpeedMps]`: write speed preview diagnostics with `soft`, `balanced`, or `punchy` presets.
 - `dotnet run --project Quantum.Debug -- centerline-frame-continuity [outputPath]`: write backend-only JSON diagnostics for frame continuity on a deterministic sample centerline.
 - `dotnet run --project Quantum.Debug -- transported-frame-comparison [outputPath]`: write backend-only JSON diagnostics comparing stateless and transported frames over the diagnostic fixture set.
 - `dotnet run --project Quantum.Debug -- banking-profile-diagnostics [outputPath]`: write backend-only JSON diagnostics for deterministic `BankingProfile` roll samples under `artifacts/banking-profile/`.
-<<<<<<< HEAD
+- `dotnet run --project Quantum.Debug -- continuous-roll-diagnostics-sample [outputPath]`: write a deterministic continuous roll diagnostics text report under `artifacts/banking-profile/`.
 - `dotnet run --project Quantum.Debug -- continuous-roll-diagnostics-json [outputPath]`: write backend-only `quantum.continuous_roll_diagnostics` JSON for deterministic continuous roll samples under `artifacts/banking-profile/`, matching `Quantum.Tests/IO/Fixtures/ContinuousRollDiagnosticsExportV1.golden.json`.
-=======
-- `dotnet run --project Quantum.Debug -- continuous-roll-diagnostics-json [outputPath]`: write backend-only `quantum.continuous_roll_diagnostics` JSON for deterministic continuous roll samples under `artifacts/banking-profile/`.
->>>>>>> origin/main
 - `dotnet run --project Quantum.Debug -- banking-profile-browser [diagnosticsJsonPath] [outputHtmlPath]`: write a self-contained local browser viewer for `BankingProfile` diagnostics JSON metadata, roll/slope graphs, interpolation transitions, and roll slope severity indicators.
 - `dotnet run --project Quantum.Debug -- transported-frame-comparison-browser [comparisonJsonPath] [outputHtmlPath]`: write a self-contained local browser viewer for transported-frame comparison JSON summary metrics, per-sample deltas, and severity indicators.
 

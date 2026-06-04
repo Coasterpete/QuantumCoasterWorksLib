@@ -18,7 +18,7 @@ Scope reviewed:
 
 Adjacent note: `Quantum.Geometry` is not an active project after the Milestone 30 scope decision. The package name is reserved for a future narrow backend-only geometry role if one becomes necessary, but it should not be counted as a current library capability.
 
-## Validation
+## Historical Validation Snapshot
 
 Requested command:
 
@@ -26,12 +26,12 @@ Requested command:
 dotnet test Quantum.Tests\Quantum.Tests.csproj --no-restore
 ```
 
-Result after a one-time restore in this fresh checkout:
+Historical result after a one-time restore in that fresh checkout:
 
-- Passed: 886
+- Passed: 886 (historical snapshot)
 - Failed: 0
 - Skipped: 0
-- Total: 886
+- Total: 886 (historical snapshot)
 
 Environment note: the first no-restore invocation in this checkout returned a zero exit code but produced only a build message because NuGet assets had not been restored yet under the installed .NET SDK 10.0.300. A one-time `dotnet restore Quantum.Tests\Quantum.Tests.csproj` was needed before the exact requested no-restore test command produced a real test run.
 
@@ -194,7 +194,7 @@ Capability level: useful backend diagnostics and artifact generation. This is a 
 
 Working today:
 
-- 886 tests pass after restore with the requested no-restore command.
+- 886 tests passed after restore with the requested no-restore command in that snapshot.
 - Tests cover project dependency boundaries, public API boundaries, math transforms, spline sampling, track distance semantics, train placement, section resolution, FVD sections, physics stepping, IO contracts, debug commands, and fixture paths.
 
 Capability level: the test suite is one of the library's strengths. It gives real confidence in the narrow backend slice, while also making clear where the library remains early.

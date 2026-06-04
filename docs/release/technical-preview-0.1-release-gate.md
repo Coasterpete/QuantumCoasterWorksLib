@@ -45,13 +45,13 @@ powershell -ExecutionPolicy Bypass -File .\tools\demo-technical-preview-0.1.ps1
 - [ ] Fixtures remain self-authored or synthetic, with no proprietary or permission-unclear assets added.
 - [ ] Public docs describe Technical Preview 0.1 as backend-first, early, and not production-ready.
 
-## Latest Local Gate Run
+## Historical Local Gate Run
 
 Validated on 2026-05-28 from a temporary local clone:
 
 - `dotnet restore QuantumCoasterWorks.sln`: passed.
 - `dotnet build QuantumCoasterWorks.sln --no-restore --nologo`: passed with 0 warnings and 0 errors.
-- `dotnet test QuantumCoasterWorks.sln --no-build --nologo`: passed, 862 tests.
+- `dotnet test QuantumCoasterWorks.sln --no-build --nologo`: passed, 862 tests (historical snapshot).
 - `.\tools\demo-technical-preview-0.1.cmd`: passed, including generated built-in and Milestone 7 snapshot validation plus SVG/gallery/index generation.
 - SDK observed during validation: .NET SDK 10.0.300.
 
