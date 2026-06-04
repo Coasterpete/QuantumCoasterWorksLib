@@ -22,6 +22,7 @@ public sealed class DebugCommandHelpTests
         string output = writer.ToString();
         Assert.Contains(DebugCommandHelp.ProjectPurpose, output);
         Assert.Contains("Commands:", output);
+        Assert.Contains("mesh-export-v1-sample [outputPath]", output);
         Assert.Contains("debug-viewport-snapshot-v1-from-csv <inputCsvPath> [outputJsonPath]", output);
         Assert.Contains("debug-viewport-snapshot-v1-gallery [artifactDirectory] [outputHtmlPath]", output);
         Assert.Contains("debug-viewport-snapshot-v1-browser [artifactDirectory] [outputHtmlPath]", output);
@@ -138,6 +139,27 @@ public sealed class DebugCommandHelpTests
         Assert.Contains("deterministic TrainPoseExportV1 regression sample", output);
         Assert.Contains("Quantum.Tests/IO/Fixtures/TrainPoseExportV1.golden.json", output);
         Assert.Contains("backend-only JSON", output);
+    }
+
+    [Fact]
+    public void TryWriteRequestedHelp_MeshExportV1Sample_PrintsSampleArtifactDetails()
+    {
+        var writer = new StringWriter(CultureInfo.InvariantCulture);
+
+        bool handled = DebugCommandHelp.TryWriteRequestedHelp(
+            new[] { "help", "mesh-export-v1-sample" },
+            writer,
+            out int exitCode);
+
+        Assert.True(handled);
+        Assert.Equal(0, exitCode);
+
+        string output = writer.ToString();
+        Assert.Contains("mesh-export-v1-sample [outputPath]", output);
+        Assert.Contains("deterministic MeshExportV1 sample", output);
+        Assert.Contains("tiny self-authored quad mesh", output);
+        Assert.Contains("not a real mesh exporter", output);
+        Assert.Contains("Blender importer", output);
     }
 
     [Fact]
@@ -281,6 +303,7 @@ public sealed class DebugCommandHelpTests
         string output = writer.ToString();
         Assert.Contains("Unknown command.", output);
         Assert.Contains("Supported commands:", output);
+        Assert.Contains("mesh-export-v1-sample [outputPath]", output);
         Assert.Contains("debug-viewport-snapshot-v1 [outputPath]", output);
         Assert.Contains("debug-viewport-snapshot-v1-gallery [artifactDirectory] [outputHtmlPath]", output);
         Assert.Contains("debug-viewport-snapshot-v1-browser [artifactDirectory] [outputHtmlPath]", output);

@@ -50,6 +50,22 @@ namespace Quantum.Debug
                     "dotnet run --project Quantum.Debug -- train-pose-export-v1 artifacts/train-pose/TrainPoseExportV1.sample.json"
                 }),
             new DebugCommandHelpEntry(
+                name: MeshExportV1SampleCommand.CommandName,
+                usage: "mesh-export-v1-sample [outputPath]",
+                summary: "Write a deterministic MeshExportV1 sample JSON file.",
+                arguments: new[]
+                {
+                    "outputPath: Optional JSON output path. Defaults to " +
+                    MeshExportV1SampleCommand.DefaultRelativeOutputPath + ".",
+                    "The sample is a tiny self-authored quad mesh using MeshExportV1 DTOs, JSON serialization, and validation.",
+                    "This is a sample artifact only; it is not a real mesh exporter, Blender importer, renderer, shader, or material pipeline."
+                },
+                examples: new[]
+                {
+                    "dotnet run --project Quantum.Debug -- mesh-export-v1-sample",
+                    "dotnet run --project Quantum.Debug -- mesh-export-v1-sample artifacts/mesh-export/MeshExportV1.sample.json"
+                }),
+            new DebugCommandHelpEntry(
                 name: "debug-viewport-snapshot-v1",
                 usage: "debug-viewport-snapshot-v1 [outputPath]",
                 summary: "Write the built-in DebugViewportSnapshotV1 sample JSON file.",

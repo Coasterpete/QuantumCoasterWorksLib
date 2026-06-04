@@ -44,6 +44,15 @@ public sealed class DebugCommandParserTests
     }
 
     [Fact]
+    public void TryParse_MeshExportV1SampleCommand_ParsesCaseInsensitive()
+    {
+        bool parsed = DebugCommandParser.TryParse(new[] { "MeSh-ExPoRt-V1-SaMpLe" }, out DebugCommandKind command);
+
+        Assert.True(parsed);
+        Assert.Equal(DebugCommandKind.MeshExportV1Sample, command);
+    }
+
+    [Fact]
     public void TryParse_DebugViewportSnapshotV1Command_ParsesCaseInsensitive()
     {
         bool parsed = DebugCommandParser.TryParse(new[] { "DeBuG-ViEwPoRt-SnApShOt-V1" }, out DebugCommandKind command);
