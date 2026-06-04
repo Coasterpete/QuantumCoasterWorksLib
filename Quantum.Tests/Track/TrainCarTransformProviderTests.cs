@@ -948,6 +948,15 @@ public sealed class TrainCarTransformProviderTests
     }
 
     [Fact]
+    public void TrainBogieWithWheelsTransform_WhenWheelsIsNull_ThrowsArgumentNullException()
+    {
+        ArgumentNullException exception = Assert.Throws<ArgumentNullException>(
+            () => new TrainBogieWithWheelsTransform(default, null!));
+
+        Assert.Equal("wheels", exception.ParamName);
+    }
+
+    [Fact]
     public void TrainBogieWithWheelsTransform_MutatingSourceWheelsArrayDoesNotAffectStoredSnapshot()
     {
         TrackDocument document = BuildSplineTrack(length: 44.0);
