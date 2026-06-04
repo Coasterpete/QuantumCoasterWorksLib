@@ -1,0 +1,68 @@
+{
+  "contract": "quantum.continuous_roll_diagnostics",
+  "version": 1,
+  "sampleCount": 7,
+  "maxRollRateRadiansPerMeter": 0.17453292519943292,
+  "averageRollRateRadiansPerMeter": 0.040724349213201005,
+  "wrapHandlingEnabled": true,
+  "warningCount": 1,
+  "samples": [
+    {
+      "stationDistance": 0,
+      "rollRadians": 5.934119456780721,
+      "rollDegrees": 340,
+      "deltaRadians": 0,
+      "deltaDegrees": 0,
+      "rollRateRadiansPerMeter": 0
+    },
+    {
+      "stationDistance": 10,
+      "rollRadians": 6.1086523819801535,
+      "rollDegrees": 350,
+      "deltaRadians": 0.17453292519943275,
+      "deltaDegrees": 9.99999999999999,
+      "rollRateRadiansPerMeter": 0.017453292519943275
+    },
+    {
+      "stationDistance": 20,
+      "rollRadians": 6.265732014659643,
+      "rollDegrees": 359,
+      "deltaRadians": 0.15707963267948966,
+      "deltaDegrees": 9,
+      "rollRateRadiansPerMeter": 0.015707963267948967
+    },
+    {
+      "stationDistance": 30,
+      "rollRadians": 6.300638599699529,
+      "rollDegrees": 361,
+      "deltaRadians": 0.034906585039886195,
+      "deltaDegrees": 1.9999999999999774,
+      "rollRateRadiansPerMeter": 0.0034906585039886197
+    },
+    {
+      "stationDistance": 40,
+      "rollRadians": 6.457718232379019,
+      "rollDegrees": 370,
+      "deltaRadians": 0.15707963267948966,
+      "deltaDegrees": 9,
+      "rollRateRadiansPerMeter": 0.015707963267948967
+    },
+    {
+      "stationDistance": 50,
+      "rollRadians": 6.632251157578452,
+      "rollDegrees": 380,
+      "deltaRadians": 0.17453292519943295,
+      "deltaDegrees": 10,
+      "rollRateRadiansPerMeter": 0.017453292519943295
+    },
+    {
+      "stationDistance": 60,
+      "rollRadians": 8.377580409572781,
+      "rollDegrees": 479.99999999999994,
+      "deltaRadians": 1.7453292519943293,
+      "deltaDegrees": 99.99999999999999,
+      "rollRateRadiansPerMeter": 0.17453292519943292,
+      "warning": "RollDelta exceeded: samples=5-\u003E6, actualRadians=1.7453292519943293, thresholdRadians=0.78539816339744828"
+    }
+  ]
+}

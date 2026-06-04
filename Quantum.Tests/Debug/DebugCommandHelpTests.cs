@@ -308,6 +308,7 @@ public sealed class DebugCommandHelpTests
         Assert.Contains("continuous-roll-diagnostics-json [outputPath]", output);
         Assert.Contains("quantum.continuous_roll_diagnostics version 1", output);
         Assert.Contains("System.Text.Json camelCase", output);
+        Assert.Contains("Quantum.Tests/IO/Fixtures/ContinuousRollDiagnosticsExportV1.golden.json", output);
         Assert.Contains("mapped from ContinuousRollDiagnostics", output);
         Assert.Contains("backend inspection artifact only", output);
         Assert.Contains("default TrackEvaluator behavior", output);
