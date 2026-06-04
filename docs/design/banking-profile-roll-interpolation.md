@@ -73,6 +73,38 @@ infrastructure only and does not change default `TrackEvaluator` behavior,
 `TrackFrame`, `DebugViewportSnapshotV1`, `TrainPoseExportV1`, or runtime
 banking behavior.
 
+## Milestone 77 Continuous Roll Diagnostics Update
+
+Milestone 77 adds backend-only `ContinuousRollDiagnostics` for inspecting
+already-sampled roll values over station distance. It is intentionally a
+diagnostic utility, not a new track generation contract. Callers can feed it
+explicit roll samples, or ask it to sample a `BankingProfile` at supplied
+distances before analysis.
+
+The report computes adjacent roll deltas, maximum and average absolute roll
+rate in radians per meter, full-turn wrap handling, and continuity warnings
+when roll delta or roll rate exceeds the configured thresholds. Full-turn wrap
+handling is enabled by default so normalized samples such as `359° -> 1°` are
+treated as a small `2°` transition instead of a false `358°` jump. The no-wrap
+option remains available when an importer or authoring tool needs to inspect
+raw authored values.
+
+The `continuous-roll-diagnostics-sample` debug command writes a deterministic
+text report under `artifacts/banking-profile/` by default. The output is a
+local backend debug artifact only. It does not modify
+`DebugViewportSnapshotV1`, `TrainPoseExportV1`, `MeshExportV1`, `TrackFrame`,
+or default `TrackEvaluator` behavior.
+
+Future heartline and spline work should consume this utility as an inspection
+layer after centerline, tangent, transported-frame, and optional heartline
+offset samples have already been evaluated. In other words, continuous roll
+diagnostics should help answer whether a sampled banking profile is smooth
+enough for a train pose path, while heartline offsets and spline evaluation
+remain responsible for spatial centerline and rider-reference geometry. If a
+later spline-backed banking model is introduced, it should still produce
+station-distance roll samples that this diagnostic can analyze without changing
+export contracts.
+
 ## Current Baseline
 
 Today `TrackSegment.RollRadians` is the only authored roll angle on

@@ -233,6 +233,18 @@ namespace Quantum.Debug
                 return BankingProfileDiagnosticsCommand.Run(outputPath);
             }
 
+            if (command == DebugCommandKind.ContinuousRollDiagnosticsSample)
+            {
+                if (args.Length > 2)
+                {
+                    Console.WriteLine("Usage: continuous-roll-diagnostics-sample [outputPath]");
+                    return 1;
+                }
+
+                string? outputPath = args.Length == 2 ? args[1] : null;
+                return ContinuousRollDiagnosticsSampleCommand.Run(outputPath);
+            }
+
             if (command == DebugCommandKind.BankingProfileBrowser)
             {
                 if (args.Length > 3)

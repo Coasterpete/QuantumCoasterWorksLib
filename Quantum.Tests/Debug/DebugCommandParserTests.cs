@@ -170,6 +170,15 @@ public sealed class DebugCommandParserTests
     }
 
     [Fact]
+    public void TryParse_ContinuousRollDiagnosticsSampleCommand_ParsesCaseInsensitive()
+    {
+        bool parsed = DebugCommandParser.TryParse(new[] { "CoNtInUoUs-RoLl-DiAgNoStIcS-SaMpLe" }, out DebugCommandKind command);
+
+        Assert.True(parsed);
+        Assert.Equal(DebugCommandKind.ContinuousRollDiagnosticsSample, command);
+    }
+
+    [Fact]
     public void TryParse_BankingProfileBrowserCommand_ParsesCaseInsensitive()
     {
         bool parsed = DebugCommandParser.TryParse(new[] { "BaNkInG-PrOfIlE-BrOwSeR" }, out DebugCommandKind command);
