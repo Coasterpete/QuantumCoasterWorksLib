@@ -1,6 +1,6 @@
 # Blender Visualization Index
 
-Last updated: 2026-06-03
+Last updated: 2026-06-04
 
 This is the on-ramp for Quantum's optional Blender diagnostics. The Blender
 tools consume renderer-neutral JSON artifacts and stay outside the backend
@@ -14,6 +14,8 @@ Use these pages for the detailed workflow notes:
 - Train pose import: [blender-train-pose-viewer.md](blender-train-pose-viewer.md)
 - Combined debug scene import, validation, and render smoke:
   [blender-debug-scene-viewer.md](blender-debug-scene-viewer.md)
+- MeshExportV1 sample import:
+  [blender-mesh-export-viewer.md](blender-mesh-export-viewer.md)
 - Blender boundary and handoff rules: [blender-handoff.md](../blender-handoff.md)
 - Neutral mesh export investigation:
   [neutral-mesh-export-investigation.md](neutral-mesh-export-investigation.md)
@@ -22,11 +24,13 @@ Use these pages for the detailed workflow notes:
 
 ## Generate Artifacts
 
-From the repository root, generate the current snapshot and train pose JSON:
+From the repository root, generate the current snapshot, train pose, and mesh
+sample JSON:
 
 ```powershell
 dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1 artifacts/debug-viewport/DebugViewportSnapshotV1.sample.json
 dotnet run --project Quantum.Debug -- train-pose-export-v1 artifacts/train-pose/TrainPoseExportV1.sample.json
+dotnet run --project Quantum.Debug -- mesh-export-v1-sample artifacts/mesh-export/MeshExportV1.sample.json
 ```
 
 ## Smoke Script
@@ -57,11 +61,11 @@ Validate a debug viewport snapshot before handing it to Blender:
 dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1-validate artifacts/debug-viewport/DebugViewportSnapshotV1.sample.json
 ```
 
-The Blender train pose and combined scene importers also verify the existing
-JSON `contract` and `version` identities before importing. When a snapshot and
-train pose are imported together, `import_debug_scene.py` prints a Blender-side
-train-on-track validation summary with bounds and nearest-centerline distance
-statistics.
+The Blender train pose, mesh sample, and combined scene importers also verify
+the existing JSON `contract` and `version` identities before importing. When a
+snapshot and train pose are imported together, `import_debug_scene.py` prints a
+Blender-side train-on-track validation summary with bounds and
+nearest-centerline distance statistics.
 
 ## Common Import Commands
 
@@ -75,6 +79,12 @@ Import a `TrainPoseExportV1` train pose:
 
 ```powershell
 blender --python tools/blender/import_train_pose_export_v1.py -- --pose artifacts/train-pose/TrainPoseExportV1.sample.json
+```
+
+Import a `MeshExportV1` sample mesh:
+
+```powershell
+blender --background --factory-startup --python tools/blender/import_mesh_export_v1.py -- artifacts/mesh-export/MeshExportV1.sample.json
 ```
 
 Import both artifacts into one combined debug scene:

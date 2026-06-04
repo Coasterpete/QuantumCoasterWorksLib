@@ -1,6 +1,6 @@
 # Blender Visualization Inventory
 
-Last updated: 2026-06-03
+Last updated: 2026-06-04
 
 Scope audited:
 
@@ -22,8 +22,8 @@ Status labels used:
   but implementation remains later work.
 - `Sketched, no importer`: a neutral backend contract sketch exists, but no
   exporter or Blender importer exists yet.
-- `Sample command, no importer`: a deterministic sample artifact command exists,
-  but no real exporter or Blender importer exists yet.
+- `Sample command and importer`: a deterministic sample artifact command and
+  optional sample importer exist, but no real exporter exists yet.
 - `Out of scope`: should not be added to the backend or current handoff.
 
 ## Current Blender-Facing Tooling
@@ -33,6 +33,7 @@ Status labels used:
 | `tools/blender/import_debug_viewport_snapshot_v1.py` | Imports `DebugViewportSnapshotV1` JSON into Blender as generated centerline, frame tick, debug line, placeholder box, camera, and light diagnostics. | Current | Blender Python only: `bpy`, `mathutils`, Python standard library. Must run inside Blender. | None. Consumes `quantum.debug_viewport_snapshot` v1 as an adapter. | Keep |
 | `tools/blender/import_train_pose_export_v1.py` | Imports `TrainPoseExportV1` JSON into Blender as generated body, bogie, wheel, transform-empty, and axis diagnostics. | Current | Blender Python only: `bpy`, `mathutils`, Python standard library. Must run inside Blender. | None. Consumes `quantum.train_pose` v1 as an adapter. | Keep |
 | `tools/blender/import_debug_scene.py` | Imports `DebugViewportSnapshotV1`, `TrainPoseExportV1`, or both into one generated `Quantum Debug Scene` diagnostic collection. Milestone 68 added combined-scene styling, inspection-oriented collection grouping, and improved orthographic framing; Milestone 69 adds combined train-on-track spatial validation; Milestone 70 adds optional factory-startup-friendly PNG render smoke output without changing contracts. | Current | Blender Python only: `bpy`, `mathutils`, Python standard library, and sibling scripts in `tools/blender/`. Must run inside Blender. | None. Coordinates existing v1 contracts as a Blender-side adapter only. | Keep |
+| `tools/blender/import_mesh_export_v1.py` | Imports the deterministic `MeshExportV1` sample JSON into Blender as generated diagnostic mesh objects with local materials derived from neutral material slot labels. It is a sample viewer, not a real track mesh exporter. | Current | Blender Python only: `bpy`, `mathutils`, Python standard library. Must run inside Blender. | None. Consumes `quantum.mesh_export` v1 as an adapter. | Keep |
 | `tools/smoke-blender-visualization.ps1` | Runs the common Blender visualization smoke path: refreshes sample JSON artifacts, validates the snapshot, conditionally runs snapshot, train pose, combined debug scene, and temp PNG render checks when Blender is on `PATH`, and removes the render output afterward. | Current | PowerShell, `dotnet`, optional `blender` executable on `PATH`. | None. Tooling wrapper only; generated JSON and render outputs stay local under ignored paths or temp storage. | Keep |
 
 | `docs/visualization/blender-visualization-index.md` | Contributor on-ramp that links the current Blender snapshot, train pose, combined scene, handoff, inventory, validation, import, and render smoke workflows from one place. | Current | Documentation only. | None. | Keep |
@@ -41,6 +42,7 @@ Status labels used:
 | `docs/visualization/blender-debug-viewer.md` | Usage notes for generating snapshot artifacts and importing them into Blender from command line or Blender Scripting workspace. | Current | Documentation only. | None. | Keep |
 | `docs/visualization/blender-train-pose-viewer.md` | Usage notes for importing `TrainPoseExportV1` JSON into Blender for train hierarchy inspection. | Current | Documentation only. | None. | Keep |
 | `docs/visualization/blender-debug-scene-viewer.md` | Usage notes for the combined debug scene importer, including snapshot-only, train-only, combined import modes, collection toggles, Milestone 68 styling, Milestone 69 train-on-track validation, and Milestone 70 diagnostic PNG smoke rendering. | Current | Documentation only. | None. | Keep |
+| `docs/visualization/blender-mesh-export-viewer.md` | Usage notes for generating the deterministic `MeshExportV1` sample JSON and importing it into Blender as generated diagnostic mesh objects. | Current | Documentation only. | None. | Keep |
 | `docs/blender-handoff.md` | Milestone 65 handoff boundary for Blender as an optional visualization/import layer. | Current | Documentation only. | None. | Keep |
 | `docs/blender-visualization-inventory.md` | Inventory of current and future Blender-facing artifacts and boundaries. | Current | Documentation only. | None. | Keep |
 
@@ -53,7 +55,7 @@ Status labels used:
 | Self-authored sampled-frame CSV fixtures | `Quantum.Tests/IO/Fixtures` plus `Quantum.Debug` CSV-to-snapshot command. | Fixture input only after backend conversion to `DebugViewportSnapshotV1` JSON. | Current | Blender should not parse NoLimits/project CSV directly for the current path. |
 | Generated SVG previews | `Quantum.Debug` SVG command and demo script. | Human reference only; Blender import should use JSON, not SVG as authoritative geometry. | Current | SVG smoothing/preview behavior is not backend geometry. |
 | Generated HTML gallery/browser | `Quantum.Debug` gallery/browser commands and demo script. | Human reference only. | Current | Local static debug aid, not a Blender dependency. |
-| `MeshExportV1` JSON | `Quantum.Debug` can write a deterministic `mesh-export-v1-sample` quad artifact. The DTO, JSON helper, and validator live in `Quantum.IO`; no real mesh exporter exists yet. | Possible future source for Blender mesh inspection. No Blender importer exists yet. | Sample command, no importer | Milestones 74-75 add the separate neutral contract sketch and sample artifact command documented in `docs/visualization/neutral-mesh-export-investigation.md`. Do not add mesh handles to current JSON contracts. |
+| `MeshExportV1` JSON | `Quantum.Debug` can write a deterministic `mesh-export-v1-sample` quad artifact. The DTO, JSON helper, and validator live in `Quantum.IO`; no real mesh exporter exists yet. | Current sample-only Blender input through `tools/blender/import_mesh_export_v1.py`. | Sample command and importer | Milestones 74-76 add the separate neutral contract sketch, sample artifact command, and optional Blender sample importer documented in `docs/visualization/neutral-mesh-export-investigation.md` and `docs/visualization/blender-mesh-export-viewer.md`. Do not add mesh handles to current JSON contracts. |
 | GLTF/GLB | Future export/import path. | Possible future interchange format for richer visualization. | Deferred | Keep scale, pivot, material, and import policy adapter-owned. |
 
 ## Current Importer Behavior
@@ -99,6 +101,28 @@ It does not evaluate Quantum backend code inside Blender, import Unity assets or
 prefabs, parse CSV fixtures directly, create production train art, or change
 `TrainPoseExportV1`, `DebugViewportSnapshotV1`, `TrackFrame`, or backend train
 placement contracts.
+
+`tools/blender/import_mesh_export_v1.py` currently:
+
+- accepts a JSON path after `--` or through `--mesh`/`--mesh-export`
+- opens a Blender file picker when run interactively without a path
+- verifies `contract == "quantum.mesh_export"` and `version == 1`
+- creates or reuses a generated collection named `Quantum MeshExportV1`
+- clears only that generated collection before rebuilding it
+- reads mesh names, vertices, flat `triangleIndices`, optional per-vertex
+  normals, and neutral `materialSlotLabels`
+- maps Quantum Y-up positions and normals into Blender Z-up coordinates
+- reverses triangle winding at the adapter boundary so the sample normal remains
+  visually aligned after the axis swap
+- creates Blender mesh objects from the sample topology
+- maps neutral material slot labels to simple local diagnostic Blender materials
+- prints mesh, vertex, triangle, normal, and material counts to Blender's
+  console
+
+It does not evaluate Quantum backend code inside Blender, import Unity assets or
+prefabs, parse CSV fixtures directly, create a real track mesh, export GLTF/GLB,
+save a `.blend` file, or change `MeshExportV1`, `DebugViewportSnapshotV1`,
+`TrainPoseExportV1`, `TrackFrame`, or backend train placement contracts.
 
 `tools/blender/import_debug_scene.py` currently:
 
@@ -173,7 +197,7 @@ backend projects, or change any renderer-neutral JSON contracts.
 
 | Candidate | Purpose | Status | Contract Boundary |
 |---|---|---|---|
-| Mesh export smoke path | Export simple backend-owned diagnostic meshes for Blender inspection. | Deferred | A deterministic `MeshExportV1` sample artifact command exists, but a real exporter and Blender importer remain future work. Build on the separate contract, not fields inside `DebugViewportSnapshotV1`. |
+| Real mesh export smoke path | Export simple backend-owned diagnostic meshes for Blender inspection beyond the deterministic sample quad. | Deferred | A deterministic `MeshExportV1` sample artifact command and Blender sample importer exist, but a real exporter remains future work. Build on the separate contract, not fields inside `DebugViewportSnapshotV1`. |
 | GLTF/GLB handoff | Use standard interchange for richer viewer or presentation assets. | Deferred | Keep GLTF/GLB as export/import adapter output. Do not add Blender or GLTF dependencies to core backend projects. |
 | Automated Blender render comparison | Optional future CI check that compares rendered diagnostics against accepted image tolerances. | Candidate | Runs outside backend tests unless a future CI environment explicitly supports Blender. |
 
@@ -203,8 +227,8 @@ backend projects, or change any renderer-neutral JSON contracts.
 - Future GLTF/GLB work should start from a neutral Quantum export artifact and a
   documented adapter convention for units, pivots, and axes. It should not
   retrofit Blender or GLTF fields into existing snapshot contracts.
-- Milestones 74-75 sketch `MeshExportV1` as a separate neutral contract and add
-  a deterministic sample artifact command, but no real exporter or Blender
-  importer exists yet. Future Blender work should consume that separate artifact
-  through an optional adapter, not expand `DebugViewportSnapshotV1` or
+- Milestones 74-76 sketch `MeshExportV1` as a separate neutral contract, add a
+  deterministic sample artifact command, and add a Blender sample importer. No
+  real exporter exists yet. Future Blender work should consume that separate
+  artifact through optional adapters, not expand `DebugViewportSnapshotV1` or
   `TrainPoseExportV1`.
