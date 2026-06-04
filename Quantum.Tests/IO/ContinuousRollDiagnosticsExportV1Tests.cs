@@ -4,8 +4,6 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using Json.Schema;
 
-using System.Text.Json;
-
 using Quantum.IO.ContinuousRollDiagnostics.V1;
 using Quantum.Track;
 using SystemMath = System.Math;
@@ -285,11 +283,6 @@ public sealed class ContinuousRollDiagnosticsExportV1Tests
     private static double ToRadians(double degrees)
     {
         return degrees * (SystemMath.PI / 180.0);
-    }
-    private static double ToRadians(double degrees)
-    {
-        return degrees * SystemMath.PI / 180.0;
-
     }
 
     private static void AssertNear(double expected, double actual)
