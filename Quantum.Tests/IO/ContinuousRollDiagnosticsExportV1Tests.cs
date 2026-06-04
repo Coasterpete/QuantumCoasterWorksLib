@@ -1,7 +1,11 @@
+
 using System.IO;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Json.Schema;
+
+using System.Text.Json;
+
 using Quantum.IO.ContinuousRollDiagnostics.V1;
 using Quantum.Track;
 using SystemMath = System.Math;
@@ -12,8 +16,10 @@ public sealed class ContinuousRollDiagnosticsExportV1Tests
 {
     private const double Tolerance = 1e-9;
 
+
     private static readonly Lazy<JsonSchema> ContinuousRollDiagnosticsSchema = new(
         CreateContinuousRollDiagnosticsSchema);
+
 
     [Fact]
     public void SerializeDeserialize_ReportDiagnostics_PreservesContractAndCamelCaseContent()
@@ -65,6 +71,7 @@ public sealed class ContinuousRollDiagnosticsExportV1Tests
     }
 
     [Fact]
+
     public void Serialize_Indented_MatchesGoldenFixture()
     {
         ContinuousRollDiagnosticsExportV1Dto dto = CreateGoldenFixtureExport();
@@ -96,6 +103,8 @@ public sealed class ContinuousRollDiagnosticsExportV1Tests
     }
 
     [Fact]
+
+
     public void Export_WrappedFullTurnTransition_Treats359To1AsSmallContinuousDelta()
     {
         ContinuousRollDiagnosticsExportV1Dto artifact = CreateExport(
@@ -160,6 +169,7 @@ public sealed class ContinuousRollDiagnosticsExportV1Tests
         Assert.Contains("malformed", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
+
     [Fact]
     public void SchemaValidation_GoldenFixture_IsValid()
     {
@@ -214,6 +224,8 @@ public sealed class ContinuousRollDiagnosticsExportV1Tests
             });
     }
 
+
+
     private static ContinuousRollDiagnosticsExportV1Dto CreateExport(
         IReadOnlyList<double> distances,
         IReadOnlyList<double> rollRadians)
@@ -223,6 +235,7 @@ public sealed class ContinuousRollDiagnosticsExportV1Tests
 
         return ContinuousRollDiagnosticsExportV1Mapper.Export(report);
     }
+
 
     private static string LoadGoldenFixtureJson()
     {
@@ -272,6 +285,11 @@ public sealed class ContinuousRollDiagnosticsExportV1Tests
     private static double ToRadians(double degrees)
     {
         return degrees * (SystemMath.PI / 180.0);
+    }
+    private static double ToRadians(double degrees)
+    {
+        return degrees * SystemMath.PI / 180.0;
+
     }
 
     private static void AssertNear(double expected, double actual)

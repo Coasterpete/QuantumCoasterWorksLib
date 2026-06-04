@@ -205,7 +205,11 @@ Generated JSON, SVG, Markdown, and HTML under `artifacts/` are local output by d
 - `dotnet run --project Quantum.Debug -- centerline-frame-continuity [outputPath]`: write backend-only JSON diagnostics for frame continuity on a deterministic sample centerline.
 - `dotnet run --project Quantum.Debug -- transported-frame-comparison [outputPath]`: write backend-only JSON diagnostics comparing stateless and transported frames over the diagnostic fixture set.
 - `dotnet run --project Quantum.Debug -- banking-profile-diagnostics [outputPath]`: write backend-only JSON diagnostics for deterministic `BankingProfile` roll samples under `artifacts/banking-profile/`.
+<<<<<<< HEAD
 - `dotnet run --project Quantum.Debug -- continuous-roll-diagnostics-json [outputPath]`: write backend-only `quantum.continuous_roll_diagnostics` JSON for deterministic continuous roll samples under `artifacts/banking-profile/`, matching `Quantum.Tests/IO/Fixtures/ContinuousRollDiagnosticsExportV1.golden.json`.
+=======
+- `dotnet run --project Quantum.Debug -- continuous-roll-diagnostics-json [outputPath]`: write backend-only `quantum.continuous_roll_diagnostics` JSON for deterministic continuous roll samples under `artifacts/banking-profile/`.
+>>>>>>> origin/main
 - `dotnet run --project Quantum.Debug -- banking-profile-browser [diagnosticsJsonPath] [outputHtmlPath]`: write a self-contained local browser viewer for `BankingProfile` diagnostics JSON metadata, roll/slope graphs, interpolation transitions, and roll slope severity indicators.
 - `dotnet run --project Quantum.Debug -- transported-frame-comparison-browser [comparisonJsonPath] [outputHtmlPath]`: write a self-contained local browser viewer for transported-frame comparison JSON summary metrics, per-sample deltas, and severity indicators.
 

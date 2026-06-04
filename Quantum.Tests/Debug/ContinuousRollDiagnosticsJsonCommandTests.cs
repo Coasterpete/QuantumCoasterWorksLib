@@ -71,6 +71,7 @@ public sealed class ContinuousRollDiagnosticsJsonCommandTests
         }
     }
 
+
     [Fact]
     public void Run_WithExplicitOutputPath_MatchesGoldenRegressionFixture()
     {
@@ -94,6 +95,7 @@ public sealed class ContinuousRollDiagnosticsJsonCommandTests
         }
     }
 
+
     private static string CreateTempDirectoryPath()
     {
         return Path.Combine(
@@ -101,6 +103,7 @@ public sealed class ContinuousRollDiagnosticsJsonCommandTests
             "QuantumCoasterWorks.ContinuousRollDiagnosticsJsonCommandTests",
             Guid.NewGuid().ToString("N"));
     }
+
 
     private static string LoadGoldenFixtureJson()
     {
@@ -113,6 +116,7 @@ public sealed class ContinuousRollDiagnosticsJsonCommandTests
     {
         return value.ReplaceLineEndings("\n");
     }
+
 
     private static void DeleteDirectoryIfPresent(string path)
     {
