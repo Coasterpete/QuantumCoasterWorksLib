@@ -16,9 +16,14 @@ namespace Quantum.Track
         /// </summary>
         public TrainBogieWithWheelsTransform(BogieTransform bogie, WheelTransform[] wheels)
         {
+            if (wheels is null)
+            {
+                throw new ArgumentNullException(nameof(wheels));
+            }
+
             Bogie = bogie;
             _wheelsSnapshot = CopyArray(wheels);
-            _wheelsReadOnly = _wheelsSnapshot == null ? null : Array.AsReadOnly(_wheelsSnapshot);
+            _wheelsReadOnly = Array.AsReadOnly(_wheelsSnapshot);
         }
 
         /// <summary>
