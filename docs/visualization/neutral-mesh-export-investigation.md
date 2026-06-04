@@ -1,14 +1,16 @@
 # Neutral Mesh Export Investigation
 
-Last updated: 2026-06-03
+Last updated: 2026-06-04
 
 Milestone 74 adds a small `MeshExportV1` contract sketch in `Quantum.IO` with
 DTOs, JSON serialization, and validation. Milestone 75 adds a minimal
 `Quantum.Debug` sample artifact command that writes a deterministic
 self-authored quad JSON through that DTO, JSON helper, and validator.
+Milestone 76 adds an optional Blender-side importer for that deterministic
+sample artifact only.
 
-This still does not add a real mesh generator/exporter, Blender importer,
-adapter, renderer dependency, or production mesh fixture.
+This still does not add a real mesh generator/exporter, renderer dependency, or
+production mesh fixture.
 
 ## Current Decision
 
@@ -19,8 +21,10 @@ slot labels.
 
 `dotnet run --project Quantum.Debug -- mesh-export-v1-sample [outputPath]`
 writes a tiny deterministic sample artifact for tooling and future adapter smoke
-tests. The command is intentionally only a sample producer; no real track,
-train, support, or scene mesh exporter exists yet.
+tests. `tools/blender/import_mesh_export_v1.py` can import that sample JSON into
+Blender as generated diagnostic mesh objects. The command is intentionally only
+a sample producer, and the Blender script is intentionally only a sample
+consumer; no real track, train, support, or scene mesh exporter exists yet.
 
 Do not add mesh fields to `DebugViewportSnapshotV1` or `TrainPoseExportV1`.
 Those contracts already have clear purposes:
@@ -113,13 +117,18 @@ scene-graph decisions.
 
 ## Adapter Consumption
 
-Blender should consume a future mesh artifact through `tools/blender/` or an
-equivalent optional adapter. No Blender `MeshExportV1` importer exists yet, and
-the current sample command is not a Blender path. A future adapter would parse
-`MeshExportV1`, verify contract/version, convert coordinates into Blender
-space, create Blender mesh objects, assign local materials from neutral labels,
-and keep `.blend`, render, and converted outputs out of committed source by
-default.
+Blender consumes the current deterministic sample artifact through
+`tools/blender/import_mesh_export_v1.py`. The importer parses `MeshExportV1`,
+verifies `contract == "quantum.mesh_export"` and `version == 1`, converts
+Quantum Y-up coordinates into Blender Z-up space at the adapter boundary,
+creates generated Blender mesh objects, assigns local diagnostic materials from
+neutral material slot labels, and keeps `.blend`, render, and converted outputs
+out of committed source by default.
+
+The importer reverses triangle winding while converting axes because the current
+Y-up to Z-up mapping swaps axes and flips handedness. That keeps the deterministic
+sample quad's upward normal visually aligned in Blender without changing the
+backend contract or the JSON topology.
 
 Unity should consume the same artifact through Unity-side tooling only. A Unity
 adapter would parse the neutral payload, create transient or generated meshes,
@@ -140,8 +149,8 @@ boundary.
 ## Deferred Work
 
 The mesh export path remains a contract sketch plus a deterministic sample JSON
-command until a later milestone defines a real generator/exporter and importer.
-Likely next steps:
+command plus an optional Blender sample importer until a later milestone defines
+a real generator/exporter. Likely next steps:
 
 - Decide whether the first real exporter writes JSON-only, binary, or a JSON
   manifest plus binary buffers.
@@ -150,7 +159,8 @@ Likely next steps:
 - Decide how mesh artifacts relate to track sections, generated supports, train
   placeholders, and production train art.
 - Add a backend mesh generator or export adapter.
-- Add a Blender importer only in optional tooling.
+- Extend or replace the sample Blender importer only when a real mesh artifact
+  needs additional adapter policy.
 - Add adapter smoke tests only in optional tooling, not core backend projects.
 
 Until then, current Blender, Unity, and browser diagnostics should continue to
