@@ -18,6 +18,9 @@ namespace Quantum.Track
         /// <summary>
         /// Creates an immutable train-pose snapshot over the evaluated car hierarchy.
         /// </summary>
+        /// <param name="leadDistance">Lead-car station distance used to evaluate the train.</param>
+        /// <param name="definition">Train consist definition used for the evaluation.</param>
+        /// <param name="cars">Evaluated articulated car hierarchy to copy into the snapshot.</param>
         public TrainPoseResult(
             double leadDistance,
             TrainConsistDefinition definition,

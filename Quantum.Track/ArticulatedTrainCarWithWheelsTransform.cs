@@ -8,6 +8,9 @@ namespace Quantum.Track
         /// <summary>
         /// Creates an articulated car-and-running-gear wrapper from evaluated transforms.
         /// </summary>
+        /// <param name="body">Evaluated articulated body transform.</param>
+        /// <param name="frontBogie">Evaluated front bogie and wheel transforms.</param>
+        /// <param name="rearBogie">Evaluated rear bogie and wheel transforms.</param>
         public ArticulatedTrainCarWithWheelsTransform(
             ArticulatedTrainCarTransform body,
             TrainBogieWithWheelsTransform frontBogie,
