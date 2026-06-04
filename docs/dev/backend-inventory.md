@@ -6,7 +6,7 @@ Scope: `Quantum.Core` plus nearby active backend projects: `Quantum.Math`, `Quan
 
 This is an inventory and cleanup report only. No backend code was changed as part of this audit.
 
-## Validation Results
+## Historical Validation Results
 
 - `dotnet build QuantumCoasterWorks.sln`
   - Result: passed
@@ -14,7 +14,7 @@ This is an inventory and cleanup report only. No backend code was changed as par
   - Errors: 0
 - `dotnet test QuantumCoasterWorks.sln --no-build`
   - Result: passed
-  - Passed: 850
+  - Passed: 850 (historical snapshot)
   - Failed: 0
   - Skipped: 0
 
@@ -306,13 +306,13 @@ Do not try to document every member at once. Start with public boundary types an
 
 ### Strong Existing Coverage
 
-The suite is strong for the current milestone:
+At the time of this historical inventory snapshot, the suite was strong for the milestone:
 
 - `Quantum.Tests/Track`: 37 test files
 - `Quantum.Tests/Physics`: 10 test files
 - `Quantum.Tests/IO`: 6 test files
 - `Quantum.Tests/FVD`: 6 test files
-- 850 total passing tests
+- 850 total passing tests in that snapshot
 
 Particularly valuable:
 
