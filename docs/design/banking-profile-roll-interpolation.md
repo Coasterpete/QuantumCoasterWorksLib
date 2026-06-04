@@ -84,10 +84,10 @@ distances before analysis.
 The report computes adjacent roll deltas, maximum and average absolute roll
 rate in radians per meter, full-turn wrap handling, and continuity warnings
 when roll delta or roll rate exceeds the configured thresholds. Full-turn wrap
-handling is enabled by default so normalized samples such as `359° -> 1°` are
-treated as a small `2°` transition instead of a false `358°` jump. The no-wrap
-option remains available when an importer or authoring tool needs to inspect
-raw authored values.
+handling is enabled by default so normalized samples such as `359 degrees -> 1
+degree` are treated as a small `2 degree` transition instead of a false `358
+degree` jump. The no-wrap option remains available when an importer or
+authoring tool needs to inspect raw authored values.
 
 The `continuous-roll-diagnostics-sample` debug command writes a deterministic
 text report under `artifacts/banking-profile/` by default. The output is a
@@ -104,6 +104,34 @@ remain responsible for spatial centerline and rider-reference geometry. If a
 later spline-backed banking model is introduced, it should still produce
 station-distance roll samples that this diagnostic can analyze without changing
 export contracts.
+
+## Milestone 78 Continuous Roll Diagnostics JSON Update
+
+Milestone 78 adds a versioned renderer-neutral JSON artifact for the same
+backend diagnostics:
+
+```text
+contract: quantum.continuous_roll_diagnostics
+version: 1
+```
+
+The `continuous-roll-diagnostics-json` debug command writes a deterministic
+sample artifact under `artifacts/banking-profile/` by default. The payload
+includes sample count, maximum and average roll rate in radians per meter,
+whether wrap handling was enabled, warning count, and per-sample station
+distance, continuity-adjusted roll radians/degrees, incoming delta
+radians/degrees, incoming roll rate, and optional warning text.
+
+The JSON export is mapped from `ContinuousRollDiagnosticsReport`; it does not
+duplicate roll delta, roll rate, wrap handling, or warning calculations. The
+existing `continuous-roll-diagnostics-sample` text report remains available for
+human inspection.
+
+This is a backend inspection artifact only. It does not modify
+`DebugViewportSnapshotV1`, `TrainPoseExportV1`, `MeshExportV1`, `TrackFrame`, or
+default `TrackEvaluator` behavior. Future browser and Blender viewers may
+consume `quantum.continuous_roll_diagnostics` JSON, but no browser, Blender, or
+other viewer implementation is added in this milestone.
 
 ## Current Baseline
 

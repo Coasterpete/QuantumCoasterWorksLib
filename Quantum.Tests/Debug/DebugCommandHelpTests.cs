@@ -32,6 +32,7 @@ public sealed class DebugCommandHelpTests
         Assert.Contains("transported-frame-comparison-browser [comparisonJsonPath] [outputHtmlPath]", output);
         Assert.Contains("banking-profile-diagnostics [outputPath]", output);
         Assert.Contains("continuous-roll-diagnostics-sample [outputPath]", output);
+        Assert.Contains("continuous-roll-diagnostics-json [outputPath]", output);
         Assert.Contains("banking-profile-browser [diagnosticsJsonPath] [outputHtmlPath]", output);
         Assert.Contains("Examples:", output);
         Assert.Contains(DebugCommandHelp.GeneratedArtifactsNote, output);
@@ -291,6 +292,28 @@ public sealed class DebugCommandHelpTests
     }
 
     [Fact]
+    public void TryWriteRequestedHelp_ContinuousRollDiagnosticsJson_PrintsArtifactDetails()
+    {
+        var writer = new StringWriter(CultureInfo.InvariantCulture);
+
+        bool handled = DebugCommandHelp.TryWriteRequestedHelp(
+            new[] { "help", "continuous-roll-diagnostics-json" },
+            writer,
+            out int exitCode);
+
+        Assert.True(handled);
+        Assert.Equal(0, exitCode);
+
+        string output = writer.ToString();
+        Assert.Contains("continuous-roll-diagnostics-json [outputPath]", output);
+        Assert.Contains("quantum.continuous_roll_diagnostics version 1", output);
+        Assert.Contains("System.Text.Json camelCase", output);
+        Assert.Contains("mapped from ContinuousRollDiagnostics", output);
+        Assert.Contains("backend inspection artifact only", output);
+        Assert.Contains("default TrackEvaluator behavior", output);
+    }
+
+    [Fact]
     public void TryWriteRequestedHelp_BankingProfileBrowser_PrintsViewerDetails()
     {
         var writer = new StringWriter(CultureInfo.InvariantCulture);
@@ -336,6 +359,7 @@ public sealed class DebugCommandHelpTests
         Assert.Contains("transported-frame-comparison-browser [comparisonJsonPath] [outputHtmlPath]", output);
         Assert.Contains("banking-profile-diagnostics [outputPath]", output);
         Assert.Contains("continuous-roll-diagnostics-sample [outputPath]", output);
+        Assert.Contains("continuous-roll-diagnostics-json [outputPath]", output);
         Assert.Contains("banking-profile-browser [diagnosticsJsonPath] [outputHtmlPath]", output);
     }
 }
