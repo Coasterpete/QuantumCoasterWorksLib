@@ -30,15 +30,18 @@ public sealed class BackendDependencyContractTests
         "Quantum.Debug/Quantum.Debug.csproj"
     };
 
-    private static readonly string[] ForbiddenFrontendOrRendererPrefixes =
+    private static readonly string[] ForbiddenFrontendOrRendererNames =
     {
+        "Unity",
         "UnityEngine",
         "UnityEditor",
         "Unreal",
         "Avalonia",
         "Silk.NET",
         "OpenTK",
-        "Veldrid"
+        "Veldrid",
+        "Renderer",
+        "Frontend"
     };
 
     private static readonly string[] ForbiddenGeometryInterchangePrefixes =
@@ -49,14 +52,18 @@ public sealed class BackendDependencyContractTests
         "OpenNurbs"
     };
 
-    private static readonly string[] ForbiddenFrontendOrBrowserPackageFragments =
+    private static readonly string[] ForbiddenFrontendOrBrowserDependencyNames =
     {
         "Unity",
+        "UnityEngine",
+        "UnityEditor",
         "Unreal",
         "Avalonia",
         "Silk.NET",
         "OpenTK",
         "Veldrid",
+        "Renderer",
+        "Frontend",
         "Blazor",
         "Playwright",
         "Selenium",
@@ -74,11 +81,11 @@ public sealed class BackendDependencyContractTests
 
             foreach (AssemblyName reference in assembly.GetReferencedAssemblies())
             {
-                foreach (string forbiddenPrefix in ForbiddenFrontendOrRendererPrefixes)
+                foreach (string forbiddenName in ForbiddenFrontendOrRendererNames)
                 {
                     Assert.False(
                         reference.Name != null &&
-                        reference.Name.StartsWith(forbiddenPrefix, StringComparison.OrdinalIgnoreCase),
+                        ContainsDependencyName(reference.Name, forbiddenName),
                         $"{assembly.GetName().Name} must not reference frontend or renderer assembly '{reference.Name}'.");
                 }
             }
@@ -115,14 +122,25 @@ public sealed class BackendDependencyContractTests
             string resolvedProjectPath = Path.Combine(repoRoot, ToPlatformPath(projectPath));
             string projectXml = File.ReadAllText(resolvedProjectPath);
 
-            foreach (string forbiddenFragment in ForbiddenFrontendOrBrowserPackageFragments)
+            foreach (string forbiddenName in ForbiddenFrontendOrBrowserDependencyNames)
             {
-                Assert.DoesNotContain(
-                    forbiddenFragment,
-                    projectXml,
-                    StringComparison.OrdinalIgnoreCase);
+                Assert.False(
+                    ContainsDependencyName(projectXml, forbiddenName),
+                    $"{projectPath} must not reference frontend, renderer, browser, or engine dependency '{forbiddenName}'.");
             }
         }
+    }
+
+    private static bool ContainsDependencyName(string dependencyName, string forbiddenName)
+    {
+        return dependencyName.Equals(forbiddenName, StringComparison.OrdinalIgnoreCase) ||
+            dependencyName.StartsWith(forbiddenName + ".", StringComparison.OrdinalIgnoreCase) ||
+            dependencyName.StartsWith(forbiddenName + "-", StringComparison.OrdinalIgnoreCase) ||
+            dependencyName.Contains("." + forbiddenName, StringComparison.OrdinalIgnoreCase) ||
+            dependencyName.Contains("-" + forbiddenName, StringComparison.OrdinalIgnoreCase) ||
+            dependencyName.Contains(forbiddenName + ".", StringComparison.OrdinalIgnoreCase) ||
+            dependencyName.Contains(forbiddenName + "-", StringComparison.OrdinalIgnoreCase) ||
+            dependencyName.Contains("\"" + forbiddenName + "\"", StringComparison.OrdinalIgnoreCase);
     }
 
     private static string ResolveRepositoryRoot()
