@@ -23,6 +23,7 @@ namespace Quantum.Debug
         TransportedFrameComparison,
         TransportedFrameComparisonBrowser,
         BankingProfileDiagnostics,
+        ContinuousRollDiagnosticsSample,
         BankingProfileBrowser
     }
 
@@ -142,6 +143,12 @@ namespace Quantum.Debug
             if (string.Equals(args[0], BankingProfileDiagnosticsCommand.CommandName, StringComparison.OrdinalIgnoreCase))
             {
                 command = DebugCommandKind.BankingProfileDiagnostics;
+                return true;
+            }
+
+            if (string.Equals(args[0], ContinuousRollDiagnosticsSampleCommand.CommandName, StringComparison.OrdinalIgnoreCase))
+            {
+                command = DebugCommandKind.ContinuousRollDiagnosticsSample;
                 return true;
             }
 

@@ -260,6 +260,23 @@ namespace Quantum.Debug
                     "dotnet run --project Quantum.Debug -- banking-profile-diagnostics artifacts/banking-profile/banking-profile-diagnostics.sample.json"
                 }),
             new DebugCommandHelpEntry(
+                name: ContinuousRollDiagnosticsSampleCommand.CommandName,
+                usage: "continuous-roll-diagnostics-sample [outputPath]",
+                summary: "Write a deterministic continuous roll diagnostics text report.",
+                arguments: new[]
+                {
+                    "outputPath: Optional text output path. Defaults to " +
+                    ContinuousRollDiagnosticsSampleCommand.DefaultRelativeOutputPath + ".",
+                    "The sample feeds explicit station-distance roll values into ContinuousRollDiagnostics, reports adjacent roll deltas, maximum and average roll rate, wrap-around handling, and roll continuity warnings.",
+                    "Full-turn wrap handling treats 359 degrees to 1 degree as a small continuous transition while still warning on a deliberately discontinuous roll jump.",
+                    "This is a backend-only diagnostic report and does not change DebugViewportSnapshotV1, TrainPoseExportV1, MeshExportV1, TrackFrame, or TrackEvaluator behavior."
+                },
+                examples: new[]
+                {
+                    "dotnet run --project Quantum.Debug -- continuous-roll-diagnostics-sample",
+                    "dotnet run --project Quantum.Debug -- continuous-roll-diagnostics-sample artifacts/banking-profile/continuous-roll-diagnostics.sample.txt"
+                }),
+            new DebugCommandHelpEntry(
                 name: BankingProfileBrowserCommand.CommandName,
                 usage: "banking-profile-browser [diagnosticsJsonPath] [outputHtmlPath]",
                 summary: "Write a self-contained browser viewer for BankingProfile diagnostics JSON.",
