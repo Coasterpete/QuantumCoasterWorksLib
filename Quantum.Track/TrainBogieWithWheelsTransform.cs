@@ -14,6 +14,8 @@ namespace Quantum.Track
         /// <summary>
         /// Creates a bogie-and-wheels wrapper from an evaluated bogie and wheel array.
         /// </summary>
+        /// <param name="bogie">Evaluated bogie transform.</param>
+        /// <param name="wheels">Evaluated wheel transforms to copy into the snapshot.</param>
         public TrainBogieWithWheelsTransform(BogieTransform bogie, WheelTransform[] wheels)
         {
             if (wheels is null)
