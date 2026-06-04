@@ -277,6 +277,27 @@ namespace Quantum.Debug
                     "dotnet run --project Quantum.Debug -- continuous-roll-diagnostics-sample artifacts/banking-profile/continuous-roll-diagnostics.sample.txt"
                 }),
             new DebugCommandHelpEntry(
+                name: ContinuousRollDiagnosticsJsonCommand.CommandName,
+                usage: "continuous-roll-diagnostics-json [outputPath]",
+                summary: "Write a deterministic continuous roll diagnostics JSON artifact.",
+                arguments: new[]
+                {
+                    "outputPath: Optional JSON output path. Defaults to " +
+                    ContinuousRollDiagnosticsJsonCommand.DefaultRelativeOutputPath + ".",
+                    "The artifact uses contract quantum.continuous_roll_diagnostics version 1 and System.Text.Json camelCase serialization.",
+
+                    "The generated payload matches Quantum.Tests/IO/Fixtures/ContinuousRollDiagnosticsExportV1.golden.json.",
+
+
+                    "The JSON is mapped from ContinuousRollDiagnostics so it shares the same roll delta, roll rate, wrap handling, and warning calculations as the text report.",
+                    "This is a backend inspection artifact only; it does not change DebugViewportSnapshotV1, TrainPoseExportV1, MeshExportV1, TrackFrame, or default TrackEvaluator behavior."
+                },
+                examples: new[]
+                {
+                    "dotnet run --project Quantum.Debug -- continuous-roll-diagnostics-json",
+                    "dotnet run --project Quantum.Debug -- continuous-roll-diagnostics-json artifacts/banking-profile/continuous-roll-diagnostics.sample.json"
+                }),
+            new DebugCommandHelpEntry(
                 name: BankingProfileBrowserCommand.CommandName,
                 usage: "banking-profile-browser [diagnosticsJsonPath] [outputHtmlPath]",
                 summary: "Write a self-contained browser viewer for BankingProfile diagnostics JSON.",
