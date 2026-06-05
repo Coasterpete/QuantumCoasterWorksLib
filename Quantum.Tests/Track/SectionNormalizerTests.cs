@@ -280,6 +280,31 @@ public sealed class SectionNormalizerTests
     }
 
     [Fact]
+    public void SectionFunction_NonIncreasingSampleX_IsRejected()
+    {
+        ArgumentException duplicate = Assert.Throws<ArgumentException>(() =>
+            new SectionFunction(
+                SectionChannel.NormalG,
+                new List<SectionSample>
+                {
+                    new SectionSample(0.0, 1.0),
+                    new SectionSample(0.0, 2.0)
+                }));
+
+        ArgumentException decreasing = Assert.Throws<ArgumentException>(() =>
+            new SectionFunction(
+                SectionChannel.NormalG,
+                new List<SectionSample>
+                {
+                    new SectionSample(1.0, 1.0),
+                    new SectionSample(0.5, 2.0)
+                }));
+
+        Assert.Equal("samples", duplicate.ParamName);
+        Assert.Equal("samples", decreasing.ParamName);
+    }
+
+    [Fact]
     public void SectionSample_NonFiniteCoordinatesOrValues_AreRejected()
     {
         ArgumentOutOfRangeException invalidX = Assert.Throws<ArgumentOutOfRangeException>(() =>
