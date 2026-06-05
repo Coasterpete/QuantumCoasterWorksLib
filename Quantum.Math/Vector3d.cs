@@ -4,13 +4,34 @@ using System.Collections.Generic;
 namespace Quantum.Math
 {
     /// <summary>
-    /// Double-precision 3D vector.
-    /// Engine-agnostic. No Unity dependencies.
+    /// Engine-agnostic double-precision 3D vector used by the Quantum backend.
     /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <see cref="Vector3d"/> is intentionally a lightweight mutable value type:
+    /// its components are public fields so coaster-domain code can pass and adjust
+    /// points, directions, tangents, and frame bases without engine dependencies.
+    /// </para>
+    /// <para>
+    /// This type is a backend math primitive, not a replacement for mature
+    /// matrix, spline, interpolation, or geometry libraries.
+    /// </para>
+    /// </remarks>
     public struct Vector3d
     {
+        /// <summary>
+        /// Mutable X component.
+        /// </summary>
         public double X;
+
+        /// <summary>
+        /// Mutable Y component.
+        /// </summary>
         public double Y;
+
+        /// <summary>
+        /// Mutable Z component.
+        /// </summary>
         public double Z;
 
         public Vector3d(double x, double y, double z)
