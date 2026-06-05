@@ -17,6 +17,11 @@ namespace Quantum.Track
                 throw new ArgumentOutOfRangeException(nameof(channel), channel, "Unsupported section channel.");
             }
 
+            if (!IsFinite(value))
+            {
+                throw new ArgumentOutOfRangeException(nameof(value), value, "Value must be finite.");
+            }
+
             Channel = channel;
             Value = value;
         }
@@ -30,5 +35,10 @@ namespace Quantum.Track
         /// Evaluated channel value.
         /// </summary>
         public double Value { get; }
+
+        private static bool IsFinite(double value)
+        {
+            return !(double.IsNaN(value) || double.IsInfinity(value));
+        }
     }
 }
