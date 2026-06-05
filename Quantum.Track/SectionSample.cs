@@ -1,3 +1,5 @@
+using System;
+
 namespace Quantum.Track
 {
     /// <summary>
@@ -10,6 +12,16 @@ namespace Quantum.Track
         /// </summary>
         public SectionSample(double x, double value)
         {
+            if (!IsFinite(x))
+            {
+                throw new ArgumentOutOfRangeException(nameof(x), x, "X must be finite.");
+            }
+
+            if (!IsFinite(value))
+            {
+                throw new ArgumentOutOfRangeException(nameof(value), value, "Value must be finite.");
+            }
+
             X = x;
             Value = value;
         }
@@ -23,5 +35,10 @@ namespace Quantum.Track
         /// Channel value at <see cref="X"/>.
         /// </summary>
         public double Value { get; }
+
+        private static bool IsFinite(double value)
+        {
+            return !(double.IsNaN(value) || double.IsInfinity(value));
+        }
     }
 }

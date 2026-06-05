@@ -271,6 +271,18 @@ public sealed class SectionNormalizerTests
     }
 
     [Fact]
+    public void SectionSample_NonFiniteCoordinatesOrValues_AreRejected()
+    {
+        ArgumentOutOfRangeException invalidX = Assert.Throws<ArgumentOutOfRangeException>(() =>
+            new SectionSample(double.NaN, value: 1.0));
+        ArgumentOutOfRangeException invalidValue = Assert.Throws<ArgumentOutOfRangeException>(() =>
+            new SectionSample(x: 0.0, double.PositiveInfinity));
+
+        Assert.Equal("x", invalidX.ParamName);
+        Assert.Equal("value", invalidValue.ParamName);
+    }
+
+    [Fact]
     public void SectionChannelEvaluation_InvalidChannel_IsRejected()
     {
         var invalidChannel = (SectionChannel)999;
