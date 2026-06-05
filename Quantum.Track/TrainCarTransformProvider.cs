@@ -8,6 +8,12 @@ namespace Quantum.Track
     /// <summary>
     /// Computes per-car frames and transform matrices from a lead-car distance.
     /// </summary>
+    /// <remarks>
+    /// <c>Evaluate*</c> is the preferred naming direction for deterministic
+    /// station-distance train transform computation. Existing <c>Get*</c>
+    /// methods remain as compatibility and convenience APIs for callers that
+    /// already depend on them.
+    /// </remarks>
     public sealed class TrainCarTransformProvider
     {
         private readonly TrackEvaluator _evaluator;
@@ -28,8 +34,15 @@ namespace Quantum.Track
         }
 
         /// <summary>
-        /// Computes per-car frames and body transform matrices from a lead-car distance.
+        /// Compatibility/convenience API that computes per-car body frames and
+        /// transform matrices from a lead-car station distance.
         /// </summary>
+        /// <remarks>
+        /// New deterministic station-distance train transform code should prefer
+        /// <see cref="EvaluateCarTransforms(double, double, int)"/>. This method
+        /// remains available for existing callers and has the same sampling
+        /// semantics.
+        /// </remarks>
         public IReadOnlyList<TrainCarTransform> GetCarTransforms(
             double leadDistance,
             double carSpacing,
@@ -39,9 +52,16 @@ namespace Quantum.Track
         }
 
         /// <summary>
-        /// Computes per-car frames and body transform matrices using an explicit
-        /// <see cref="BankingProfile"/> as the roll source.
+        /// Compatibility/convenience API that computes per-car body frames and
+        /// transform matrices using an explicit <see cref="BankingProfile"/> as
+        /// the roll source.
         /// </summary>
+        /// <remarks>
+        /// New deterministic station-distance train transform code should prefer
+        /// <see cref="EvaluateCarTransforms(double, double, int, BankingProfile)"/>.
+        /// This method remains available for existing callers and has the same
+        /// profile-backed sampling semantics.
+        /// </remarks>
         public IReadOnlyList<TrainCarTransform> GetCarTransforms(
             double leadDistance,
             double carSpacing,
@@ -61,9 +81,14 @@ namespace Quantum.Track
         }
 
         /// <summary>
-        /// Alias for <see cref="GetCarTransforms(double, double, int)"/> to align naming with other
-        /// <c>Evaluate*</c> provider APIs.
+        /// Preferred API for evaluating per-car body frames and transform
+        /// matrices from a lead-car station distance.
         /// </summary>
+        /// <remarks>
+        /// This method keeps deterministic station-distance computation under the
+        /// <c>Evaluate*</c> naming convention and delegates to the compatibility
+        /// <see cref="GetCarTransforms(double, double, int)"/> implementation.
+        /// </remarks>
         public IReadOnlyList<TrainCarTransform> EvaluateCarTransforms(
             double leadDistance,
             double carSpacing,
@@ -73,9 +98,16 @@ namespace Quantum.Track
         }
 
         /// <summary>
-        /// Alias for <see cref="GetCarTransforms(double, double, int, BankingProfile)"/> to align naming with other
-        /// <c>Evaluate*</c> provider APIs.
+        /// Preferred API for evaluating per-car body frames and transform
+        /// matrices from a lead-car station distance using an explicit
+        /// <see cref="BankingProfile"/> as the roll source.
         /// </summary>
+        /// <remarks>
+        /// This method keeps deterministic station-distance computation under the
+        /// <c>Evaluate*</c> naming convention and delegates to the compatibility
+        /// <see cref="GetCarTransforms(double, double, int, BankingProfile)"/>
+        /// implementation.
+        /// </remarks>
         public IReadOnlyList<TrainCarTransform> EvaluateCarTransforms(
             double leadDistance,
             double carSpacing,
@@ -85,6 +117,10 @@ namespace Quantum.Track
             return GetCarTransforms(leadDistance, carSpacing, carCount, bankingProfile);
         }
 
+        /// <summary>
+        /// Evaluates deterministic body and bogie transforms from a lead-car
+        /// station distance and consist definition.
+        /// </summary>
         public IReadOnlyList<TrainCarWithBogiesTransform> EvaluateTrainWithBogies(
             double leadDistance,
             TrainConsistDefinition definition)
@@ -101,6 +137,10 @@ namespace Quantum.Track
                 definition.BogieSpacing);
         }
 
+        /// <summary>
+        /// Evaluates deterministic body, bogie, and wheel transforms from a
+        /// lead-car station distance and consist definition.
+        /// </summary>
         public IReadOnlyList<TrainCarWithBogiesAndWheelsTransform> EvaluateTrainWithBogiesAndWheels(
             double leadDistance,
             TrainConsistDefinition definition)
@@ -122,6 +162,10 @@ namespace Quantum.Track
             return _wheelLayoutSolver.AttachWheels(carsWithBogies, wheelLayout);
         }
 
+        /// <summary>
+        /// Evaluates deterministic articulated body transforms from a lead-car
+        /// station distance and consist definition.
+        /// </summary>
         public IReadOnlyList<ArticulatedTrainCarTransform> EvaluateArticulatedTrain(
             double leadDistance,
             TrainConsistDefinition definition)
@@ -137,6 +181,10 @@ namespace Quantum.Track
             return _articulationSolver.SolveArticulatedBodies(carsWithBogies);
         }
 
+        /// <summary>
+        /// Evaluates deterministic articulated body and wheel transforms from a
+        /// lead-car station distance and consist definition.
+        /// </summary>
         public IReadOnlyList<ArticulatedTrainCarWithWheelsTransform> EvaluateArticulatedTrainWithWheels(
             double leadDistance,
             TrainConsistDefinition definition)
@@ -162,7 +210,8 @@ namespace Quantum.Track
         }
 
         /// <summary>
-        /// Public train-pose entrypoint for distance-based coaster train placement.
+        /// Preferred public train-pose entrypoint for distance-based coaster train
+        /// placement.
         /// </summary>
         /// <remarks>
         /// This method is the stable backend boundary for consumers that need a
@@ -186,7 +235,7 @@ namespace Quantum.Track
         }
 
         /// <summary>
-        /// Public train-pose entrypoint that explicitly uses a
+        /// Preferred public train-pose entrypoint that explicitly uses a
         /// <see cref="BankingProfile"/> as the roll source.
         /// </summary>
         /// <remarks>
@@ -227,6 +276,10 @@ namespace Quantum.Track
             return _poseAssembler.BuildPoseResult(leadDistance, definition, evaluatedCars);
         }
 
+        /// <summary>
+        /// Evaluates deterministic body and bogie transforms from explicit train
+        /// spacing values and a lead-car station distance.
+        /// </summary>
         public IReadOnlyList<TrainCarWithBogiesTransform> EvaluateTrainWithBogies(
             double leadDistance,
             int carCount,
