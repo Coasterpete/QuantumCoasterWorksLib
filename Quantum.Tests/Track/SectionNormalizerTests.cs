@@ -271,6 +271,15 @@ public sealed class SectionNormalizerTests
     }
 
     [Fact]
+    public void SectionFunction_EmptySampleBackedFunction_IsRejected()
+    {
+        ArgumentException exception = Assert.Throws<ArgumentException>(() =>
+            new SectionFunction(SectionChannel.NormalG, new List<SectionSample>()));
+
+        Assert.Equal("samples", exception.ParamName);
+    }
+
+    [Fact]
     public void SectionSample_NonFiniteCoordinatesOrValues_AreRejected()
     {
         ArgumentOutOfRangeException invalidX = Assert.Throws<ArgumentOutOfRangeException>(() =>

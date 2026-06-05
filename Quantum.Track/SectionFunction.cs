@@ -32,6 +32,13 @@ namespace Quantum.Track
 
             ValidateChannel(channel);
 
+            if (evaluateAt is null && samples.Count == 0)
+            {
+                throw new ArgumentException(
+                    "Sample-backed section functions require at least one sample.",
+                    nameof(samples));
+            }
+
             Channel = channel;
             _samples = new List<SectionSample>(samples.Count);
             for (int i = 0; i < samples.Count; i++)
