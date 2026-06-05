@@ -10,6 +10,11 @@ namespace Quantum.Track
             double endDistance,
             bool includeEndDistance = false)
         {
+            if (section is null)
+            {
+                throw new ArgumentNullException(nameof(section));
+            }
+
             if (double.IsNaN(startDistance) || double.IsInfinity(startDistance))
             {
                 throw new ArgumentOutOfRangeException(
