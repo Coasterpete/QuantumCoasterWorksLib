@@ -32,6 +32,13 @@ namespace Quantum.Track
                 throw new ArgumentNullException(nameof(functions));
             }
 
+            if (functions.Count == 0)
+            {
+                throw new ArgumentException(
+                    "At least one section function is required.",
+                    nameof(functions));
+            }
+
             ValidateKind(kind);
             ValidateDomain(domain);
 

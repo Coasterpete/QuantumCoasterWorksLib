@@ -239,6 +239,20 @@ public sealed class SectionNormalizerTests
     }
 
     [Fact]
+    public void SectionDefinition_EmptyFunctions_IsRejected()
+    {
+        ArgumentException exception = Assert.Throws<ArgumentException>(() =>
+            new SectionDefinition(
+                SectionKind.Force,
+                SectionDomain.Distance,
+                startX: 0.0,
+                endX: 1.0,
+                new List<SectionFunction>()));
+
+        Assert.Equal("functions", exception.ParamName);
+    }
+
+    [Fact]
     public void SectionDefinition_SampleOutsideRangeIsRejected()
     {
         var function = new SectionFunction(
