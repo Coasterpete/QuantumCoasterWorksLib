@@ -32,11 +32,24 @@ namespace Quantum.Track
 
             ValidateChannel(channel);
 
-            if (evaluateAt is null && samples.Count == 0)
+            if (evaluateAt is null)
             {
-                throw new ArgumentException(
-                    "Sample-backed section functions require at least one sample.",
-                    nameof(samples));
+                if (samples.Count == 0)
+                {
+                    throw new ArgumentException(
+                        "Sample-backed section functions require at least one sample.",
+                        nameof(samples));
+                }
+
+                for (int i = 1; i < samples.Count; i++)
+                {
+                    if (samples[i].X <= samples[i - 1].X)
+                    {
+                        throw new ArgumentException(
+                            "Sample-backed section function sample X values must be strictly increasing.",
+                            nameof(samples));
+                    }
+                }
             }
 
             Channel = channel;
