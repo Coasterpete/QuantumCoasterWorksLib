@@ -270,6 +270,29 @@ public sealed class SectionNormalizerTests
                 }));
     }
 
+    [Fact]
+    public void SectionDefinition_EvaluateAt_InvalidChannel_IsRejected()
+    {
+        var definition = new SectionDefinition(
+            SectionKind.Force,
+            SectionDomain.Distance,
+            startX: 0.0,
+            endX: 1.0,
+            new List<SectionFunction>
+            {
+                new SectionFunction(
+                    SectionChannel.NormalG,
+                    new List<SectionSample>
+                    {
+                        new SectionSample(0.0, 1.0),
+                        new SectionSample(1.0, 2.0)
+                    })
+            });
+
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            definition.EvaluateAt((SectionChannel)999, 0.5));
+    }
+
     private static SectionChannel[] Channels(SectionDefinition definition)
     {
         var channels = new SectionChannel[definition.Functions.Count];

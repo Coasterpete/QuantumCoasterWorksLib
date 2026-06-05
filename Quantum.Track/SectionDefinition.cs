@@ -110,6 +110,8 @@ namespace Quantum.Track
         /// </summary>
         public double EvaluateAt(SectionChannel channel, double x)
         {
+            ValidateChannel(channel);
+
             for (int i = 0; i < _functions.Count; i++)
             {
                 SectionFunction function = _functions[i];
@@ -163,6 +165,19 @@ namespace Quantum.Track
             if (domain != SectionDomain.Distance && domain != SectionDomain.Time)
             {
                 throw new ArgumentOutOfRangeException(nameof(domain), domain, "Unsupported section domain.");
+            }
+        }
+
+        private static void ValidateChannel(SectionChannel channel)
+        {
+            if (channel != SectionChannel.NormalG
+                && channel != SectionChannel.LateralG
+                && channel != SectionChannel.LongitudinalG
+                && channel != SectionChannel.RollRateDegPerSec
+                && channel != SectionChannel.Curvature
+                && channel != SectionChannel.Roll)
+            {
+                throw new ArgumentOutOfRangeException(nameof(channel), channel, "Unsupported section channel.");
             }
         }
 
