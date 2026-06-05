@@ -294,6 +294,25 @@ public sealed class SectionNormalizerTests
     }
 
     [Fact]
+    public void SectionChannelEvaluation_NonFiniteValue_IsRejected()
+    {
+        var values = new[]
+        {
+            double.NaN,
+            double.PositiveInfinity,
+            double.NegativeInfinity
+        };
+
+        foreach (double value in values)
+        {
+            ArgumentOutOfRangeException exception = Assert.Throws<ArgumentOutOfRangeException>(() =>
+                new SectionChannelEvaluation(SectionChannel.Roll, value));
+
+            Assert.Equal("value", exception.ParamName);
+        }
+    }
+
+    [Fact]
     public void SectionDefinition_EvaluateAt_InvalidChannel_IsRejected()
     {
         var definition = new SectionDefinition(
