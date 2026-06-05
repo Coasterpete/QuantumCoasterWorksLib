@@ -1,3 +1,5 @@
+using System;
+
 namespace Quantum.Track
 {
     /// <summary>
@@ -10,6 +12,11 @@ namespace Quantum.Track
         /// </summary>
         public SectionChannelEvaluation(SectionChannel channel, double value)
         {
+            if (!Enum.IsDefined(typeof(SectionChannel), channel))
+            {
+                throw new ArgumentOutOfRangeException(nameof(channel), channel, "Unsupported section channel.");
+            }
+
             Channel = channel;
             Value = value;
         }
