@@ -271,6 +271,17 @@ public sealed class SectionNormalizerTests
     }
 
     [Fact]
+    public void SectionChannelEvaluation_InvalidChannel_IsRejected()
+    {
+        var invalidChannel = (SectionChannel)999;
+
+        ArgumentOutOfRangeException exception = Assert.Throws<ArgumentOutOfRangeException>(() =>
+            new SectionChannelEvaluation(invalidChannel, value: 1.0));
+
+        Assert.Equal("channel", exception.ParamName);
+    }
+
+    [Fact]
     public void SectionDefinition_EvaluateAt_InvalidChannel_IsRejected()
     {
         var definition = new SectionDefinition(
