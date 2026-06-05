@@ -3,7 +3,7 @@ using System.Collections.Generic;
 namespace Quantum.Track
 {
     /// <summary>
-    /// Coaster track document used as the source of truth for centerline sampling.
+    /// Mutable coaster track document used as the source of truth for centerline sampling.
     /// </summary>
     /// <remarks>
     /// Segment order defines the station-distance coordinate consumed by
@@ -11,16 +11,19 @@ namespace Quantum.Track
     /// inputs; spline/math details are support-layer implementation choices behind
     /// segment evaluation.
     ///
-    /// Documents are intentionally mutable during the current backend prototype.
-    /// Evaluators read the current segment and section lists when an evaluation call
-    /// starts; they do not take ownership of, or freeze, the document. Avoid mutating
-    /// a document while it is being evaluated, and treat mutations as affecting later
-    /// evaluations, including evaluations from an already-bound <see cref="TrackEvaluator"/>.
+    /// Documents are intentionally mutable during authoring and the current backend
+    /// prototype. The public lists are live authoring collections rather than
+    /// immutable views or snapshots. Evaluators read the current segment list when
+    /// an evaluation call starts; they do not take ownership of, or freeze, the
+    /// document. Avoid mutating a document while it is being evaluated, and treat
+    /// mutations as affecting later evaluations, including evaluations from an
+    /// already-bound <see cref="TrackEvaluator"/>.
     /// </remarks>
     public class TrackDocument
     {
         /// <summary>
-        /// Creates a track document from ordered segments and optional sections.
+        /// Creates a track document by copying ordered segments and optional sections
+        /// into mutable authoring lists.
         /// </summary>
         public TrackDocument(
             IEnumerable<TrackSegment>? segments = null,
@@ -36,22 +39,26 @@ namespace Quantum.Track
         }
 
         /// <summary>
-        /// Ordered centerline segments. Their lengths define station-distance sampling.
+        /// Live ordered centerline segments whose lengths define station-distance sampling.
         /// </summary>
         /// <remarks>
         /// This list is mutable by design for authoring and prototype workflows.
-        /// Mutating it changes the station-distance coordinate for future evaluation
-        /// calls. The backend does not currently provide concurrent mutation safety.
+        /// Callers may add, remove, replace, or reorder entries before evaluation.
+        /// Mutating it changes <see cref="TotalLength"/> and the station-distance
+        /// coordinate for future evaluation calls. The backend does not currently
+        /// provide concurrent mutation safety.
         /// </remarks>
         public IList<TrackSegment> Segments { get; }
 
         /// <summary>
-        /// Coaster-domain sections associated with the document.
+        /// Live coaster-domain sections associated with the document.
         /// </summary>
         /// <remarks>
-        /// This list is mutable by design. Section mutations are visible to future
-        /// consumers that resolve force, metadata, or authoring information from the
-        /// same document instance.
+        /// This list is mutable by design for authoring and prototype workflows.
+        /// Callers may add, remove, replace, or reorder entries before section-aware
+        /// consumers read the document. Sections carry force, metadata, or authoring
+        /// information; centerline distance sampling is defined by
+        /// <see cref="Segments"/>.
         /// </remarks>
         public IList<TrackSection> Sections { get; }
 
