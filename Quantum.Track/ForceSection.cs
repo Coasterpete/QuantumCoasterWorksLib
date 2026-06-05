@@ -1,13 +1,20 @@
 namespace Quantum.Track
 {
     /// <summary>
-    /// Coaster-domain force target section attached to a track document or resolved interval.
+    /// Compatibility/prototype authoring model for coaster-domain force target sections.
     /// </summary>
     /// <remarks>
     /// <para>
-    /// The scalar fields on this type are compatibility shorthand. During normalization,
-    /// they become channel functions only when no newer channel representation exists for
-    /// the same force component.
+    /// This type remains the existing input surface for simple force targets, resolver
+    /// tests, and debug visualization while the backend moves toward normalized section
+    /// definitions and explicit force channels.
+    /// </para>
+    /// <para>
+    /// The scalar target/start/end fields, interpolation mode, and easing function are
+    /// compatibility shorthands over the newer normalized/channel-section direction.
+    /// During <see cref="SectionNormalizer.NormalizeForceSection"/>, they become
+    /// normalized channel functions only when no newer channel representation exists
+    /// for the same force component.
     /// </para>
     /// <para>
     /// Each force component resolves independently. Precedence is: a non-empty
@@ -25,14 +32,16 @@ namespace Quantum.Track
     /// </para>
     /// <para>
     /// <see cref="Domain"/> is section-wide. <see cref="ForceChannelSet.Domain"/> overrides
-    /// it when present. Distance is the default domain, and elapsed-time sampling remains
-    /// an explicit opt-in call path.
+    /// it when present. In the default distance domain, the channel parameter is resolved
+    /// from track distance within the section interval. In the time domain, elapsed time
+    /// is used only by sampling APIs that explicitly accept elapsed time; distance-only
+    /// APIs preserve legacy distance-normalized behavior.
     /// </para>
     /// </remarks>
     public sealed class ForceSection : TrackSection
     {
         /// <summary>
-        /// Initializes a force section using compatibility scalar fields and optional legacy channels.
+        /// Initializes a compatibility force section using scalar fields and optional legacy channels.
         /// </summary>
         public ForceSection(
             double? targetNormalG = null,
@@ -90,18 +99,19 @@ namespace Quantum.Track
         public double? TargetLongitudinalG { get; }
 
         /// <summary>
-        /// Authoring length for this force section. Resolved intervals provide the actual
-        /// normalized section start and end distances.
+        /// Compatibility authoring length for this force section. Resolved intervals provide
+        /// the authoritative start and end distances used for distance-domain normalization.
         /// </summary>
         public double? Length { get; }
 
         /// <summary>
-        /// Duration used by explicit elapsed-time sampling for time-domain force sections.
+        /// Duration used to normalize elapsed time for explicit time-domain sampling.
+        /// Distance-only sampling paths do not require or consume this value.
         /// </summary>
         public double? Duration { get; }
 
         /// <summary>
-        /// Scalar compatibility interpolation mode used when no channel override exists.
+        /// Scalar compatibility interpolation mode used when no channel representation exists.
         /// </summary>
         public ForceInterpolationMode InterpolationMode { get; }
 
@@ -136,7 +146,8 @@ namespace Quantum.Track
         public double? EndLongitudinalG { get; }
 
         /// <summary>
-        /// Optional easing applied by the scalar compatibility interpolation path.
+        /// Optional easing applied by the scalar compatibility interpolation path when no
+        /// channel representation exists for the same force component.
         /// </summary>
         public IForceEasingFunction? EasingFunction { get; }
 
@@ -165,7 +176,9 @@ namespace Quantum.Track
 
         /// <summary>
         /// Section sampling domain. This is overridden by <see cref="ForceChannelSet.Domain"/>
-        /// when <see cref="Channels"/> is present and its domain is set.
+        /// when <see cref="Channels"/> is present and its domain is set. Distance maps the
+        /// resolved interval to normalized t; time requires an elapsed-time sampling call
+        /// and a positive finite <see cref="Duration"/>.
         /// </summary>
         public ForceChannelDomain Domain { get; }
 
