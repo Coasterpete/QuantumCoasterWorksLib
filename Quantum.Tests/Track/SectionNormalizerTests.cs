@@ -258,6 +258,18 @@ public sealed class SectionNormalizerTests
                 new List<SectionFunction> { function }));
     }
 
+    [Fact]
+    public void SectionFunction_InvalidChannel_IsRejected()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            new SectionFunction(
+                (SectionChannel)999,
+                new List<SectionSample>
+                {
+                    new SectionSample(0.0, 1.0)
+                }));
+    }
+
     private static SectionChannel[] Channels(SectionDefinition definition)
     {
         var channels = new SectionChannel[definition.Functions.Count];
