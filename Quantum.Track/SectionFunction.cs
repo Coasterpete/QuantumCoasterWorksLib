@@ -30,6 +30,8 @@ namespace Quantum.Track
                 throw new ArgumentNullException(nameof(samples));
             }
 
+            ValidateChannel(channel);
+
             Channel = channel;
             _samples = new List<SectionSample>(samples.Count);
             for (int i = 0; i < samples.Count; i++)
@@ -118,6 +120,19 @@ namespace Quantum.Track
         private static double Lerp(double start, double end, double t)
         {
             return start + ((end - start) * t);
+        }
+
+        private static void ValidateChannel(SectionChannel channel)
+        {
+            if (channel != SectionChannel.NormalG
+                && channel != SectionChannel.LateralG
+                && channel != SectionChannel.LongitudinalG
+                && channel != SectionChannel.RollRateDegPerSec
+                && channel != SectionChannel.Curvature
+                && channel != SectionChannel.Roll)
+            {
+                throw new ArgumentOutOfRangeException(nameof(channel), channel, "Unsupported section channel.");
+            }
         }
 
         private static bool IsFinite(double value)
