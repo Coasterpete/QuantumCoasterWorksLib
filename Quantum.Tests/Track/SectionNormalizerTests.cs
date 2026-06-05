@@ -335,6 +335,34 @@ public sealed class SectionNormalizerTests
             definition.EvaluateAt((SectionChannel)999, 0.5));
     }
 
+    [Fact]
+    public void SectionDefinition_NonFiniteEvaluationX_IsRejected()
+    {
+        var definition = new SectionDefinition(
+            SectionKind.Force,
+            SectionDomain.Distance,
+            startX: 0.0,
+            endX: 1.0,
+            new List<SectionFunction>
+            {
+                new SectionFunction(
+                    SectionChannel.NormalG,
+                    new List<SectionSample>
+                    {
+                        new SectionSample(0.0, 1.0),
+                        new SectionSample(1.0, 2.0)
+                    })
+            });
+
+        ArgumentOutOfRangeException evaluateAt = Assert.Throws<ArgumentOutOfRangeException>(() =>
+            definition.EvaluateAt(SectionChannel.NormalG, double.NaN));
+        ArgumentOutOfRangeException evaluateAllAt = Assert.Throws<ArgumentOutOfRangeException>(() =>
+            definition.EvaluateAllAt(double.PositiveInfinity));
+
+        Assert.Equal("x", evaluateAt.ParamName);
+        Assert.Equal("x", evaluateAllAt.ParamName);
+    }
+
     private static SectionChannel[] Channels(SectionDefinition definition)
     {
         var channels = new SectionChannel[definition.Functions.Count];

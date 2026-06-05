@@ -110,6 +110,7 @@ namespace Quantum.Track
         /// </summary>
         public double EvaluateAt(SectionChannel channel, double x)
         {
+            ValidateEvaluationX(x);
             ValidateChannel(channel);
 
             for (int i = 0; i < _functions.Count; i++)
@@ -130,6 +131,8 @@ namespace Quantum.Track
         /// </summary>
         public IReadOnlyList<SectionChannelEvaluation> EvaluateAllAt(double x)
         {
+            ValidateEvaluationX(x);
+
             var evaluations = new List<SectionChannelEvaluation>(_functions.Count);
             var channelOrder = (SectionChannel[])Enum.GetValues(typeof(SectionChannel));
 
@@ -150,6 +153,14 @@ namespace Quantum.Track
             }
 
             return evaluations;
+        }
+
+        private static void ValidateEvaluationX(double x)
+        {
+            if (!IsFinite(x))
+            {
+                throw new ArgumentOutOfRangeException(nameof(x), x, "Evaluation X must be finite.");
+            }
         }
 
         private static void ValidateKind(SectionKind kind)
