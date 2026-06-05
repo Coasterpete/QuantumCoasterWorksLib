@@ -51,6 +51,15 @@ public sealed class SectionResolverTests
     }
 
     [Fact]
+    public void ResolvedSectionInterval_NullSection_ThrowsArgumentNullException()
+    {
+        ArgumentNullException exception = Assert.Throws<ArgumentNullException>(() =>
+            new ResolvedSectionInterval<string>(null!, 0.0, 1.0));
+
+        Assert.Equal("section", exception.ParamName);
+    }
+
+    [Fact]
     public void SectionResolver_Lookup_BoundaryBetweenIntervals_ReturnsNextInterval()
     {
         IReadOnlyList<ResolvedSectionInterval<string>> intervals = SectionResolver.Resolve(new[]
