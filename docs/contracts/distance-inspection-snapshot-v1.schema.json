@@ -1,0 +1,106 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quantumcoasterworks.dev/schemas/distance-inspection-snapshot-v1.schema.json",
+  "title": "DistanceInspectionSnapshotV1",
+  "description": "Stable JSON contract for backend distance inspection snapshots.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract",
+    "version",
+    "distance",
+    "sections"
+  ],
+  "properties": {
+    "contract": {
+      "description": "Stable contract discriminator.",
+      "type": "string",
+      "const": "quantum.distance_inspection_snapshot"
+    },
+    "version": {
+      "description": "Contract version.",
+      "type": "integer",
+      "const": 1
+    },
+    "distance": {
+      "description": "Inspected centerline distance.",
+      "type": "number"
+    },
+    "sections": {
+      "description": "Track sections active or relevant at the inspected distance.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/distanceInspectionSection"
+      }
+    }
+  },
+  "$defs": {
+    "distanceInspectionSection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "domain",
+        "startX",
+        "endX",
+        "diagnostic",
+        "channels",
+        "channelValues"
+      ],
+      "properties": {
+        "kind": {
+          "description": "Section kind as serialized by the distance inspection contract.",
+          "type": "string"
+        },
+        "domain": {
+          "description": "Section domain as serialized by the distance inspection contract.",
+          "type": "string"
+        },
+        "startX": {
+          "description": "Section start coordinate in its domain.",
+          "type": "number"
+        },
+        "endX": {
+          "description": "Section end coordinate in its domain.",
+          "type": "number"
+        },
+        "diagnostic": {
+          "description": "Section evaluation diagnostic label.",
+          "type": "string"
+        },
+        "channels": {
+          "description": "Channel names declared by the section.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "channelValues": {
+          "description": "Evaluated channel values at the inspected distance.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/distanceInspectionChannelValue"
+          }
+        }
+      }
+    },
+    "distanceInspectionChannelValue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "channel",
+        "value"
+      ],
+      "properties": {
+        "channel": {
+          "description": "Evaluated channel name.",
+          "type": "string"
+        },
+        "value": {
+          "description": "Evaluated channel value.",
+          "type": "number"
+        }
+      }
+    }
+  }
+}
