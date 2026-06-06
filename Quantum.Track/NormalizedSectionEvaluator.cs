@@ -71,6 +71,31 @@ namespace Quantum.Track
                 out diagnostic);
         }
 
+        public bool TryGetDistanceFunctionAt(
+            SectionKind kind,
+            SectionChannel channel,
+            double distance,
+            out SectionFunction? function,
+            out SectionEvaluationDiagnostic diagnostic)
+        {
+            ValidateChannel(channel);
+
+            if (!TryResolveDistanceSection(kind, distance, out SectionDefinition section, out diagnostic))
+            {
+                function = null;
+                return false;
+            }
+
+            if (!section.TryGetFunction(channel, out function))
+            {
+                diagnostic = SectionEvaluationDiagnostic.MissingChannel;
+                return false;
+            }
+
+            diagnostic = SectionEvaluationDiagnostic.None;
+            return true;
+        }
+
         public double EvaluateDistanceChannelAt(
             SectionKind kind,
             SectionChannel channel,
