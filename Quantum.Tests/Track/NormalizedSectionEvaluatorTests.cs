@@ -183,6 +183,29 @@ public sealed class NormalizedSectionEvaluatorTests
     }
 
     [Fact]
+    public void NormalizedSectionEvaluator_TryEvaluateDistanceChannelAt_PresentChannel_UsesDistanceFunctionLookup()
+    {
+        SectionDefinition section = ForceSectionDefinition(
+            startX: 0.0,
+            endX: 10.0,
+            SectionChannel.NormalG,
+            startValue: 1.0,
+            endValue: 3.0);
+        var evaluator = new NormalizedSectionEvaluator(new[] { section });
+
+        bool evaluated = evaluator.TryEvaluateDistanceChannelAt(
+            SectionKind.Force,
+            SectionChannel.NormalG,
+            distance: 2.5,
+            out double value,
+            out SectionEvaluationDiagnostic diagnostic);
+
+        Assert.True(evaluated);
+        Assert.Equal(1.5, value);
+        Assert.Equal(SectionEvaluationDiagnostic.None, diagnostic);
+    }
+
+    [Fact]
     public void NormalizedSectionEvaluator_TryGetDistanceFunctionAt_ReturnsFunctionForPresentChannel()
     {
         SectionDefinition section = ForceSectionDefinition(
