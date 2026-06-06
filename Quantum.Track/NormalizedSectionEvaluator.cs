@@ -71,6 +71,11 @@ namespace Quantum.Track
                 out diagnostic);
         }
 
+        public bool ContainsDistanceSectionAt(SectionKind kind, double distance)
+        {
+            return TryResolveDistanceSection(kind, distance, out _, out _);
+        }
+
         public bool TryGetDistanceFunctionAt(
             SectionKind kind,
             SectionChannel channel,
