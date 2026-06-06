@@ -93,6 +93,21 @@ namespace Quantum.Track
             return false;
         }
 
+        public bool TryInspectDistanceSectionAt(
+            SectionKind kind,
+            double distance,
+            [NotNullWhen(true)] out DistanceSectionInspection? inspection)
+        {
+            if (!TryGetDistanceSectionAt(kind, distance, out SectionDefinition? section, out _))
+            {
+                inspection = null;
+                return false;
+            }
+
+            inspection = CreateInspection(section);
+            return true;
+        }
+
         public bool TryGetDistanceFunctionAt(
             SectionKind kind,
             SectionChannel channel,
@@ -237,6 +252,23 @@ namespace Quantum.Track
                 ? SectionEvaluationDiagnostic.OutsideSectionCoverage
                 : SectionEvaluationDiagnostic.NoSection;
             return false;
+        }
+
+        private static DistanceSectionInspection CreateInspection(SectionDefinition section)
+        {
+            var channels = new List<SectionChannel>(section.Functions.Count);
+            for (int i = 0; i < section.Functions.Count; i++)
+            {
+                channels.Add(section.Functions[i].Channel);
+            }
+
+            return new DistanceSectionInspection(
+                section.Kind,
+                section.Domain,
+                section.StartX,
+                section.EndX,
+                channels,
+                SectionEvaluationDiagnostic.None);
         }
 
         private void ValidateSectionOverlap(SectionDefinition candidate, int candidateIndex)

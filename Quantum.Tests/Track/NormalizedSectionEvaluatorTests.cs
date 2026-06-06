@@ -397,6 +397,110 @@ public sealed class NormalizedSectionEvaluatorTests
     }
 
     [Fact]
+    public void NormalizedSectionEvaluator_TryInspectDistanceSectionAt_ReturnsInspectionForMatchingSection()
+    {
+        SectionDefinition section = ForceSectionDefinition(
+            startX: 2.0,
+            endX: 12.0,
+            SectionChannel.NormalG,
+            startValue: 1.0,
+            endValue: 3.0);
+        var evaluator = new NormalizedSectionEvaluator(new[] { section });
+
+        bool found = evaluator.TryInspectDistanceSectionAt(
+            SectionKind.Force,
+            distance: 8.0,
+            out DistanceSectionInspection? inspection);
+
+        Assert.True(found);
+        Assert.NotNull(inspection);
+        Assert.Equal(SectionKind.Force, inspection.Kind);
+        Assert.Equal(SectionDomain.Distance, inspection.Domain);
+        Assert.Equal(2.0, inspection.StartX);
+        Assert.Equal(12.0, inspection.EndX);
+        Assert.Equal(SectionEvaluationDiagnostic.None, inspection.Diagnostic);
+    }
+
+    [Fact]
+    public void NormalizedSectionEvaluator_TryInspectDistanceSectionAt_IncludesSectionChannels()
+    {
+        var section = new SectionDefinition(
+            SectionKind.Force,
+            SectionDomain.Distance,
+            startX: 0.0,
+            endX: 10.0,
+            new List<SectionFunction>
+            {
+                Function(SectionChannel.LongitudinalG, 0.0, 10.0, -0.2, 0.4),
+                Function(SectionChannel.NormalG, 0.0, 10.0, 1.0, 2.0),
+                Function(SectionChannel.LateralG, 0.0, 10.0, -0.5, 0.5)
+            });
+        var evaluator = new NormalizedSectionEvaluator(new[] { section });
+
+        bool found = evaluator.TryInspectDistanceSectionAt(
+            SectionKind.Force,
+            distance: 4.0,
+            out DistanceSectionInspection? inspection);
+
+        Assert.True(found);
+        Assert.NotNull(inspection);
+        Assert.Equal(
+            new[]
+            {
+                SectionChannel.LongitudinalG,
+                SectionChannel.NormalG,
+                SectionChannel.LateralG
+            },
+            inspection.Channels);
+    }
+
+    [Fact]
+    public void NormalizedSectionEvaluator_TryInspectDistanceSectionAt_ReturnsFalseWhenNoSectionExists()
+    {
+        SectionDefinition timeSection = ForceSectionDefinition(
+            startX: 0.0,
+            endX: 10.0,
+            SectionChannel.NormalG,
+            startValue: 1.0,
+            endValue: 1.0,
+            domain: SectionDomain.Time);
+        var evaluator = new NormalizedSectionEvaluator(new[] { timeSection });
+
+        bool found = evaluator.TryInspectDistanceSectionAt(
+            SectionKind.Force,
+            distance: 5.0,
+            out DistanceSectionInspection? inspection);
+
+        Assert.False(found);
+        Assert.Null(inspection);
+    }
+
+    [Fact]
+    public void NormalizedSectionEvaluator_TryInspectDistanceSectionAt_InvalidKind_IsRejected()
+    {
+        var evaluator = new NormalizedSectionEvaluator(Array.Empty<SectionDefinition>());
+
+        ArgumentOutOfRangeException exception = Assert.Throws<ArgumentOutOfRangeException>(() =>
+            evaluator.TryInspectDistanceSectionAt((SectionKind)999, distance: 5.0, out _));
+
+        Assert.Equal("kind", exception.ParamName);
+    }
+
+    [Theory]
+    [InlineData(double.NaN)]
+    [InlineData(double.PositiveInfinity)]
+    [InlineData(double.NegativeInfinity)]
+    public void NormalizedSectionEvaluator_TryInspectDistanceSectionAt_NonFiniteDistance_IsRejected(double distance)
+    {
+        var evaluator = new NormalizedSectionEvaluator(Array.Empty<SectionDefinition>());
+
+        ArgumentOutOfRangeException exception = Assert.Throws<ArgumentOutOfRangeException>(() =>
+            evaluator.TryInspectDistanceSectionAt(SectionKind.Force, distance, out _));
+
+        Assert.Equal("x", exception.ParamName);
+    }
+
+    [Fact]
     public void NormalizedSectionEvaluator_ContainsDistanceSectionAt_InvalidKind_IsRejected()
     {
         var evaluator = new NormalizedSectionEvaluator(Array.Empty<SectionDefinition>());
