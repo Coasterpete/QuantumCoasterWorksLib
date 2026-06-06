@@ -96,6 +96,13 @@ duplicating function scans. Invalid channel enum values are still rejected at AP
 boundaries. Missing valid channels remain explicit behavior: try APIs return `false`
 and may provide a diagnostic, while throwing APIs raise `InvalidOperationException`.
 
+`NormalizedSectionEvaluator.TryGetDistanceFunctionAt` resolves the distance section and
+then retrieves the matching `SectionFunction`. Missing sections preserve the resolver
+diagnostic. Missing valid channels return `false` with
+`SectionEvaluationDiagnostic.MissingChannel`, while successful lookups return the
+function with `SectionEvaluationDiagnostic.None`. `TryEvaluateDistanceChannelAt` reuses
+this helper before evaluating the function.
+
 ## Direct Evaluation
 
 Direct evaluation APIs require finite evaluation `x` values. Unsupported channels are
