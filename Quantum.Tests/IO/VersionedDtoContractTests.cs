@@ -2,6 +2,7 @@ using System;
 using Quantum.IO.BankingProfile.V1;
 using Quantum.IO.ContinuousRollDiagnostics.V1;
 using Quantum.IO.DebugViewport.V1;
+using Quantum.IO.DistanceInspection.V1;
 using Quantum.IO.MeshExport.V1;
 using Quantum.IO.TrackFrameContinuity.V1;
 using Quantum.IO.TrainPose.V1;
@@ -42,6 +43,13 @@ public sealed class VersionedDtoContractTests
             DebugViewportSnapshotV1Dto.ContractVersion,
             new DebugViewportSnapshotV1Dto().Contract,
             new DebugViewportSnapshotV1Dto().Version);
+        AssertContractIdentity(
+            "quantum.distance_inspection_snapshot",
+            1,
+            DistanceInspectionSnapshotV1Dto.ContractName,
+            DistanceInspectionSnapshotV1Dto.ContractVersion,
+            new DistanceInspectionSnapshotV1Dto().Contract,
+            new DistanceInspectionSnapshotV1Dto().Version);
         AssertContractIdentity(
             "quantum.track_frame_continuity_diagnostics",
             1,
@@ -95,6 +103,9 @@ public sealed class VersionedDtoContractTests
         Assert.Empty(debugViewport.Lines);
         Assert.Empty(debugViewport.Boxes);
         Assert.Null(debugViewport.TrainPose);
+
+        var distanceInspection = new DistanceInspectionSnapshotV1Dto();
+        Assert.Empty(distanceInspection.Sections);
 
         var trackFrameContinuity = new TrackFrameContinuityDiagnosticsExportV1Dto();
         Assert.True(trackFrameContinuity.BackendOnly);
@@ -212,6 +223,18 @@ public sealed class VersionedDtoContractTests
               "lines": [],
               "boxes": [],
               "trainPose": null
+            }
+            """);
+        AssertStableJson(
+            new DistanceInspectionSnapshotV1Dto(),
+            DistanceInspectionSnapshotV1Json.Serialize,
+            DistanceInspectionSnapshotV1Json.Deserialize,
+            """
+            {
+              "contract": "quantum.distance_inspection_snapshot",
+              "version": 1,
+              "distance": 0,
+              "sections": []
             }
             """);
         AssertStableJson(
