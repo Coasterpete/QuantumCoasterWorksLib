@@ -298,6 +298,22 @@ namespace Quantum.Debug
                     "dotnet run --project Quantum.Debug -- continuous-roll-diagnostics-json artifacts/banking-profile/continuous-roll-diagnostics.sample.json"
                 }),
             new DebugCommandHelpEntry(
+                name: DistanceInspectionJsonCommand.CommandName,
+                usage: "distance-inspection-json [outputPath]",
+                summary: "Write a deterministic DistanceInspectionSnapshotV1 sample JSON file.",
+                arguments: new[]
+                {
+                    "outputPath: Optional JSON output path. Defaults to " +
+                    DistanceInspectionJsonCommand.DefaultRelativeOutputPath + ".",
+                    "The command builds a self-authored normalized evaluator with active distance-domain Force and Geometry sections, inspects a fixed distance, maps through DistanceInspectionSnapshotV1Mapper, and serializes through DistanceInspectionSnapshotV1Json.",
+                    "This is a backend-only debug artifact for frontend and debug UI handoff; it does not change evaluator behavior or the v1 contract shape."
+                },
+                examples: new[]
+                {
+                    "dotnet run --project Quantum.Debug -- distance-inspection-json",
+                    "dotnet run --project Quantum.Debug -- distance-inspection-json artifacts/track/distance-inspection.sample.json"
+                }),
+            new DebugCommandHelpEntry(
                 name: BankingProfileBrowserCommand.CommandName,
                 usage: "banking-profile-browser [diagnosticsJsonPath] [outputHtmlPath]",
                 summary: "Write a self-contained browser viewer for BankingProfile diagnostics JSON.",
