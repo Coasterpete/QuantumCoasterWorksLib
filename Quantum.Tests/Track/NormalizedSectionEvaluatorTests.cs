@@ -160,7 +160,7 @@ public sealed class NormalizedSectionEvaluatorTests
     }
 
     [Fact]
-    public void NormalizedSectionEvaluator_MissingChannel_ReturnsMissingChannelDiagnostic()
+    public void NormalizedSectionEvaluator_TryEvaluateDistanceChannelAt_MissingValidChannel_ReturnsMissingChannelDiagnostic()
     {
         SectionDefinition section = ForceSectionDefinition(
             startX: 0.0,
@@ -178,7 +178,7 @@ public sealed class NormalizedSectionEvaluatorTests
             out SectionEvaluationDiagnostic diagnostic);
 
         Assert.False(evaluated);
-        Assert.Equal(0.0, value);
+        Assert.Equal(default, value);
         Assert.Equal(SectionEvaluationDiagnostic.MissingChannel, diagnostic);
     }
 
