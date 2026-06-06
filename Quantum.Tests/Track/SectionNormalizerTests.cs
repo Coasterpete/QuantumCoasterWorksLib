@@ -411,6 +411,15 @@ public sealed class SectionNormalizerTests
     }
 
     [Fact]
+    public void SectionDefinition_EvaluateAt_MissingValidChannel_ThrowsInvalidOperationException()
+    {
+        var definition = CreateNormalGSectionDefinition();
+
+        Assert.Throws<InvalidOperationException>(() =>
+            definition.EvaluateAt(SectionChannel.LateralG, 0.5));
+    }
+
+    [Fact]
     public void SectionDefinition_NonFiniteEvaluationX_IsRejected()
     {
         var definition = new SectionDefinition(

@@ -171,19 +171,7 @@ namespace Quantum.Track
         public double EvaluateAt(SectionChannel channel, double x)
         {
             ValidateEvaluationX(x);
-            ValidateChannel(channel);
-
-            for (int i = 0; i < _functions.Count; i++)
-            {
-                SectionFunction function = _functions[i];
-                if (function.Channel == channel)
-                {
-                    return function.EvaluateAt(x);
-                }
-            }
-
-            throw new InvalidOperationException(
-                $"Section does not contain a function for channel '{channel}'.");
+            return GetFunction(channel).EvaluateAt(x);
         }
 
         /// <summary>
