@@ -291,6 +291,67 @@ public sealed class NormalizedSectionEvaluatorTests
     }
 
     [Fact]
+    public void NormalizedSectionEvaluator_ContainsDistanceSectionAt_ReturnsTrueForMatchingSection()
+    {
+        SectionDefinition section = ForceSectionDefinition(
+            startX: 0.0,
+            endX: 10.0,
+            SectionChannel.NormalG,
+            startValue: 1.0,
+            endValue: 1.0);
+        var evaluator = new NormalizedSectionEvaluator(new[] { section });
+
+        bool contains = evaluator.ContainsDistanceSectionAt(
+            SectionKind.Force,
+            distance: 5.0);
+
+        Assert.True(contains);
+    }
+
+    [Fact]
+    public void NormalizedSectionEvaluator_ContainsDistanceSectionAt_ReturnsFalseWhenNoSectionExists()
+    {
+        SectionDefinition section = ForceSectionDefinition(
+            startX: 0.0,
+            endX: 10.0,
+            SectionChannel.NormalG,
+            startValue: 1.0,
+            endValue: 1.0);
+        var evaluator = new NormalizedSectionEvaluator(new[] { section });
+
+        bool contains = evaluator.ContainsDistanceSectionAt(
+            SectionKind.Force,
+            distance: 15.0);
+
+        Assert.False(contains);
+    }
+
+    [Fact]
+    public void NormalizedSectionEvaluator_ContainsDistanceSectionAt_InvalidKind_IsRejected()
+    {
+        var evaluator = new NormalizedSectionEvaluator(Array.Empty<SectionDefinition>());
+
+        ArgumentOutOfRangeException exception = Assert.Throws<ArgumentOutOfRangeException>(() =>
+            evaluator.ContainsDistanceSectionAt((SectionKind)999, distance: 5.0));
+
+        Assert.Equal("kind", exception.ParamName);
+    }
+
+    [Theory]
+    [InlineData(double.NaN)]
+    [InlineData(double.PositiveInfinity)]
+    [InlineData(double.NegativeInfinity)]
+    public void NormalizedSectionEvaluator_ContainsDistanceSectionAt_NonFiniteDistance_IsRejected(double distance)
+    {
+        var evaluator = new NormalizedSectionEvaluator(Array.Empty<SectionDefinition>());
+
+        ArgumentOutOfRangeException exception = Assert.Throws<ArgumentOutOfRangeException>(() =>
+            evaluator.ContainsDistanceSectionAt(SectionKind.Force, distance));
+
+        Assert.Equal("x", exception.ParamName);
+    }
+
+    [Fact]
     public void SectionDefinition_DuplicateChannelWithinSection_IsRejected()
     {
         SectionFunction first = Function(
