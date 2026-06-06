@@ -104,7 +104,7 @@ namespace Quantum.Track
                 return false;
             }
 
-            inspection = CreateInspection(section);
+            inspection = CreateInspection(section, distance);
             return true;
         }
 
@@ -254,12 +254,17 @@ namespace Quantum.Track
             return false;
         }
 
-        private static DistanceSectionInspection CreateInspection(SectionDefinition section)
+        private static DistanceSectionInspection CreateInspection(SectionDefinition section, double distance)
         {
             var channels = new List<SectionChannel>(section.Functions.Count);
+            var channelValues = new List<DistanceSectionChannelInspection>(section.Functions.Count);
             for (int i = 0; i < section.Functions.Count; i++)
             {
-                channels.Add(section.Functions[i].Channel);
+                SectionFunction function = section.Functions[i];
+                channels.Add(function.Channel);
+                channelValues.Add(new DistanceSectionChannelInspection(
+                    function.Channel,
+                    function.EvaluateAt(distance)));
             }
 
             return new DistanceSectionInspection(
@@ -268,6 +273,7 @@ namespace Quantum.Track
                 section.StartX,
                 section.EndX,
                 channels,
+                channelValues,
                 SectionEvaluationDiagnostic.None);
         }
 
