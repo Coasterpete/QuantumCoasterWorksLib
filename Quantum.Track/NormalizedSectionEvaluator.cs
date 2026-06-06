@@ -105,23 +105,16 @@ namespace Quantum.Track
                 return false;
             }
 
-            IReadOnlyList<SectionFunction> functions = section.Functions;
-            for (int i = 0; i < functions.Count; i++)
+            if (!section.TryGetFunction(channel, out SectionFunction? function))
             {
-                SectionFunction function = functions[i];
-                if (function.Channel != channel)
-                {
-                    continue;
-                }
-
-                value = function.EvaluateAt(distance);
-                diagnostic = SectionEvaluationDiagnostic.None;
-                return true;
+                value = default;
+                diagnostic = SectionEvaluationDiagnostic.MissingChannel;
+                return false;
             }
 
-            value = default;
-            diagnostic = SectionEvaluationDiagnostic.MissingChannel;
-            return false;
+            value = function!.EvaluateAt(distance);
+            diagnostic = SectionEvaluationDiagnostic.None;
+            return true;
         }
 
         public IReadOnlyList<SectionChannelEvaluation> EvaluateDistanceAllAt(
