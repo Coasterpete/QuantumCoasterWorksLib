@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Quantum.Track
 {
@@ -74,6 +75,22 @@ namespace Quantum.Track
         public bool ContainsDistanceSectionAt(SectionKind kind, double distance)
         {
             return TryResolveDistanceSection(kind, distance, out _, out _);
+        }
+
+        public bool TryGetDistanceSectionAt(
+            SectionKind kind,
+            double distance,
+            [NotNullWhen(true)] out SectionDefinition? section,
+            out SectionEvaluationDiagnostic diagnostic)
+        {
+            if (TryResolveDistanceSection(kind, distance, out SectionDefinition resolvedSection, out diagnostic))
+            {
+                section = resolvedSection;
+                return true;
+            }
+
+            section = null;
+            return false;
         }
 
         public bool TryGetDistanceFunctionAt(
