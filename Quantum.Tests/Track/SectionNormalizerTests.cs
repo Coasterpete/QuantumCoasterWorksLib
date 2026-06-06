@@ -361,6 +361,33 @@ public sealed class SectionNormalizerTests
     }
 
     [Fact]
+    public void SectionDefinition_ContainsChannel_ReturnsTrueForPresentChannel()
+    {
+        var definition = CreateNormalGSectionDefinition();
+
+        Assert.True(definition.ContainsChannel(SectionChannel.NormalG));
+    }
+
+    [Fact]
+    public void SectionDefinition_ContainsChannel_ReturnsFalseForMissingValidChannel()
+    {
+        var definition = CreateNormalGSectionDefinition();
+
+        Assert.False(definition.ContainsChannel(SectionChannel.LateralG));
+    }
+
+    [Fact]
+    public void SectionDefinition_ContainsChannel_InvalidChannel_IsRejected()
+    {
+        var definition = CreateNormalGSectionDefinition();
+
+        ArgumentOutOfRangeException exception = Assert.Throws<ArgumentOutOfRangeException>(() =>
+            definition.ContainsChannel((SectionChannel)999));
+
+        Assert.Equal("channel", exception.ParamName);
+    }
+
+    [Fact]
     public void SectionDefinition_EvaluateAt_InvalidChannel_IsRejected()
     {
         var definition = new SectionDefinition(
@@ -420,6 +447,25 @@ public sealed class SectionNormalizerTests
         }
 
         return channels;
+    }
+
+    private static SectionDefinition CreateNormalGSectionDefinition()
+    {
+        return new SectionDefinition(
+            SectionKind.Force,
+            SectionDomain.Distance,
+            startX: 0.0,
+            endX: 1.0,
+            new List<SectionFunction>
+            {
+                new SectionFunction(
+                    SectionChannel.NormalG,
+                    new List<SectionSample>
+                    {
+                        new SectionSample(0.0, 1.0),
+                        new SectionSample(1.0, 2.0)
+                    })
+            });
     }
 
     private sealed class FixedForceEasingFunction : IForceEasingFunction
