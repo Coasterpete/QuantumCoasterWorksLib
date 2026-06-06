@@ -183,6 +183,91 @@ public sealed class NormalizedSectionEvaluatorTests
     }
 
     [Fact]
+    public void NormalizedSectionEvaluator_TryGetDistanceFunctionAt_ReturnsFunctionForPresentChannel()
+    {
+        SectionDefinition section = ForceSectionDefinition(
+            startX: 0.0,
+            endX: 10.0,
+            SectionChannel.NormalG,
+            startValue: 1.0,
+            endValue: 2.0);
+        var evaluator = new NormalizedSectionEvaluator(new[] { section });
+
+        bool found = evaluator.TryGetDistanceFunctionAt(
+            SectionKind.Force,
+            SectionChannel.NormalG,
+            distance: 5.0,
+            out SectionFunction? function,
+            out SectionEvaluationDiagnostic diagnostic);
+
+        Assert.True(found);
+        Assert.Same(section.Functions[0], function);
+        Assert.Equal(SectionEvaluationDiagnostic.None, diagnostic);
+    }
+
+    [Fact]
+    public void NormalizedSectionEvaluator_TryGetDistanceFunctionAt_MissingValidChannel_ReturnsMissingChannelDiagnostic()
+    {
+        SectionDefinition section = ForceSectionDefinition(
+            startX: 0.0,
+            endX: 10.0,
+            SectionChannel.NormalG,
+            startValue: 1.0,
+            endValue: 1.0);
+        var evaluator = new NormalizedSectionEvaluator(new[] { section });
+
+        bool found = evaluator.TryGetDistanceFunctionAt(
+            SectionKind.Force,
+            SectionChannel.LateralG,
+            distance: 5.0,
+            out SectionFunction? function,
+            out SectionEvaluationDiagnostic diagnostic);
+
+        Assert.False(found);
+        Assert.Null(function);
+        Assert.Equal(SectionEvaluationDiagnostic.MissingChannel, diagnostic);
+    }
+
+    [Fact]
+    public void NormalizedSectionEvaluator_TryGetDistanceFunctionAt_NoSection_ReturnsResolutionDiagnostic()
+    {
+        var evaluator = new NormalizedSectionEvaluator(Array.Empty<SectionDefinition>());
+
+        bool found = evaluator.TryGetDistanceFunctionAt(
+            SectionKind.Force,
+            SectionChannel.NormalG,
+            distance: 5.0,
+            out SectionFunction? function,
+            out SectionEvaluationDiagnostic diagnostic);
+
+        Assert.False(found);
+        Assert.Null(function);
+        Assert.Equal(SectionEvaluationDiagnostic.NoSection, diagnostic);
+    }
+
+    [Fact]
+    public void NormalizedSectionEvaluator_TryGetDistanceFunctionAt_InvalidChannel_IsRejected()
+    {
+        SectionDefinition section = ForceSectionDefinition(
+            startX: 0.0,
+            endX: 10.0,
+            SectionChannel.NormalG,
+            startValue: 1.0,
+            endValue: 1.0);
+        var evaluator = new NormalizedSectionEvaluator(new[] { section });
+
+        ArgumentOutOfRangeException exception = Assert.Throws<ArgumentOutOfRangeException>(() =>
+            evaluator.TryGetDistanceFunctionAt(
+                SectionKind.Force,
+                (SectionChannel)999,
+                distance: 5.0,
+                out _,
+                out _));
+
+        Assert.Equal("channel", exception.ParamName);
+    }
+
+    [Fact]
     public void SectionDefinition_DuplicateChannelWithinSection_IsRejected()
     {
         SectionFunction first = Function(
