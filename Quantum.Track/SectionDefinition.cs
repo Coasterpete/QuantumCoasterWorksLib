@@ -113,6 +113,24 @@ namespace Quantum.Track
         public IReadOnlyList<SectionFunction> Functions => _functionsView;
 
         /// <summary>
+        /// Returns whether this section carries a function for the requested channel.
+        /// </summary>
+        public bool ContainsChannel(SectionChannel channel)
+        {
+            ValidateChannel(channel);
+
+            for (int i = 0; i < _functions.Count; i++)
+            {
+                if (_functions[i].Channel == channel)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        /// <summary>
         /// Evaluates a channel at the requested coordinate.
         /// </summary>
         public double EvaluateAt(SectionChannel channel, double x)
