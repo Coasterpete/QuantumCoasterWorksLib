@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Quantum.Track
 {
@@ -133,7 +134,7 @@ namespace Quantum.Track
         /// <summary>
         /// Attempts to get the function for the requested channel.
         /// </summary>
-        public bool TryGetFunction(SectionChannel channel, out SectionFunction? function)
+        public bool TryGetFunction(SectionChannel channel, [NotNullWhen(true)] out SectionFunction? function)
         {
             ValidateChannel(channel);
 
