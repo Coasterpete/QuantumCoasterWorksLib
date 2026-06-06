@@ -103,6 +103,43 @@ diagnostic. Missing valid channels return `false` with
 function with `SectionEvaluationDiagnostic.None`. `TryEvaluateDistanceChannelAt` reuses
 this helper before evaluating the function.
 
+## Distance Inspection Snapshots
+
+Distance inspection APIs provide backend data for future editor and inspector UI
+surfaces. They are snapshots of normalized evaluator state at one cursor distance, not a
+finished UI model.
+
+`DistanceSectionChannelInspection` is the UI-facing row for one evaluated channel. It
+contains the `SectionChannel` and finite evaluated `Value` that an inspector can render
+as a channel/value pair.
+
+`DistanceSectionInspection` is the active section card for one resolved distance-domain
+section. It carries the section `Kind`, `Domain`, interval (`StartX`, `EndX`), available
+`Channels`, evaluated `ChannelValues`, and `Diagnostic`. Successful active inspections
+use `SectionEvaluationDiagnostic.None`; missing sections are skipped by the all-kind
+inspection flow instead of producing placeholder cards.
+
+`NormalizedSectionEvaluator.InspectDistanceAt(double distance)` returns the active
+section inspections for all supported section kinds at the supplied cursor distance. The
+list is ordered by `SectionKind` enum order, skips kinds with no active distance section,
+and preserves each section's function order for channel values.
+
+`DistanceInspectionSnapshot` is the top-level UI snapshot. It contains the inspected
+cursor `Distance` and the active section inspections returned for that distance.
+
+`NormalizedSectionEvaluator.InspectDistance(double distance)` is the preferred one-call
+entry point for UI and inspector callers. It validates the distance, gathers active
+sections through `InspectDistanceAt`, and wraps the result in a
+`DistanceInspectionSnapshot`.
+
+Distance inspection validation expectations:
+
+- Distance values must be finite.
+- Missing kinds or out-of-coverage kinds are omitted from all-kind snapshots.
+- Ordering is deterministic: section cards follow `SectionKind` enum order, and channel
+  values follow section function order.
+- Snapshot collections are defensively copied and exposed as read-only views.
+
 ## Direct Evaluation
 
 Direct evaluation APIs require finite evaluation `x` values. Unsupported channels are
