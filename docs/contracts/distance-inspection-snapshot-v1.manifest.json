@@ -1,0 +1,10 @@
+{
+  "contract": "quantum.distance_inspection_snapshot",
+  "version": 1,
+  "purpose": "Renderer-neutral frontend/debug inspection snapshot for distance-based track section handoff.",
+  "schema": "docs/contracts/distance-inspection-snapshot-v1.schema.json",
+  "sample": "docs/contracts/distance-inspection-snapshot-v1.sample.json",
+  "handoff": "docs/contracts/distance-inspection-json-handoff.md",
+  "debugCommand": "dotnet run --project Quantum.Debug -- distance-inspection-json",
+  "defaultArtifact": "artifacts/track/distance-inspection.sample.json"
+}
