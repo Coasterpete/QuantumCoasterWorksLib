@@ -131,6 +131,27 @@ namespace Quantum.Track
         }
 
         /// <summary>
+        /// Attempts to get the function for the requested channel.
+        /// </summary>
+        public bool TryGetFunction(SectionChannel channel, out SectionFunction? function)
+        {
+            ValidateChannel(channel);
+
+            for (int i = 0; i < _functions.Count; i++)
+            {
+                SectionFunction candidate = _functions[i];
+                if (candidate.Channel == channel)
+                {
+                    function = candidate;
+                    return true;
+                }
+            }
+
+            function = null;
+            return false;
+        }
+
+        /// <summary>
         /// Evaluates a channel at the requested coordinate.
         /// </summary>
         public double EvaluateAt(SectionChannel channel, double x)
