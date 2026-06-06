@@ -420,6 +420,41 @@ public sealed class SectionNormalizerTests
     }
 
     [Fact]
+    public void SectionDefinition_EvaluateAllAt_ReturnsEvaluationsInChannelOrder()
+    {
+        var definition = new SectionDefinition(
+            SectionKind.Force,
+            SectionDomain.Distance,
+            startX: 0.0,
+            endX: 10.0,
+            new List<SectionFunction>
+            {
+                new SectionFunction(
+                    SectionChannel.LateralG,
+                    new List<SectionSample>
+                    {
+                        new SectionSample(0.0, -0.25),
+                        new SectionSample(10.0, -0.25)
+                    }),
+                new SectionFunction(
+                    SectionChannel.NormalG,
+                    new List<SectionSample>
+                    {
+                        new SectionSample(0.0, 2.5),
+                        new SectionSample(10.0, 2.5)
+                    })
+            });
+
+        IReadOnlyList<SectionChannelEvaluation> evaluations = definition.EvaluateAllAt(5.0);
+
+        Assert.Equal(2, evaluations.Count);
+        Assert.Equal(SectionChannel.NormalG, evaluations[0].Channel);
+        Assert.Equal(2.5, evaluations[0].Value);
+        Assert.Equal(SectionChannel.LateralG, evaluations[1].Channel);
+        Assert.Equal(-0.25, evaluations[1].Value);
+    }
+
+    [Fact]
     public void SectionDefinition_NonFiniteEvaluationX_IsRejected()
     {
         var definition = new SectionDefinition(

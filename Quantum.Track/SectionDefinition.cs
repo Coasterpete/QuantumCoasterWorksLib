@@ -187,15 +187,8 @@ namespace Quantum.Track
             for (int channelIndex = 0; channelIndex < channelOrder.Length; channelIndex++)
             {
                 SectionChannel channel = channelOrder[channelIndex];
-
-                for (int functionIndex = 0; functionIndex < _functions.Count; functionIndex++)
+                if (TryGetFunction(channel, out SectionFunction? function))
                 {
-                    SectionFunction function = _functions[functionIndex];
-                    if (function.Channel != channel)
-                    {
-                        continue;
-                    }
-
                     evaluations.Add(new SectionChannelEvaluation(channel, function.EvaluateAt(x)));
                 }
             }
