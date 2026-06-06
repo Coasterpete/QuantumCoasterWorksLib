@@ -122,18 +122,9 @@ namespace Quantum.Track
             out double value,
             out SectionEvaluationDiagnostic diagnostic)
         {
-            ValidateChannel(channel);
-
-            if (!TryResolveDistanceSection(kind, distance, out SectionDefinition section, out diagnostic))
+            if (!TryGetDistanceFunctionAt(kind, channel, distance, out SectionFunction? function, out diagnostic))
             {
                 value = default;
-                return false;
-            }
-
-            if (!section.TryGetFunction(channel, out SectionFunction? function))
-            {
-                value = default;
-                diagnostic = SectionEvaluationDiagnostic.MissingChannel;
                 return false;
             }
 
