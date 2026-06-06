@@ -327,6 +327,76 @@ public sealed class NormalizedSectionEvaluatorTests
     }
 
     [Fact]
+    public void NormalizedSectionEvaluator_TryGetDistanceSectionAt_ReturnsSectionForMatchingDistance()
+    {
+        SectionDefinition section = ForceSectionDefinition(
+            startX: 0.0,
+            endX: 10.0,
+            SectionChannel.NormalG,
+            startValue: 1.0,
+            endValue: 1.0);
+        var evaluator = new NormalizedSectionEvaluator(new[] { section });
+
+        bool found = evaluator.TryGetDistanceSectionAt(
+            SectionKind.Force,
+            distance: 5.0,
+            out SectionDefinition? resolved,
+            out SectionEvaluationDiagnostic diagnostic);
+
+        Assert.True(found);
+        Assert.Same(section, resolved);
+        Assert.Equal(SectionEvaluationDiagnostic.None, diagnostic);
+    }
+
+    [Fact]
+    public void NormalizedSectionEvaluator_TryGetDistanceSectionAt_ReturnsFalseAndDiagnosticWhenNoSectionExists()
+    {
+        SectionDefinition timeSection = ForceSectionDefinition(
+            startX: 0.0,
+            endX: 10.0,
+            SectionChannel.NormalG,
+            startValue: 1.0,
+            endValue: 1.0,
+            domain: SectionDomain.Time);
+        var evaluator = new NormalizedSectionEvaluator(new[] { timeSection });
+
+        bool found = evaluator.TryGetDistanceSectionAt(
+            SectionKind.Force,
+            distance: 5.0,
+            out SectionDefinition? resolved,
+            out SectionEvaluationDiagnostic diagnostic);
+
+        Assert.False(found);
+        Assert.Null(resolved);
+        Assert.Equal(SectionEvaluationDiagnostic.NoSection, diagnostic);
+    }
+
+    [Fact]
+    public void NormalizedSectionEvaluator_TryGetDistanceSectionAt_InvalidKind_IsRejected()
+    {
+        var evaluator = new NormalizedSectionEvaluator(Array.Empty<SectionDefinition>());
+
+        ArgumentOutOfRangeException exception = Assert.Throws<ArgumentOutOfRangeException>(() =>
+            evaluator.TryGetDistanceSectionAt((SectionKind)999, distance: 5.0, out _, out _));
+
+        Assert.Equal("kind", exception.ParamName);
+    }
+
+    [Theory]
+    [InlineData(double.NaN)]
+    [InlineData(double.PositiveInfinity)]
+    [InlineData(double.NegativeInfinity)]
+    public void NormalizedSectionEvaluator_TryGetDistanceSectionAt_NonFiniteDistance_IsRejected(double distance)
+    {
+        var evaluator = new NormalizedSectionEvaluator(Array.Empty<SectionDefinition>());
+
+        ArgumentOutOfRangeException exception = Assert.Throws<ArgumentOutOfRangeException>(() =>
+            evaluator.TryGetDistanceSectionAt(SectionKind.Force, distance, out _, out _));
+
+        Assert.Equal("x", exception.ParamName);
+    }
+
+    [Fact]
     public void NormalizedSectionEvaluator_ContainsDistanceSectionAt_InvalidKind_IsRejected()
     {
         var evaluator = new NormalizedSectionEvaluator(Array.Empty<SectionDefinition>());
