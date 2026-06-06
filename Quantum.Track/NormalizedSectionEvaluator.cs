@@ -108,6 +108,21 @@ namespace Quantum.Track
             return true;
         }
 
+        public IReadOnlyList<DistanceSectionInspection> InspectDistanceAt(double distance)
+        {
+            var inspections = new List<DistanceSectionInspection>();
+
+            foreach (SectionKind kind in Enum.GetValues(typeof(SectionKind)))
+            {
+                if (TryInspectDistanceSectionAt(kind, distance, out DistanceSectionInspection? inspection))
+                {
+                    inspections.Add(inspection);
+                }
+            }
+
+            return inspections.AsReadOnly();
+        }
+
         public bool TryGetDistanceFunctionAt(
             SectionKind kind,
             SectionChannel channel,

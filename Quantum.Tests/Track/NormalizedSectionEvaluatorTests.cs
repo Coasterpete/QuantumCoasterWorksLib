@@ -521,6 +521,123 @@ public sealed class NormalizedSectionEvaluatorTests
     }
 
     [Fact]
+    public void NormalizedSectionEvaluator_InspectDistanceAt_ReturnsActiveInspectionsForAllKinds()
+    {
+        SectionDefinition force = ForceSectionDefinition(
+            startX: 0.0,
+            endX: 10.0,
+            SectionChannel.NormalG,
+            startValue: 1.0,
+            endValue: 2.0);
+        SectionDefinition geometry = GeometrySectionDefinition(
+            startX: 0.0,
+            endX: 10.0,
+            curvature: 0.05,
+            rollRadians: 0.1);
+        var evaluator = new NormalizedSectionEvaluator(new[] { force, geometry });
+
+        IReadOnlyList<DistanceSectionInspection> inspections = evaluator.InspectDistanceAt(distance: 5.0);
+
+        Assert.Equal(2, inspections.Count);
+        Assert.Equal(SectionKind.Force, inspections[0].Kind);
+        Assert.Equal(SectionKind.Geometry, inspections[1].Kind);
+        Assert.Equal(SectionDomain.Distance, inspections[0].Domain);
+        Assert.Equal(SectionDomain.Distance, inspections[1].Domain);
+        Assert.Equal(SectionEvaluationDiagnostic.None, inspections[0].Diagnostic);
+        Assert.Equal(SectionEvaluationDiagnostic.None, inspections[1].Diagnostic);
+    }
+
+    [Fact]
+    public void NormalizedSectionEvaluator_InspectDistanceAt_PreservesSectionKindOrder()
+    {
+        SectionDefinition geometry = GeometrySectionDefinition(
+            startX: 0.0,
+            endX: 10.0,
+            curvature: 0.05,
+            rollRadians: 0.1);
+        SectionDefinition force = ForceSectionDefinition(
+            startX: 0.0,
+            endX: 10.0,
+            SectionChannel.NormalG,
+            startValue: 1.0,
+            endValue: 2.0);
+        var evaluator = new NormalizedSectionEvaluator(new[] { geometry, force });
+
+        IReadOnlyList<DistanceSectionInspection> inspections = evaluator.InspectDistanceAt(distance: 5.0);
+
+        Assert.Equal(2, inspections.Count);
+        Assert.Equal(SectionKind.Force, inspections[0].Kind);
+        Assert.Equal(SectionKind.Geometry, inspections[1].Kind);
+    }
+
+    [Fact]
+    public void NormalizedSectionEvaluator_InspectDistanceAt_SkipsMissingKinds()
+    {
+        SectionDefinition geometry = GeometrySectionDefinition(
+            startX: 0.0,
+            endX: 10.0,
+            curvature: 0.05,
+            rollRadians: 0.1);
+        var evaluator = new NormalizedSectionEvaluator(new[] { geometry });
+
+        IReadOnlyList<DistanceSectionInspection> inspections = evaluator.InspectDistanceAt(distance: 5.0);
+
+        Assert.Single(inspections);
+        Assert.Equal(SectionKind.Geometry, inspections[0].Kind);
+    }
+
+    [Fact]
+    public void NormalizedSectionEvaluator_InspectDistanceAt_IncludesEvaluatedChannelValues()
+    {
+        var force = new SectionDefinition(
+            SectionKind.Force,
+            SectionDomain.Distance,
+            startX: 0.0,
+            endX: 10.0,
+            new List<SectionFunction>
+            {
+                Function(SectionChannel.NormalG, 0.0, 10.0, 1.0, 3.0),
+                Function(SectionChannel.LateralG, 0.0, 10.0, -0.5, 0.5)
+            });
+        SectionDefinition geometry = GeometrySectionDefinition(
+            startX: 0.0,
+            endX: 10.0,
+            curvature: 0.1,
+            rollRadians: 0.2);
+        var evaluator = new NormalizedSectionEvaluator(new[] { force, geometry });
+
+        IReadOnlyList<DistanceSectionInspection> inspections = evaluator.InspectDistanceAt(distance: 2.5);
+
+        Assert.Equal(2, inspections.Count);
+        Assert.Equal(SectionKind.Force, inspections[0].Kind);
+        Assert.Equal(2, inspections[0].ChannelValues.Count);
+        Assert.Equal(SectionChannel.NormalG, inspections[0].ChannelValues[0].Channel);
+        Assert.Equal(1.5, inspections[0].ChannelValues[0].Value);
+        Assert.Equal(SectionChannel.LateralG, inspections[0].ChannelValues[1].Channel);
+        Assert.Equal(-0.25, inspections[0].ChannelValues[1].Value);
+        Assert.Equal(SectionKind.Geometry, inspections[1].Kind);
+        Assert.Equal(2, inspections[1].ChannelValues.Count);
+        Assert.Equal(SectionChannel.Curvature, inspections[1].ChannelValues[0].Channel);
+        Assert.Equal(0.1, inspections[1].ChannelValues[0].Value);
+        Assert.Equal(SectionChannel.Roll, inspections[1].ChannelValues[1].Channel);
+        Assert.Equal(0.2, inspections[1].ChannelValues[1].Value);
+    }
+
+    [Theory]
+    [InlineData(double.NaN)]
+    [InlineData(double.PositiveInfinity)]
+    [InlineData(double.NegativeInfinity)]
+    public void NormalizedSectionEvaluator_InspectDistanceAt_NonFiniteDistance_IsRejected(double distance)
+    {
+        var evaluator = new NormalizedSectionEvaluator(Array.Empty<SectionDefinition>());
+
+        ArgumentOutOfRangeException exception = Assert.Throws<ArgumentOutOfRangeException>(() =>
+            evaluator.InspectDistanceAt(distance));
+
+        Assert.Equal("x", exception.ParamName);
+    }
+
+    [Fact]
     public void DistanceSectionInspection_NullChannelValues_IsRejected()
     {
         ArgumentNullException exception = Assert.Throws<ArgumentNullException>(() =>
