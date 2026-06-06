@@ -260,6 +260,51 @@ public sealed class NormalizedSectionEvaluatorTests
     }
 
     [Fact]
+    public void SectionDefinition_GetFunction_ReturnsFunctionForPresentChannel()
+    {
+        SectionDefinition section = ForceSectionDefinition(
+            startX: 0.0,
+            endX: 10.0,
+            SectionChannel.NormalG,
+            startValue: 1.0,
+            endValue: 2.0);
+
+        SectionFunction function = section.GetFunction(SectionChannel.NormalG);
+
+        Assert.Same(section.Functions[0], function);
+    }
+
+    [Fact]
+    public void SectionDefinition_GetFunction_MissingValidChannel_ThrowsInvalidOperationException()
+    {
+        SectionDefinition section = ForceSectionDefinition(
+            startX: 0.0,
+            endX: 10.0,
+            SectionChannel.NormalG,
+            startValue: 1.0,
+            endValue: 2.0);
+
+        Assert.Throws<InvalidOperationException>(() =>
+            section.GetFunction(SectionChannel.LateralG));
+    }
+
+    [Fact]
+    public void SectionDefinition_GetFunction_InvalidChannel_IsRejected()
+    {
+        SectionDefinition section = ForceSectionDefinition(
+            startX: 0.0,
+            endX: 10.0,
+            SectionChannel.NormalG,
+            startValue: 1.0,
+            endValue: 2.0);
+
+        ArgumentOutOfRangeException exception = Assert.Throws<ArgumentOutOfRangeException>(() =>
+            section.GetFunction((SectionChannel)999));
+
+        Assert.Equal("channel", exception.ParamName);
+    }
+
+    [Fact]
     public void NormalizedSectionEvaluator_DistanceForceChannels_MatchForceTargetSampler()
     {
         var first = new ForceSection(
