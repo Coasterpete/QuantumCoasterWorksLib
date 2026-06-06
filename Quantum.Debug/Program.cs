@@ -257,6 +257,18 @@ namespace Quantum.Debug
                 return ContinuousRollDiagnosticsJsonCommand.Run(outputPath);
             }
 
+            if (command == DebugCommandKind.DistanceInspectionJson)
+            {
+                if (args.Length > 2)
+                {
+                    Console.WriteLine("Usage: distance-inspection-json [outputPath]");
+                    return 1;
+                }
+
+                string? outputPath = args.Length == 2 ? args[1] : null;
+                return DistanceInspectionJsonCommand.Run(outputPath);
+            }
+
             if (command == DebugCommandKind.BankingProfileBrowser)
             {
                 if (args.Length > 3)

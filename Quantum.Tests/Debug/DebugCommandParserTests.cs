@@ -188,6 +188,15 @@ public sealed class DebugCommandParserTests
     }
 
     [Fact]
+    public void TryParse_DistanceInspectionJsonCommand_ParsesCaseInsensitive()
+    {
+        bool parsed = DebugCommandParser.TryParse(new[] { "DiStAnCe-InSpEcTiOn-JsOn" }, out DebugCommandKind command);
+
+        Assert.True(parsed);
+        Assert.Equal(DebugCommandKind.DistanceInspectionJson, command);
+    }
+
+    [Fact]
     public void TryParse_BankingProfileBrowserCommand_ParsesCaseInsensitive()
     {
         bool parsed = DebugCommandParser.TryParse(new[] { "BaNkInG-PrOfIlE-BrOwSeR" }, out DebugCommandKind command);
