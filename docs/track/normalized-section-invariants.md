@@ -81,6 +81,21 @@ input and must return finite output.
 Definitions use half-open interval lookup semantics, `[StartX, EndX)`, with final
 endpoint handling owned by the normalized evaluator.
 
+## Function Lookup Helpers
+
+`SectionDefinition` exposes a single lookup pattern for channel-backed functions:
+
+- `ContainsChannel` is for availability checks.
+- `TryGetFunction` is the non-throwing lookup path when a valid channel may be
+  missing.
+- `GetFunction` is the throwing lookup path for callers that expect the channel to
+  exist.
+
+`EvaluateAt` and evaluator single-channel lookup use these helpers instead of
+duplicating function scans. Invalid channel enum values are still rejected at API
+boundaries. Missing valid channels remain explicit behavior: try APIs return `false`
+and may provide a diagnostic, while throwing APIs raise `InvalidOperationException`.
+
 ## Direct Evaluation
 
 Direct evaluation APIs require finite evaluation `x` values. Unsupported channels are
