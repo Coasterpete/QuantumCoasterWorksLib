@@ -152,6 +152,20 @@ namespace Quantum.Track
         }
 
         /// <summary>
+        /// Gets the function for the requested channel.
+        /// </summary>
+        public SectionFunction GetFunction(SectionChannel channel)
+        {
+            if (TryGetFunction(channel, out SectionFunction? function))
+            {
+                return function!;
+            }
+
+            throw new InvalidOperationException(
+                $"Section does not contain a function for channel '{channel}'.");
+        }
+
+        /// <summary>
         /// Evaluates a channel at the requested coordinate.
         /// </summary>
         public double EvaluateAt(SectionChannel channel, double x)
