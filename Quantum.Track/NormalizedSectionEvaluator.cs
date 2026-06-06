@@ -123,6 +123,12 @@ namespace Quantum.Track
             return inspections.AsReadOnly();
         }
 
+        public DistanceInspectionSnapshot InspectDistance(double distance)
+        {
+            IReadOnlyList<DistanceSectionInspection> inspections = InspectDistanceAt(distance);
+            return new DistanceInspectionSnapshot(distance, inspections);
+        }
+
         public bool TryGetDistanceFunctionAt(
             SectionKind kind,
             SectionChannel channel,

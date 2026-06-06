@@ -623,6 +623,49 @@ public sealed class NormalizedSectionEvaluatorTests
         Assert.Equal(0.2, inspections[1].ChannelValues[1].Value);
     }
 
+    [Fact]
+    public void NormalizedSectionEvaluator_InspectDistance_ReturnsSnapshotWithDistance()
+    {
+        SectionDefinition force = ForceSectionDefinition(
+            startX: 0.0,
+            endX: 10.0,
+            SectionChannel.NormalG,
+            startValue: 1.0,
+            endValue: 2.0);
+        var evaluator = new NormalizedSectionEvaluator(new[] { force });
+
+        DistanceInspectionSnapshot snapshot = evaluator.InspectDistance(distance: 4.25);
+
+        Assert.Equal(4.25, snapshot.Distance);
+    }
+
+    [Fact]
+    public void NormalizedSectionEvaluator_InspectDistance_ReturnsSnapshotWithActiveSections()
+    {
+        SectionDefinition force = ForceSectionDefinition(
+            startX: 0.0,
+            endX: 10.0,
+            SectionChannel.NormalG,
+            startValue: 1.0,
+            endValue: 2.0);
+        SectionDefinition geometry = GeometrySectionDefinition(
+            startX: 0.0,
+            endX: 10.0,
+            curvature: 0.05,
+            rollRadians: 0.1);
+        var evaluator = new NormalizedSectionEvaluator(new[] { geometry, force });
+
+        DistanceInspectionSnapshot snapshot = evaluator.InspectDistance(distance: 5.0);
+
+        Assert.Equal(2, snapshot.Sections.Count);
+        Assert.Equal(SectionKind.Force, snapshot.Sections[0].Kind);
+        Assert.Equal(SectionKind.Geometry, snapshot.Sections[1].Kind);
+        Assert.Equal(SectionDomain.Distance, snapshot.Sections[0].Domain);
+        Assert.Equal(SectionDomain.Distance, snapshot.Sections[1].Domain);
+        Assert.Equal(SectionEvaluationDiagnostic.None, snapshot.Sections[0].Diagnostic);
+        Assert.Equal(SectionEvaluationDiagnostic.None, snapshot.Sections[1].Diagnostic);
+    }
+
     [Theory]
     [InlineData(double.NaN)]
     [InlineData(double.PositiveInfinity)]
@@ -635,6 +678,45 @@ public sealed class NormalizedSectionEvaluatorTests
             evaluator.InspectDistanceAt(distance));
 
         Assert.Equal("x", exception.ParamName);
+    }
+
+    [Theory]
+    [InlineData(double.NaN)]
+    [InlineData(double.PositiveInfinity)]
+    [InlineData(double.NegativeInfinity)]
+    public void DistanceInspectionSnapshot_NonFiniteDistance_IsRejected(double distance)
+    {
+        ArgumentOutOfRangeException exception = Assert.Throws<ArgumentOutOfRangeException>(() =>
+            new DistanceInspectionSnapshot(distance, Array.Empty<DistanceSectionInspection>()));
+
+        Assert.Equal("distance", exception.ParamName);
+    }
+
+    [Fact]
+    public void DistanceInspectionSnapshot_NullInspections_IsRejected()
+    {
+        ArgumentNullException exception = Assert.Throws<ArgumentNullException>(() =>
+            new DistanceInspectionSnapshot(distance: 5.0, sections: null!));
+
+        Assert.Equal("sections", exception.ParamName);
+    }
+
+    [Fact]
+    public void DistanceInspectionSnapshot_DefensivelyCopiesInspections()
+    {
+        DistanceSectionInspection first = Inspection(SectionKind.Force);
+        DistanceSectionInspection second = Inspection(SectionKind.Geometry);
+        var inspections = new List<DistanceSectionInspection> { first };
+
+        DistanceInspectionSnapshot snapshot = new DistanceInspectionSnapshot(
+            distance: 5.0,
+            sections: inspections);
+
+        inspections[0] = second;
+        inspections.Add(second);
+
+        Assert.Single(snapshot.Sections);
+        Assert.Same(first, snapshot.Sections[0]);
     }
 
     [Fact]
@@ -1258,6 +1340,17 @@ public sealed class NormalizedSectionEvaluatorTests
                 new SectionSample(startX, startValue),
                 new SectionSample(endX, endValue)
             });
+    }
+
+    private static DistanceSectionInspection Inspection(SectionKind kind)
+    {
+        return new DistanceSectionInspection(
+            kind,
+            SectionDomain.Distance,
+            startX: 0.0,
+            endX: 10.0,
+            new[] { kind == SectionKind.Force ? SectionChannel.NormalG : SectionChannel.Curvature },
+            SectionEvaluationDiagnostic.None);
     }
 
     private sealed class FixedForceEasingFunction : IForceEasingFunction
