@@ -1,0 +1,54 @@
+{
+  "contract": "quantum.distance_inspection_snapshot",
+  "version": 1,
+  "distance": 12.5,
+  "sections": [
+    {
+      "kind": "Force",
+      "domain": "Distance",
+      "startX": 0,
+      "endX": 25,
+      "diagnostic": "None",
+      "channels": [
+        "NormalG",
+        "LateralG",
+        "LongitudinalG"
+      ],
+      "channelValues": [
+        {
+          "channel": "NormalG",
+          "value": 1.4
+        },
+        {
+          "channel": "LateralG",
+          "value": 0
+        },
+        {
+          "channel": "LongitudinalG",
+          "value": 0.05
+        }
+      ]
+    },
+    {
+      "kind": "Geometry",
+      "domain": "Distance",
+      "startX": 0,
+      "endX": 25,
+      "diagnostic": "None",
+      "channels": [
+        "Curvature",
+        "Roll"
+      ],
+      "channelValues": [
+        {
+          "channel": "Curvature",
+          "value": 0.015
+        },
+        {
+          "channel": "Roll",
+          "value": 0.18
+        }
+      ]
+    }
+  ]
+}
