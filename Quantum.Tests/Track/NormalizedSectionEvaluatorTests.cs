@@ -455,6 +455,109 @@ public sealed class NormalizedSectionEvaluatorTests
     }
 
     [Fact]
+    public void NormalizedSectionEvaluator_TryInspectDistanceSectionAt_IncludesEvaluatedChannelValues()
+    {
+        var section = new SectionDefinition(
+            SectionKind.Force,
+            SectionDomain.Distance,
+            startX: 0.0,
+            endX: 10.0,
+            new List<SectionFunction>
+            {
+                Function(SectionChannel.NormalG, 0.0, 10.0, 1.0, 3.0),
+                Function(SectionChannel.LateralG, 0.0, 10.0, -0.5, 0.5)
+            });
+        var evaluator = new NormalizedSectionEvaluator(new[] { section });
+
+        bool found = evaluator.TryInspectDistanceSectionAt(
+            SectionKind.Force,
+            distance: 2.5,
+            out DistanceSectionInspection? inspection);
+
+        Assert.True(found);
+        Assert.NotNull(inspection);
+        Assert.Equal(SectionEvaluationDiagnostic.None, inspection.Diagnostic);
+        Assert.Equal(2, inspection.ChannelValues.Count);
+        Assert.Equal(SectionChannel.NormalG, inspection.ChannelValues[0].Channel);
+        Assert.Equal(1.5, inspection.ChannelValues[0].Value);
+        Assert.Equal(SectionChannel.LateralG, inspection.ChannelValues[1].Channel);
+        Assert.Equal(-0.25, inspection.ChannelValues[1].Value);
+    }
+
+    [Fact]
+    public void NormalizedSectionEvaluator_TryInspectDistanceSectionAt_ChannelValuesPreserveFunctionOrder()
+    {
+        var section = new SectionDefinition(
+            SectionKind.Force,
+            SectionDomain.Distance,
+            startX: 0.0,
+            endX: 10.0,
+            new List<SectionFunction>
+            {
+                Function(SectionChannel.LongitudinalG, 0.0, 10.0, -0.2, 0.4),
+                Function(SectionChannel.NormalG, 0.0, 10.0, 1.0, 2.0),
+                Function(SectionChannel.LateralG, 0.0, 10.0, -0.5, 0.5)
+            });
+        var evaluator = new NormalizedSectionEvaluator(new[] { section });
+
+        bool found = evaluator.TryInspectDistanceSectionAt(
+            SectionKind.Force,
+            distance: 5.0,
+            out DistanceSectionInspection? inspection);
+
+        Assert.True(found);
+        Assert.NotNull(inspection);
+        Assert.Equal(
+            new[]
+            {
+                SectionChannel.LongitudinalG,
+                SectionChannel.NormalG,
+                SectionChannel.LateralG
+            },
+            ChannelValues(inspection));
+        Assert.Equal(0.1, inspection.ChannelValues[0].Value, 10);
+        Assert.Equal(1.5, inspection.ChannelValues[1].Value, 10);
+        Assert.Equal(0.0, inspection.ChannelValues[2].Value, 10);
+    }
+
+    [Fact]
+    public void DistanceSectionInspection_NullChannelValues_IsRejected()
+    {
+        ArgumentNullException exception = Assert.Throws<ArgumentNullException>(() =>
+            new DistanceSectionInspection(
+                SectionKind.Force,
+                SectionDomain.Distance,
+                startX: 0.0,
+                endX: 10.0,
+                channels: new[] { SectionChannel.NormalG },
+                channelValues: null!,
+                SectionEvaluationDiagnostic.None));
+
+        Assert.Equal("channelValues", exception.ParamName);
+    }
+
+    [Fact]
+    public void DistanceSectionChannelInspection_InvalidChannel_IsRejected()
+    {
+        ArgumentOutOfRangeException exception = Assert.Throws<ArgumentOutOfRangeException>(() =>
+            new DistanceSectionChannelInspection((SectionChannel)999, value: 1.0));
+
+        Assert.Equal("channel", exception.ParamName);
+    }
+
+    [Theory]
+    [InlineData(double.NaN)]
+    [InlineData(double.PositiveInfinity)]
+    [InlineData(double.NegativeInfinity)]
+    public void DistanceSectionChannelInspection_NonFiniteValue_IsRejected(double value)
+    {
+        ArgumentOutOfRangeException exception = Assert.Throws<ArgumentOutOfRangeException>(() =>
+            new DistanceSectionChannelInspection(SectionChannel.NormalG, value));
+
+        Assert.Equal("value", exception.ParamName);
+    }
+
+    [Fact]
     public void NormalizedSectionEvaluator_TryInspectDistanceSectionAt_ReturnsFalseWhenNoSectionExists()
     {
         SectionDefinition timeSection = ForceSectionDefinition(
@@ -989,6 +1092,17 @@ public sealed class NormalizedSectionEvaluatorTests
         for (int i = 0; i < definition.Functions.Count; i++)
         {
             channels[i] = definition.Functions[i].Channel;
+        }
+
+        return channels;
+    }
+
+    private static SectionChannel[] ChannelValues(DistanceSectionInspection inspection)
+    {
+        var channels = new SectionChannel[inspection.ChannelValues.Count];
+        for (int i = 0; i < inspection.ChannelValues.Count; i++)
+        {
+            channels[i] = inspection.ChannelValues[i].Channel;
         }
 
         return channels;
