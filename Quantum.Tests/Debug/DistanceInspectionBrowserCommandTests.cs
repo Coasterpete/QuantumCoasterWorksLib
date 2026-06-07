@@ -71,8 +71,8 @@ public sealed class DistanceInspectionBrowserCommandTests
             Assert.Contains("<section class=\"timeline-panel\" aria-label=\"Distance inspection timeline\">", html);
             Assert.Contains("<h2>Visual Timeline</h2>", html);
             Assert.Contains("<p>Inspected distance 12.5 m</p>", html);
-            Assert.Contains("<div class=\"timeline-kind\">Force</div>", html);
-            Assert.Contains("<div class=\"timeline-kind\">Geometry</div>", html);
+            Assert.Contains("<div class=\"timeline-kind\"><a href=\"#section-0-force\">Force</a></div>", html);
+            Assert.Contains("<div class=\"timeline-kind\"><a href=\"#section-1-geometry\">Geometry</a></div>", html);
             Assert.Contains("<div class=\"timeline-range\">[0, 25]</div>", html);
             Assert.Contains("style=\"left: 50%;\"", html);
         }
@@ -111,6 +111,125 @@ public sealed class DistanceInspectionBrowserCommandTests
             Assert.DoesNotContain("npm", lowerHtml);
             Assert.DoesNotContain("unpkg", lowerHtml);
             Assert.DoesNotContain("cdnjs", lowerHtml);
+        }
+        finally
+        {
+            DeleteDirectoryIfPresent(tempDirectory);
+        }
+    }
+
+    [Fact]
+    public void Run_OutputHtml_IncludesDeterministicSectionCardIds()
+    {
+        string tempDirectory = CreateTempDirectoryPath();
+        string outputPath = Path.Combine(tempDirectory, "distance-inspection.browser.html");
+
+        try
+        {
+            int exitCode = DistanceInspectionBrowserCommand.Run(outputPath);
+
+            Assert.Equal(0, exitCode);
+
+            string html = File.ReadAllText(outputPath);
+
+            Assert.Contains("<article id=\"section-0-force\" class=\"section-card\">", html);
+            Assert.Contains("<article id=\"section-1-geometry\" class=\"section-card\">", html);
+        }
+        finally
+        {
+            DeleteDirectoryIfPresent(tempDirectory);
+        }
+    }
+
+    [Fact]
+    public void Run_OutputHtml_IncludesTimelineRowAnchorLinks()
+    {
+        string tempDirectory = CreateTempDirectoryPath();
+        string outputPath = Path.Combine(tempDirectory, "distance-inspection.browser.html");
+
+        try
+        {
+            int exitCode = DistanceInspectionBrowserCommand.Run(outputPath);
+
+            Assert.Equal(0, exitCode);
+
+            string html = File.ReadAllText(outputPath);
+
+            Assert.Contains("<a href=\"#section-0-force\">Force</a>", html);
+            Assert.Contains("<a href=\"#section-1-geometry\">Geometry</a>", html);
+        }
+        finally
+        {
+            DeleteDirectoryIfPresent(tempDirectory);
+        }
+    }
+
+    [Fact]
+    public void Run_OutputHtml_LinksForceTimelineRowToForceSectionCard()
+    {
+        string tempDirectory = CreateTempDirectoryPath();
+        string outputPath = Path.Combine(tempDirectory, "distance-inspection.browser.html");
+
+        try
+        {
+            int exitCode = DistanceInspectionBrowserCommand.Run(outputPath);
+
+            Assert.Equal(0, exitCode);
+
+            string html = File.ReadAllText(outputPath);
+            int linkIndex = html.IndexOf("<a href=\"#section-0-force\">Force</a>", StringComparison.Ordinal);
+            int cardIndex = html.IndexOf("<article id=\"section-0-force\" class=\"section-card\">", StringComparison.Ordinal);
+
+            Assert.True(linkIndex >= 0);
+            Assert.True(cardIndex > linkIndex);
+        }
+        finally
+        {
+            DeleteDirectoryIfPresent(tempDirectory);
+        }
+    }
+
+    [Fact]
+    public void Run_OutputHtml_LinksGeometryTimelineRowToGeometrySectionCard()
+    {
+        string tempDirectory = CreateTempDirectoryPath();
+        string outputPath = Path.Combine(tempDirectory, "distance-inspection.browser.html");
+
+        try
+        {
+            int exitCode = DistanceInspectionBrowserCommand.Run(outputPath);
+
+            Assert.Equal(0, exitCode);
+
+            string html = File.ReadAllText(outputPath);
+            int linkIndex = html.IndexOf("<a href=\"#section-1-geometry\">Geometry</a>", StringComparison.Ordinal);
+            int cardIndex = html.IndexOf("<article id=\"section-1-geometry\" class=\"section-card\">", StringComparison.Ordinal);
+
+            Assert.True(linkIndex >= 0);
+            Assert.True(cardIndex > linkIndex);
+        }
+        finally
+        {
+            DeleteDirectoryIfPresent(tempDirectory);
+        }
+    }
+
+    [Fact]
+    public void Run_OutputHtml_IncludesTargetAndFocusStylingForLinkedSectionCards()
+    {
+        string tempDirectory = CreateTempDirectoryPath();
+        string outputPath = Path.Combine(tempDirectory, "distance-inspection.browser.html");
+
+        try
+        {
+            int exitCode = DistanceInspectionBrowserCommand.Run(outputPath);
+
+            Assert.Equal(0, exitCode);
+
+            string html = File.ReadAllText(outputPath);
+
+            Assert.Contains(".section-card:target", html);
+            Assert.Contains(".timeline-kind a:focus", html);
         }
         finally
         {
@@ -261,6 +380,8 @@ public sealed class DistanceInspectionBrowserCommandTests
 
             string html = File.ReadAllText(outputPath);
             Assert.Contains("<h2>Force &amp; Diagnostics section</h2>", html);
+            Assert.Contains("<article id=\"section-0-force-diagnostics\" class=\"section-card\">", html);
+            Assert.Contains("<a href=\"#section-0-force-diagnostics\">Force &amp; Diagnostics</a>", html);
             Assert.Contains("<dt>Domain</dt><dd>Distance</dd>", html);
             Assert.Contains("<dt>Range</dt><dd>[40, 45]</dd>", html);
             Assert.Contains("<li>NormalG &amp; Trim</li>", html);

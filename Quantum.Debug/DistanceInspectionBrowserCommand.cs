@@ -144,6 +144,8 @@ namespace Quantum.Debug
             builder.AppendLine("    .timeline-row { display: grid; grid-template-columns: minmax(90px, 130px) minmax(74px, 96px) minmax(0, 1fr); gap: 12px; align-items: center; padding: 10px 15px; border-bottom: 1px solid #e2e8f0; }");
             builder.AppendLine("    .timeline-row:last-child { border-bottom: 0; }");
             builder.AppendLine("    .timeline-kind { min-width: 0; color: #1f2937; font-size: 13px; font-weight: 700; overflow-wrap: anywhere; }");
+            builder.AppendLine("    .timeline-kind a { color: inherit; text-decoration: none; border-bottom: 1px solid transparent; }");
+            builder.AppendLine("    .timeline-kind a:hover, .timeline-kind a:focus { color: #0f766e; border-bottom-color: currentColor; outline: none; }");
             builder.AppendLine("    .timeline-range { color: #475569; font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }");
             builder.AppendLine("    .timeline-track { position: relative; height: 28px; border: 1px solid #cbd5e1; border-radius: 8px; background: linear-gradient(90deg, #f8fafc, #eef6f4); overflow: hidden; }");
             builder.AppendLine("    .timeline-track::before { content: ''; position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: #dbe3ea; }");
@@ -151,7 +153,9 @@ namespace Quantum.Debug
             builder.AppendLine("    .timeline-cursor { position: absolute; top: 3px; bottom: 3px; width: 2px; transform: translateX(-1px); background: #dc2626; box-shadow: 0 0 0 1px rgba(220, 38, 38, 0.18); }");
             builder.AppendLine("    .timeline-empty { padding: 12px 15px; color: #64748b; font-size: 13px; }");
             builder.AppendLine("    .sections { display: grid; gap: 12px; }");
-            builder.AppendLine("    .section-card { overflow: hidden; }");
+            builder.AppendLine("    .section-card { overflow: hidden; scroll-margin-top: 16px; }");
+            builder.AppendLine("    .section-card:target { border-color: #0f766e; background: #f7fffd; box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.18); }");
+            builder.AppendLine("    .section-card:target .section-header { background: #ecfdf5; }");
             builder.AppendLine("    .section-header { display: flex; gap: 12px; align-items: center; justify-content: space-between; padding: 13px 15px; border-bottom: 1px solid #e2e8f0; background: #fbfcfe; }");
             builder.AppendLine("    .section-index { flex: 0 0 auto; min-width: 58px; color: #64748b; font-size: 12px; font-weight: 700; text-align: right; }");
             builder.AppendLine("    .section-body { display: grid; grid-template-columns: minmax(220px, 280px) minmax(0, 1fr); gap: 16px; padding: 15px; }");
@@ -206,7 +210,7 @@ namespace Quantum.Debug
             {
                 for (int i = 0; i < dto.Sections.Length; i++)
                 {
-                    AppendTimelineRow(builder, dto.Sections[i], dto.Distance, scale);
+                    AppendTimelineRow(builder, dto.Sections[i], i, dto.Distance, scale);
                 }
             }
 
@@ -217,9 +221,11 @@ namespace Quantum.Debug
         private static void AppendTimelineRow(
             StringBuilder builder,
             DistanceInspectionSectionV1Dto section,
+            int index,
             double inspectedDistance,
             TimelineScale scale)
         {
+            string sectionId = BuildSectionId(section, index);
             string rangeText = "[" + FormatNumber(section.StartX) + ", " + FormatNumber(section.EndX) + "]";
             double rangeStart = System.Math.Min(section.StartX, section.EndX);
             double rangeEnd = System.Math.Max(section.StartX, section.EndX);
@@ -232,7 +238,12 @@ namespace Quantum.Debug
                 FormatNumber(inspectedDistance) + " m";
 
             builder.AppendLine("        <div class=\"timeline-row\">");
-            builder.AppendLine("          <div class=\"timeline-kind\">" + Escape(section.Kind) + "</div>");
+            builder.AppendLine(
+                "          <div class=\"timeline-kind\"><a href=\"#" +
+                Escape(sectionId) +
+                "\">" +
+                Escape(section.Kind) +
+                "</a></div>");
             builder.AppendLine("          <div class=\"timeline-range\">" + Escape(rangeText) + "</div>");
             builder.AppendLine("          <div class=\"timeline-track\" aria-label=\"" + Escape(label) + "\">");
             builder.AppendLine(
@@ -254,7 +265,12 @@ namespace Quantum.Debug
             DistanceInspectionSectionV1Dto section,
             int index)
         {
-            builder.AppendLine("      <article class=\"section-card\">");
+            string sectionId = BuildSectionId(section, index);
+
+            builder.AppendLine(
+                "      <article id=\"" +
+                Escape(sectionId) +
+                "\" class=\"section-card\">");
             builder.AppendLine("        <div class=\"section-header\">");
             builder.AppendLine("          <h2>" + Escape(section.Kind) + " section</h2>");
             builder.AppendLine("          <span class=\"section-index\">Section " + (index + 1).ToString(CultureInfo.InvariantCulture) + "</span>");
@@ -366,6 +382,41 @@ namespace Quantum.Debug
         private static string FormatPercent(double value)
         {
             return value.ToString("0.###", CultureInfo.InvariantCulture);
+        }
+
+        private static string BuildSectionId(DistanceInspectionSectionV1Dto section, int index)
+        {
+            return "section-" +
+                index.ToString(CultureInfo.InvariantCulture) +
+                "-" +
+                NormalizeIdToken(section.Kind, "unknown");
+        }
+
+        private static string NormalizeIdToken(string value, string fallback)
+        {
+            string source = string.IsNullOrWhiteSpace(value) ? fallback : value;
+            var builder = new StringBuilder(source.Length);
+            bool previousDash = false;
+
+            for (int i = 0; i < source.Length; i++)
+            {
+                char c = char.ToLowerInvariant(source[i]);
+                bool isTokenCharacter = (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9');
+
+                if (isTokenCharacter)
+                {
+                    builder.Append(c);
+                    previousDash = false;
+                }
+                else if (!previousDash)
+                {
+                    builder.Append('-');
+                    previousDash = true;
+                }
+            }
+
+            string token = builder.ToString().Trim('-');
+            return token.Length == 0 ? fallback : token;
         }
 
         private static TimelineScale CreateTimelineScale(DistanceInspectionSnapshotV1Dto dto)
