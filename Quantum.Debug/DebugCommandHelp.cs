@@ -314,6 +314,22 @@ namespace Quantum.Debug
                     "dotnet run --project Quantum.Debug -- distance-inspection-json artifacts/track/distance-inspection.sample.json"
                 }),
             new DebugCommandHelpEntry(
+                name: DistanceInspectionBrowserCommand.CommandName,
+                usage: "distance-inspection-browser [outputPath]",
+                summary: "Write a deterministic static HTML preview for the DistanceInspectionSnapshotV1 sample.",
+                arguments: new[]
+                {
+                    "outputPath: Optional HTML output path. Defaults to " +
+                    DistanceInspectionBrowserCommand.DefaultRelativeOutputPath + ".",
+                    "The preview builds the deterministic DistanceInspectionJsonCommand.BuildSample() snapshot and renders contract metadata, inspected distance, ordered section cards, channels, and channelValues tables.",
+                    "The HTML is self-contained, static, escaped, and backend-only; it does not change evaluator behavior or the v1 JSON contract shape."
+                },
+                examples: new[]
+                {
+                    "dotnet run --project Quantum.Debug -- distance-inspection-browser",
+                    "dotnet run --project Quantum.Debug -- distance-inspection-browser artifacts/track/distance-inspection.browser.html"
+                }),
+            new DebugCommandHelpEntry(
                 name: BankingProfileBrowserCommand.CommandName,
                 usage: "banking-profile-browser [diagnosticsJsonPath] [outputHtmlPath]",
                 summary: "Write a self-contained browser viewer for BankingProfile diagnostics JSON.",
