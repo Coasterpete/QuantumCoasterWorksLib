@@ -1,10 +1,10 @@
 # Distance Inspection Browser Preview
 
 The distance inspection browser preview is a backend-generated HTML artifact for
-quickly inspecting a `DistanceInspectionSnapshotV1` sample in a local browser. It
-is a practical read-only preview for the same inspector concept described in the
-Unreal UI/view-model guidance, without requiring Unreal, Unity, or a frontend
-runtime.
+quickly inspecting a `DistanceInspectionSnapshotV1` sample or generated JSON
+artifact in a local browser. It is a practical read-only preview for the same
+inspector concept described in the Unreal UI/view-model guidance, without
+requiring Unreal, Unity, or a frontend runtime.
 
 This preview is documentation and debug workflow support only. It does not
 change evaluator behavior, the v1 JSON contract, DTOs, schema, sample payload, or
@@ -30,7 +30,7 @@ dotnet run --project Quantum.Debug -- distance-inspection-json artifacts/track/m
 
 ## Generate The Browser Preview
 
-Generate the default browser preview:
+Generate the default browser preview from the deterministic sample:
 
 ```powershell
 dotnet run --project Quantum.Debug -- distance-inspection-browser
@@ -43,6 +43,13 @@ Pass an explicit output path when the preview should be written somewhere else:
 
 ```powershell
 dotnet run --project Quantum.Debug -- distance-inspection-browser artifacts/track/my-distance-inspection.browser.html
+```
+
+Render an existing `DistanceInspectionSnapshotV1` JSON artifact by passing the
+input JSON path and output HTML path:
+
+```powershell
+dotnet run --project Quantum.Debug -- distance-inspection-browser artifacts/track/distance-inspection.sample.json artifacts/track/distance-inspection.browser.html
 ```
 
 Open the generated HTML file in a browser to inspect the snapshot. The file is a

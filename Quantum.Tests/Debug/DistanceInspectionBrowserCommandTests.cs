@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.IO;
+using System.Reflection;
 using Quantum.Debug;
 using Quantum.IO.DistanceInspection.V1;
 
@@ -120,6 +121,179 @@ public sealed class DistanceInspectionBrowserCommandTests
         {
             DeleteDirectoryIfPresent(tempDirectory);
         }
+    }
+
+    [Fact]
+    public void Run_WithInputJsonAndOutputHtml_ReadsJsonFileAndWritesHtml()
+    {
+        string tempDirectory = CreateTempDirectoryPath();
+        string inputJsonPath = Path.Combine(tempDirectory, "distance-inspection.input.json");
+        string outputPath = Path.Combine(tempDirectory, "distance-inspection.browser.html");
+        var writer = new StringWriter(CultureInfo.InvariantCulture);
+
+        try
+        {
+            WriteInputJson(inputJsonPath);
+
+            int exitCode = DistanceInspectionBrowserCommand.Run(inputJsonPath, outputPath, writer);
+
+            Assert.Equal(0, exitCode);
+            Assert.True(File.Exists(outputPath));
+
+            string html = File.ReadAllText(outputPath);
+            Assert.Contains("<dt>Inspected distance</dt><dd>42.25 m</dd>", html);
+            Assert.DoesNotContain("<dt>Inspected distance</dt><dd>12.5 m</dd>", html);
+            Assert.Contains("Wrote distance inspection browser preview", writer.ToString());
+        }
+        finally
+        {
+            DeleteDirectoryIfPresent(tempDirectory);
+        }
+    }
+
+    [Fact]
+    public void Run_WithInputJsonAndOutputHtml_PreservesContractAndVersionDisplay()
+    {
+        string tempDirectory = CreateTempDirectoryPath();
+        string inputJsonPath = Path.Combine(tempDirectory, "distance-inspection.input.json");
+        string outputPath = Path.Combine(tempDirectory, "distance-inspection.browser.html");
+
+        try
+        {
+            WriteInputJson(inputJsonPath);
+
+            int exitCode = DistanceInspectionBrowserCommand.Run(inputJsonPath, outputPath);
+
+            Assert.Equal(0, exitCode);
+
+            string html = File.ReadAllText(outputPath);
+            Assert.Contains(
+                "<dt>Contract</dt><dd>" + DistanceInspectionSnapshotV1Dto.ContractName + "</dd>",
+                html);
+            Assert.Contains("<dt>Version</dt><dd>1</dd>", html);
+        }
+        finally
+        {
+            DeleteDirectoryIfPresent(tempDirectory);
+        }
+    }
+
+    [Fact]
+    public void Run_WithInputJsonAndOutputHtml_PreservesSectionChannelAndValueContent()
+    {
+        string tempDirectory = CreateTempDirectoryPath();
+        string inputJsonPath = Path.Combine(tempDirectory, "distance-inspection.input.json");
+        string outputPath = Path.Combine(tempDirectory, "distance-inspection.browser.html");
+
+        try
+        {
+            WriteInputJson(inputJsonPath);
+
+            int exitCode = DistanceInspectionBrowserCommand.Run(inputJsonPath, outputPath);
+
+            Assert.Equal(0, exitCode);
+
+            string html = File.ReadAllText(outputPath);
+            Assert.Contains("<h2>Force &amp; Diagnostics section</h2>", html);
+            Assert.Contains("<dt>Domain</dt><dd>Distance</dd>", html);
+            Assert.Contains("<dt>Range</dt><dd>[40, 45]</dd>", html);
+            Assert.Contains("<li>NormalG &amp; Trim</li>", html);
+            Assert.Contains("<tr><td>NormalG &amp; Trim</td><td>2.75</td></tr>", html);
+        }
+        finally
+        {
+            DeleteDirectoryIfPresent(tempDirectory);
+        }
+    }
+
+    [Fact]
+    public void Program_WithInvalidDistanceInspectionBrowserArgumentCount_PrintsUsageAndReturnsFailure()
+    {
+        TextWriter originalOut = Console.Out;
+        var writer = new StringWriter(CultureInfo.InvariantCulture);
+
+        try
+        {
+            Console.SetOut(writer);
+
+            int exitCode = InvokeProgramMain(new[]
+            {
+                "distance-inspection-browser",
+                "input.json",
+                "output.html",
+                "extra"
+            });
+
+            Assert.Equal(1, exitCode);
+
+            string output = writer.ToString();
+            Assert.Contains("Usage: distance-inspection-browser [outputHtmlPath]", output);
+            Assert.Contains("distance-inspection-browser <inputJsonPath> <outputHtmlPath>", output);
+        }
+        finally
+        {
+            Console.SetOut(originalOut);
+        }
+    }
+
+    private static void WriteInputJson(string inputJsonPath)
+    {
+        string? parentDirectory = Path.GetDirectoryName(inputJsonPath);
+
+        if (!string.IsNullOrEmpty(parentDirectory))
+        {
+            Directory.CreateDirectory(parentDirectory);
+        }
+
+        var dto = new DistanceInspectionSnapshotV1Dto
+        {
+            Distance = 42.25,
+            Sections = new[]
+            {
+                new DistanceInspectionSectionV1Dto
+                {
+                    Kind = "Force & Diagnostics",
+                    Domain = "Distance",
+                    StartX = 40.0,
+                    EndX = 45.0,
+                    Diagnostic = "None",
+                    Channels = new[] { "NormalG & Trim" },
+                    ChannelValues = new[]
+                    {
+                        new DistanceInspectionChannelValueV1Dto
+                        {
+                            Channel = "NormalG & Trim",
+                            Value = 2.75
+                        }
+                    }
+                }
+            }
+        };
+
+        string json = DistanceInspectionSnapshotV1Json.Serialize(dto, indented: true);
+        File.WriteAllText(inputJsonPath, json);
+    }
+
+    private static int InvokeProgramMain(string[] args)
+    {
+        Type programType = typeof(DistanceInspectionBrowserCommand)
+            .Assembly
+            .GetType("Quantum.Debug.Program") ??
+            throw new InvalidOperationException("Quantum.Debug.Program type was not found.");
+
+        MethodInfo main = programType.GetMethod(
+            "Main",
+            BindingFlags.Static | BindingFlags.NonPublic) ??
+            throw new InvalidOperationException("Quantum.Debug.Program.Main method was not found.");
+
+        object? result = main.Invoke(null, new object[] { args });
+
+        if (result is int exitCode)
+        {
+            return exitCode;
+        }
+
+        throw new InvalidOperationException("Quantum.Debug.Program.Main did not return an exit code.");
     }
 
     private static string CreateTempDirectoryPath()

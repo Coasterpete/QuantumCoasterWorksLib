@@ -315,19 +315,27 @@ namespace Quantum.Debug
                 }),
             new DebugCommandHelpEntry(
                 name: DistanceInspectionBrowserCommand.CommandName,
-                usage: "distance-inspection-browser [outputPath]",
-                summary: "Write a deterministic static HTML preview for the DistanceInspectionSnapshotV1 sample.",
+                usage: "distance-inspection-browser [outputHtmlPath]",
+                summary: "Write a static HTML preview/viewer for DistanceInspectionSnapshotV1.",
                 arguments: new[]
                 {
-                    "outputPath: Optional HTML output path. Defaults to " +
+                    "outputHtmlPath: Optional HTML output path in sample mode. Defaults to " +
                     DistanceInspectionBrowserCommand.DefaultRelativeOutputPath + ".",
-                    "The preview builds the deterministic DistanceInspectionJsonCommand.BuildSample() snapshot and renders contract metadata, inspected distance, ordered section cards, channels, and channelValues tables.",
+                    "inputJsonPath: Required JSON input path in the two-argument form.",
+                    "outputHtmlPath: Required HTML output path in the two-argument form.",
+                    "The sample mode builds the deterministic DistanceInspectionSnapshotV1 sample with DistanceInspectionJsonCommand.BuildSample() and renders contract metadata, inspected distance, ordered section cards, channels, and channelValues tables.",
+                    "The two-argument form renders an existing DistanceInspectionSnapshotV1 JSON artifact through the same static HTML renderer.",
                     "The HTML is self-contained, static, escaped, and backend-only; it does not change evaluator behavior or the v1 JSON contract shape."
                 },
                 examples: new[]
                 {
                     "dotnet run --project Quantum.Debug -- distance-inspection-browser",
-                    "dotnet run --project Quantum.Debug -- distance-inspection-browser artifacts/track/distance-inspection.browser.html"
+                    "dotnet run --project Quantum.Debug -- distance-inspection-browser artifacts/track/distance-inspection.browser.html",
+                    "dotnet run --project Quantum.Debug -- distance-inspection-browser artifacts/track/distance-inspection.sample.json artifacts/track/distance-inspection.browser.html"
+                },
+                additionalUsages: new[]
+                {
+                    "distance-inspection-browser <inputJsonPath> <outputHtmlPath>"
                 }),
             new DebugCommandHelpEntry(
                 name: BankingProfileBrowserCommand.CommandName,
@@ -445,7 +453,11 @@ namespace Quantum.Debug
             for (int i = 0; i < CommandEntries.Length; i++)
             {
                 DebugCommandHelpEntry entry = CommandEntries[i];
-                output.WriteLine("  " + entry.Usage + " - " + entry.Summary);
+                for (int j = 0; j < entry.Usages.Length; j++)
+                {
+                    string summary = j == 0 ? " - " + entry.Summary : string.Empty;
+                    output.WriteLine("  " + entry.Usages[j] + summary);
+                }
             }
 
             output.WriteLine();
@@ -486,7 +498,10 @@ namespace Quantum.Debug
             output.WriteLine("  " + entry.Summary);
             output.WriteLine();
             output.WriteLine("Usage:");
-            output.WriteLine("  dotnet run --project Quantum.Debug -- " + entry.Usage);
+            for (int i = 0; i < entry.Usages.Length; i++)
+            {
+                output.WriteLine("  dotnet run --project Quantum.Debug -- " + entry.Usages[i]);
+            }
             output.WriteLine();
             output.WriteLine("Arguments:");
 
@@ -533,7 +548,11 @@ namespace Quantum.Debug
 
             for (int i = 0; i < CommandEntries.Length; i++)
             {
-                output.WriteLine("  " + CommandEntries[i].Usage);
+                DebugCommandHelpEntry entry = CommandEntries[i];
+                for (int j = 0; j < entry.Usages.Length; j++)
+                {
+                    output.WriteLine("  " + entry.Usages[j]);
+                }
             }
 
             output.WriteLine("  longitudinal-force-preview presets: soft | balanced | punchy");
@@ -561,24 +580,46 @@ namespace Quantum.Debug
                 string usage,
                 string summary,
                 string[] arguments,
-                string[] examples)
+                string[] examples,
+                string[]? additionalUsages = null)
             {
                 Name = name;
                 Usage = usage;
                 Summary = summary;
                 Arguments = arguments;
                 Examples = examples;
+                Usages = BuildUsages(usage, additionalUsages);
             }
 
             public string Name { get; }
 
             public string Usage { get; }
 
+            public string[] Usages { get; }
+
             public string Summary { get; }
 
             public string[] Arguments { get; }
 
             public string[] Examples { get; }
+
+            private static string[] BuildUsages(string usage, string[]? additionalUsages)
+            {
+                if (additionalUsages == null || additionalUsages.Length == 0)
+                {
+                    return new[] { usage };
+                }
+
+                var usages = new string[additionalUsages.Length + 1];
+                usages[0] = usage;
+
+                for (int i = 0; i < additionalUsages.Length; i++)
+                {
+                    usages[i + 1] = additionalUsages[i];
+                }
+
+                return usages;
+            }
         }
     }
 }
