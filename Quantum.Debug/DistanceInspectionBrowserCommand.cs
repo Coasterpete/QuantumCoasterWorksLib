@@ -106,6 +106,7 @@ namespace Quantum.Debug
             AppendSummary(builder, "Sections", dto.Sections.Length.ToString(CultureInfo.InvariantCulture));
             builder.AppendLine("      </dl>");
             builder.AppendLine("    </header>");
+            AppendTimeline(builder, dto);
             builder.AppendLine("    <section class=\"sections\" aria-label=\"Ordered distance inspection sections\">");
 
             for (int i = 0; i < dto.Sections.Length; i++)
@@ -136,6 +137,19 @@ namespace Quantum.Debug
             builder.AppendLine("    .summary-grid div { min-width: 0; padding: 9px 11px; overflow-wrap: anywhere; }");
             builder.AppendLine("    dt { margin: 0 0 4px; color: #64748b; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0; }");
             builder.AppendLine("    dd { margin: 0; color: #1f2937; font-size: 13px; }");
+            builder.AppendLine("    .timeline-panel { margin: 0 0 16px; border: 1px solid #cbd5e1; border-radius: 8px; background: #ffffff; overflow: hidden; }");
+            builder.AppendLine("    .timeline-header { display: flex; gap: 12px; align-items: flex-end; justify-content: space-between; padding: 13px 15px; border-bottom: 1px solid #e2e8f0; background: #fbfcfe; }");
+            builder.AppendLine("    .timeline-header p { margin: 3px 0 0; color: #64748b; font-size: 13px; }");
+            builder.AppendLine("    .timeline-rows { display: grid; }");
+            builder.AppendLine("    .timeline-row { display: grid; grid-template-columns: minmax(90px, 130px) minmax(74px, 96px) minmax(0, 1fr); gap: 12px; align-items: center; padding: 10px 15px; border-bottom: 1px solid #e2e8f0; }");
+            builder.AppendLine("    .timeline-row:last-child { border-bottom: 0; }");
+            builder.AppendLine("    .timeline-kind { min-width: 0; color: #1f2937; font-size: 13px; font-weight: 700; overflow-wrap: anywhere; }");
+            builder.AppendLine("    .timeline-range { color: #475569; font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }");
+            builder.AppendLine("    .timeline-track { position: relative; height: 28px; border: 1px solid #cbd5e1; border-radius: 8px; background: linear-gradient(90deg, #f8fafc, #eef6f4); overflow: hidden; }");
+            builder.AppendLine("    .timeline-track::before { content: ''; position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: #dbe3ea; }");
+            builder.AppendLine("    .timeline-bar { position: absolute; top: 9px; height: 10px; border-radius: 999px; background: #2563eb; }");
+            builder.AppendLine("    .timeline-cursor { position: absolute; top: 3px; bottom: 3px; width: 2px; transform: translateX(-1px); background: #dc2626; box-shadow: 0 0 0 1px rgba(220, 38, 38, 0.18); }");
+            builder.AppendLine("    .timeline-empty { padding: 12px 15px; color: #64748b; font-size: 13px; }");
             builder.AppendLine("    .sections { display: grid; gap: 12px; }");
             builder.AppendLine("    .section-card { overflow: hidden; }");
             builder.AppendLine("    .section-header { display: flex; gap: 12px; align-items: center; justify-content: space-between; padding: 13px 15px; border-bottom: 1px solid #e2e8f0; background: #fbfcfe; }");
@@ -153,13 +167,86 @@ namespace Quantum.Debug
             builder.AppendLine("    th { color: #334155; background: #f8fafc; font-weight: 700; }");
             builder.AppendLine("    tr:last-child td { border-bottom: 0; }");
             builder.AppendLine("    td:nth-child(2) { text-align: right; font-variant-numeric: tabular-nums; }");
-            builder.AppendLine("    @media (max-width: 760px) { main { width: min(100% - 20px, 1040px); padding-top: 18px; } .section-header { align-items: flex-start; } .section-body { grid-template-columns: 1fr; } .section-index { text-align: left; } }");
+            builder.AppendLine("    @media (max-width: 760px) { main { width: min(100% - 20px, 1040px); padding-top: 18px; } .timeline-header { align-items: flex-start; flex-direction: column; } .timeline-row { grid-template-columns: 1fr; gap: 6px; } .section-header { align-items: flex-start; } .section-body { grid-template-columns: 1fr; } .section-index { text-align: left; } }");
             builder.AppendLine("  </style>");
         }
 
         private static void AppendSummary(StringBuilder builder, string label, string value)
         {
             builder.AppendLine("        <div><dt>" + Escape(label) + "</dt><dd>" + Escape(value) + "</dd></div>");
+        }
+
+        private static void AppendTimeline(StringBuilder builder, DistanceInspectionSnapshotV1Dto dto)
+        {
+            TimelineScale scale = CreateTimelineScale(dto);
+
+            builder.AppendLine("    <section class=\"timeline-panel\" aria-label=\"Distance inspection timeline\">");
+            builder.AppendLine("      <div class=\"timeline-header\">");
+            builder.AppendLine("        <div>");
+            builder.AppendLine("          <h2>Visual Timeline</h2>");
+            builder.AppendLine(
+                "          <p>Timeline range [" +
+                Escape(FormatNumber(scale.Min)) +
+                ", " +
+                Escape(FormatNumber(scale.Max)) +
+                "] m</p>");
+            builder.AppendLine("        </div>");
+            builder.AppendLine(
+                "        <p>Inspected distance " +
+                Escape(FormatNumber(dto.Distance)) +
+                " m</p>");
+            builder.AppendLine("      </div>");
+            builder.AppendLine("      <div class=\"timeline-rows\">");
+
+            if (dto.Sections.Length == 0)
+            {
+                builder.AppendLine("        <div class=\"timeline-empty\">No active sections</div>");
+            }
+            else
+            {
+                for (int i = 0; i < dto.Sections.Length; i++)
+                {
+                    AppendTimelineRow(builder, dto.Sections[i], dto.Distance, scale);
+                }
+            }
+
+            builder.AppendLine("      </div>");
+            builder.AppendLine("    </section>");
+        }
+
+        private static void AppendTimelineRow(
+            StringBuilder builder,
+            DistanceInspectionSectionV1Dto section,
+            double inspectedDistance,
+            TimelineScale scale)
+        {
+            string rangeText = "[" + FormatNumber(section.StartX) + ", " + FormatNumber(section.EndX) + "]";
+            double rangeStart = System.Math.Min(section.StartX, section.EndX);
+            double rangeEnd = System.Math.Max(section.StartX, section.EndX);
+            double rangeStartPercent = ToTimelinePercent(rangeStart, scale);
+            double rangeEndPercent = ToTimelinePercent(rangeEnd, scale);
+            double barLeft = ClampPercent(System.Math.Min(rangeStartPercent, rangeEndPercent));
+            double barWidth = ClampPercent(System.Math.Max(rangeStartPercent, rangeEndPercent) - barLeft);
+            double cursorLeft = ToTimelinePercent(inspectedDistance, scale);
+            string label = section.Kind + " section " + rangeText + ", inspected distance " +
+                FormatNumber(inspectedDistance) + " m";
+
+            builder.AppendLine("        <div class=\"timeline-row\">");
+            builder.AppendLine("          <div class=\"timeline-kind\">" + Escape(section.Kind) + "</div>");
+            builder.AppendLine("          <div class=\"timeline-range\">" + Escape(rangeText) + "</div>");
+            builder.AppendLine("          <div class=\"timeline-track\" aria-label=\"" + Escape(label) + "\">");
+            builder.AppendLine(
+                "            <div class=\"timeline-bar\" style=\"left: " +
+                FormatPercent(barLeft) +
+                "%; width: " +
+                FormatPercent(barWidth) +
+                "%;\"></div>");
+            builder.AppendLine(
+                "            <div class=\"timeline-cursor\" style=\"left: " +
+                FormatPercent(cursorLeft) +
+                "%;\"></div>");
+            builder.AppendLine("          </div>");
+            builder.AppendLine("        </div>");
         }
 
         private static void AppendSection(
@@ -276,6 +363,66 @@ namespace Quantum.Debug
             return value.ToString("0.######", CultureInfo.InvariantCulture);
         }
 
+        private static string FormatPercent(double value)
+        {
+            return value.ToString("0.###", CultureInfo.InvariantCulture);
+        }
+
+        private static TimelineScale CreateTimelineScale(DistanceInspectionSnapshotV1Dto dto)
+        {
+            double min = dto.Distance;
+            double max = dto.Distance;
+            bool hasSection = false;
+
+            for (int i = 0; i < dto.Sections.Length; i++)
+            {
+                DistanceInspectionSectionV1Dto section = dto.Sections[i];
+                double rangeStart = System.Math.Min(section.StartX, section.EndX);
+                double rangeEnd = System.Math.Max(section.StartX, section.EndX);
+
+                if (!hasSection)
+                {
+                    min = rangeStart;
+                    max = rangeEnd;
+                    hasSection = true;
+                }
+                else
+                {
+                    min = System.Math.Min(min, rangeStart);
+                    max = System.Math.Max(max, rangeEnd);
+                }
+            }
+
+            return new TimelineScale(min, max);
+        }
+
+        private static double ToTimelinePercent(double value, TimelineScale scale)
+        {
+            double span = scale.Max - scale.Min;
+
+            if (!(span > 0.0))
+            {
+                return 0.0;
+            }
+
+            return ClampPercent((value - scale.Min) / span * 100.0);
+        }
+
+        private static double ClampPercent(double value)
+        {
+            if (double.IsNaN(value) || double.IsNegativeInfinity(value))
+            {
+                return 0.0;
+            }
+
+            if (double.IsPositiveInfinity(value))
+            {
+                return 100.0;
+            }
+
+            return System.Math.Min(100.0, System.Math.Max(0.0, value));
+        }
+
         private static string Escape(string value)
         {
             return WebUtility.HtmlEncode(value);
@@ -289,6 +436,19 @@ namespace Quantum.Debug
                    ex is NotSupportedException ||
                    ex is JsonException ||
                    ex is InvalidOperationException;
+        }
+
+        private readonly struct TimelineScale
+        {
+            public TimelineScale(double min, double max)
+            {
+                Min = min;
+                Max = max;
+            }
+
+            public double Min { get; }
+
+            public double Max { get; }
         }
     }
 }
