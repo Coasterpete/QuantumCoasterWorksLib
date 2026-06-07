@@ -30,6 +30,7 @@ public sealed class DistanceInspectionBrowserCommandTests
             Assert.Contains(DistanceInspectionSnapshotV1Dto.ContractName, html);
             Assert.Contains("<dt>Version</dt><dd>1</dd>", html);
             Assert.Contains("<dt>Inspected distance</dt><dd>12.5 m</dd>", html);
+            Assert.Contains("Visual Timeline", html);
             Assert.Contains("Ordered distance inspection sections", html);
             Assert.Contains("Channels", html);
             Assert.Contains("Channel Values", html);
@@ -38,6 +39,7 @@ public sealed class DistanceInspectionBrowserCommandTests
             Assert.Contains("<tr><th>Channel</th><th>Value</th></tr>", html);
             Assert.Contains("<tr><td>NormalG</td><td>1.4</td></tr>", html);
             Assert.Contains("<tr><td>Curvature</td><td>0.015</td></tr>", html);
+            Assert.Contains("<tr><td>Roll</td><td>0.18</td></tr>", html);
             Assert.DoesNotContain("<script", lowerHtml);
             Assert.DoesNotContain("<link ", lowerHtml);
             Assert.DoesNotContain("node_modules", lowerHtml);
@@ -45,6 +47,70 @@ public sealed class DistanceInspectionBrowserCommandTests
             Assert.DoesNotContain("unpkg", lowerHtml);
             Assert.DoesNotContain("cdnjs", lowerHtml);
             Assert.Contains("Wrote distance inspection browser preview", writer.ToString());
+        }
+        finally
+        {
+            DeleteDirectoryIfPresent(tempDirectory);
+        }
+    }
+
+    [Fact]
+    public void Run_OutputHtml_IncludesVisualTimelinePanelWithSectionRows()
+    {
+        string tempDirectory = CreateTempDirectoryPath();
+        string outputPath = Path.Combine(tempDirectory, "distance-inspection.browser.html");
+
+        try
+        {
+            int exitCode = DistanceInspectionBrowserCommand.Run(outputPath);
+
+            Assert.Equal(0, exitCode);
+
+            string html = File.ReadAllText(outputPath);
+
+            Assert.Contains("<section class=\"timeline-panel\" aria-label=\"Distance inspection timeline\">", html);
+            Assert.Contains("<h2>Visual Timeline</h2>", html);
+            Assert.Contains("<p>Inspected distance 12.5 m</p>", html);
+            Assert.Contains("<div class=\"timeline-kind\">Force</div>", html);
+            Assert.Contains("<div class=\"timeline-kind\">Geometry</div>", html);
+            Assert.Contains("<div class=\"timeline-range\">[0, 25]</div>", html);
+            Assert.Contains("style=\"left: 50%;\"", html);
+        }
+        finally
+        {
+            DeleteDirectoryIfPresent(tempDirectory);
+        }
+    }
+
+    [Fact]
+    public void Run_OutputHtml_TimelinePreviewPreservesBadgesChannelRowsAndSelfContainedOutput()
+    {
+        string tempDirectory = CreateTempDirectoryPath();
+        string outputPath = Path.Combine(tempDirectory, "distance-inspection.browser.html");
+
+        try
+        {
+            int exitCode = DistanceInspectionBrowserCommand.Run(outputPath);
+
+            Assert.Equal(0, exitCode);
+
+            string html = File.ReadAllText(outputPath);
+            string lowerHtml = html.ToLowerInvariant();
+
+            Assert.Contains(
+                "<dt>Diagnostic</dt><dd><span class=\"diagnostic-badge diagnostic-none\">None</span></dd>",
+                html);
+            Assert.Contains("<tr><td>NormalG</td><td>1.4</td></tr>", html);
+            Assert.Contains("<tr><td>Curvature</td><td>0.015</td></tr>", html);
+            Assert.Contains("<tr><td>Roll</td><td>0.18</td></tr>", html);
+            Assert.DoesNotContain("<script", lowerHtml);
+            Assert.DoesNotContain("<link ", lowerHtml);
+            Assert.DoesNotContain("href=\"http", lowerHtml);
+            Assert.DoesNotContain("src=\"http", lowerHtml);
+            Assert.DoesNotContain("node_modules", lowerHtml);
+            Assert.DoesNotContain("npm", lowerHtml);
+            Assert.DoesNotContain("unpkg", lowerHtml);
+            Assert.DoesNotContain("cdnjs", lowerHtml);
         }
         finally
         {
