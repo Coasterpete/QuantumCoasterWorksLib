@@ -34,6 +34,7 @@ public sealed class DebugCommandHelpTests
         Assert.Contains("continuous-roll-diagnostics-sample [outputPath]", output);
         Assert.Contains("continuous-roll-diagnostics-json [outputPath]", output);
         Assert.Contains("distance-inspection-json [outputPath]", output);
+        Assert.Contains("distance-inspection-browser [outputPath]", output);
         Assert.Contains("banking-profile-browser [diagnosticsJsonPath] [outputHtmlPath]", output);
         Assert.Contains("Examples:", output);
         Assert.Contains(DebugCommandHelp.GeneratedArtifactsNote, output);
@@ -365,6 +366,29 @@ public sealed class DebugCommandHelpTests
     }
 
     [Fact]
+    public void TryWriteRequestedHelp_DistanceInspectionBrowser_PrintsPreviewDetails()
+    {
+        var writer = new StringWriter(CultureInfo.InvariantCulture);
+
+        bool handled = DebugCommandHelp.TryWriteRequestedHelp(
+            new[] { "help", "distance-inspection-browser" },
+            writer,
+            out int exitCode);
+
+        Assert.True(handled);
+        Assert.Equal(0, exitCode);
+
+        string output = writer.ToString();
+        Assert.Contains("distance-inspection-browser [outputPath]", output);
+        Assert.Contains("DistanceInspectionSnapshotV1 sample", output);
+        Assert.Contains("DistanceInspectionJsonCommand.BuildSample()", output);
+        Assert.Contains("ordered section cards", output);
+        Assert.Contains("channelValues tables", output);
+        Assert.Contains("self-contained, static, escaped", output);
+        Assert.Contains("does not change evaluator behavior", output);
+    }
+
+    [Fact]
     public void WriteUnknownCommand_PrintsUnknownCommandAndSupportedCommands()
     {
         var writer = new StringWriter(CultureInfo.InvariantCulture);
@@ -387,6 +411,7 @@ public sealed class DebugCommandHelpTests
         Assert.Contains("continuous-roll-diagnostics-sample [outputPath]", output);
         Assert.Contains("continuous-roll-diagnostics-json [outputPath]", output);
         Assert.Contains("distance-inspection-json [outputPath]", output);
+        Assert.Contains("distance-inspection-browser [outputPath]", output);
         Assert.Contains("banking-profile-browser [diagnosticsJsonPath] [outputHtmlPath]", output);
     }
 }

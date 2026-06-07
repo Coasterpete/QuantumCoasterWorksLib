@@ -269,6 +269,18 @@ namespace Quantum.Debug
                 return DistanceInspectionJsonCommand.Run(outputPath);
             }
 
+            if (command == DebugCommandKind.DistanceInspectionBrowser)
+            {
+                if (args.Length > 2)
+                {
+                    Console.WriteLine("Usage: distance-inspection-browser [outputPath]");
+                    return 1;
+                }
+
+                string? outputPath = args.Length == 2 ? args[1] : null;
+                return DistanceInspectionBrowserCommand.Run(outputPath);
+            }
+
             if (command == DebugCommandKind.BankingProfileBrowser)
             {
                 if (args.Length > 3)

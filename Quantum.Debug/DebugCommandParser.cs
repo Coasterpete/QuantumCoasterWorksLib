@@ -26,6 +26,7 @@ namespace Quantum.Debug
         ContinuousRollDiagnosticsSample,
         ContinuousRollDiagnosticsJson,
         DistanceInspectionJson,
+        DistanceInspectionBrowser,
         BankingProfileBrowser
     }
 
@@ -163,6 +164,12 @@ namespace Quantum.Debug
             if (string.Equals(args[0], DistanceInspectionJsonCommand.CommandName, StringComparison.OrdinalIgnoreCase))
             {
                 command = DebugCommandKind.DistanceInspectionJson;
+                return true;
+            }
+
+            if (string.Equals(args[0], DistanceInspectionBrowserCommand.CommandName, StringComparison.OrdinalIgnoreCase))
+            {
+                command = DebugCommandKind.DistanceInspectionBrowser;
                 return true;
             }
 
