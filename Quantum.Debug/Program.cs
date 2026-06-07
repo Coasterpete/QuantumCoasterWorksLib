@@ -271,14 +271,20 @@ namespace Quantum.Debug
 
             if (command == DebugCommandKind.DistanceInspectionBrowser)
             {
-                if (args.Length > 2)
+                if (args.Length > 3)
                 {
-                    Console.WriteLine("Usage: distance-inspection-browser [outputPath]");
+                    Console.WriteLine("Usage: distance-inspection-browser [outputHtmlPath]");
+                    Console.WriteLine("       distance-inspection-browser <inputJsonPath> <outputHtmlPath>");
                     return 1;
                 }
 
-                string? outputPath = args.Length == 2 ? args[1] : null;
-                return DistanceInspectionBrowserCommand.Run(outputPath);
+                if (args.Length == 3)
+                {
+                    return DistanceInspectionBrowserCommand.Run(args[1], args[2]);
+                }
+
+                string? outputHtmlPath = args.Length == 2 ? args[1] : null;
+                return DistanceInspectionBrowserCommand.Run(outputHtmlPath);
             }
 
             if (command == DebugCommandKind.BankingProfileBrowser)

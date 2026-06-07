@@ -3,6 +3,7 @@ using System.Globalization;
 using System.IO;
 using System.Net;
 using System.Text;
+using System.Text.Json;
 using Quantum.IO.DistanceInspection.V1;
 
 namespace Quantum.Debug
@@ -29,6 +30,44 @@ namespace Quantum.Debug
             }
 
             DistanceInspectionSnapshotV1Dto dto = DistanceInspectionJsonCommand.BuildSample();
+            return WriteHtml(dto, outputPath, output);
+        }
+
+        public static int Run(string inputJsonPath, string outputHtmlPath)
+        {
+            return Run(inputJsonPath, outputHtmlPath, Console.Out);
+        }
+
+        public static int Run(string inputJsonPath, string outputHtmlPath, TextWriter output)
+        {
+            if (output == null)
+            {
+                throw new ArgumentNullException(nameof(output));
+            }
+
+            DistanceInspectionSnapshotV1Dto dto;
+
+            try
+            {
+                string resolvedInputJsonPath = Path.GetFullPath(inputJsonPath);
+                string json = File.ReadAllText(resolvedInputJsonPath);
+                dto = DistanceInspectionSnapshotV1Json.Deserialize(json);
+            }
+            catch (Exception ex) when (IsReadOrParseException(ex))
+            {
+                output.WriteLine("Failed to read DistanceInspectionSnapshotV1 JSON.");
+                output.WriteLine(ex.Message);
+                return 1;
+            }
+
+            return WriteHtml(dto, outputHtmlPath, output);
+        }
+
+        private static int WriteHtml(
+            DistanceInspectionSnapshotV1Dto dto,
+            string? outputPath,
+            TextWriter output)
+        {
             string html = BuildHtml(dto);
             string resolvedOutputPath = ResolveOutputPath(outputPath);
             string? parentDirectory = Path.GetDirectoryName(resolvedOutputPath);
@@ -240,6 +279,16 @@ namespace Quantum.Debug
         private static string Escape(string value)
         {
             return WebUtility.HtmlEncode(value);
+        }
+
+        private static bool IsReadOrParseException(Exception ex)
+        {
+            return ex is IOException ||
+                   ex is UnauthorizedAccessException ||
+                   ex is ArgumentException ||
+                   ex is NotSupportedException ||
+                   ex is JsonException ||
+                   ex is InvalidOperationException;
         }
     }
 }
