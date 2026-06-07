@@ -32,6 +32,8 @@ public sealed class DistanceInspectionBrowserCommandTests
             Assert.Contains("Ordered distance inspection sections", html);
             Assert.Contains("Channels", html);
             Assert.Contains("Channel Values", html);
+            Assert.Contains("diagnostic-badge", html);
+            Assert.Contains("diagnostic-none", html);
             Assert.Contains("<tr><th>Channel</th><th>Value</th></tr>", html);
             Assert.Contains("<tr><td>NormalG</td><td>1.4</td></tr>", html);
             Assert.Contains("<tr><td>Curvature</td><td>0.015</td></tr>", html);
@@ -102,7 +104,9 @@ public sealed class DistanceInspectionBrowserCommandTests
             Assert.Contains("<dt>Kind</dt><dd>Force</dd>", html);
             Assert.Contains("<dt>Domain</dt><dd>Distance</dd>", html);
             Assert.Contains("<dt>Range</dt><dd>[0, 25]</dd>", html);
-            Assert.Contains("<dt>Diagnostic</dt><dd>None</dd>", html);
+            Assert.Contains(
+                "<dt>Diagnostic</dt><dd><span class=\"diagnostic-badge diagnostic-none\">None</span></dd>",
+                html);
             Assert.Contains("<li>NormalG</li>", html);
             Assert.Contains("<li>LateralG</li>", html);
             Assert.Contains("<li>LongitudinalG</li>", html);

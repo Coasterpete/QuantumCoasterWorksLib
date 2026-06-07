@@ -104,6 +104,9 @@ namespace Quantum.Debug
             builder.AppendLine("    .section-body { display: grid; grid-template-columns: minmax(220px, 280px) minmax(0, 1fr); gap: 16px; padding: 15px; }");
             builder.AppendLine("    .section-facts { display: grid; grid-template-columns: minmax(92px, 116px) minmax(0, 1fr); gap: 8px 10px; align-content: start; margin: 0; }");
             builder.AppendLine("    .section-facts dd { min-width: 0; overflow-wrap: anywhere; }");
+            builder.AppendLine("    .diagnostic-badge { display: inline-flex; align-items: center; min-height: 20px; padding: 2px 8px; border: 1px solid transparent; border-radius: 999px; font-size: 12px; font-weight: 700; line-height: 1.2; }");
+            builder.AppendLine("    .diagnostic-none { color: #166534; background: #dcfce7; border-color: #bbf7d0; }");
+            builder.AppendLine("    .diagnostic-attention { color: #92400e; background: #fef3c7; border-color: #fde68a; }");
             builder.AppendLine("    .channels { margin: 0; padding-left: 18px; color: #334155; font-size: 13px; line-height: 1.6; }");
             builder.AppendLine("    .table-scroll { overflow: auto; border: 1px solid #e2e8f0; border-radius: 8px; }");
             builder.AppendLine("    table { width: 100%; border-collapse: collapse; font-size: 13px; }");
@@ -135,7 +138,7 @@ namespace Quantum.Debug
             AppendFact(builder, "Kind", section.Kind);
             AppendFact(builder, "Domain", section.Domain);
             AppendFact(builder, "Range", "[" + FormatNumber(section.StartX) + ", " + FormatNumber(section.EndX) + "]");
-            AppendFact(builder, "Diagnostic", section.Diagnostic);
+            AppendDiagnosticFact(builder, section.Diagnostic);
             builder.AppendLine("          </dl>");
             builder.AppendLine("          <div>");
             builder.AppendLine("            <h3>Channels</h3>");
@@ -150,6 +153,20 @@ namespace Quantum.Debug
         private static void AppendFact(StringBuilder builder, string label, string value)
         {
             builder.AppendLine("            <dt>" + Escape(label) + "</dt><dd>" + Escape(value) + "</dd>");
+        }
+
+        private static void AppendDiagnosticFact(StringBuilder builder, string diagnostic)
+        {
+            string className = string.Equals(diagnostic, "None", StringComparison.Ordinal)
+                ? "diagnostic-badge diagnostic-none"
+                : "diagnostic-badge diagnostic-attention";
+
+            builder.AppendLine(
+                "            <dt>Diagnostic</dt><dd><span class=\"" +
+                className +
+                "\">" +
+                Escape(diagnostic) +
+                "</span></dd>");
         }
 
         private static void AppendChannels(StringBuilder builder, string[] channels)
