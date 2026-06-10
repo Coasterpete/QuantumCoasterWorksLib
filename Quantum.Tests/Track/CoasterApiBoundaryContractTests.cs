@@ -8,6 +8,7 @@ using Quantum.IO.TrainPose.V1;
 using Quantum.Math;
 using Quantum.Physics;
 using Quantum.Track;
+using Quantum.Track.Authoring;
 using ExportTrackFrame = Quantum.Track.TrackFrame;
 using SplineTrackFrame = Quantum.Splines.TrackFrame;
 
@@ -220,6 +221,52 @@ public sealed class CoasterApiBoundaryContractTests
     }
 
     [Fact]
+    public void TrackAuthoringApis_ExposeNoSplineUiOrEngineTypes()
+    {
+        Type[] authoringTypes =
+        {
+            typeof(TrackAuthoringDefinition),
+            typeof(GeometricSectionDefinition),
+            typeof(StraightSectionDefinition),
+            typeof(ConstantCurvatureSectionDefinition),
+            typeof(TrackAuthoringDocumentBuilder)
+        };
+
+        foreach (Type type in authoringTypes)
+        {
+            foreach (ConstructorInfo constructor in type.GetConstructors())
+            {
+                foreach (ParameterInfo parameter in constructor.GetParameters())
+                {
+                    AssertDoesNotExposeAuthoringFrameworkType(parameter.ParameterType, constructor.Name);
+                }
+            }
+
+            foreach (PropertyInfo property in type.GetProperties(
+                BindingFlags.Public |
+                BindingFlags.Instance |
+                BindingFlags.Static |
+                BindingFlags.DeclaredOnly))
+            {
+                AssertDoesNotExposeAuthoringFrameworkType(property.PropertyType, property.Name);
+            }
+
+            foreach (MethodInfo method in type.GetMethods(
+                BindingFlags.Public |
+                BindingFlags.Instance |
+                BindingFlags.Static |
+                BindingFlags.DeclaredOnly))
+            {
+                AssertDoesNotExposeAuthoringFrameworkType(method.ReturnType, method.Name);
+                foreach (ParameterInfo parameter in method.GetParameters())
+                {
+                    AssertDoesNotExposeAuthoringFrameworkType(parameter.ParameterType, method.Name);
+                }
+            }
+        }
+    }
+
+    [Fact]
     public void EvaluateTrainPose_RemainsTheTrainPoseEntryPoint()
     {
         AssertMethod(
@@ -386,6 +433,43 @@ public sealed class CoasterApiBoundaryContractTests
             Type? elementType = type.GetElementType();
             Assert.NotNull(elementType);
             AssertDoesNotExposeSplineType(elementType, methodName);
+        }
+    }
+
+    private static void AssertDoesNotExposeAuthoringFrameworkType(Type type, string memberName)
+    {
+        string typeNamespace = type.Namespace ?? string.Empty;
+        string[] forbiddenNamespacePrefixes =
+        {
+            "Quantum.Splines",
+            "UnityEngine",
+            "UnityEditor",
+            "Avalonia",
+            "Silk.NET",
+            "OpenTK"
+        };
+
+        foreach (string prefix in forbiddenNamespacePrefixes)
+        {
+            Assert.False(
+                string.Equals(typeNamespace, prefix, StringComparison.Ordinal) ||
+                typeNamespace.StartsWith(prefix + ".", StringComparison.Ordinal),
+                $"{memberName} exposes forbidden authoring dependency type {type.FullName}.");
+        }
+
+        if (type.IsGenericType)
+        {
+            foreach (Type argumentType in type.GetGenericArguments())
+            {
+                AssertDoesNotExposeAuthoringFrameworkType(argumentType, memberName);
+            }
+        }
+
+        if (type.HasElementType)
+        {
+            Type? elementType = type.GetElementType();
+            Assert.NotNull(elementType);
+            AssertDoesNotExposeAuthoringFrameworkType(elementType, memberName);
         }
     }
 
