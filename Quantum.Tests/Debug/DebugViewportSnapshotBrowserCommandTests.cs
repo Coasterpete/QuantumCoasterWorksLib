@@ -103,7 +103,7 @@ public sealed class DebugViewportSnapshotBrowserCommandTests
             Assert.Contains("addEventListener('mouseenter'", html);
             Assert.Contains("addEventListener('click'", html);
             Assert.Contains("Metadata", html);
-            Assert.Contains("sampling-perf-smoke", html);
+            Assert.Contains(AuthoringPipelineProofScenario.FixtureName, html);
             Assert.Contains("quantum.debug_viewport_snapshot", html);
             Assert.Contains("\"trainPose\":", html);
             Assert.Contains("<style>", html);

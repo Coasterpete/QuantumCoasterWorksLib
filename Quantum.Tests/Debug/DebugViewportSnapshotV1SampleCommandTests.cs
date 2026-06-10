@@ -18,18 +18,19 @@ public sealed class DebugViewportSnapshotV1SampleCommandTests
         Assert.Equal(DebugViewportSnapshotV1Dto.ContractName, actual.Contract);
         Assert.Equal(DebugViewportSnapshotV1Dto.ContractVersion, actual.Version);
         Assert.Equal("meters", actual.Metadata.Units);
-        Assert.Equal("sampling-perf-smoke", actual.Metadata.SourceFixtureName);
+        Assert.Equal(AuthoringPipelineProofScenario.FixtureName, actual.Metadata.SourceFixtureName);
+        Assert.Equal(5, DebugViewportSnapshotV1SampleCommand.TrainCarCount);
         Assert.Equal(DebugViewportSnapshotV1SampleCommand.CenterlineSampleCount, actual.Metadata.SampleCount);
 
         Assert.Equal(DebugViewportSnapshotV1SampleCommand.CenterlineSampleCount, actual.CenterlinePoints.Length);
         Assert.Equal(DebugViewportSnapshotV1SampleCommand.CenterlineSampleCount, actual.Frames.Length);
         Assert.Equal(3, actual.Lines.Length);
-        Assert.Equal(DebugViewportSnapshotV1SampleCommand.TrainCarCount, actual.Boxes.Length);
+        Assert.Equal(5, actual.Boxes.Length);
 
         Assert.NotNull(actual.TrainPose);
         Assert.Equal(TrainPoseExportV1Dto.ContractName, actual.TrainPose!.Contract);
         Assert.Equal(TrainPoseExportV1Dto.ContractVersion, actual.TrainPose.Version);
-        Assert.Equal(DebugViewportSnapshotV1SampleCommand.TrainCarCount, actual.TrainPose.Cars.Length);
+        Assert.Equal(5, actual.TrainPose.Cars.Length);
     }
 
     [Fact]
