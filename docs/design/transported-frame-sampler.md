@@ -2,10 +2,13 @@
 
 Date: 2026-05-31
 
-Status: design note only. This document proposes future coaster-domain behavior
-for transported frame sampling before `BankingProfile` runtime work begins. It
-does not change runtime evaluation, `TrackFrame`, `DebugViewportSnapshotV1`,
-`TrainPoseExportV1`, or dependencies.
+Status: historical design note, implemented for canonical runtime sampling by
+Milestone 138 PR 3. `TrackEvaluator` scalar and batch frame APIs now sample from
+the same deterministic transported-frame history. Requested finite station
+distances are resolved against measured geometric arc length, clamped to track
+extents, and stored in `Quantum.Track.TrackFrame.Distance`. Roll is applied after
+base-frame transport. `TransportedTrackFrameSampler` remains only as an obsolete
+compatibility facade.
 
 ## Context
 

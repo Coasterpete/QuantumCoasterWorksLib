@@ -8,6 +8,7 @@ namespace Quantum.Track
     /// Production distance-based evaluation now uses the same canonical transport
     /// history through <see cref="TrackEvaluator"/>.
     /// </summary>
+    [Obsolete("Use TrackEvaluator.EvaluateFrameAtDistance/EvaluateFramesAtDistances; canonical evaluation now uses transported frames.")]
     public static class TransportedTrackFrameSampler
     {
         public static TrackFrame[] SampleFramesAtDistances(
@@ -43,10 +44,7 @@ namespace Quantum.Track
             }
 
             ValidateOrderedDistances(distances);
-            return evaluator.EvaluateCanonicalFramesAtDistances(
-                document,
-                distances,
-                resolvedDistance => resolvedDistance.Segment.RollRadians);
+            return evaluator.EvaluateTrackFramesAtDistances(document, distances);
         }
 
         private static void ValidateOrderedDistances(IReadOnlyList<double> distances)

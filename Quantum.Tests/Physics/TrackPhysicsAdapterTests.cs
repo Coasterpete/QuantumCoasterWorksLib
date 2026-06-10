@@ -3,6 +3,7 @@ using Quantum.Physics;
 using Quantum.Splines;
 using Quantum.Track;
 using Xunit;
+using TrackFrame = Quantum.Track.TrackFrame;
 
 namespace Quantum.Tests;
 
@@ -25,7 +26,7 @@ public sealed class TrackPhysicsAdapterTests
 
         TrackFrame frame = adapter.GetFrameAtDistance(document, 2.5);
 
-        AssertDoubleNear(2.5, frame.S);
+        AssertDoubleNear(2.5, frame.Distance);
         AssertDoubleNear(0.0, frame.Position.X);
         AssertDoubleNear(0.0, frame.Position.Y);
         AssertDoubleNear(2.5, frame.Position.Z);
@@ -44,10 +45,10 @@ public sealed class TrackPhysicsAdapterTests
         });
         const double distance = 9.5;
 
-        TrackFrame expected = evaluator.EvaluateFrameAtDistance(document, distance);
+        TrackFrame expected = evaluator.EvaluateTrackFrameAtDistance(document, distance);
         TrackFrame actual = adapter.GetFrameAtDistance(document, distance);
 
-        AssertDoubleNear(expected.S, actual.S);
+        AssertDoubleNear(expected.Distance, actual.Distance);
         AssertVectorNear(expected.Position, actual.Position);
         AssertVectorNear(expected.Tangent, actual.Tangent);
         AssertVectorNear(expected.Normal, actual.Normal);

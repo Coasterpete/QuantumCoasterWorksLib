@@ -1,7 +1,9 @@
 using Quantum.Math;
 using Quantum.Physics;
 using Quantum.Splines;
+using Quantum.Track;
 using Xunit;
+using TrackFrame = Quantum.Track.TrackFrame;
 
 namespace Quantum.Tests;
 
@@ -14,7 +16,7 @@ public sealed class ForceTargetProjectionTests
     public void ComputeForceVector_ProjectsNormalAndLateralCorrectly()
     {
         TrackFrame frame = new TrackFrame(
-            s: 0.0,
+            distance: 0.0,
             position: Vector3d.Zero,
             tangent: Vector3d.UnitX,
             normal: Vector3d.UnitY,

@@ -1,11 +1,17 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
+using Quantum.Debug;
+using Quantum.IO.DebugViewport.V1;
 using Quantum.IO.TrainPose.V1;
 using Quantum.Math;
+using Quantum.Physics;
 using Quantum.Track;
 using ExportTrackFrame = Quantum.Track.TrackFrame;
 using SplineTrackFrame = Quantum.Splines.TrackFrame;
+
+#pragma warning disable CS0618
 
 namespace Quantum.Tests;
 
@@ -49,6 +55,18 @@ public sealed class CoasterApiBoundaryContractTests
             typeof(IReadOnlyList<double>));
         AssertMethod(
             evaluatorType,
+            nameof(TrackEvaluator.EvaluateTrackFrameAtDistance),
+            typeof(ExportTrackFrame),
+            typeof(TrackDocument),
+            typeof(double));
+        AssertMethod(
+            evaluatorType,
+            nameof(TrackEvaluator.EvaluateTrackFramesAtDistances),
+            typeof(ExportTrackFrame[]),
+            typeof(TrackDocument),
+            typeof(IReadOnlyList<double>));
+        AssertMethod(
+            evaluatorType,
             nameof(TrackEvaluator.GetBoundTrackTotalLength),
             typeof(double),
             Type.EmptyTypes);
@@ -71,18 +89,121 @@ public sealed class CoasterApiBoundaryContractTests
     {
         Type evaluatorType = typeof(TrackEvaluator);
 
-        AssertMethod(
+        MethodInfo scalarMethod = AssertMethod(
             evaluatorType,
             nameof(TrackEvaluator.EvaluateSplineFrameAtDistance),
             typeof(SplineTrackFrame),
             typeof(TrackDocument),
             typeof(double));
-        AssertMethod(
+        MethodInfo batchMethod = AssertMethod(
             evaluatorType,
             nameof(TrackEvaluator.EvaluateSplineFramesAtDistances),
             typeof(SplineTrackFrame[]),
             typeof(TrackDocument),
             typeof(IReadOnlyList<double>));
+
+        AssertObsolete(scalarMethod);
+        AssertObsolete(batchMethod);
+    }
+
+    [Fact]
+    public void PhysicsTrainDebugAndExportFrameApis_ExposeCanonicalTrackFrame()
+    {
+        AssertMethod(
+            typeof(TrackPhysicsAdapter),
+            nameof(TrackPhysicsAdapter.GetFrameAtDistance),
+            typeof(ExportTrackFrame),
+            typeof(TrackDocument),
+            typeof(double));
+
+        MethodInfo providerMethod = AssertMethod(
+            typeof(ITrackFrameProvider),
+            nameof(ITrackFrameProvider.TryGetFrameAtDistance),
+            typeof(bool),
+            typeof(double),
+            typeof(ExportTrackFrame).MakeByRefType());
+
+        AssertProperty(typeof(TrainFollowerState), nameof(TrainFollowerState.Frame), typeof(ExportTrackFrame));
+        AssertProperty(typeof(TrainCarTransform), nameof(TrainCarTransform.Frame), typeof(ExportTrackFrame));
+        AssertProperty(
+            typeof(DebugViewportSnapshotV1Source),
+            nameof(DebugViewportSnapshotV1Source.SampledFrames),
+            typeof(IReadOnlyList<ExportTrackFrame>));
+        AssertMethod(
+            typeof(DebugTrackContinuousSampler),
+            nameof(DebugTrackContinuousSampler.SampleContinuousFrames),
+            typeof(ExportTrackFrame[]),
+            typeof(TrackDocument),
+            typeof(TrackEvaluator),
+            typeof(IReadOnlyList<double>),
+            typeof(int),
+            typeof(int),
+            typeof(double));
+
+        AssertDoesNotExposeSplineType(providerMethod.ReturnType, providerMethod.Name);
+        foreach (ParameterInfo parameter in providerMethod.GetParameters())
+        {
+            AssertDoesNotExposeSplineType(parameter.ParameterType, providerMethod.Name);
+        }
+    }
+
+    [Fact]
+    public void LegacyFrameAndTrainCompatibilityApis_AreObsolete()
+    {
+        AssertObsolete(typeof(SplineTrackFrame));
+        AssertObsolete(typeof(Quantum.Splines.TrackFrameSampler));
+        AssertObsolete(typeof(TransportedTrackFrameSampler));
+
+        AssertObsolete(AssertMethod(
+            typeof(TrackEvaluator),
+            nameof(TrackEvaluator.EvaluateFrameAtDistance),
+            typeof(SplineTrackFrame),
+            typeof(TrackDocument),
+            typeof(double)));
+        AssertObsolete(AssertMethod(
+            typeof(TrackEvaluator),
+            nameof(TrackEvaluator.EvaluateFramesAtDistances),
+            typeof(SplineTrackFrame[]),
+            typeof(TrackDocument),
+            typeof(IReadOnlyList<double>)));
+        AssertObsolete(AssertMethod(
+            typeof(TrainCarTransformProvider),
+            nameof(TrainCarTransformProvider.GetCarTransforms),
+            typeof(IReadOnlyList<TrainCarTransform>),
+            typeof(double),
+            typeof(double),
+            typeof(int)));
+    }
+
+    [Fact]
+    public void CoasterAssemblies_OnlyExposeSplineTrackFrameThroughObsoleteCompatibilityMembers()
+    {
+        Assembly[] assemblies =
+        {
+            typeof(TrackEvaluator).Assembly,
+            typeof(TrackPhysicsAdapter).Assembly,
+            typeof(DebugViewportSnapshotV1Source).Assembly,
+            typeof(SamplingPerfCommand).Assembly
+        };
+
+        IEnumerable<MethodInfo> publicMethods = assemblies
+            .SelectMany(assembly => assembly.GetExportedTypes())
+            .SelectMany(type => type.GetMethods(
+                BindingFlags.Public |
+                BindingFlags.Instance |
+                BindingFlags.Static |
+                BindingFlags.DeclaredOnly));
+
+        foreach (MethodInfo method in publicMethods)
+        {
+            bool exposesLegacySplineFrame = ContainsType(method.ReturnType, typeof(SplineTrackFrame)) ||
+                method.GetParameters().Any(parameter => ContainsType(parameter.ParameterType, typeof(SplineTrackFrame)));
+
+            if (exposesLegacySplineFrame)
+            {
+                AssertObsolete(method);
+            }
+        }
     }
 
     [Fact]
@@ -268,9 +389,33 @@ public sealed class CoasterApiBoundaryContractTests
         }
     }
 
+    private static bool ContainsType(Type candidate, Type expected)
+    {
+        if (candidate == expected)
+        {
+            return true;
+        }
+
+        if (candidate.HasElementType)
+        {
+            Type? elementType = candidate.GetElementType();
+            return elementType != null && ContainsType(elementType, expected);
+        }
+
+        return candidate.IsGenericType &&
+            candidate.GetGenericArguments().Any(argument => ContainsType(argument, expected));
+    }
+
+    private static void AssertObsolete(MemberInfo member)
+    {
+        Assert.NotNull(member.GetCustomAttribute<ObsoleteAttribute>());
+    }
+
     private static bool IsSplineType(Type type)
     {
         return string.Equals(type.Namespace, "Quantum.Splines", StringComparison.Ordinal) ||
                (type.Namespace?.StartsWith("Quantum.Splines.", StringComparison.Ordinal) ?? false);
     }
 }
+
+#pragma warning restore CS0618

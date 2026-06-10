@@ -41,7 +41,7 @@ Strengths:
 
 Weak spots:
 - `Quantum.Track` is now broad (track eval, sections, camera, train transforms, debug gizmos), so cohesion is weakening.
-- Two `TrackFrame` types (`Quantum.Splines.TrackFrame`, `Quantum.Track.TrackFrame`) already require aliasing and mental context switching.
+- The obsolete `Quantum.Splines.TrackFrame` compatibility name still exists, but active train-transform paths use canonical `Quantum.Track.TrackFrame`; generic spline tests use `CurveFrame`.
 
 ## 3) Immutable / Value-Object Consistency
 Strengths:

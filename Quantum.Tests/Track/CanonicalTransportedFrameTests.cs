@@ -4,7 +4,6 @@ using Quantum.Physics;
 using Quantum.Splines;
 using Quantum.Track;
 using ExportTrackFrame = Quantum.Track.TrackFrame;
-using SplineTrackFrame = Quantum.Splines.TrackFrame;
 
 namespace Quantum.Tests;
 
@@ -161,9 +160,10 @@ public sealed class CanonicalTransportedFrameTests
             evaluator,
             profile,
             new[] { distance })[0];
-        SplineTrackFrame physics = new TrackPhysicsAdapter(evaluator).GetFrameAtDistance(document, distance);
+        ExportTrackFrame physics = new TrackPhysicsAdapter(evaluator).GetFrameAtDistance(document, distance);
 
         AssertFrameNear(canonical, banked);
+        Assert.InRange(System.Math.Abs(canonical.Distance - physics.Distance), 0.0, Tolerance);
         AssertVectorNear(canonical.Position, physics.Position);
         AssertVectorNear(canonical.Tangent, physics.Tangent);
         AssertVectorNear(canonical.Normal, physics.Normal);

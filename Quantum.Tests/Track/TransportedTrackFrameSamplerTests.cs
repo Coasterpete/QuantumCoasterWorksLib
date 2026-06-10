@@ -4,6 +4,8 @@ using Quantum.Track;
 using ExportTrackFrame = Quantum.Track.TrackFrame;
 using SystemMath = System.Math;
 
+#pragma warning disable CS0618 // Compatibility facade coverage.
+
 namespace Quantum.Tests;
 
 public sealed class TransportedTrackFrameSamplerTests
@@ -237,3 +239,5 @@ public sealed class TransportedTrackFrameSamplerTests
         Assert.InRange(SystemMath.Abs(expected - actual), 0.0, tolerance);
     }
 }
+
+#pragma warning restore CS0618

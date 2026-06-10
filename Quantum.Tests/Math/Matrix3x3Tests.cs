@@ -51,8 +51,8 @@ public sealed class Matrix3x3Tests
             new Vector3d(10.0, 8.0, 3.0));
 
         IArcLengthCurve curve = new ArcLengthCurveAdapter(paramCurve, samples: 256);
-        var sampler = new TrackFrameSampler(curve, Vector3d.UnitY);
-        TrackFrame frame = sampler.GetFrameAt(curve.Length * 0.4);
+        var sampler = new CurveFrameSampler(curve, Vector3d.UnitY);
+        CurveFrame frame = sampler.GetFrameAt(curve.Length * 0.4);
 
         Matrix3x3 worldFromLocal = Matrix3x3.FromBasis(frame.Tangent, frame.Normal, frame.Binormal);
         Matrix3x3 localFromWorld = worldFromLocal.Transpose();

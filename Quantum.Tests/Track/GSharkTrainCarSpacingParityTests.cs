@@ -33,8 +33,8 @@ public sealed class GSharkTrainCarSpacingParityTests
         var gSharkProvider = new TrainCarTransformProvider(new TrackEvaluator(
             BuildSingleSegmentDocument(segmentLength, rollRadians, gSharkCurve)));
 
-        IReadOnlyList<TrainCarTransform> legacyCars = legacyProvider.GetCarTransforms(leadDistance, carSpacing, carCount);
-        IReadOnlyList<TrainCarTransform> gSharkCars = gSharkProvider.GetCarTransforms(leadDistance, carSpacing, carCount);
+        IReadOnlyList<TrainCarTransform> legacyCars = legacyProvider.EvaluateCarTransforms(leadDistance, carSpacing, carCount);
+        IReadOnlyList<TrainCarTransform> gSharkCars = gSharkProvider.EvaluateCarTransforms(leadDistance, carSpacing, carCount);
 
         Assert.Equal(legacyCars.Count, gSharkCars.Count);
 

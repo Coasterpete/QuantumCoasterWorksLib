@@ -2,6 +2,9 @@ using Quantum.Math;
 using Quantum.Splines;
 using Quantum.Track;
 using Xunit;
+using TrackFrame = Quantum.Splines.TrackFrame;
+
+#pragma warning disable CS0618 // Legacy segment-local frame compatibility coverage.
 
 namespace Quantum.Tests;
 
@@ -266,3 +269,5 @@ public sealed class TrackEvaluatorFrameTests
         Assert.InRange(System.Math.Abs(expected - actual), 0.0, Tolerance);
     }
 }
+
+#pragma warning restore CS0618

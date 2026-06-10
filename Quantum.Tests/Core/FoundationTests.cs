@@ -508,9 +508,9 @@ public class FoundationTests
     }
 
     [Fact]
-    public void TrackFrameSampler_SampleByLength_ClampsToEndpoints_AndReturnsFiniteNormalizedTangent()
+    public void CurveFrameSampler_SampleByLength_ClampsToEndpoints_AndReturnsFiniteNormalizedTangent()
     {
-        Type samplerType = RequireTrackFrameSamplerType();
+        Type samplerType = RequireCurveFrameSamplerType();
         Type sampleType = RequireArcLengthSampleType();
 
         MethodInfo? sampleByLength = samplerType.GetMethod(
@@ -522,7 +522,7 @@ public class FoundationTests
 
         Assert.True(
             sampleByLength is not null,
-            "Expected method: TrackFrameSampler.SampleByLength(IArcLengthCurve, double).");
+            "Expected method: CurveFrameSampler.SampleByLength(IArcLengthCurve, double).");
 
         IArcLengthCurve track = new LineCurve(new Vector3d(0, 0, 0), new Vector3d(10, 0, 0));
 
@@ -548,10 +548,10 @@ public class FoundationTests
     }
 
     [Fact]
-    public void TrackFrameSampler_SampleFrameByLength_ReturnsOrthonormalBasis()
+    public void CurveFrameSampler_SampleFrameByLength_ReturnsOrthonormalBasis()
     {
-        Type samplerType = RequireTrackFrameSamplerType();
-        Type frameType = RequireTrackFrameType();
+        Type samplerType = RequireCurveFrameSamplerType();
+        Type frameType = RequireCurveFrameType();
 
         MethodInfo? sampleFrameByLength = samplerType.GetMethod(
             "SampleFrameByLength",
@@ -562,7 +562,7 @@ public class FoundationTests
 
         Assert.True(
             sampleFrameByLength is not null,
-            "Expected method: TrackFrameSampler.SampleFrameByLength(IArcLengthCurve, double, Vector3d).");
+            "Expected method: CurveFrameSampler.SampleFrameByLength(IArcLengthCurve, double, Vector3d).");
 
         IArcLengthCurve track = new LineCurve(new Vector3d(0, 0, 0), new Vector3d(10, 10, 0));
         object? frameObject = sampleFrameByLength!.Invoke(null, new object[] { track, track.Length * 0.5, Vector3d.UnitZ });
@@ -584,9 +584,9 @@ public class FoundationTests
     }
 
     [Fact]
-    public void TrackFrameSampler_SampleFrameByLength_HandlesReferenceUpParallelToTangent_WithoutNaNOrInfinity()
+    public void CurveFrameSampler_SampleFrameByLength_HandlesReferenceUpParallelToTangent_WithoutNaNOrInfinity()
     {
-        Type samplerType = RequireTrackFrameSamplerType();
+        Type samplerType = RequireCurveFrameSamplerType();
 
         MethodInfo? sampleFrameByLength = samplerType.GetMethod(
             "SampleFrameByLength",
@@ -597,7 +597,7 @@ public class FoundationTests
 
         Assert.True(
             sampleFrameByLength is not null,
-            "Expected method: TrackFrameSampler.SampleFrameByLength(IArcLengthCurve, double, Vector3d).");
+            "Expected method: CurveFrameSampler.SampleFrameByLength(IArcLengthCurve, double, Vector3d).");
 
         IArcLengthCurve track = new LineCurve(new Vector3d(0, 0, 0), new Vector3d(0, 10, 0));
         object? frameObject = sampleFrameByLength!.Invoke(null, new object[] { track, track.Length * 0.5, Vector3d.UnitY });
@@ -617,9 +617,9 @@ public class FoundationTests
     }
 
     [Fact]
-    public void TrackFrameSampler_SampleFramesUniform_IncludesStartAndEnd_WhenLengthNotDivisibleByStepLength()
+    public void CurveFrameSampler_SampleFramesUniform_IncludesStartAndEnd_WhenLengthNotDivisibleByStepLength()
     {
-        Type samplerType = RequireTrackFrameSamplerType();
+        Type samplerType = RequireCurveFrameSamplerType();
 
         MethodInfo? sampleFramesUniform = samplerType.GetMethod(
             "SampleFramesUniform",
@@ -630,7 +630,7 @@ public class FoundationTests
 
         Assert.True(
             sampleFramesUniform is not null,
-            "Expected method: TrackFrameSampler.SampleFramesUniform(IArcLengthCurve, double, Vector3d).");
+            "Expected method: CurveFrameSampler.SampleFramesUniform(IArcLengthCurve, double, Vector3d).");
 
         IArcLengthCurve track = new LineCurve(new Vector3d(0, 0, 0), new Vector3d(10, 0, 0));
         object? framesObject = sampleFramesUniform!.Invoke(null, new object[] { track, 3.0, Vector3d.UnitY });
@@ -659,7 +659,7 @@ public class FoundationTests
     [Fact]
     public void TrainFollowerState_ExposesTrackFrame_AtCurrentDistance()
     {
-        Type frameType = RequireTrackFrameType();
+        Type frameType = typeof(Quantum.Track.TrackFrame);
         PropertyInfo? frameProperty = typeof(TrainFollowerState).GetProperty("Frame", BindingFlags.Public | BindingFlags.Instance);
 
         Assert.True(frameProperty is not null, "Expected TrainFollowerState to expose a public Frame property.");
@@ -1224,17 +1224,17 @@ public class FoundationTests
         return type!;
     }
 
-    private static Type RequireTrackFrameType()
+    private static Type RequireCurveFrameType()
     {
-        Type? type = typeof(IParamCurve).Assembly.GetType("Quantum.Splines.TrackFrame");
-        Assert.True(type is not null, "Expected Quantum.Splines.TrackFrame to exist.");
+        Type? type = typeof(IParamCurve).Assembly.GetType("Quantum.Splines.CurveFrame");
+        Assert.True(type is not null, "Expected Quantum.Splines.CurveFrame to exist.");
         return type!;
     }
 
-    private static Type RequireTrackFrameSamplerType()
+    private static Type RequireCurveFrameSamplerType()
     {
-        Type? type = typeof(IParamCurve).Assembly.GetType("Quantum.Splines.TrackFrameSampler");
-        Assert.True(type is not null, "Expected Quantum.Splines.TrackFrameSampler to exist.");
+        Type? type = typeof(IParamCurve).Assembly.GetType("Quantum.Splines.CurveFrameSampler");
+        Assert.True(type is not null, "Expected Quantum.Splines.CurveFrameSampler to exist.");
         return type!;
     }
 

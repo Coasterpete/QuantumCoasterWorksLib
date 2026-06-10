@@ -1,6 +1,6 @@
 # Math Backend Status
 
-As of 2026-05-12, Quantum's math backend is stable for the current milestone (simple train boxes moving along centerline with stable frame sampling and distance-based placement), but it is intentionally mixed:
+As of 2026-06-10, Quantum's math backend is stable for the current milestone (simple train boxes moving along centerline with stable frame sampling and distance-based placement), but it is intentionally mixed:
 - core math primitives are custom and lightweight
 - frame/placement logic is coaster-domain-specific and should stay custom
 - some general numerical functionality is duplicated and can be migrated incrementally to mature libraries later
@@ -16,8 +16,9 @@ Core math primitives (`Quantum.Math`):
 - `ITrackFrameBasis` (`Quantum.Math/ITrackFrameBasis.cs`): bridge interface to avoid project reference cycles.
 
 Frame and transform domain types (coaster-facing, outside `Quantum.Math`):
-- `Quantum.Splines.TrackFrame` (`Quantum.Splines/TrackFrame.cs`): sampled frame (`S`, position, tangent/normal/binormal), implements `ITrackFrameBasis`.
-- `Quantum.Track.TrackFrame` (`Quantum.Track/TrackFrame.cs`): export/runtime frame with `Distance` and canonical `ToMatrix4x4()` policy.
+- `Quantum.Splines.CurveFrame` (`Quantum.Splines/CurveFrame.cs`): generic curve-sampling frame (`S`, position, tangent/normal/binormal), implements `ITrackFrameBasis`.
+- `Quantum.Splines.TrackFrame` (`Quantum.Splines/TrackFrame.cs`): obsolete compatibility name retained for existing spline callers.
+- `Quantum.Track.TrackFrame` (`Quantum.Track/TrackFrame.cs`): canonical coaster-facing runtime frame with global station `Distance`, `ITrackFrameBasis`, and `ToMatrix4x4()` policy.
 - Train transform records:
   - `TrainCarTransform` (`Quantum.Track/TrainCarTransform.cs`) uses `Matrix4x4` (float)
   - `BogieTransform` (`Quantum.Track/BogieTransform.cs`) uses `Matrix4x4d` (double)
@@ -37,7 +38,7 @@ Train placement path:
 - Wheel transforms currently inherit bogie frame/matrix (`Quantum.Track/Internal/TrainWheelTransformLayoutSolver.cs`).
 
 Physics and debug:
-- Physics reads transform snapshots via `TrackPhysicsAdapter.GetTransformAtDistance(...)` (`Quantum.Physics/TrackPhysicsAdapter.cs`).
+- Physics reads canonical `Quantum.Track.TrackFrame` values and transform snapshots through `TrackPhysicsAdapter` (`Quantum.Physics/TrackPhysicsAdapter.cs`).
 - Camera builders emit `System.Numerics.Matrix4x4` from frame basis (`Quantum.Track/CameraFrameBuilder.cs`).
 
 IO/export:
@@ -49,9 +50,9 @@ IO/export:
 These are not generic math-library replacements; they encode Quantum coaster semantics and should remain custom:
 - Global-distance to segment/local-`t` resolution and clamping semantics (`Quantum.Track/Internal/CompiledTrackSamplingContext.cs`, `Quantum.Track/TrackEvaluator.cs`).
 - Frame construction rules with roll application and fallback axes (`Quantum.Track/TrackEvaluator.cs`).
-- Track-frame sampling policy and fallback normal behavior (`Quantum.Splines/TrackFrameSampler.cs`).
+- Generic curve-frame sampling policy and fallback normal behavior (`Quantum.Splines/CurveFrameSampler.cs`).
 - Distance-based train placement and spacing semantics (body/bogie/articulation/wheel layout solvers under `Quantum.Track/Internal`).
-- Dual frame surfaces (`Quantum.Splines.TrackFrame` vs `Quantum.Track.TrackFrame`) because they represent different integration contracts.
+- Canonical transported coaster-frame history and post-transport roll application (`Quantum.Track/Internal/CanonicalTransportedFrameSampler.cs`).
 - Train pose data contracts and export mapping (`Quantum.IO/TrainPose/V1/*`).
 
 ## What Currently Duplicates General Numerical Library Behavior
@@ -93,7 +94,7 @@ Core matrix/transform correctness:
 - `Quantum.Tests/Track/TrackFrameTests.cs`: `TrackFrame -> Matrix4x4` convention, orthonormality, non-finite guards.
 
 Frame sampling and distance semantics:
-- `Quantum.Tests/Splines/TrackFrameSamplerTests.cs`: sampled frame orthonormality.
+- `Quantum.Tests/Splines/TrackFrameSamplerTests.cs`: generic `CurveFrame` sampling orthonormality.
 - `Quantum.Tests/Track/TrackEvaluatorFrameTests.cs`: frame orthonormality, tangent alignment, roll behavior, fallback behavior.
 - `Quantum.Tests/Track/TrackEvaluatorSplineTransformTests.cs`: transform position and rotation behavior for spline/fallback paths.
 - `Quantum.Tests/Track/TrackEvaluatorDistanceSemanticsContractTests.cs`: public frame distances remain clamped global station distances while support-layer spline frames preserve local `S`.
@@ -107,7 +108,7 @@ Train placement and matrix policy:
 
 Physics/adapter transform parity:
 - `Quantum.Tests/Physics/TrackPhysicsAdapterTests.cs`: adapter frame/transform parity with `TrackEvaluator`, curvature stability.
-- `Quantum.Tests/Physics/TrackFrameProviderDistanceSemanticsContractTests.cs`: physics provider preserves support-layer segment-local spline frame semantics for global distance queries.
+- `Quantum.Tests/Physics/TrackFrameProviderDistanceSemanticsContractTests.cs`: physics provider preserves canonical clamped global station distance semantics.
 
 ## What Should Not Be Deleted Yet
 
@@ -116,6 +117,7 @@ Do not delete these yet; they remain active integration points or parity baselin
 - `Quantum.Math/Transform3d.cs`: still used by `TrackEvaluator`, physics adapter, and transform contract tests.
 - `Quantum.Math/Matrix3x3.cs`: required by `Transform3d`, `TrackEvaluator` fallback transform path, and math tests.
 - `Quantum.Math/ITrackFrameBasis.cs`: required cross-project bridge for `Transform3d.FromTrackFrame(...)` without project cycles.
+- `Quantum.Splines.TrackFrame` and `TrackFrameSampler`: obsolete compatibility surfaces retained until a later breaking cleanup.
 - `Quantum.Splines/Curves/NurbsCurve.cs`: still used as legacy parity baseline in FVD/adapter migration path.
 - `Quantum.Splines/Curves/GSharkNurbsCurveAdapter.cs` and `Quantum.Splines/GSharkVector3dConversions.cs`: active production integration path and parity coverage.
 - `Quantum.FVD/FvdNurbsBuildResult.cs` and `Quantum.FVD/FvdGraph.cs` legacy return surfaces: still expose/use legacy `NurbsCurve` while arc-length runtime path also uses G-Shark.

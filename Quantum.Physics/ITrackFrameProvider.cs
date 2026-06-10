@@ -1,9 +1,9 @@
-using Quantum.Splines;
+using Quantum.Track;
 
 namespace Quantum.Physics
 {
     /// <summary>
-    /// Read-only provider for track frames at an arc-length distance.
+    /// Read-only provider for canonical coaster track frames at global station distance.
     /// </summary>
     public interface ITrackFrameProvider
     {

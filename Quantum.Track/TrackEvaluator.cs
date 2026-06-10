@@ -5,6 +5,8 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using SplineTrackFrame = Quantum.Splines.TrackFrame;
 
+#pragma warning disable CS0618 // Legacy spline-frame compatibility surface.
+
 namespace Quantum.Track
 {
     /// <summary>
@@ -103,7 +105,7 @@ namespace Quantum.Track
 
         public Transform3d EvaluateTransform(TrackDocument doc, TrackPosition position)
         {
-            SplineTrackFrame frame = EvaluateFrame(doc, position);
+            CurveFrame frame = EvaluateCurveFrame(doc, position);
             return Transform3d.FromTrackFrame(frame, frame.Position);
         }
 
@@ -116,6 +118,20 @@ namespace Quantum.Track
         public TrackFrame EvaluateFrameAtDistance(double distance)
         {
             TrackDocument doc = ResolveBoundDocument();
+            return EvaluateTrackFrameAtDistance(doc, distance);
+        }
+
+        /// <summary>
+        /// Samples a track document at a global station distance and returns the
+        /// canonical coaster-domain frame.
+        /// </summary>
+        public TrackFrame EvaluateTrackFrameAtDistance(TrackDocument doc, double distance)
+        {
+            if (doc is null)
+            {
+                throw new System.ArgumentNullException(nameof(doc));
+            }
+
             ThrowIfDistanceNonFinite(distance);
             CompiledTrackSamplingContext samplingContext = CompileForDistance(doc, distance);
             return samplingContext.SampleCanonicalFrame(distance, ResolveRollRadians);
@@ -160,6 +176,7 @@ namespace Quantum.Track
         /// <see cref="EvaluateFrameAtDistance(double)"/>, which returns
         /// <see cref="Quantum.Track.TrackFrame"/>.
         /// </remarks>
+        [System.Obsolete("Use EvaluateTrackFrameAtDistance for coaster-facing sampling. This method remains for spline-frame compatibility.")]
         public SplineTrackFrame EvaluateSplineFrameAtDistance(TrackDocument doc, double distance)
         {
             if (doc is null)
@@ -184,6 +201,7 @@ namespace Quantum.Track
         /// <see cref="EvaluateFrameAtDistance(double)"/> for the preferred
         /// coaster-facing <see cref="Quantum.Track.TrackFrame"/> contract.
         /// </remarks>
+        [System.Obsolete("Use EvaluateTrackFrameAtDistance for coaster-facing sampling. This overload remains for compatibility.")]
         [EditorBrowsable(EditorBrowsableState.Never)]
         public SplineTrackFrame EvaluateFrameAtDistance(TrackDocument doc, double distance)
         {
@@ -244,6 +262,7 @@ namespace Quantum.Track
         /// <see cref="EvaluateFramesAtDistances(IReadOnlyList{double})"/>, which
         /// returns <see cref="Quantum.Track.TrackFrame"/> values.
         /// </remarks>
+        [System.Obsolete("Use EvaluateTrackFramesAtDistances for coaster-facing sampling. This method remains for spline-frame compatibility.")]
         public SplineTrackFrame[] EvaluateSplineFramesAtDistances(
             TrackDocument doc,
             IReadOnlyList<double> distances)
@@ -294,6 +313,7 @@ namespace Quantum.Track
         /// <see cref="EvaluateFramesAtDistances(IReadOnlyList{double})"/> for the
         /// preferred coaster-facing <see cref="Quantum.Track.TrackFrame"/> contract.
         /// </remarks>
+        [System.Obsolete("Use EvaluateTrackFramesAtDistances for coaster-facing sampling. This overload remains for compatibility.")]
         [EditorBrowsable(EditorBrowsableState.Never)]
         public SplineTrackFrame[] EvaluateFramesAtDistances(
             TrackDocument doc,
@@ -312,6 +332,22 @@ namespace Quantum.Track
         public TrackFrame[] EvaluateFramesAtDistances(IReadOnlyList<double> distances)
         {
             TrackDocument doc = ResolveBoundDocument();
+            return EvaluateTrackFramesAtDistances(doc, distances);
+        }
+
+        /// <summary>
+        /// Samples a track document at global station distances and returns
+        /// canonical coaster-domain frames in caller order.
+        /// </summary>
+        public TrackFrame[] EvaluateTrackFramesAtDistances(
+            TrackDocument doc,
+            IReadOnlyList<double> distances)
+        {
+            if (doc is null)
+            {
+                throw new System.ArgumentNullException(nameof(doc));
+            }
+
             if (distances is null)
             {
                 throw new System.ArgumentNullException(nameof(distances));
@@ -334,16 +370,7 @@ namespace Quantum.Track
 
         public Transform3d EvaluateTransformAtDistance(TrackDocument doc, double distance)
         {
-            if (doc is null)
-            {
-                throw new System.ArgumentNullException(nameof(doc));
-            }
-
-            ThrowIfDistanceNonFinite(distance);
-            CompiledTrackSamplingContext samplingContext = CompileForDistance(doc, distance);
-            ResolvedTrackDistance resolvedDistance = samplingContext.Resolve(distance);
-            TrackFrame canonicalFrame = samplingContext.SampleCanonicalFrame(distance, ResolveRollRadians);
-            SplineTrackFrame frame = BuildSplineFrame(canonicalFrame, resolvedDistance.LocalDistance);
+            TrackFrame frame = EvaluateTrackFrameAtDistance(doc, distance);
             return Transform3d.FromTrackFrame(frame, frame.Position);
         }
 
@@ -381,7 +408,7 @@ namespace Quantum.Track
             return samplingContext.SampleCanonicalFrames(distances, rollRadiansResolver);
         }
 
-        internal SplineTrackFrame[] EvaluateStatelessSplineFramesAtDistances(
+        internal CurveFrame[] EvaluateStatelessCurveFramesAtDistances(
             TrackDocument doc,
             IReadOnlyList<double> distances)
         {
@@ -397,7 +424,7 @@ namespace Quantum.Track
 
             if (distances.Count == 0)
             {
-                return System.Array.Empty<SplineTrackFrame>();
+                return System.Array.Empty<CurveFrame>();
             }
 
             for (int i = 0; i < distances.Count; i++)
@@ -406,18 +433,35 @@ namespace Quantum.Track
             }
 
             CompiledTrackSamplingContext samplingContext = CompileForDistance(doc, distances[0]);
-            var frames = new SplineTrackFrame[distances.Count];
+            var frames = new CurveFrame[distances.Count];
 
             for (int i = 0; i < distances.Count; i++)
             {
-                frames[i] = EvaluateResolvedFrame(samplingContext.Resolve(distances[i]));
+                frames[i] = EvaluateResolvedCurveFrame(samplingContext.Resolve(distances[i]));
             }
 
             return frames;
         }
 
+        [System.Obsolete("Use global station-distance TrackFrame APIs for coaster-facing sampling. This segment-local spline frame remains for compatibility.")]
         public SplineTrackFrame EvaluateFrame(TrackDocument doc, TrackPosition position)
         {
+            CurveFrame frame = EvaluateCurveFrame(doc, position);
+            return new SplineTrackFrame(
+                frame.S,
+                frame.Position,
+                frame.Tangent,
+                frame.Normal,
+                frame.Binormal);
+        }
+
+        private CurveFrame EvaluateCurveFrame(TrackDocument doc, TrackPosition position)
+        {
+            if (doc is null)
+            {
+                throw new System.ArgumentNullException(nameof(doc));
+            }
+
             TrackEvaluationPoint evaluationPoint = EvaluateAt(doc, position);
             double rollRadians = ResolveRollRadians(evaluationPoint);
 
@@ -425,14 +469,14 @@ namespace Quantum.Track
             {
                 Vector3d splinePosition = spline.Evaluate(evaluationPoint.LocalT);
                 Vector3d splineTangent = NormalizeOrThrow(spline.Tangent(evaluationPoint.LocalT), "tangent");
-                return BuildTrackFrame(
+                return BuildCurveFrame(
                     splinePosition,
                     splineTangent,
                     rollRadians,
                     evaluationPoint.LocalT * evaluationPoint.Segment.Length);
             }
 
-            return EvaluateFallbackFrame(doc, position, evaluationPoint, rollRadians);
+            return EvaluateFallbackCurveFrame(doc, position, evaluationPoint, rollRadians);
         }
 
         private static Transform3d EvaluateFallbackTransform(TrackDocument doc, TrackPosition position, TrackEvaluationPoint evaluationPoint)
@@ -458,17 +502,6 @@ namespace Quantum.Track
                 new Vector3d(distanceAlongTrack, 0.0, 0.0));
         }
 
-        private static TrackFrame BuildExportFrame(SplineTrackFrame sourceFrame, double stationDistance)
-        {
-            Vector3d tangent = NormalizeOrThrow(sourceFrame.Tangent, "tangent");
-            Vector3d projectedNormal = sourceFrame.Normal - (tangent * Vector3d.Dot(sourceFrame.Normal, tangent));
-            Vector3d normal = NormalizeOrThrow(projectedNormal, "normal");
-            Vector3d binormal = NormalizeOrThrow(Vector3d.Cross(tangent, normal), "binormal");
-            normal = NormalizeOrThrow(Vector3d.Cross(binormal, tangent), "normal");
-
-            return new TrackFrame(stationDistance, sourceFrame.Position, tangent, normal, binormal);
-        }
-
         private static SplineTrackFrame BuildSplineFrame(TrackFrame sourceFrame, double localDistance)
         {
             return new SplineTrackFrame(
@@ -479,21 +512,21 @@ namespace Quantum.Track
                 sourceFrame.Binormal);
         }
 
-        private static SplineTrackFrame EvaluateFallbackFrame(
+        private static CurveFrame EvaluateFallbackCurveFrame(
             TrackDocument doc,
             TrackPosition position,
             TrackEvaluationPoint evaluationPoint,
             double rollRadians)
         {
             Transform3d fallbackTransform = EvaluateFallbackTransform(doc, position, evaluationPoint);
-            return BuildTrackFrame(
+            return BuildCurveFrame(
                 fallbackTransform.Position,
                 Vector3d.UnitX,
                 rollRadians,
                 evaluationPoint.LocalT * evaluationPoint.Segment.Length);
         }
 
-        private static SplineTrackFrame EvaluateResolvedFrame(ResolvedTrackDistance resolvedDistance)
+        private static CurveFrame EvaluateResolvedCurveFrame(ResolvedTrackDistance resolvedDistance)
         {
             ThrowIfFrameLocalTInvalid(resolvedDistance.LocalT);
 
@@ -522,21 +555,21 @@ namespace Quantum.Track
                         "tangent");
                 }
 
-                return BuildTrackFrame(
+                return BuildCurveFrame(
                     splinePosition,
                     splineTangent,
                     rollRadians,
                     resolvedDistance.LocalDistance);
             }
 
-            return BuildTrackFrame(
+            return BuildCurveFrame(
                 new Vector3d(resolvedDistance.ClampedDistance, 0.0, 0.0),
                 Vector3d.UnitX,
                 rollRadians,
                 resolvedDistance.LocalDistance);
         }
 
-        private static SplineTrackFrame BuildTrackFrame(
+        private static CurveFrame BuildCurveFrame(
             Vector3d position,
             Vector3d tangent,
             double rollRadians,
@@ -553,7 +586,7 @@ namespace Quantum.Track
                 binormal = NormalizeOrThrow(RotateAroundAxis(binormal, normalizedTangent, rollRadians), "binormal");
             }
 
-            return new SplineTrackFrame(localDistance, position, normalizedTangent, normal, binormal);
+            return new CurveFrame(localDistance, position, normalizedTangent, normal, binormal);
         }
 
         private static double ResolveRollRadians(TrackEvaluationPoint evaluationPoint)
@@ -706,3 +739,5 @@ namespace Quantum.Track
 
     }
 }
+
+#pragma warning restore CS0618

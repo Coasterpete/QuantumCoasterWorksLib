@@ -1,8 +1,7 @@
 # Public Coaster API Boundary
 
-Milestone 1 freezes the consumer-facing backend lanes that make Quantum read as a
-coaster-domain library. This does not change runtime math, spline evaluation, or
-train placement behavior.
+Milestone 138 unifies the consumer-facing frame and distance lanes that make
+Quantum read as a coaster-domain library.
 
 ## Stable Boundary Lanes
 
@@ -18,8 +17,10 @@ transforms.
 - `Binormal`: right/lateral axis.
 - `ToMatrix4x4()`: canonical frame-to-matrix conversion for interop.
 
-Consumers should treat `Quantum.Track.TrackFrame` as authoritative. The similarly
-named `Quantum.Splines.TrackFrame` is a support-layer implementation type.
+Consumers should treat `Quantum.Track.TrackFrame` as authoritative. Generic
+spline sampling uses `Quantum.Splines.CurveFrame`. The old
+`Quantum.Splines.TrackFrame` name remains available only as an obsolete
+compatibility type.
 
 ### 2) `TrackEvaluator` Station-Distance Sampling
 
@@ -28,6 +29,8 @@ The public station-distance lane is:
 - `new TrackEvaluator(trackDocument)`
 - `EvaluateFrameAtDistance(double distance)`
 - `EvaluateFramesAtDistances(IReadOnlyList<double> distances)`
+- `EvaluateTrackFrameAtDistance(TrackDocument, double)`
+- `EvaluateTrackFramesAtDistances(TrackDocument, IReadOnlyList<double>)`
 - `GetBoundTrackTotalLength()`
 
 `EvaluateAtDistance(TrackDocument, double)` remains the stable resolver for
@@ -35,14 +38,26 @@ station distance to `TrackEvaluationPoint` (`TrackSegment` + local `t`).
 
 Current public distance behavior:
 
+- station distance is cumulative measured geometric arc length, not normalized
+  parameter distance and not authored segment-local `t`
+- spline-backed segment lengths are measured/validated when the sampling context
+  is compiled, and document station length is the sum of those geometric lengths
 - finite out-of-range distances clamp to the track extents, and public
   `Quantum.Track.TrackFrame.Distance` stores that clamped global station value
 - non-finite distances are rejected
 - empty documents are rejected for sampling
+- scalar and batch frame APIs use the same deterministic transported base-frame
+  history; query order and batch density do not change a frame at a station
+- segment roll or an explicit `BankingProfile` is applied after base-frame
+  transport, followed by orthonormalization
 
 Document overloads that return `Quantum.Splines.TrackFrame` are compatibility
-support-layer APIs, not the preferred consumer boundary. Their `S` value may be
-segment-local and must not be treated as the public frame distance contract.
+support-layer APIs, are marked obsolete, and must not be used by active runtime
+paths. Their `S` value may be segment-local and is not the public frame distance
+contract.
+
+`TransportedTrackFrameSampler` also remains as an obsolete compatibility facade.
+Canonical `TrackEvaluator` frame sampling already uses transported-frame behavior.
 
 ### 3) `TrackDocument` / `TrackSegment` Centerline Evaluation
 
@@ -78,6 +93,9 @@ BankingProfile bankingProfile)` is an explicit opt-in variant for callers that
 want runtime train poses evaluated with a separate `BankingProfile` roll source.
 The default overload remains segment/evaluator-backed, and `TrackDocument` does
 not own a `BankingProfile`.
+
+`EvaluateCarTransforms(...)` is the preferred body-only API.
+`GetCarTransforms(...)` remains available as an obsolete forwarding alias.
 
 ### 5) `TrainPoseExportV1`
 

@@ -12,13 +12,13 @@ public sealed class TrainCarTransformProviderTests
     private const double Tolerance = 1e-6;
 
     [Fact]
-    public void GetCarTransforms_ReturnsRequestedCarCount()
+    public void EvaluateCarTransforms_ReturnsRequestedCarCount()
     {
         TrackDocument document = BuildStraightTrack(length: 20.0);
         var evaluator = new TrackEvaluator(document);
         var provider = new TrainCarTransformProvider(evaluator);
 
-        IReadOnlyList<TrainCarTransform> cars = provider.GetCarTransforms(
+        IReadOnlyList<TrainCarTransform> cars = provider.EvaluateCarTransforms(
             leadDistance: 12.0,
             carSpacing: 2.0,
             carCount: 4);
@@ -27,7 +27,7 @@ public sealed class TrainCarTransformProviderTests
     }
 
     [Fact]
-    public void EvaluateCarTransforms_MatchesGetCarTransforms()
+    public void GetCarTransforms_ForwardsToEvaluateCarTransforms()
     {
         TrackDocument document = BuildSplineTrack(length: 28.0);
         var evaluator = new TrackEvaluator(document);
@@ -36,14 +36,16 @@ public sealed class TrainCarTransformProviderTests
         const double carSpacing = 2.25;
         const int carCount = 5;
 
-        IReadOnlyList<TrainCarTransform> expected = provider.GetCarTransforms(
+        IReadOnlyList<TrainCarTransform> expected = provider.EvaluateCarTransforms(
             leadDistance: leadDistance,
             carSpacing: carSpacing,
             carCount: carCount);
-        IReadOnlyList<TrainCarTransform> actual = provider.EvaluateCarTransforms(
+#pragma warning disable CS0618
+        IReadOnlyList<TrainCarTransform> actual = provider.GetCarTransforms(
             leadDistance: leadDistance,
             carSpacing: carSpacing,
             carCount: carCount);
+#pragma warning restore CS0618
 
         Assert.Equal(expected.Count, actual.Count);
 
@@ -54,13 +56,13 @@ public sealed class TrainCarTransformProviderTests
     }
 
     [Fact]
-    public void GetCarTransforms_UsesExpectedSpacingDistances()
+    public void EvaluateCarTransforms_UsesExpectedSpacingDistances()
     {
         TrackDocument document = BuildStraightTrack(length: 20.0);
         var evaluator = new TrackEvaluator(document);
         var provider = new TrainCarTransformProvider(evaluator);
 
-        IReadOnlyList<TrainCarTransform> cars = provider.GetCarTransforms(
+        IReadOnlyList<TrainCarTransform> cars = provider.EvaluateCarTransforms(
             leadDistance: 10.0,
             carSpacing: 2.5,
             carCount: 4);
@@ -72,13 +74,13 @@ public sealed class TrainCarTransformProviderTests
     }
 
     [Fact]
-    public void GetCarTransforms_ProducesFiniteMatrices()
+    public void EvaluateCarTransforms_ProducesFiniteMatrices()
     {
         TrackDocument document = BuildSplineTrack(length: 15.0);
         var evaluator = new TrackEvaluator(document);
         var provider = new TrainCarTransformProvider(evaluator);
 
-        IReadOnlyList<TrainCarTransform> cars = provider.GetCarTransforms(
+        IReadOnlyList<TrainCarTransform> cars = provider.EvaluateCarTransforms(
             leadDistance: 12.0,
             carSpacing: 1.75,
             carCount: 5);
@@ -90,7 +92,7 @@ public sealed class TrainCarTransformProviderTests
     }
 
     [Fact]
-    public void GetCarTransforms_FirstCarFrameMatchesLeadFrame()
+    public void EvaluateCarTransforms_FirstCarFrameMatchesLeadFrame()
     {
         TrackDocument document = BuildSplineTrack(length: 20.0);
         var evaluator = new TrackEvaluator(document);
@@ -98,7 +100,7 @@ public sealed class TrainCarTransformProviderTests
         const double leadDistance = 8.25;
 
         ExportTrackFrame expectedLeadFrame = evaluator.EvaluateFrameAtDistance(leadDistance);
-        IReadOnlyList<TrainCarTransform> cars = provider.GetCarTransforms(
+        IReadOnlyList<TrainCarTransform> cars = provider.EvaluateCarTransforms(
             leadDistance,
             carSpacing: 1.5,
             carCount: 3);
@@ -112,13 +114,13 @@ public sealed class TrainCarTransformProviderTests
     }
 
     [Fact]
-    public void GetCarTransforms_BodyMatrixMatchesFrameMatrixPolicy()
+    public void EvaluateCarTransforms_BodyMatrixMatchesFrameMatrixPolicy()
     {
         TrackDocument document = BuildSplineTrack(length: 20.0);
         var evaluator = new TrackEvaluator(document);
         var provider = new TrainCarTransformProvider(evaluator);
 
-        IReadOnlyList<TrainCarTransform> cars = provider.GetCarTransforms(
+        IReadOnlyList<TrainCarTransform> cars = provider.EvaluateCarTransforms(
             leadDistance: 10.0,
             carSpacing: 2.0,
             carCount: 4);
@@ -131,13 +133,13 @@ public sealed class TrainCarTransformProviderTests
     }
 
     [Fact]
-    public void GetCarTransforms_WhenAnyCarDistanceIsOutOfRange_ThrowsWithClearMessage()
+    public void EvaluateCarTransforms_WhenAnyCarDistanceIsOutOfRange_ThrowsWithClearMessage()
     {
         TrackDocument document = BuildStraightTrack(length: 6.0);
         var evaluator = new TrackEvaluator(document);
         var provider = new TrainCarTransformProvider(evaluator);
 
-        ArgumentOutOfRangeException exception = Assert.Throws<ArgumentOutOfRangeException>(() => provider.GetCarTransforms(
+        ArgumentOutOfRangeException exception = Assert.Throws<ArgumentOutOfRangeException>(() => provider.EvaluateCarTransforms(
             leadDistance: 1.0,
             carSpacing: 2.0,
             carCount: 2));
@@ -149,13 +151,13 @@ public sealed class TrainCarTransformProviderTests
     [Theory]
     [InlineData(-0.1)]
     [InlineData(6.1)]
-    public void GetCarTransforms_WhenLeadDistanceIsOutOfRange_ThrowsWithClearMessage(double invalidLeadDistance)
+    public void EvaluateCarTransforms_WhenLeadDistanceIsOutOfRange_ThrowsWithClearMessage(double invalidLeadDistance)
     {
         TrackDocument document = BuildStraightTrack(length: 6.0);
         var evaluator = new TrackEvaluator(document);
         var provider = new TrainCarTransformProvider(evaluator);
 
-        ArgumentOutOfRangeException exception = Assert.Throws<ArgumentOutOfRangeException>(() => provider.GetCarTransforms(
+        ArgumentOutOfRangeException exception = Assert.Throws<ArgumentOutOfRangeException>(() => provider.EvaluateCarTransforms(
             leadDistance: invalidLeadDistance,
             carSpacing: 1.0,
             carCount: 1));

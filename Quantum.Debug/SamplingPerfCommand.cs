@@ -151,7 +151,7 @@ namespace Quantum.Debug
         private static double EvaluateBodyBatch(SamplingPerfSmokeScenario scenario)
         {
             double checksum = 0.0;
-            IReadOnlyList<TrainCarTransform> cars = scenario.Provider.GetCarTransforms(
+            IReadOnlyList<TrainCarTransform> cars = scenario.Provider.EvaluateCarTransforms(
                 scenario.LeadDistance,
                 scenario.CarSpacing,
                 scenario.CarCount);

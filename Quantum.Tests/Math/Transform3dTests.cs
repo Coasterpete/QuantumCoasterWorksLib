@@ -49,7 +49,7 @@ public sealed class Transform3dTests
     [Fact]
     public void FromTrackFrame_UsesFrameBasisAndProvidedPosition()
     {
-        TrackFrame frame = new TrackFrame(
+        CurveFrame frame = new CurveFrame(
             s: 12.0,
             position: new Vector3d(99.0, 99.0, 99.0),
             tangent: Vector3d.UnitX,

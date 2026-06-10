@@ -3,6 +3,7 @@ using Quantum.Physics;
 using Quantum.Splines;
 using Quantum.Track;
 using Xunit;
+using TrackFrame = Quantum.Track.TrackFrame;
 
 namespace Quantum.Tests;
 
@@ -11,15 +12,14 @@ public sealed class TrackFrameProviderDistanceSemanticsContractTests
     private const double Tolerance = 1e-6;
 
     [Theory]
-    [InlineData(2.0, 0, 0.25, 2.0)]
-    [InlineData(8.0, 1, 0.0, 0.0)]
-    [InlineData(9.0, 1, 0.25, 1.0)]
-    [InlineData(99.0, 1, 1.0, 4.0)]
-    public void TrackFrameProviderFromDocument_TryGetFrameAtDistance_UsesGlobalDistanceWithSegmentLocalFrameOutput(
+    [InlineData(2.0, 0, 0.25)]
+    [InlineData(8.0, 1, 0.0)]
+    [InlineData(9.0, 1, 0.25)]
+    [InlineData(99.0, 1, 1.0)]
+    public void TrackFrameProviderFromDocument_TryGetFrameAtDistance_PreservesClampedGlobalStationDistance(
         double globalDistance,
         int expectedSegmentIndex,
-        double expectedLocalT,
-        double expectedLocalDistance)
+        double expectedLocalT)
     {
         (TrackDocument document, TrackSegment first, TrackSegment second) = CreateDistanceSemanticsDocument();
         var provider = new TrackFrameProviderFromDocument(document);
@@ -31,7 +31,9 @@ public sealed class TrackFrameProviderDistanceSemanticsContractTests
         TrackSegment expectedSegment = expectedSegmentIndex == 0 ? first : second;
         Vector3d expectedPosition = expectedSegment.Spline!.Evaluate(expectedLocalT);
 
-        AssertDoubleNear(expectedLocalDistance, frame.S);
+        double totalLength = new TrackEvaluator().GetTrackTotalLength(document);
+        double expectedGlobalDistance = System.Math.Clamp(globalDistance, 0.0, totalLength);
+        AssertDoubleNear(expectedGlobalDistance, frame.Distance);
         AssertVectorNear(frame.Position, expectedPosition);
     }
 

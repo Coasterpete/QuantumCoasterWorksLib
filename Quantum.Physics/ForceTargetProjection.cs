@@ -1,5 +1,5 @@
 using Quantum.Math;
-using Quantum.Splines;
+using Quantum.Track;
 
 namespace Quantum.Physics
 {

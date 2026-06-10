@@ -5,6 +5,8 @@ using Xunit;
 using ExportTrackFrame = Quantum.Track.TrackFrame;
 using SplineTrackFrame = Quantum.Splines.TrackFrame;
 
+#pragma warning disable CS0618 // Legacy document-overload compatibility coverage.
+
 namespace Quantum.Tests;
 
 public sealed class TrackEvaluatorBatchSamplingParityTests
@@ -303,3 +305,5 @@ public sealed class TrackEvaluatorBatchSamplingParityTests
         Assert.InRange(System.Math.Abs(expected - actual), 0.0, Tolerance);
     }
 }
+
+#pragma warning restore CS0618

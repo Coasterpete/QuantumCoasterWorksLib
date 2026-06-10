@@ -224,7 +224,7 @@ public sealed class DebugCommandHelpTests
         string output = writer.ToString();
         Assert.Contains("transported-frame-comparison [outputPath]", output);
         Assert.Contains("stateless TrackEvaluator frames", output);
-        Assert.Contains("TransportedTrackFrameSampler frames", output);
+        Assert.Contains("canonical transported TrackEvaluator frames", output);
         Assert.Contains("per-sample deltas, summary metrics, smoothness metrics, and continuity metrics", output);
         Assert.Contains("backend-only JSON", output);
     }

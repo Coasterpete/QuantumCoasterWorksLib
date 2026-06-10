@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using Quantum.Core;
 using Quantum.Math;
-using Quantum.Splines;
+using Quantum.Track;
 
 namespace Quantum.Physics
 {

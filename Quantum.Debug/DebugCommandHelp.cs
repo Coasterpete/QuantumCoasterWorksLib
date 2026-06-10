@@ -234,7 +234,7 @@ namespace Quantum.Debug
                 {
                     "outputPath: Optional JSON output path. Defaults to " +
                     TransportedFrameComparisonCommand.DefaultRelativeOutputPath + ".",
-                    "The command compares stateless TrackEvaluator frames with TransportedTrackFrameSampler frames over the self-authored diagnostic track fixtures.",
+                    "The command compares stateless TrackEvaluator frames as a support baseline with canonical transported TrackEvaluator frames over the self-authored diagnostic track fixtures.",
                     "The output includes per-sample deltas, summary metrics, smoothness metrics, and continuity metrics for both frame sets.",
                     "The output is backend-only JSON and does not depend on Unity or any renderer."
                 },
