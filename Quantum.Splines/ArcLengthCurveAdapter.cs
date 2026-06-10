@@ -11,7 +11,10 @@ namespace Quantum.Splines
         private readonly IParamCurve _curve;
         private readonly ArcLengthLUT _lut;
 
-        public ArcLengthCurveAdapter(IParamCurve curve, int samples = 100)
+        public ArcLengthCurveAdapter(
+            IParamCurve curve,
+            int samples = 100,
+            double tolerance = ArcLengthLUT.DefaultTolerance)
         {
             if (curve == null)
                 throw new ArgumentNullException(nameof(curve));
@@ -19,8 +22,11 @@ namespace Quantum.Splines
             if (samples < 2)
                 throw new ArgumentOutOfRangeException(nameof(samples), "Sample count must be at least 2.");
 
+            if (double.IsNaN(tolerance) || double.IsInfinity(tolerance) || tolerance <= 0.0)
+                throw new ArgumentOutOfRangeException(nameof(tolerance), "Tolerance must be finite and greater than zero.");
+
             _curve = curve;
-            _lut = new ArcLengthLUT(curve, samples);
+            _lut = new ArcLengthLUT(curve, samples, tolerance);
         }
 
         public double Length => _lut.TotalLength;
