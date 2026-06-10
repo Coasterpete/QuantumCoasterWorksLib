@@ -88,7 +88,14 @@ dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1-validate artifa
 
 The validation command is backend-only and prints a concise summary of contract/version, units, source fixture name, centerline/frame/line/box counts, train pose presence, and pass/fail status. It checks identity metadata, finite numeric values, centerline distance ordering, sample/frame count consistency, frame orthonormality and handedness, positive box dimensions, known role/kind vocabulary, finite and non-degenerate line endpoints, and nested train pose validation when `trainPose` is present. Nested train pose validation uses the existing `TrainPoseExportV1` validator and enables matrix bottom-row and matrix/frame consistency checks for visualization handoff readiness.
 
-The sample is intentionally small and frontend-neutral. It is built from the existing deterministic debug smoke scenario and includes:
+The sample is intentionally small and frontend-neutral. It is backed by the
+built-in `AuthoringPipelineProofScenario`, so the normal sample command proves
+the `Quantum.Track.Authoring` path through compilation, frame sampling,
+distance-based train placement, train-pose export, and debug snapshot export.
+The authored centerline is a zero-roll 12 m straight, 24 m constant-curvature
+arc, and 12 m straight. The output includes nine frames at 6 m intervals and
+five train body boxes centered at station distances 36, 30, 24, 18, and 12 m.
+It includes:
 
 - contract/version metadata and `metadata.units`
 - sampled `centerlinePoints`

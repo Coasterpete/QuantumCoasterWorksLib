@@ -52,10 +52,35 @@ Validation completes before `TrackAuthoringDocumentBuilder` is called. The
 definitions are immutable and the input sequence is copied, so later mutations
 to the caller's collection do not alter the validated authoring definition.
 
-## Document Generation
+## Compilation
 
-`TrackAuthoringDocumentBuilder.Build` and `BuildDocument` produce the same
-`TrackDocument` shape:
+`TrackAuthoringDocumentBuilder.Compile` produces a
+`TrackAuthoringCompilation` containing:
+
+- `Definition`: the exact validated `TrackAuthoringDefinition` instance
+- `Document`: the evaluator-ready `TrackDocument` snapshot
+- `ResolvedSections`: one ordered
+  `ResolvedSectionInterval<GeometricSectionDefinition>` per authored section
+- `TotalLength`: the compiled total in station-distance units
+
+Station distances use the same units as authored section lengths and radii. For
+example, lengths `6`, `8`, and `5` compile to ranges `0-6`, `6-14`, and
+`14-19`, with a total length of `19`.
+
+The compilation preserves exact source section references. For every index `i`:
+
+- `ResolvedSections[i].Section` is the same instance as `Definition.Sections[i]`
+- `Document.Segments[i]` is the generated centerline segment for that definition
+- `Document.Sections[i]` is the generated `GeometricSection` for that definition
+
+Resolved intervals are exposed through a defensive read-only copy. Shared
+boundaries belong to the following section: the first two example intervals are
+`[0, 6)` and `[6, 14)`. The final interval includes its endpoint, `[14, 19]`, so
+the total track length resolves to the final authored section.
+
+`TrackAuthoringDocumentBuilder.Build` and `BuildDocument` remain compatible and
+forward to `Compile(definition).Document`. All three entry points produce the
+same `TrackDocument` shape:
 
 - one `TrackSegment` per authoring section
 - original section order and exact IDs
@@ -70,8 +95,25 @@ window presents each composed section to the existing `TrackEvaluator` as its ow
 segment. This preserves point and tangent continuity while leaving evaluator,
 spline, FVD, IO, and `TrackDocument` contracts unchanged.
 
-Repeated builds from the same definition are deterministic and produce
+Repeated compilations from the same definition are deterministic and produce
 equivalent canonical frame samples through `TrackEvaluator`.
+
+`Quantum.Debug.AuthoringPipelineProofScenario` is the built-in end-to-end proof
+for this compilation path. It authors a zero-roll 12 m straight, 24 m
+constant-curvature arc, and 12 m straight; compiles them through
+`TrackAuthoringDocumentBuilder.Compile`; samples global station frames every
+6 m from 0 m through 48 m; and evaluates a five-car train whose body centers are
+at 36, 30, 24, 18, and 12 m. Its lead and trailing cars place bogies on both
+sides of the 36 m and 12 m section boundaries respectively. The scenario then
+uses the existing `TrainPoseExportV1Mapper` and
+`DebugViewportSnapshotV1Mapper` boundaries without changing either V1
+contract.
+
+`TrackDocument` remains mutable under its existing contract. Mutating the
+document returned by a compilation can break its index and distance alignment
+with `Definition` and `ResolvedSections`. Compile the definition again to obtain
+a fresh aligned document snapshot; the compilation does not silently track or
+rewrite later document mutations.
 
 ## API Boundary
 
@@ -104,7 +146,9 @@ var definition = new TrackAuthoringDefinition(new GeometricSectionDefinition[]
     new StraightSectionDefinition("exit", length: 8.0, rollRadians: 0.2)
 });
 
-TrackDocument document = TrackAuthoringDocumentBuilder.Build(definition);
+TrackAuthoringCompilation compilation =
+    TrackAuthoringDocumentBuilder.Compile(definition);
+TrackDocument document = compilation.Document;
 var evaluator = new TrackEvaluator(document);
 TrackFrame frame = evaluator.EvaluateFrameAtDistance(18.0);
 ```

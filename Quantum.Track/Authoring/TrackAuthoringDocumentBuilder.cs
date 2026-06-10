@@ -11,10 +11,15 @@ namespace Quantum.Track.Authoring
     {
         public static TrackDocument Build(TrackAuthoringDefinition definition)
         {
-            return BuildDocument(definition);
+            return Compile(definition).Document;
         }
 
         public static TrackDocument BuildDocument(TrackAuthoringDefinition definition)
+        {
+            return Compile(definition).Document;
+        }
+
+        public static TrackAuthoringCompilation Compile(TrackAuthoringDefinition definition)
         {
             if (definition is null)
             {
@@ -22,6 +27,17 @@ namespace Quantum.Track.Authoring
             }
 
             IReadOnlyList<GeometricSectionDefinition> definitions = definition.Sections;
+            var sectionLengths = new List<(GeometricSectionDefinition Section, double Length)>(
+                definitions.Count);
+
+            for (int i = 0; i < definitions.Count; i++)
+            {
+                GeometricSectionDefinition section = definitions[i];
+                sectionLengths.Add((section, section.Length));
+            }
+
+            IReadOnlyList<ResolvedSectionInterval<GeometricSectionDefinition>> resolvedSections =
+                SectionResolver.Resolve(sectionLengths);
             var geometricSections = new List<GeometricSection>(definitions.Count);
 
             for (int i = 0; i < definitions.Count; i++)
@@ -31,15 +47,15 @@ namespace Quantum.Track.Authoring
 
             CompositeSectionCurve assembledCurve = SectionCurveAssembler.Assemble(geometricSections);
             var segments = new List<TrackSegment>(definitions.Count);
-            double startDistance = 0.0;
 
             for (int i = 0; i < definitions.Count; i++)
             {
                 GeometricSectionDefinition section = definitions[i];
+                ResolvedSectionInterval<GeometricSectionDefinition> resolvedSection = resolvedSections[i];
                 var curve = new AuthoringSectionCurve(
                     assembledCurve,
-                    startDistance,
-                    section.Length);
+                    resolvedSection.StartDistance,
+                    resolvedSection.Length);
 
                 TrackSegment segment;
                 if (section is StraightSectionDefinition)
@@ -65,10 +81,16 @@ namespace Quantum.Track.Authoring
                 }
 
                 segments.Add(segment);
-                startDistance += section.Length;
             }
 
-            return new TrackDocument(segments, geometricSections);
+            var document = new TrackDocument(segments, geometricSections);
+            double totalLength = resolvedSections[resolvedSections.Count - 1].EndDistance;
+
+            return new TrackAuthoringCompilation(
+                definition,
+                document,
+                resolvedSections,
+                totalLength);
         }
 
         private static GeometricSection CreateGeometricSection(

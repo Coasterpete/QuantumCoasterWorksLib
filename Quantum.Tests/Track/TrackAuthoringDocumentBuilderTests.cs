@@ -9,6 +9,147 @@ public sealed class TrackAuthoringDocumentBuilderTests
     private const double Tolerance = 1e-6;
 
     [Fact]
+    public void Compile_ReturnsOrderedResolvedSectionRanges()
+    {
+        var station = new StraightSectionDefinition("station", 6.0, 0.1);
+        var left = new ConstantCurvatureSectionDefinition("left", 8.0, 20.0, -0.25);
+        var right = new ConstantCurvatureSectionDefinition("right", 5.0, -15.0, 0.4);
+        var definition = new TrackAuthoringDefinition(new GeometricSectionDefinition[]
+        {
+            station,
+            left,
+            right
+        });
+
+        TrackAuthoringCompilation compilation = TrackAuthoringDocumentBuilder.Compile(definition);
+
+        Assert.Same(definition, compilation.Definition);
+        Assert.Collection(
+            compilation.ResolvedSections,
+            interval => AssertInterval(interval, station, 0.0, 6.0, includeEndDistance: false),
+            interval => AssertInterval(interval, left, 6.0, 14.0, includeEndDistance: false),
+            interval => AssertInterval(interval, right, 14.0, 19.0, includeEndDistance: true));
+    }
+
+    [Fact]
+    public void Compile_PreservesSourceMetadataAndAlignsDocumentIndices()
+    {
+        var station = new StraightSectionDefinition("station", 6.0, 0.1);
+        var left = new ConstantCurvatureSectionDefinition("left", 8.0, 20.0, -0.25);
+        var right = new ConstantCurvatureSectionDefinition("right", 5.0, -15.0, 0.4);
+        var definition = new TrackAuthoringDefinition(new GeometricSectionDefinition[]
+        {
+            station,
+            left,
+            right
+        });
+
+        TrackAuthoringCompilation compilation = TrackAuthoringDocumentBuilder.Compile(definition);
+
+        Assert.Equal(definition.Sections.Count, compilation.ResolvedSections.Count);
+        Assert.Equal(definition.Sections.Count, compilation.Document.Segments.Count);
+        Assert.Equal(definition.Sections.Count, compilation.Document.Sections.Count);
+
+        for (int i = 0; i < definition.Sections.Count; i++)
+        {
+            GeometricSectionDefinition source = definition.Sections[i];
+            ResolvedSectionInterval<GeometricSectionDefinition> interval = compilation.ResolvedSections[i];
+            TrackSegment segment = compilation.Document.Segments[i];
+            GeometricSection geometricSection = Assert.IsType<GeometricSection>(
+                compilation.Document.Sections[i]);
+
+            Assert.Same(source, interval.Section);
+            Assert.Equal(source.Id, interval.Section.Id);
+            Assert.Equal(source.GetType(), interval.Section.GetType());
+            Assert.Equal(source.RollRadians, interval.Section.RollRadians, 12);
+            Assert.Equal(source.Length, interval.Length, 12);
+            Assert.Equal(source.Id, segment.Id);
+            Assert.Equal(source.Length, segment.Length, 12);
+            Assert.Equal(source.RollRadians, segment.RollRadians, 12);
+            Assert.Equal(source.Length, geometricSection.Length, 12);
+            Assert.True(geometricSection.Roll.HasValue);
+            Assert.Equal(source.RollRadians, geometricSection.Roll.Value, 12);
+        }
+
+        Assert.Same(station, compilation.ResolvedSections[0].Section);
+        Assert.Equal(left.Radius, Assert.IsType<ConstantCurvatureSectionDefinition>(
+            compilation.ResolvedSections[1].Section).Radius, 12);
+        Assert.Equal(right.Radius, Assert.IsType<ConstantCurvatureSectionDefinition>(
+            compilation.ResolvedSections[2].Section).Radius, 12);
+    }
+
+    [Fact]
+    public void Compile_ResolvedSectionLookupUsesFollowingSectionAtSharedBoundaries()
+    {
+        TrackAuthoringCompilation compilation = TrackAuthoringDocumentBuilder.Compile(
+            new TrackAuthoringDefinition(new GeometricSectionDefinition[]
+            {
+                new StraightSectionDefinition("station", 6.0),
+                new ConstantCurvatureSectionDefinition("left", 8.0, 20.0),
+                new StraightSectionDefinition("exit", 5.0)
+            }));
+
+        Assert.Same(
+            compilation.Definition.Sections[1],
+            SectionResolver.Lookup(compilation.ResolvedSections, 6.0).Section);
+        Assert.Same(
+            compilation.Definition.Sections[2],
+            SectionResolver.Lookup(compilation.ResolvedSections, 14.0).Section);
+        Assert.Same(
+            compilation.Definition.Sections[2],
+            SectionResolver.Lookup(compilation.ResolvedSections, 19.0).Section);
+    }
+
+    [Fact]
+    public void Compile_TotalLengthAgreesWithFinalIntervalAndDocument()
+    {
+        TrackAuthoringCompilation compilation = TrackAuthoringDocumentBuilder.Compile(
+            new TrackAuthoringDefinition(new GeometricSectionDefinition[]
+            {
+                new StraightSectionDefinition("station", 6.0),
+                new ConstantCurvatureSectionDefinition("left", 8.0, 20.0),
+                new StraightSectionDefinition("exit", 5.0)
+            }));
+
+        Assert.Equal(19.0, compilation.TotalLength, 12);
+        Assert.Equal(compilation.TotalLength, compilation.ResolvedSections[^1].EndDistance, 12);
+        Assert.Equal(compilation.TotalLength, compilation.Document.TotalLength, 12);
+    }
+
+    [Fact]
+    public void Compile_ExposesReadOnlyResolvedSectionSnapshot()
+    {
+        TrackAuthoringCompilation compilation = TrackAuthoringDocumentBuilder.Compile(
+            CreateMixedDefinition());
+        IList<ResolvedSectionInterval<GeometricSectionDefinition>> exposed =
+            Assert.IsAssignableFrom<IList<ResolvedSectionInterval<GeometricSectionDefinition>>>(
+                compilation.ResolvedSections);
+
+        Assert.True(exposed.IsReadOnly);
+        Assert.Throws<NotSupportedException>(() => exposed.RemoveAt(0));
+        Assert.Equal(compilation.Definition.Sections.Count, compilation.ResolvedSections.Count);
+    }
+
+    [Fact]
+    public void Compile_RecompilingRestoresAlignmentAfterDocumentMutation()
+    {
+        TrackAuthoringDefinition definition = CreateMixedDefinition();
+        TrackAuthoringCompilation first = TrackAuthoringDocumentBuilder.Compile(definition);
+
+        first.Document.Segments.RemoveAt(0);
+        first.Document.Sections.RemoveAt(0);
+
+        TrackAuthoringCompilation second = TrackAuthoringDocumentBuilder.Compile(definition);
+
+        Assert.Equal(definition.Sections.Count - 1, first.Document.Segments.Count);
+        Assert.Equal(definition.Sections.Count, first.ResolvedSections.Count);
+        Assert.Equal(definition.Sections.Count, second.Document.Segments.Count);
+        Assert.Equal(definition.Sections.Count, second.Document.Sections.Count);
+        Assert.Equal(definition.Sections.Count, second.ResolvedSections.Count);
+        Assert.NotSame(first.Document, second.Document);
+    }
+
+    [Fact]
     public void Build_GeneratesOrderedSegmentsWithIdsLengthsKindsAndRolls()
     {
         var definition = new TrackAuthoringDefinition(new GeometricSectionDefinition[]
@@ -70,12 +211,28 @@ public sealed class TrackAuthoringDocumentBuilderTests
     }
 
     [Fact]
-    public void RepeatedBuilds_ProduceEquivalentFrameSamples()
+    public void RepeatedCompilations_ProduceIdenticalRangesAndEquivalentFrameSamples()
     {
         TrackAuthoringDefinition definition = CreateMixedDefinition();
-        var firstEvaluator = new TrackEvaluator(TrackAuthoringDocumentBuilder.Build(definition));
-        var secondEvaluator = new TrackEvaluator(TrackAuthoringDocumentBuilder.Build(definition));
+        TrackAuthoringCompilation firstCompilation = TrackAuthoringDocumentBuilder.Compile(definition);
+        TrackAuthoringCompilation secondCompilation = TrackAuthoringDocumentBuilder.Compile(definition);
+        var firstEvaluator = new TrackEvaluator(firstCompilation.Document);
+        var secondEvaluator = new TrackEvaluator(secondCompilation.Document);
         double[] distances = { 0.0, 2.5, 5.0, 7.0, 11.0, 14.0, 18.0 };
+
+        Assert.Equal(firstCompilation.ResolvedSections.Count, secondCompilation.ResolvedSections.Count);
+        for (int i = 0; i < firstCompilation.ResolvedSections.Count; i++)
+        {
+            ResolvedSectionInterval<GeometricSectionDefinition> firstInterval =
+                firstCompilation.ResolvedSections[i];
+            ResolvedSectionInterval<GeometricSectionDefinition> secondInterval =
+                secondCompilation.ResolvedSections[i];
+
+            Assert.Same(firstInterval.Section, secondInterval.Section);
+            Assert.Equal(firstInterval.StartDistance, secondInterval.StartDistance, 12);
+            Assert.Equal(firstInterval.EndDistance, secondInterval.EndDistance, 12);
+            Assert.Equal(firstInterval.IncludeEndDistance, secondInterval.IncludeEndDistance);
+        }
 
         foreach (double distance in distances)
         {
@@ -88,6 +245,26 @@ public sealed class TrackAuthoringDocumentBuilderTests
             AssertVectorNear(first.Normal, second.Normal, 1e-10);
             AssertVectorNear(first.Binormal, second.Binormal, 1e-10);
         }
+    }
+
+    [Fact]
+    public void BuildAndBuildDocument_RemainEquivalentToCompileDocument()
+    {
+        TrackAuthoringDefinition definition = CreateMixedDefinition();
+        TrackDocument compiled = TrackAuthoringDocumentBuilder.Compile(definition).Document;
+        TrackDocument built = TrackAuthoringDocumentBuilder.Build(definition);
+        TrackDocument builtDocument = TrackAuthoringDocumentBuilder.BuildDocument(definition);
+
+        AssertEquivalentDocuments(compiled, built);
+        AssertEquivalentDocuments(compiled, builtDocument);
+    }
+
+    [Fact]
+    public void BuilderEntryPoints_NullDefinition_ThrowArgumentNullException()
+    {
+        Assert.Throws<ArgumentNullException>(() => TrackAuthoringDocumentBuilder.Compile(null!));
+        Assert.Throws<ArgumentNullException>(() => TrackAuthoringDocumentBuilder.Build(null!));
+        Assert.Throws<ArgumentNullException>(() => TrackAuthoringDocumentBuilder.BuildDocument(null!));
     }
 
     [Fact]
@@ -130,6 +307,52 @@ public sealed class TrackAuthoringDocumentBuilderTests
         Assert.Equal(expectedLength, segment.Length, 10);
         Assert.Equal(expectedRoll, segment.RollRadians, 10);
         Assert.NotNull(segment.Spline);
+    }
+
+    private static void AssertInterval(
+        ResolvedSectionInterval<GeometricSectionDefinition> interval,
+        GeometricSectionDefinition expectedSection,
+        double expectedStart,
+        double expectedEnd,
+        bool includeEndDistance)
+    {
+        Assert.Same(expectedSection, interval.Section);
+        Assert.Equal(expectedStart, interval.StartDistance, 12);
+        Assert.Equal(expectedEnd, interval.EndDistance, 12);
+        Assert.Equal(includeEndDistance, interval.IncludeEndDistance);
+    }
+
+    private static void AssertEquivalentDocuments(TrackDocument expected, TrackDocument actual)
+    {
+        Assert.Equal(expected.TotalLength, actual.TotalLength, 12);
+        Assert.Equal(expected.Segments.Count, actual.Segments.Count);
+        Assert.Equal(expected.Sections.Count, actual.Sections.Count);
+
+        for (int i = 0; i < expected.Segments.Count; i++)
+        {
+            TrackSegment expectedSegment = expected.Segments[i];
+            TrackSegment actualSegment = actual.Segments[i];
+
+            Assert.Equal(expectedSegment.GetType(), actualSegment.GetType());
+            Assert.Equal(expectedSegment.Id, actualSegment.Id);
+            Assert.Equal(expectedSegment.Length, actualSegment.Length, 12);
+            Assert.Equal(expectedSegment.RollRadians, actualSegment.RollRadians, 12);
+        }
+
+        var expectedEvaluator = new TrackEvaluator(expected);
+        var actualEvaluator = new TrackEvaluator(actual);
+        double[] distances = { 0.0, 5.0, 11.0, expected.TotalLength };
+
+        foreach (double distance in distances)
+        {
+            TrackFrame expectedFrame = expectedEvaluator.EvaluateFrameAtDistance(distance);
+            TrackFrame actualFrame = actualEvaluator.EvaluateFrameAtDistance(distance);
+
+            AssertVectorNear(expectedFrame.Position, actualFrame.Position, 1e-10);
+            AssertVectorNear(expectedFrame.Tangent, actualFrame.Tangent, 1e-10);
+            AssertVectorNear(expectedFrame.Normal, actualFrame.Normal, 1e-10);
+            AssertVectorNear(expectedFrame.Binormal, actualFrame.Binormal, 1e-10);
+        }
     }
 
     private static void AssertFiniteOrthonormal(TrackFrame frame)

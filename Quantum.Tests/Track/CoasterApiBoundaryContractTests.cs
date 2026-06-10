@@ -229,6 +229,7 @@ public sealed class CoasterApiBoundaryContractTests
             typeof(GeometricSectionDefinition),
             typeof(StraightSectionDefinition),
             typeof(ConstantCurvatureSectionDefinition),
+            typeof(TrackAuthoringCompilation),
             typeof(TrackAuthoringDocumentBuilder)
         };
 
@@ -264,6 +265,33 @@ public sealed class CoasterApiBoundaryContractTests
                 }
             }
         }
+    }
+
+    [Fact]
+    public void TrackAuthoringCompilation_ExposesDeterministicCompilationContract()
+    {
+        AssertProperty(
+            typeof(TrackAuthoringCompilation),
+            nameof(TrackAuthoringCompilation.Definition),
+            typeof(TrackAuthoringDefinition));
+        AssertProperty(
+            typeof(TrackAuthoringCompilation),
+            nameof(TrackAuthoringCompilation.Document),
+            typeof(TrackDocument));
+        AssertProperty(
+            typeof(TrackAuthoringCompilation),
+            nameof(TrackAuthoringCompilation.ResolvedSections),
+            typeof(IReadOnlyList<ResolvedSectionInterval<GeometricSectionDefinition>>));
+        AssertProperty(
+            typeof(TrackAuthoringCompilation),
+            nameof(TrackAuthoringCompilation.TotalLength),
+            typeof(double));
+
+        AssertMethod(
+            typeof(TrackAuthoringDocumentBuilder),
+            nameof(TrackAuthoringDocumentBuilder.Compile),
+            typeof(TrackAuthoringCompilation),
+            typeof(TrackAuthoringDefinition));
     }
 
     [Fact]
