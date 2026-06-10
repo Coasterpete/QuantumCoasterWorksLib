@@ -161,28 +161,20 @@ public sealed class TransportedTrackFrameSamplerTests
     }
 
     [Fact]
-    public void TransportedTrackFrameSampler_QuarterLoopLike_ReducesReferenceUpJumpDiagnostics()
+    public void TransportedTrackFrameSampler_QuarterLoopLike_MatchesCanonicalEvaluatorFrames()
     {
         DiagnosticTrackFixture fixture = DiagnosticTrackFixtures.QuarterLoopLike();
         var evaluator = new TrackEvaluator(fixture.Document);
-        ExportTrackFrame[] scalarFrames = evaluator.EvaluateFramesAtDistances(fixture.SampleDistances);
+        ExportTrackFrame[] canonicalFrames = evaluator.EvaluateFramesAtDistances(fixture.SampleDistances);
         ExportTrackFrame[] transportedFrames = TransportedTrackFrameSampler.SampleFramesAtDistances(
             fixture.Document,
             fixture.SampleDistances);
 
-        TrackFrameSmoothnessReport scalarReport = TrackFrameSmoothnessDiagnostics.Analyze(
-            scalarFrames,
-            fixture.SampleDistances);
-        TrackFrameSmoothnessReport transportedReport = TrackFrameSmoothnessDiagnostics.Analyze(
-            transportedFrames,
-            fixture.SampleDistances);
-
-        Assert.True(
-            transportedReport.NormalAngleDelta.MaxAbsoluteRadians < scalarReport.NormalAngleDelta.MaxAbsoluteRadians,
-            $"Expected transported normal max {transportedReport.NormalAngleDelta.MaxAbsoluteRadians} to be below scalar max {scalarReport.NormalAngleDelta.MaxAbsoluteRadians}.");
-        Assert.True(
-            transportedReport.BinormalAngleDelta.MaxAbsoluteRadians < scalarReport.BinormalAngleDelta.MaxAbsoluteRadians,
-            $"Expected transported binormal max {transportedReport.BinormalAngleDelta.MaxAbsoluteRadians} to be below scalar max {scalarReport.BinormalAngleDelta.MaxAbsoluteRadians}.");
+        Assert.Equal(canonicalFrames.Length, transportedFrames.Length);
+        for (int i = 0; i < canonicalFrames.Length; i++)
+        {
+            AssertFrameNear(canonicalFrames[i], transportedFrames[i]);
+        }
     }
 
     private static DiagnosticTrackFixture GetFixture(string fixtureName)

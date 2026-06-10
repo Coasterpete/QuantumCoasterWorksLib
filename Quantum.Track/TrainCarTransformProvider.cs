@@ -18,7 +18,6 @@ namespace Quantum.Track
     {
         private readonly TrackEvaluator _evaluator;
         private readonly TrainCarBodySampler _bodySampler;
-        private readonly TrainBogieTransformSolver _bogieSolver;
         private readonly TrainArticulationFrameSolver _articulationSolver;
         private readonly TrainWheelTransformLayoutSolver _wheelLayoutSolver;
         private readonly TrainPoseAssembler _poseAssembler;
@@ -27,7 +26,6 @@ namespace Quantum.Track
         {
             _evaluator = evaluator ?? throw new ArgumentNullException(nameof(evaluator));
             _bodySampler = new TrainCarBodySampler(_evaluator);
-            _bogieSolver = new TrainBogieTransformSolver(_evaluator);
             _articulationSolver = new TrainArticulationFrameSolver();
             _wheelLayoutSolver = new TrainWheelTransformLayoutSolver();
             _poseAssembler = new TrainPoseAssembler();
@@ -294,12 +292,22 @@ namespace Quantum.Track
                     "Bogie spacing must be finite and non-negative.");
             }
 
-            IReadOnlyList<TrainCarTransform> bodyTransforms = GetCarTransforms(
+            ResolveDocumentAndValidateBodyInputs(
                 leadDistance,
                 carSpacing,
                 carCount);
+            double totalLength = _evaluator.GetBoundTrackTotalLength();
+            double[] bodyDistances = BuildBodyDistances(
+                leadDistance,
+                carSpacing,
+                carCount,
+                totalLength);
 
-            return _bogieSolver.SolveBogies(bodyTransforms, bogieSpacing);
+            return SampleTrainWithBogies(
+                bodyDistances,
+                bogieSpacing,
+                totalLength,
+                distances => _evaluator.EvaluateFramesAtDistances(distances));
         }
 
         private IReadOnlyList<TrainCarTransform> SampleProfileBackedBodies(
@@ -316,9 +324,10 @@ namespace Quantum.Track
                 leadDistance,
                 carSpacing,
                 carCount,
-                document.TotalLength);
-            TrackFrame[] frames = SampleProfileFramesInInputOrder(
+                _evaluator.GetBoundTrackTotalLength());
+            TrackFrame[] frames = BankingProfileSampler.SampleFramesAtDistances(
                 document,
+                _evaluator,
                 bankingProfile,
                 distances);
             var transforms = new List<TrainCarTransform>(carCount);
@@ -346,16 +355,40 @@ namespace Quantum.Track
                 leadDistance,
                 definition.CarSpacing,
                 definition.CarCount);
-            double totalLength = document.TotalLength;
+            double totalLength = _evaluator.GetBoundTrackTotalLength();
             double[] bodyDistances = BuildBodyDistances(
                 leadDistance,
                 definition.CarSpacing,
                 definition.CarCount,
                 totalLength);
-            double bogieHalfSpacing = definition.BogieSpacing * 0.5;
-            var sampleDistances = new double[definition.CarCount * 3];
+            IReadOnlyList<TrainCarWithBogiesTransform> carsWithBogies = SampleTrainWithBogies(
+                bodyDistances,
+                definition.BogieSpacing,
+                totalLength,
+                distances => BankingProfileSampler.SampleFramesAtDistances(
+                    document,
+                    _evaluator,
+                    bankingProfile,
+                    distances));
 
-            for (int i = 0; i < definition.CarCount; i++)
+            IReadOnlyList<ArticulatedTrainCarTransform> articulatedCars =
+                _articulationSolver.SolveArticulatedBodies(carsWithBogies);
+            IReadOnlyList<TrainCarWithBogiesAndWheelsTransform> carsWithWheels =
+                _wheelLayoutSolver.AttachWheels(carsWithBogies, wheelLayout);
+
+            return _poseAssembler.AssembleArticulatedWithWheels(articulatedCars, carsWithWheels);
+        }
+
+        private static IReadOnlyList<TrainCarWithBogiesTransform> SampleTrainWithBogies(
+            IReadOnlyList<double> bodyDistances,
+            double bogieSpacing,
+            double totalLength,
+            Func<IReadOnlyList<double>, TrackFrame[]> sampleFrames)
+        {
+            double bogieHalfSpacing = bogieSpacing * 0.5;
+            var sampleDistances = new double[bodyDistances.Count * 3];
+
+            for (int i = 0; i < bodyDistances.Count; i++)
             {
                 int sampleIndex = i * 3;
                 double bodyDistance = bodyDistances[i];
@@ -376,13 +409,10 @@ namespace Quantum.Track
                 sampleDistances[sampleIndex + 2] = rearDistance;
             }
 
-            TrackFrame[] frames = SampleProfileFramesInInputOrder(
-                document,
-                bankingProfile,
-                sampleDistances);
-            var carsWithBogies = new List<TrainCarWithBogiesTransform>(definition.CarCount);
+            TrackFrame[] frames = sampleFrames(sampleDistances);
+            var carsWithBogies = new List<TrainCarWithBogiesTransform>(bodyDistances.Count);
 
-            for (int i = 0; i < definition.CarCount; i++)
+            for (int i = 0; i < bodyDistances.Count; i++)
             {
                 int sampleIndex = i * 3;
                 TrackFrame bodyFrame = frames[sampleIndex];
@@ -414,59 +444,7 @@ namespace Quantum.Track
                     rearBogie));
             }
 
-            IReadOnlyList<ArticulatedTrainCarTransform> articulatedCars =
-                _articulationSolver.SolveArticulatedBodies(carsWithBogies);
-            IReadOnlyList<TrainCarWithBogiesAndWheelsTransform> carsWithWheels =
-                _wheelLayoutSolver.AttachWheels(carsWithBogies, wheelLayout);
-
-            return _poseAssembler.AssembleArticulatedWithWheels(articulatedCars, carsWithWheels);
-        }
-
-        private TrackFrame[] SampleProfileFramesInInputOrder(
-            TrackDocument document,
-            BankingProfile bankingProfile,
-            IReadOnlyList<double> distances)
-        {
-            if (distances.Count == 0)
-            {
-                return Array.Empty<TrackFrame>();
-            }
-
-            var sortedSamples = new IndexedDistance[distances.Count];
-            for (int i = 0; i < distances.Count; i++)
-            {
-                sortedSamples[i] = new IndexedDistance(distances[i], i);
-            }
-
-            Array.Sort(
-                sortedSamples,
-                (left, right) =>
-                {
-                    int distanceComparison = left.Distance.CompareTo(right.Distance);
-                    return distanceComparison != 0
-                        ? distanceComparison
-                        : left.OriginalIndex.CompareTo(right.OriginalIndex);
-                });
-
-            var sortedDistances = new double[sortedSamples.Length];
-            for (int i = 0; i < sortedSamples.Length; i++)
-            {
-                sortedDistances[i] = sortedSamples[i].Distance;
-            }
-
-            TrackFrame[] sortedFrames = BankingProfileSampler.SampleFramesAtDistances(
-                document,
-                _evaluator,
-                bankingProfile,
-                sortedDistances);
-            var frames = new TrackFrame[sortedFrames.Length];
-
-            for (int i = 0; i < sortedFrames.Length; i++)
-            {
-                frames[sortedSamples[i].OriginalIndex] = sortedFrames[i];
-            }
-
-            return frames;
+            return carsWithBogies;
         }
 
         private TrackDocument ResolveDocumentAndValidateBodyInputs(
@@ -539,17 +517,5 @@ namespace Quantum.Track
             }
         }
 
-        private readonly struct IndexedDistance
-        {
-            public IndexedDistance(double distance, int originalIndex)
-            {
-                Distance = distance;
-                OriginalIndex = originalIndex;
-            }
-
-            public double Distance { get; }
-
-            public int OriginalIndex { get; }
-        }
     }
 }

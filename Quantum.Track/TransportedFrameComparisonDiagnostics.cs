@@ -244,7 +244,7 @@ namespace Quantum.Track
             TrackEvaluator evaluator,
             IReadOnlyList<double> distances)
         {
-            SplineTrackFrame[] splineFrames = evaluator.EvaluateSplineFramesAtDistances(document, distances);
+            SplineTrackFrame[] splineFrames = evaluator.EvaluateStatelessSplineFramesAtDistances(document, distances);
             double[] stationDistances = ClampStationDistances(document, distances);
             var frames = new TrackFrame[splineFrames.Length];
 
