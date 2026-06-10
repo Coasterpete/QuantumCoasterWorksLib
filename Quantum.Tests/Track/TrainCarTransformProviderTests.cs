@@ -1500,15 +1500,23 @@ public sealed class TrainCarTransformProviderTests
 
     private static TrackDocument BuildSplineTrack(double length)
     {
+        var baseCurve = new Quantum.Splines.CubicBezierCurve(
+            new Vector3d(0.0, 0.0, 0.0),
+            new Vector3d(4.0, 1.0, 0.0),
+            new Vector3d(9.0, 3.0, 2.0),
+            new Vector3d(14.0, 6.0, 3.0));
+        double scale = length / new Quantum.Splines.ArcLengthLUT(baseCurve).TotalLength;
+        var scaledCurve = new Quantum.Splines.CubicBezierCurve(
+            baseCurve.P0 * scale,
+            baseCurve.P1 * scale,
+            baseCurve.P2 * scale,
+            baseCurve.P3 * scale);
+
         return new TrackDocument(new TrackSegment[]
         {
             new CurvedSegment(
                 length: length,
-                spline: new Quantum.Splines.CubicBezierCurve(
-                    new Vector3d(0.0, 0.0, 0.0),
-                    new Vector3d(4.0, 1.0, 0.0),
-                    new Vector3d(9.0, 3.0, 2.0),
-                    new Vector3d(14.0, 6.0, 3.0)),
+                spline: scaledCurve,
                 rollRadians: 0.3)
         });
     }

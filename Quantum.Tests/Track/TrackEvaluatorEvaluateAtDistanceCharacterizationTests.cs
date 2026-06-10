@@ -64,16 +64,16 @@ public sealed class TrackEvaluatorEvaluateAtDistanceCharacterizationTests
     }
 
     [Fact]
-    public void TrackEvaluator_EvaluateAtDistance_LastSegmentWithNonPositiveLength_ReturnsLastSegmentAtZero()
+    public void TrackEvaluator_EvaluateAtDistance_LastSegmentWithNonPositiveLength_RejectsDocument()
     {
         var evaluator = new TrackEvaluator();
         var first = new StraightSegment(length: 10.0, id: "s-01");
         var last = new CurvedSegment(length: 0.0, id: "c-zero");
         var document = new TrackDocument(new TrackSegment[] { first, last });
 
-        TrackEvaluationPoint point = evaluator.EvaluateAtDistance(document, 999.0);
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(
+            () => evaluator.EvaluateAtDistance(document, 999.0));
 
-        Assert.Same(last, point.Segment);
-        Assert.Equal(0.0, point.LocalT);
+        Assert.Contains("finite declared length greater than zero", ex.Message);
     }
 }

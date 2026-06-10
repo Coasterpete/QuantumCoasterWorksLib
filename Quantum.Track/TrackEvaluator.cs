@@ -3,7 +3,6 @@ using Quantum.Splines;
 using Quantum.Track.Internal;
 using System.Collections.Generic;
 using System.ComponentModel;
-using System.Runtime.CompilerServices;
 using SplineTrackFrame = Quantum.Splines.TrackFrame;
 
 namespace Quantum.Track
@@ -117,8 +116,11 @@ namespace Quantum.Track
         public TrackFrame EvaluateFrameAtDistance(double distance)
         {
             TrackDocument doc = ResolveBoundDocument();
-            SplineTrackFrame splineFrame = EvaluateSplineFrameAtDistance(doc, distance);
-            return BuildExportFrame(splineFrame, ClampStationDistance(doc, distance));
+            ThrowIfDistanceNonFinite(distance);
+            CompiledTrackSamplingContext samplingContext = CompileForDistance(doc, distance);
+            ResolvedTrackDistance resolvedDistance = samplingContext.Resolve(distance);
+            SplineTrackFrame splineFrame = EvaluateResolvedFrame(resolvedDistance);
+            return BuildExportFrame(splineFrame, resolvedDistance.ClampedDistance);
         }
 
         /// <summary>
@@ -127,7 +129,20 @@ namespace Quantum.Track
         public double GetBoundTrackTotalLength()
         {
             TrackDocument doc = ResolveBoundDocument();
-            return doc.TotalLength;
+            return CompiledTrackSamplingContext.Compile(doc).TotalLength;
+        }
+
+        /// <summary>
+        /// Returns the measured geometric station length used by distance sampling.
+        /// </summary>
+        public double GetTrackTotalLength(TrackDocument doc)
+        {
+            if (doc is null)
+            {
+                throw new System.ArgumentNullException(nameof(doc));
+            }
+
+            return CompiledTrackSamplingContext.Compile(doc).TotalLength;
         }
 
         internal TrackDocument GetBoundTrackDocument()
@@ -149,9 +164,15 @@ namespace Quantum.Track
         /// </remarks>
         public SplineTrackFrame EvaluateSplineFrameAtDistance(TrackDocument doc, double distance)
         {
-            TrackEvaluationPoint evaluationPoint = EvaluateAtDistance(doc, distance);
-            TrackPosition position = ResolveTrackPosition(doc, evaluationPoint);
-            return EvaluateFrame(doc, position);
+            if (doc is null)
+            {
+                throw new System.ArgumentNullException(nameof(doc));
+            }
+
+            ThrowIfDistanceNonFinite(distance);
+            CompiledTrackSamplingContext samplingContext = CompileForDistance(doc, distance);
+            ResolvedTrackDistance resolvedDistance = samplingContext.Resolve(distance);
+            return EvaluateResolvedFrame(resolvedDistance);
         }
 
         /// <summary>
@@ -200,15 +221,7 @@ namespace Quantum.Track
                 ThrowIfDistanceNonFinite(distances[i]);
             }
 
-            if (doc.Segments.Count == 0)
-            {
-                throw new System.ArgumentOutOfRangeException(
-                    "distance",
-                    distances[0],
-                    "Distance cannot be evaluated for an empty track document.");
-            }
-
-            CompiledTrackSamplingContext samplingContext = CompiledTrackSamplingContext.Compile(doc);
+            CompiledTrackSamplingContext samplingContext = CompileForDistance(doc, distances[0]);
             var points = new TrackEvaluationPoint[distanceCount];
 
             for (int i = 0; i < distanceCount; i++)
@@ -257,39 +270,13 @@ namespace Quantum.Track
                 ThrowIfDistanceNonFinite(distances[i]);
             }
 
-            if (doc.Segments.Count == 0)
-            {
-                throw new System.ArgumentOutOfRangeException(
-                    "distance",
-                    distances[0],
-                    "Distance cannot be evaluated for an empty track document.");
-            }
-
-            CompiledTrackSamplingContext samplingContext = CompiledTrackSamplingContext.Compile(doc);
-            Dictionary<TrackSegment, int>? firstSegmentIndicesByReference = null;
+            CompiledTrackSamplingContext samplingContext = CompileForDistance(doc, distances[0]);
             var frames = new SplineTrackFrame[distanceCount];
 
             for (int i = 0; i < distanceCount; i++)
             {
                 ResolvedTrackDistance resolvedDistance = samplingContext.Resolve(distances[i]);
-
-                if (resolvedDistance.Segment.Spline is IParamCurve spline)
-                {
-                    ThrowIfFrameLocalTInvalid(resolvedDistance.LocalT);
-
-                    var evaluationPoint = new TrackEvaluationPoint(
-                        resolvedDistance.Segment,
-                        resolvedDistance.LocalT);
-                    double rollRadians = ResolveRollRadians(evaluationPoint);
-                    Vector3d splinePosition = spline.Evaluate(resolvedDistance.LocalT);
-                    Vector3d splineTangent = NormalizeOrThrow(spline.Tangent(resolvedDistance.LocalT), "tangent");
-                    frames[i] = BuildTrackFrame(evaluationPoint, splinePosition, splineTangent, rollRadians);
-                    continue;
-                }
-
-                firstSegmentIndicesByReference ??= BuildFirstSegmentIndicesByReference(doc);
-                TrackPosition position = ResolveTrackPosition(firstSegmentIndicesByReference, resolvedDistance);
-                frames[i] = EvaluateFrame(doc, position);
+                frames[i] = EvaluateResolvedFrame(resolvedDistance);
             }
 
             return frames;
@@ -323,13 +310,30 @@ namespace Quantum.Track
         public TrackFrame[] EvaluateFramesAtDistances(IReadOnlyList<double> distances)
         {
             TrackDocument doc = ResolveBoundDocument();
-            SplineTrackFrame[] splineFrames = EvaluateSplineFramesAtDistances(doc, distances);
-            double[] stationDistances = ClampStationDistances(doc, distances);
-            var exportFrames = new TrackFrame[splineFrames.Length];
-
-            for (int i = 0; i < splineFrames.Length; i++)
+            if (distances is null)
             {
-                exportFrames[i] = BuildExportFrame(splineFrames[i], stationDistances[i]);
+                throw new System.ArgumentNullException(nameof(distances));
+            }
+
+            int distanceCount = distances.Count;
+            if (distanceCount == 0)
+            {
+                return System.Array.Empty<TrackFrame>();
+            }
+
+            for (int i = 0; i < distanceCount; i++)
+            {
+                ThrowIfDistanceNonFinite(distances[i]);
+            }
+
+            CompiledTrackSamplingContext samplingContext = CompileForDistance(doc, distances[0]);
+            var exportFrames = new TrackFrame[distanceCount];
+
+            for (int i = 0; i < distanceCount; i++)
+            {
+                ResolvedTrackDistance resolvedDistance = samplingContext.Resolve(distances[i]);
+                SplineTrackFrame splineFrame = EvaluateResolvedFrame(resolvedDistance);
+                exportFrames[i] = BuildExportFrame(splineFrame, resolvedDistance.ClampedDistance);
             }
 
             return exportFrames;
@@ -337,9 +341,16 @@ namespace Quantum.Track
 
         public Transform3d EvaluateTransformAtDistance(TrackDocument doc, double distance)
         {
-            TrackEvaluationPoint evaluationPoint = EvaluateAtDistance(doc, distance);
-            TrackPosition position = ResolveTrackPosition(doc, evaluationPoint);
-            return EvaluateTransform(doc, position);
+            if (doc is null)
+            {
+                throw new System.ArgumentNullException(nameof(doc));
+            }
+
+            ThrowIfDistanceNonFinite(distance);
+            CompiledTrackSamplingContext samplingContext = CompileForDistance(doc, distance);
+            ResolvedTrackDistance resolvedDistance = samplingContext.Resolve(distance);
+            SplineTrackFrame frame = EvaluateResolvedFrame(resolvedDistance);
+            return Transform3d.FromTrackFrame(frame, frame.Position);
         }
 
         public SplineTrackFrame EvaluateFrame(TrackDocument doc, TrackPosition position)
@@ -351,7 +362,11 @@ namespace Quantum.Track
             {
                 Vector3d splinePosition = spline.Evaluate(evaluationPoint.LocalT);
                 Vector3d splineTangent = NormalizeOrThrow(spline.Tangent(evaluationPoint.LocalT), "tangent");
-                return BuildTrackFrame(evaluationPoint, splinePosition, splineTangent, rollRadians);
+                return BuildTrackFrame(
+                    splinePosition,
+                    splineTangent,
+                    rollRadians,
+                    evaluationPoint.LocalT * evaluationPoint.Segment.Length);
             }
 
             return EvaluateFallbackFrame(doc, position, evaluationPoint, rollRadians);
@@ -391,35 +406,6 @@ namespace Quantum.Track
             return new TrackFrame(stationDistance, sourceFrame.Position, tangent, normal, binormal);
         }
 
-        private static double ClampStationDistance(TrackDocument doc, double distance)
-        {
-            return System.Math.Max(0.0, System.Math.Min(distance, doc.TotalLength));
-        }
-
-        private static double[] ClampStationDistances(TrackDocument doc, IReadOnlyList<double> distances)
-        {
-            if (distances is null)
-            {
-                throw new System.ArgumentNullException(nameof(distances));
-            }
-
-            int distanceCount = distances.Count;
-            if (distanceCount == 0)
-            {
-                return System.Array.Empty<double>();
-            }
-
-            double totalLength = doc.TotalLength;
-            var stationDistances = new double[distanceCount];
-
-            for (int i = 0; i < distanceCount; i++)
-            {
-                stationDistances[i] = System.Math.Max(0.0, System.Math.Min(distances[i], totalLength));
-            }
-
-            return stationDistances;
-        }
-
         private static SplineTrackFrame EvaluateFallbackFrame(
             TrackDocument doc,
             TrackPosition position,
@@ -427,14 +413,61 @@ namespace Quantum.Track
             double rollRadians)
         {
             Transform3d fallbackTransform = EvaluateFallbackTransform(doc, position, evaluationPoint);
-            return BuildTrackFrame(evaluationPoint, fallbackTransform.Position, Vector3d.UnitX, rollRadians);
+            return BuildTrackFrame(
+                fallbackTransform.Position,
+                Vector3d.UnitX,
+                rollRadians,
+                evaluationPoint.LocalT * evaluationPoint.Segment.Length);
+        }
+
+        private static SplineTrackFrame EvaluateResolvedFrame(ResolvedTrackDistance resolvedDistance)
+        {
+            ThrowIfFrameLocalTInvalid(resolvedDistance.LocalT);
+
+            var evaluationPoint = new TrackEvaluationPoint(
+                resolvedDistance.Segment,
+                resolvedDistance.LocalT);
+            double rollRadians = ResolveRollRadians(evaluationPoint);
+
+            if (resolvedDistance.Segment.Spline is IParamCurve spline)
+            {
+                Vector3d splinePosition;
+                Vector3d splineTangent;
+
+                if (spline is IArcLengthCurve arcLengthCurve)
+                {
+                    splinePosition = arcLengthCurve.EvaluateByLength(resolvedDistance.LocalDistance);
+                    splineTangent = NormalizeOrThrow(
+                        arcLengthCurve.TangentByLength(resolvedDistance.LocalDistance),
+                        "tangent");
+                }
+                else
+                {
+                    splinePosition = spline.Evaluate(resolvedDistance.LocalT);
+                    splineTangent = NormalizeOrThrow(
+                        spline.Tangent(resolvedDistance.LocalT),
+                        "tangent");
+                }
+
+                return BuildTrackFrame(
+                    splinePosition,
+                    splineTangent,
+                    rollRadians,
+                    resolvedDistance.LocalDistance);
+            }
+
+            return BuildTrackFrame(
+                new Vector3d(resolvedDistance.ClampedDistance, 0.0, 0.0),
+                Vector3d.UnitX,
+                rollRadians,
+                resolvedDistance.LocalDistance);
         }
 
         private static SplineTrackFrame BuildTrackFrame(
-            TrackEvaluationPoint evaluationPoint,
             Vector3d position,
             Vector3d tangent,
-            double rollRadians)
+            double rollRadians,
+            double localDistance)
         {
             Vector3d normalizedTangent = NormalizeOrThrow(tangent, "tangent");
             Vector3d referenceUp = SelectReferenceUp(normalizedTangent);
@@ -447,9 +480,7 @@ namespace Quantum.Track
                 binormal = NormalizeOrThrow(RotateAroundAxis(binormal, normalizedTangent, rollRadians), "binormal");
             }
 
-            double s = evaluationPoint.LocalT * evaluationPoint.Segment.Length;
-
-            return new SplineTrackFrame(s, position, normalizedTangent, normal, binormal);
+            return new SplineTrackFrame(localDistance, position, normalizedTangent, normal, binormal);
         }
 
         private static double ResolveRollRadians(TrackEvaluationPoint evaluationPoint)
@@ -516,50 +547,6 @@ namespace Quantum.Track
                      double.IsInfinity(vector.Z));
         }
 
-        private static TrackPosition ResolveTrackPosition(TrackDocument doc, TrackEvaluationPoint evaluationPoint)
-        {
-            for (int i = 0; i < doc.Segments.Count; i++)
-            {
-                if (object.ReferenceEquals(doc.Segments[i], evaluationPoint.Segment))
-                {
-                    return new TrackPosition(i, evaluationPoint.LocalT);
-                }
-            }
-
-            throw new System.InvalidOperationException("TrackDocument could not resolve the evaluated segment.");
-        }
-
-        private static TrackPosition ResolveTrackPosition(
-            IReadOnlyDictionary<TrackSegment, int> firstSegmentIndicesByReference,
-            ResolvedTrackDistance resolvedDistance)
-        {
-            if (!firstSegmentIndicesByReference.TryGetValue(resolvedDistance.Segment, out int segmentIndex))
-            {
-                throw new System.InvalidOperationException("TrackDocument could not resolve the evaluated segment.");
-            }
-
-            return new TrackPosition(segmentIndex, resolvedDistance.LocalT);
-        }
-
-        private static Dictionary<TrackSegment, int> BuildFirstSegmentIndicesByReference(TrackDocument doc)
-        {
-            var firstSegmentIndicesByReference = new Dictionary<TrackSegment, int>(
-                doc.Segments.Count,
-                ReferenceIdentityComparer<TrackSegment>.Instance);
-
-            for (int i = 0; i < doc.Segments.Count; i++)
-            {
-                TrackSegment segment = doc.Segments[i];
-
-                if (!firstSegmentIndicesByReference.ContainsKey(segment))
-                {
-                    firstSegmentIndicesByReference.Add(segment, i);
-                }
-            }
-
-            return firstSegmentIndicesByReference;
-        }
-
         private TrackDocument ResolveBoundDocument()
         {
             if (_boundDocument is null)
@@ -595,6 +582,15 @@ namespace Quantum.Track
                     "Distance must be finite.");
             }
 
+            CompiledTrackSamplingContext samplingContext = CompileForDistance(doc, distance);
+            ResolvedTrackDistance resolvedDistance = samplingContext.Resolve(distance);
+            return new TrackEvaluationPoint(resolvedDistance.Segment, resolvedDistance.LocalT);
+        }
+
+        private static CompiledTrackSamplingContext CompileForDistance(
+            TrackDocument doc,
+            double distance)
+        {
             if (doc.Segments.Count == 0)
             {
                 throw new System.ArgumentOutOfRangeException(
@@ -603,9 +599,7 @@ namespace Quantum.Track
                     "Distance cannot be evaluated for an empty track document.");
             }
 
-            CompiledTrackSamplingContext samplingContext = CompiledTrackSamplingContext.Compile(doc);
-            ResolvedTrackDistance resolvedDistance = samplingContext.Resolve(distance);
-            return new TrackEvaluationPoint(resolvedDistance.Segment, resolvedDistance.LocalT);
+            return CompiledTrackSamplingContext.Compile(doc);
         }
 
         private static void ThrowIfDistanceNonFinite(double distance)
@@ -630,21 +624,5 @@ namespace Quantum.Track
             }
         }
 
-        private sealed class ReferenceIdentityComparer<TReference> : IEqualityComparer<TReference>
-            where TReference : class
-        {
-            public static ReferenceIdentityComparer<TReference> Instance { get; } =
-                new ReferenceIdentityComparer<TReference>();
-
-            public bool Equals(TReference? x, TReference? y)
-            {
-                return object.ReferenceEquals(x, y);
-            }
-
-            public int GetHashCode(TReference obj)
-            {
-                return RuntimeHelpers.GetHashCode(obj);
-            }
-        }
     }
 }

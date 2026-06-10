@@ -20,7 +20,7 @@ public sealed class TrackEvaluatorTrackFrameOutputTests
             new Vector3d(10.0, 6.0, 4.0));
         var document = new TrackDocument(new TrackSegment[]
         {
-            new CurvedSegment(length: 10.0, spline: spline, rollRadians: 0.4)
+            new CurvedSegment(length: MeasureLength(spline), spline: spline, rollRadians: 0.4)
         });
         var evaluator = new TrackEvaluator(document);
 
@@ -45,7 +45,7 @@ public sealed class TrackEvaluatorTrackFrameOutputTests
             new Vector3d(10.0, 8.0, 3.0));
         var document = new TrackDocument(new TrackSegment[]
         {
-            new CurvedSegment(length: 12.0, spline: spline, rollRadians: 0.7)
+            new CurvedSegment(length: MeasureLength(spline), spline: spline, rollRadians: 0.7)
         });
         var evaluator = new TrackEvaluator(document);
 
@@ -62,7 +62,7 @@ public sealed class TrackEvaluatorTrackFrameOutputTests
             new Vector3d(12.0, 3.0, 9.0));
         var document = new TrackDocument(new TrackSegment[]
         {
-            new StraightSegment(length: 10.0, spline: spline)
+            new StraightSegment(length: MeasureLength(spline), spline: spline)
         });
         var evaluator = new TrackEvaluator(document);
         double distance = 3.75;
@@ -84,7 +84,7 @@ public sealed class TrackEvaluatorTrackFrameOutputTests
             new Vector3d(10.0, 9.0, 4.0));
         var document = new TrackDocument(new TrackSegment[]
         {
-            new CurvedSegment(length: 10.0, spline: spline),
+            new CurvedSegment(length: MeasureLength(spline), spline: spline),
             new StraightSegment(length: 5.0, rollRadians: 0.25)
         });
         var evaluator = new TrackEvaluator(document);
@@ -113,6 +113,11 @@ public sealed class TrackEvaluatorTrackFrameOutputTests
 
         Vector3d cross = Vector3d.Cross(frame.Tangent, frame.Normal);
         AssertVectorNear(cross, frame.Binormal);
+    }
+
+    private static double MeasureLength(IParamCurve curve)
+    {
+        return new ArcLengthLUT(curve).TotalLength;
     }
 
     private static void AssertFiniteVector(Vector3d vector)

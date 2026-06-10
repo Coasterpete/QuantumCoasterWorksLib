@@ -68,6 +68,19 @@ namespace Quantum.Debug
 
         private static TrackDocument BuildSampleCenterline()
         {
+            var baseMiddleSpline = new CubicBezierCurve(
+                new Vector3d(0.0, 0.0, 0.0),
+                new Vector3d(15.0, 0.0, 0.0),
+                new Vector3d(25.0, 12.0, 20.0),
+                new Vector3d(40.0, 10.0, 30.0));
+            double middleScale = 40.0 / new ArcLengthLUT(baseMiddleSpline).TotalLength;
+            Vector3d middleStart = new Vector3d(40.0, 0.0, 0.0);
+            var middleSpline = new CubicBezierCurve(
+                middleStart + (baseMiddleSpline.P0 * middleScale),
+                middleStart + (baseMiddleSpline.P1 * middleScale),
+                middleStart + (baseMiddleSpline.P2 * middleScale),
+                middleStart + (baseMiddleSpline.P3 * middleScale));
+            Vector3d finalStart = middleSpline.P3;
             TrackSegment[] segments =
             {
                 new StraightSegment(
@@ -80,18 +93,14 @@ namespace Quantum.Debug
                 new CurvedSegment(
                     length: 40.0,
                     id: "c1",
-                    spline: new CubicBezierCurve(
-                        new Vector3d(40.0, 0.0, 0.0),
-                        new Vector3d(55.0, 0.0, 0.0),
-                        new Vector3d(65.0, 12.0, 20.0),
-                        new Vector3d(80.0, 10.0, 30.0)),
+                    spline: middleSpline,
                     rollRadians: 0.35),
                 new StraightSegment(
                     length: 40.0,
                     id: "s2",
                     spline: new LineCurve(
-                        new Vector3d(80.0, 10.0, 30.0),
-                        new Vector3d(120.0, 10.0, 30.0)),
+                        finalStart,
+                        finalStart + new Vector3d(40.0, 0.0, 0.0)),
                     rollRadians: 0.15)
             };
 

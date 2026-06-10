@@ -44,6 +44,11 @@ namespace Quantum.Debug
 
         public static SamplingPerfSmokeScenario CreateDeterministic()
         {
+            var middleCurve = new CubicBezierCurve(
+                new Vector3d(60.0, 0.0, 0.0),
+                new Vector3d(90.0, 6.0, 2.0),
+                new Vector3d(130.0, 14.0, 5.0),
+                new Vector3d(160.0, 20.0, 8.0));
             TrackSegment[] segments =
             {
                 new StraightSegment(
@@ -53,13 +58,9 @@ namespace Quantum.Debug
                         new Vector3d(0.0, 0.0, 0.0),
                         new Vector3d(60.0, 0.0, 0.0))),
                 new CurvedSegment(
-                    length: 100.0,
+                    length: new ArcLengthLUT(middleCurve).TotalLength,
                     id: "c1",
-                    spline: new CubicBezierCurve(
-                        new Vector3d(60.0, 0.0, 0.0),
-                        new Vector3d(90.0, 6.0, 2.0),
-                        new Vector3d(130.0, 14.0, 5.0),
-                        new Vector3d(160.0, 20.0, 8.0)),
+                    spline: middleCurve,
                     rollRadians: 0.2),
                 new StraightSegment(
                     length: 60.0,

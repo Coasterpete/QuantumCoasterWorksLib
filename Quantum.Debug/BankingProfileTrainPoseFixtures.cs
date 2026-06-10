@@ -136,6 +136,14 @@ namespace Quantum.Debug
 
         private static TrackDocument BuildDocument()
         {
+            var curvedSpline = new CubicBezierCurve(
+                new Vector3d(18.0, 0.0, 0.0),
+                new Vector3d(28.0, 3.0, 5.0),
+                new Vector3d(36.0, 5.0, 18.0),
+                new Vector3d(45.0, 2.0, 26.0));
+            var finalSpline = new LineCurve(
+                new Vector3d(45.0, 2.0, 26.0),
+                new Vector3d(67.0, 4.0, 34.0));
             TrackSegment[] segments =
             {
                 new StraightSegment(
@@ -146,20 +154,14 @@ namespace Quantum.Debug
                         new Vector3d(18.0, 0.0, 0.0)),
                     rollRadians: -0.35),
                 new CurvedSegment(
-                    length: 30.0,
+                    length: new ArcLengthLUT(curvedSpline).TotalLength,
                     id: "bp-train-c1",
-                    spline: new CubicBezierCurve(
-                        new Vector3d(18.0, 0.0, 0.0),
-                        new Vector3d(28.0, 3.0, 5.0),
-                        new Vector3d(36.0, 5.0, 18.0),
-                        new Vector3d(45.0, 2.0, 26.0)),
+                    spline: curvedSpline,
                     rollRadians: -0.35),
                 new StraightSegment(
-                    length: 24.0,
+                    length: finalSpline.Length,
                     id: "bp-train-s2",
-                    spline: new LineCurve(
-                        new Vector3d(45.0, 2.0, 26.0),
-                        new Vector3d(67.0, 4.0, 34.0)),
+                    spline: finalSpline,
                     rollRadians: -0.35)
             };
 

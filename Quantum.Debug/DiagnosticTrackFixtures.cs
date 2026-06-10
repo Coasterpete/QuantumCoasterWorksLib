@@ -115,17 +115,18 @@ namespace Quantum.Debug
 
         public static DiagnosticTrackFixture CrestHill()
         {
-            const double length = 54.0;
+            var spline = new CubicBezierCurve(
+                new Vector3d(0.0, 0.0, 0.0),
+                new Vector3d(14.0, 20.0, 0.0),
+                new Vector3d(40.0, 20.0, 0.0),
+                new Vector3d(54.0, 0.0, 0.0));
+            double length = new ArcLengthLUT(spline).TotalLength;
             var document = new TrackDocument(new[]
             {
                 new CurvedSegment(
                     length: length,
                     id: CrestHillName,
-                    spline: new CubicBezierCurve(
-                        new Vector3d(0.0, 0.0, 0.0),
-                        new Vector3d(14.0, 20.0, 0.0),
-                        new Vector3d(40.0, 20.0, 0.0),
-                        new Vector3d(54.0, 0.0, 0.0)),
+                    spline: spline,
                     rollRadians: 0.0)
             });
 
@@ -270,7 +271,7 @@ namespace Quantum.Debug
             return !double.IsNaN(value) && !double.IsInfinity(value);
         }
 
-        private sealed class HorizontalArcCurve : IParamCurve, IParamCurveCurvature
+        private sealed class HorizontalArcCurve : IArcLengthCurve, IParamCurveCurvature
         {
             private readonly double _radius;
             private readonly double _angleRadians;
@@ -300,6 +301,8 @@ namespace Quantum.Debug
                     _radius * (1.0 - SystemMath.Cos(theta)));
             }
 
+            public double Length => SystemMath.Abs(_radius * _angleRadians);
+
             public Vector3d Tangent(double t)
             {
                 double theta = _angleRadians * Clamp01(t);
@@ -311,10 +314,30 @@ namespace Quantum.Debug
                 return Normalize(tangent);
             }
 
+            public Vector3d EvaluateByLength(double s)
+            {
+                return Evaluate(MapLengthToParameter(s));
+            }
+
+            public Vector3d TangentByLength(double s)
+            {
+                return Tangent(MapLengthToParameter(s));
+            }
+
             public bool TryGetCurvature(double t, out double curvature)
             {
                 curvature = 1.0 / _radius;
                 return IsFinite(t) && t >= 0.0 && t <= 1.0;
+            }
+
+            private double MapLengthToParameter(double s)
+            {
+                if (Length <= 1e-9)
+                {
+                    return 0.0;
+                }
+
+                return Clamp01(s / Length);
             }
 
             private static double Clamp01(double value)

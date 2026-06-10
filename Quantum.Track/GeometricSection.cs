@@ -39,18 +39,22 @@ namespace Quantum.Track
             return !double.IsNaN(value) && !double.IsInfinity(value);
         }
 
-        private sealed class ConstantCurvatureArcCurve : IParamCurve, IParamCurveCurvature
+        private sealed class ConstantCurvatureArcCurve : IArcLengthCurve, IParamCurveCurvature
         {
+            private readonly double _length;
             private readonly double _curvature;
             private readonly double _angle;
             private readonly double _radius;
 
             public ConstantCurvatureArcCurve(double length, double curvature)
             {
+                _length = length;
                 _curvature = curvature;
                 _angle = length * curvature;
                 _radius = 1.0 / curvature;
             }
+
+            public double Length => _length;
 
             public Vector3d Evaluate(double t)
             {
@@ -74,10 +78,30 @@ namespace Quantum.Track
                     0.0);
             }
 
+            public Vector3d EvaluateByLength(double s)
+            {
+                return Evaluate(MapLengthToParameter(s));
+            }
+
+            public Vector3d TangentByLength(double s)
+            {
+                return Tangent(MapLengthToParameter(s));
+            }
+
             public bool TryGetCurvature(double t, out double curvature)
             {
                 curvature = _curvature;
                 return true;
+            }
+
+            private double MapLengthToParameter(double s)
+            {
+                if (_length <= MathUtil.Epsilon)
+                {
+                    return 0.0;
+                }
+
+                return MathUtil.Clamp(s, 0.0, _length) / _length;
             }
         }
     }
