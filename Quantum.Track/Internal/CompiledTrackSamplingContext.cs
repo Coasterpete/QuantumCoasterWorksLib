@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Quantum.Math;
 using Quantum.Splines;
 
@@ -7,17 +8,26 @@ namespace Quantum.Track.Internal
     internal sealed class CompiledTrackSamplingContext
     {
         private const int ArcLengthSamples = 100;
+        private const int TransportSamplesPerSegment = 100;
         private const double DeclaredLengthAbsoluteTolerance = 1e-3;
         private const double DeclaredLengthRelativeTolerance = 1e-6;
 
         private readonly CompiledTrackSegment[] _segments;
+        private readonly Lazy<CanonicalTransportedFrameSampler>? _canonicalFrameSampler;
 
         private CompiledTrackSamplingContext(
             CompiledTrackSegment[] segments,
-            double totalLength)
+            double totalLength,
+            IReadOnlyList<double> transportNodeDistances)
         {
             _segments = segments;
             TotalLength = totalLength;
+            if (segments.Length > 0)
+            {
+                _canonicalFrameSampler = new Lazy<CanonicalTransportedFrameSampler>(
+                    () => new CanonicalTransportedFrameSampler(this, transportNodeDistances),
+                    isThreadSafe: true);
+            }
         }
 
         public double TotalLength { get; }
@@ -81,7 +91,34 @@ namespace Quantum.Track.Internal
                 totalLength += geometricLength;
             }
 
-            return new CompiledTrackSamplingContext(segments, totalLength);
+            return new CompiledTrackSamplingContext(
+                segments,
+                totalLength,
+                BuildTransportNodeDistances(segments, totalLength));
+        }
+
+        public TrackFrame SampleCanonicalFrame(
+            double distance,
+            Func<ResolvedTrackDistance, double> rollRadiansResolver)
+        {
+            if (_canonicalFrameSampler is null)
+            {
+                throw new InvalidOperationException("TrackDocument could not be evaluated because it contains no segments.");
+            }
+
+            return _canonicalFrameSampler.Value.Sample(distance, rollRadiansResolver);
+        }
+
+        public TrackFrame[] SampleCanonicalFrames(
+            IReadOnlyList<double> distances,
+            Func<ResolvedTrackDistance, double> rollRadiansResolver)
+        {
+            if (_canonicalFrameSampler is null)
+            {
+                throw new InvalidOperationException("TrackDocument could not be evaluated because it contains no segments.");
+            }
+
+            return _canonicalFrameSampler.Value.SampleMany(distances, rollRadiansResolver);
         }
 
         public ResolvedTrackDistance Resolve(double distance)
@@ -112,6 +149,33 @@ namespace Quantum.Track.Internal
             }
 
             throw new InvalidOperationException("TrackDocument could not be evaluated at the specified distance.");
+        }
+
+        private static double[] BuildTransportNodeDistances(
+            IReadOnlyList<CompiledTrackSegment> segments,
+            double totalLength)
+        {
+            if (segments.Count == 0)
+            {
+                return Array.Empty<double>();
+            }
+
+            var distances = new double[(segments.Count * TransportSamplesPerSegment) + 1];
+            distances[0] = 0.0;
+            int nodeIndex = 1;
+
+            for (int segmentIndex = 0; segmentIndex < segments.Count; segmentIndex++)
+            {
+                CompiledTrackSegment segment = segments[segmentIndex];
+                for (int sampleIndex = 1; sampleIndex <= TransportSamplesPerSegment; sampleIndex++)
+                {
+                    double fraction = (double)sampleIndex / TransportSamplesPerSegment;
+                    distances[nodeIndex++] = segment.StationStartDistance + (segment.GeometricLength * fraction);
+                }
+            }
+
+            distances[distances.Length - 1] = totalLength;
+            return distances;
         }
 
         private static void ValidateFinitePositiveLength(TrackSegment segment, int segmentIndex)

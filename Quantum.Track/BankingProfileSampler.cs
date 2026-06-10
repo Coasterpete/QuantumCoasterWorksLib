@@ -147,11 +147,10 @@ namespace Quantum.Track
                 throw new ArgumentNullException(nameof(distances));
             }
 
-            return TransportedTrackFrameSampler.SampleFramesAtDistances(
+            return evaluator.EvaluateCanonicalFramesAtDistances(
                 document,
-                evaluator,
                 distances,
-                (index, _) => SampleRollRadians(profile, distances[index]));
+                resolvedDistance => SampleRollRadians(profile, resolvedDistance.ClampedDistance));
         }
 
         private static double Interpolate(
