@@ -41,12 +41,13 @@ namespace Quantum.Track
         /// remains available for existing callers and has the same sampling
         /// semantics.
         /// </remarks>
+        [Obsolete("Use EvaluateCarTransforms for deterministic station-distance train transforms.")]
         public IReadOnlyList<TrainCarTransform> GetCarTransforms(
             double leadDistance,
             double carSpacing,
             int carCount)
         {
-            return _bodySampler.SampleBodies(leadDistance, carSpacing, carCount);
+            return EvaluateCarTransforms(leadDistance, carSpacing, carCount);
         }
 
         /// <summary>
@@ -60,7 +61,42 @@ namespace Quantum.Track
         /// This method remains available for existing callers and has the same
         /// profile-backed sampling semantics.
         /// </remarks>
+        [Obsolete("Use EvaluateCarTransforms with BankingProfile for deterministic station-distance train transforms.")]
         public IReadOnlyList<TrainCarTransform> GetCarTransforms(
+            double leadDistance,
+            double carSpacing,
+            int carCount,
+            BankingProfile bankingProfile)
+        {
+            return EvaluateCarTransforms(leadDistance, carSpacing, carCount, bankingProfile);
+        }
+
+        /// <summary>
+        /// Preferred API for evaluating per-car body frames and transform
+        /// matrices from a lead-car station distance.
+        /// </summary>
+        /// <remarks>
+        /// This method keeps deterministic station-distance computation under the
+        /// <c>Evaluate*</c> naming convention.
+        /// </remarks>
+        public IReadOnlyList<TrainCarTransform> EvaluateCarTransforms(
+            double leadDistance,
+            double carSpacing,
+            int carCount)
+        {
+            return _bodySampler.SampleBodies(leadDistance, carSpacing, carCount);
+        }
+
+        /// <summary>
+        /// Preferred API for evaluating per-car body frames and transform
+        /// matrices from a lead-car station distance using an explicit
+        /// <see cref="BankingProfile"/> as the roll source.
+        /// </summary>
+        /// <remarks>
+        /// This method keeps deterministic station-distance computation under the
+        /// <c>Evaluate*</c> naming convention.
+        /// </remarks>
+        public IReadOnlyList<TrainCarTransform> EvaluateCarTransforms(
             double leadDistance,
             double carSpacing,
             int carCount,
@@ -76,43 +112,6 @@ namespace Quantum.Track
                 carSpacing,
                 carCount,
                 bankingProfile);
-        }
-
-        /// <summary>
-        /// Preferred API for evaluating per-car body frames and transform
-        /// matrices from a lead-car station distance.
-        /// </summary>
-        /// <remarks>
-        /// This method keeps deterministic station-distance computation under the
-        /// <c>Evaluate*</c> naming convention and delegates to the compatibility
-        /// <see cref="GetCarTransforms(double, double, int)"/> implementation.
-        /// </remarks>
-        public IReadOnlyList<TrainCarTransform> EvaluateCarTransforms(
-            double leadDistance,
-            double carSpacing,
-            int carCount)
-        {
-            return GetCarTransforms(leadDistance, carSpacing, carCount);
-        }
-
-        /// <summary>
-        /// Preferred API for evaluating per-car body frames and transform
-        /// matrices from a lead-car station distance using an explicit
-        /// <see cref="BankingProfile"/> as the roll source.
-        /// </summary>
-        /// <remarks>
-        /// This method keeps deterministic station-distance computation under the
-        /// <c>Evaluate*</c> naming convention and delegates to the compatibility
-        /// <see cref="GetCarTransforms(double, double, int, BankingProfile)"/>
-        /// implementation.
-        /// </remarks>
-        public IReadOnlyList<TrainCarTransform> EvaluateCarTransforms(
-            double leadDistance,
-            double carSpacing,
-            int carCount,
-            BankingProfile bankingProfile)
-        {
-            return GetCarTransforms(leadDistance, carSpacing, carCount, bankingProfile);
         }
 
         /// <summary>

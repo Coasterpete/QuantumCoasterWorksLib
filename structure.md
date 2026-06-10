@@ -11,10 +11,12 @@ QuantumCoasterWorks.sln
   - Includes `Matrix3x3`
   - Includes `Transform3d`
   - Includes `ITrackFrameBasis` to prevent `Quantum.Math -> Quantum.Splines` dependency cycles
-- Quantum.Splines = curve logic and track frame sampling
-  - `TrackFrame` implements `ITrackFrameBasis`
-  - `TrackFrame -> Transform3d` bridge is provided through `Transform3d.FromTrackFrame(...)`
-- Quantum.Track = active major backend project for track documents, segments, traversal, evaluation, and train transform placement
+- Quantum.Splines = curve logic and generic curve-frame sampling
+  - `CurveFrame` implements `ITrackFrameBasis`
+  - legacy `TrackFrame` / `TrackFrameSampler` names are obsolete compatibility surfaces
+- Quantum.Track = active major backend project for track documents, canonical `TrackFrame`, segments, traversal, evaluation, and train transform placement
+  - `Quantum.Track.TrackFrame` implements `ITrackFrameBasis`
+  - frame-to-transform bridging is provided through `Transform3d.FromTrackFrame(...)`
 - Quantum.Physics = train simulation
 - Quantum.FVD = force vector design systems
 - Quantum.IO = save/load/import/export

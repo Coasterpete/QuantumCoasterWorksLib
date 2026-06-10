@@ -2,6 +2,7 @@ using Quantum.Math;
 using Quantum.Physics;
 using Quantum.Splines;
 using Quantum.Track;
+using TrackFrame = Quantum.Track.TrackFrame;
 
 namespace Quantum.Tests;
 
@@ -37,7 +38,7 @@ public sealed class TrackFrameProviderFromDocumentTests
         bool hasFrame = provider.TryGetFrameAtDistance(2.5, out TrackFrame frame);
 
         Assert.True(hasFrame);
-        AssertDoubleNear(2.5, frame.S);
+        AssertDoubleNear(2.5, frame.Distance);
         AssertDoubleNear(0.0, frame.Position.X);
         AssertDoubleNear(0.0, frame.Position.Y);
         AssertDoubleNear(2.5, frame.Position.Z);
@@ -61,7 +62,7 @@ public sealed class TrackFrameProviderFromDocumentTests
         bool hasFrame = provider.TryGetFrameAtDistance(distance, out TrackFrame actual);
 
         Assert.True(hasFrame);
-        AssertDoubleNear(expected.S, actual.S);
+        AssertDoubleNear(expected.Distance, actual.Distance);
         AssertVectorNear(expected.Position, actual.Position);
         AssertVectorNear(expected.Tangent, actual.Tangent);
         AssertVectorNear(expected.Normal, actual.Normal);

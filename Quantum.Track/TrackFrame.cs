@@ -13,7 +13,7 @@ namespace Quantum.Track
     /// downstream train, export, Unity, and debug code can depend on coaster
     /// concepts instead of spline implementation types.
     /// </remarks>
-    public readonly struct TrackFrame
+    public readonly struct TrackFrame : ITrackFrameBasis
     {
         /// <summary>
         /// Creates a track frame at the provided clamped global station distance.

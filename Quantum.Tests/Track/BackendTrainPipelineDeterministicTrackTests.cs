@@ -51,7 +51,7 @@ public sealed class BackendTrainPipelineDeterministicTrackTests
 
         foreach (double leadDistance in leadDistances)
         {
-            IReadOnlyList<TrainCarTransform> cars = provider.GetCarTransforms(
+            IReadOnlyList<TrainCarTransform> cars = provider.EvaluateCarTransforms(
                 leadDistance,
                 carSpacing,
                 carCount);

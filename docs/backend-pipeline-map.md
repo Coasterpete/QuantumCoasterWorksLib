@@ -20,12 +20,14 @@ What breaks if changed:
 
 ## 2) TrackEvaluator
 What it owns:
-- Core distance-to-sample logic (`s` along track to segment/local evaluation).
-- Point/tangent/frame/transform evaluation policy, including fallback behavior.
+- True geometric arc-length station resolution to segment/local evaluation.
+- Canonical transported-frame history shared by scalar and batch queries.
+- Point/tangent/frame/transform evaluation policy, including fallback and roll behavior.
 
 What it assumes:
 - Input document/segment data is valid enough to sample.
 - Clamping and edge-case behavior stay deterministic.
+- Declared spline segment lengths match measured geometry within the configured tolerance.
 
 What breaks if changed:
 - Car spacing and placement can shift or jitter.
@@ -36,6 +38,8 @@ What breaks if changed:
 What it owns:
 - Canonical sampled pose basis: position + tangent/normal/binormal + distance.
 - Canonical matrix conversion convention used downstream.
+- The only coaster-facing frame contract used by Track, Physics, train, debug,
+  and export runtime paths.
 
 What it assumes:
 - Basis vectors are finite and near-orthonormal.

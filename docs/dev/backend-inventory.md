@@ -77,21 +77,19 @@ The package can stay as the coaster-domain package, but the namespace is broad. 
 
 Do not split this now unless the move is purely mechanical and covered by tests. The current train-placement milestone benefits more from stable behavior than from namespace churn.
 
-### Two `TrackFrame` Types Still Create Boundary Friction
+### Legacy Spline `TrackFrame` Is Isolated Compatibility Debt
 
-This is already documented in `docs/public-coaster-api-boundary.md` and `docs/math-backend-status.md`, but it remains one of the biggest mental-model costs:
+The public runtime boundary now uses one coaster frame:
 
-- `Quantum.Splines.TrackFrame` uses `S`
-- `Quantum.Track.TrackFrame` uses `Distance`
+- `Quantum.Track.TrackFrame` uses global station `Distance`
+- `Quantum.Splines.CurveFrame` uses generic curve arc-length `S`
 
-`Quantum.Track.TrackFrame` is the preferred coaster-facing contract, but support APIs still expose `Quantum.Splines.TrackFrame`:
+The old `Quantum.Splines.TrackFrame` name remains only through obsolete
+compatibility types and `TrackEvaluator` overloads. Physics, train, debug, and
+export runtime paths use `Quantum.Track.TrackFrame` directly.
 
-- `Quantum.Track/TrackEvaluator.cs:134`
-- `Quantum.Track/TrackEvaluator.cs:195`
-- `Quantum.Physics/TrackPhysicsAdapter.cs:5`
-- `Quantum.Physics/TrackFrameProviderFromDocument.cs:4`
-
-This is acceptable as transition debt, but it should stay visible because it affects public API clarity.
+This transition debt stays visible until a later breaking cleanup removes those
+obsolete members.
 
 ### `Quantum.Debug` Public Types Look Like A Library Surface
 
@@ -129,10 +127,9 @@ These overloads are easy to confuse:
 
 The `Quantum.Track.TrackFrame` overloads expose the public coaster-domain
 contract: `Distance` is the requested clamped global station distance. The
-`Quantum.Splines.TrackFrame` overloads are support-layer compatibility APIs;
-their `S` value may be segment-local.
-
-The XML remarks explain this, but the overload shape still asks callers to know the support-layer distinction. A future polish pass could rename support-layer overloads, move them behind an adapter, or mark them as compatibility APIs.
+`Quantum.Splines.TrackFrame` overloads are obsolete support-layer compatibility
+APIs; their `S` value may be segment-local. Active coaster consumers use
+`Quantum.Track.TrackFrame`, while generic spline sampling uses `CurveFrame`.
 
 ### `TrackDocument` Is Mutable At The Core Boundary
 
@@ -158,7 +155,8 @@ Several downstream evaluators reject bad values later. A small future cleanup co
 - `GetCarTransforms(...)`
 - `EvaluateCarTransforms(...)`
 
-`EvaluateCarTransforms` is documented as an alias at `Quantum.Track/TrainCarTransformProvider.cs:41`. The alias is harmless, but it adds API surface. The cleanup path is to pick one naming convention for new APIs and eventually mark the non-preferred alias as compatibility-only.
+`EvaluateCarTransforms` is the preferred deterministic API. `GetCarTransforms`
+remains as an obsolete forwarding alias for compatibility.
 
 ### `TrainPoseResult` Could Guard Runtime Nulls More Explicitly
 
@@ -195,7 +193,7 @@ This is documented in code and `docs/math-backend-status.md`, but downstream con
 
 ## 3. Naming Inconsistencies
 
-- `Quantum.Splines.TrackFrame.S` vs `Quantum.Track.TrackFrame.Distance`; `S` is support-layer producer distance, while public `Distance` is clamped global station distance.
+- `Quantum.Splines.CurveFrame.S` vs `Quantum.Track.TrackFrame.Distance`; `S` is generic curve arc length, while public `Distance` is clamped global coaster station distance.
 - `LocalT`, `t`, `U`, `EvaluationX`, `StartX`, `EndX`, `distance`, and `station` all appear as coordinate names. They mean different things, but the distinctions are not always discoverable from API names alone.
 - `FVD` namespace vs `Fvd*` type prefix is acceptable C# casing, but it still reads slightly mixed.
 - `GetFrameAtDistance`, `EvaluateFrameAtDistance`, `Sample`, `TryGetForceTargets`, and `Build*` are all present. Most are defensible individually, but new APIs should follow a documented convention:
@@ -375,11 +373,9 @@ These do not need immediate splitting, but future changes will be easier if fixt
 
 ### P2 - Public API Boundary Polish
 
-- Make the `TrackEvaluator` public/support overload split more explicit.
-- Pick preferred naming for car transform APIs, likely `Evaluate*` for new code.
+- Remove obsolete spline `TrackFrame` compatibility members in a future breaking release.
 - Add runtime null guards to public result/data constructors where safe.
 - Document `TrackDocument` mutation expectations.
-- Decide whether `Quantum.Physics` should keep exposing `Quantum.Splines.TrackFrame` or move toward `Quantum.Track.TrackFrame`.
 
 ### P3 - Section Model Consolidation
 

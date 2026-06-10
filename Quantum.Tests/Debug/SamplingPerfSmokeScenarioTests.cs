@@ -38,7 +38,7 @@ public sealed class SamplingPerfSmokeScenarioTests
 
         Assert.InRange(scenario.LeadDistance, 0.0, trackLength);
 
-        IReadOnlyList<TrainCarTransform> bodies = scenario.Provider.GetCarTransforms(
+        IReadOnlyList<TrainCarTransform> bodies = scenario.Provider.EvaluateCarTransforms(
             scenario.LeadDistance,
             scenario.CarSpacing,
             scenario.CarCount);

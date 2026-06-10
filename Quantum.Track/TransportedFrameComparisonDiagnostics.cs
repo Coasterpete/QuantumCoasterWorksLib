@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Quantum.Math;
-using SplineTrackFrame = Quantum.Splines.TrackFrame;
+using Quantum.Splines;
 using SystemMath = System.Math;
 
 namespace Quantum.Track
@@ -194,10 +194,7 @@ namespace Quantum.Track
             }
 
             TrackFrame[] statelessFrames = EvaluateStatelessFrames(document, evaluator, distances);
-            TrackFrame[] transportedFrames = TransportedTrackFrameSampler.SampleFramesAtDistances(
-                document,
-                evaluator,
-                distances);
+            TrackFrame[] transportedFrames = evaluator.EvaluateTrackFramesAtDistances(document, distances);
 
             if (statelessFrames.Length != transportedFrames.Length ||
                 statelessFrames.Length != distances.Count)
@@ -244,19 +241,19 @@ namespace Quantum.Track
             TrackEvaluator evaluator,
             IReadOnlyList<double> distances)
         {
-            SplineTrackFrame[] splineFrames = evaluator.EvaluateStatelessSplineFramesAtDistances(document, distances);
+            CurveFrame[] curveFrames = evaluator.EvaluateStatelessCurveFramesAtDistances(document, distances);
             double[] stationDistances = ClampStationDistances(document, distances);
-            var frames = new TrackFrame[splineFrames.Length];
+            var frames = new TrackFrame[curveFrames.Length];
 
-            for (int i = 0; i < splineFrames.Length; i++)
+            for (int i = 0; i < curveFrames.Length; i++)
             {
-                frames[i] = BuildExportFrame(splineFrames[i], stationDistances[i]);
+                frames[i] = BuildTrackFrame(curveFrames[i], stationDistances[i]);
             }
 
             return frames;
         }
 
-        private static TrackFrame BuildExportFrame(SplineTrackFrame sourceFrame, double stationDistance)
+        private static TrackFrame BuildTrackFrame(CurveFrame sourceFrame, double stationDistance)
         {
             Vector3d tangent = NormalizeOrThrow(sourceFrame.Tangent, "tangent");
             Vector3d projectedNormal = sourceFrame.Normal - (tangent * Vector3d.Dot(sourceFrame.Normal, tangent));

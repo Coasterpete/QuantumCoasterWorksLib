@@ -53,8 +53,9 @@ Read `ROADMAP.md` and `docs/architecture/frontend-strategy.md` before frontend o
   - `Matrix3x3 Rotation`
   - `Vector3d Position`
   - point/direction transform helpers and simple rigid inverse
-- `ITrackFrameBasis` exists in `Quantum.Math` to avoid `Quantum.Math -> Quantum.Splines` dependency cycles.
-- `TrackFrame` implements `ITrackFrameBasis`.
+- `ITrackFrameBasis` exists in `Quantum.Math` to avoid project dependency cycles.
+- `Quantum.Track.TrackFrame` is the canonical coaster-facing implementation.
+- `Quantum.Splines.CurveFrame` is the generic spline-sampling implementation.
 - `Transform3d.FromTrackFrame(...)` provides the spatial bridge from track frame basis to world transform.
 - FVD force target pipeline exists.
 - `FvdGraph` supports strict and permissive force target queries.

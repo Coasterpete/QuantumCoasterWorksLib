@@ -2,6 +2,8 @@
 using Quantum.Core;
 using Quantum.Math;
 using Quantum.Splines;
+using Quantum.Track;
+using TrackFrame = Quantum.Track.TrackFrame;
 
 namespace Quantum.Physics
 {
@@ -212,7 +214,13 @@ namespace Quantum.Physics
 
         private void SampleCurrentState()
         {
-            Frame = TrackFrameSampler.SampleFrameByLength(Track, Distance, Vector3d.UnitY);
+            CurveFrame curveFrame = CurveFrameSampler.SampleFrameByLength(Track, Distance, Vector3d.UnitY);
+            Frame = new TrackFrame(
+                Distance,
+                curveFrame.Position,
+                curveFrame.Tangent,
+                curveFrame.Normal,
+                curveFrame.Binormal);
             Position = Frame.Position;
             Tangent = Frame.Tangent;
         }

@@ -1,3 +1,4 @@
+using System;
 using Quantum.Math;
 
 namespace Quantum.Splines
@@ -5,6 +6,7 @@ namespace Quantum.Splines
     /// <summary>
     /// Orthonormal support-layer frame sampled along a curve or track segment.
     /// </summary>
+    [Obsolete("Use CurveFrame for generic spline sampling or Quantum.Track.TrackFrame for coaster-facing APIs.")]
     public readonly struct TrackFrame : ITrackFrameBasis
     {
         /// <summary>
@@ -33,6 +35,11 @@ namespace Quantum.Splines
             Tangent = tangent;
             Normal = normal;
             Binormal = binormal;
+        }
+
+        internal TrackFrame(CurveFrame frame)
+            : this(frame.S, frame.Position, frame.Tangent, frame.Normal, frame.Binormal)
+        {
         }
 
         public override string ToString()
