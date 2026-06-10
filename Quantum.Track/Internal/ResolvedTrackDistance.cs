@@ -5,32 +5,28 @@ namespace Quantum.Track.Internal
     internal readonly struct ResolvedTrackDistance
     {
         public ResolvedTrackDistance(
-            int segmentIndex,
             TrackSegment segment,
             double localT,
-            double clampedDistance,
-            double segmentStartDistance)
+            double localDistance,
+            double clampedDistance)
         {
             if (segment is null)
             {
                 throw new ArgumentNullException(nameof(segment));
             }
 
-            SegmentIndex = segmentIndex;
             Segment = segment;
             LocalT = localT;
+            LocalDistance = localDistance;
             ClampedDistance = clampedDistance;
-            SegmentStartDistance = segmentStartDistance;
         }
-
-        public int SegmentIndex { get; }
 
         public TrackSegment Segment { get; }
 
         public double LocalT { get; }
 
-        public double ClampedDistance { get; }
+        public double LocalDistance { get; }
 
-        public double SegmentStartDistance { get; }
+        public double ClampedDistance { get; }
     }
 }

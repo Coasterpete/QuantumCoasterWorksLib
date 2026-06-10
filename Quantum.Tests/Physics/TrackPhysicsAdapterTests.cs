@@ -175,19 +175,22 @@ public sealed class TrackPhysicsAdapterTests
     public void TrackPhysicsAdapter_TryGetCurvatureAtDistance_CurvedSpline_IsFiniteAndStable()
     {
         var adapter = new TrackPhysicsAdapter();
+        var curve = new QuadraticBezierCurve(
+            new Vector3d(0.0, 0.0, 0.0),
+            new Vector3d(1.0, 1.0, 0.0),
+            new Vector3d(2.0, 0.0, 0.0));
+        double curveLength = new ArcLengthLUT(curve).TotalLength;
         var document = new TrackDocument(new TrackSegment[]
         {
             new CurvedSegment(
-                length: 2.0,
-                spline: new QuadraticBezierCurve(
-                    new Vector3d(0.0, 0.0, 0.0),
-                    new Vector3d(1.0, 1.0, 0.0),
-                    new Vector3d(2.0, 0.0, 0.0)))
+                length: curveLength,
+                spline: curve)
         });
 
-        bool successBefore = adapter.TryGetCurvatureAtDistance(document, distance: 0.9, out double curvatureBefore);
-        bool successMiddle = adapter.TryGetCurvatureAtDistance(document, distance: 1.0, out double curvatureMiddle);
-        bool successAfter = adapter.TryGetCurvatureAtDistance(document, distance: 1.1, out double curvatureAfter);
+        double middleDistance = curveLength * 0.5;
+        bool successBefore = adapter.TryGetCurvatureAtDistance(document, distance: middleDistance - 0.1, out double curvatureBefore);
+        bool successMiddle = adapter.TryGetCurvatureAtDistance(document, distance: middleDistance, out double curvatureMiddle);
+        bool successAfter = adapter.TryGetCurvatureAtDistance(document, distance: middleDistance + 0.1, out double curvatureAfter);
 
         Assert.True(successBefore);
         Assert.True(successMiddle);

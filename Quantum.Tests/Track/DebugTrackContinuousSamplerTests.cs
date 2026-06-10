@@ -114,14 +114,14 @@ public sealed class DebugTrackContinuousSamplerTests
         TrackSegment[] segments =
         {
             new StraightSegment(
-                length: 52.0,
+                length: 52.3450093132096,
                 id: "s0",
                 spline: new LineCurve(
                     new Vector3d(0.0, 0.0, 0.0),
                     new Vector3d(52.0, 6.0, 0.0)),
                 rollRadians: 0.0),
             new CurvedSegment(
-                length: 92.0,
+                length: 102.5673744475657,
                 id: "c1",
                 spline: new CubicBezierCurve(
                     new Vector3d(52.0, 6.0, 0.0),
@@ -130,7 +130,7 @@ public sealed class DebugTrackContinuousSamplerTests
                     new Vector3d(122.0, 34.0, 66.0)),
                 rollRadians: c1Roll),
             new CurvedSegment(
-                length: 94.0,
+                length: 79.23453083610931,
                 id: "c2",
                 spline: new CubicBezierCurve(
                     new Vector3d(122.0, 34.0, 66.0),
@@ -139,7 +139,7 @@ public sealed class DebugTrackContinuousSamplerTests
                     new Vector3d(176.0, 24.0, 22.0)),
                 rollRadians: c2Roll),
             new CurvedSegment(
-                length: 76.0,
+                length: 76.41747274859141,
                 id: "c3",
                 spline: new CubicBezierCurve(
                     new Vector3d(176.0, 24.0, 22.0),
@@ -148,7 +148,7 @@ public sealed class DebugTrackContinuousSamplerTests
                     new Vector3d(244.0, 10.0, -6.0)),
                 rollRadians: c3Roll),
             new StraightSegment(
-                length: 54.0,
+                length: 54.037024344425184,
                 id: "s4",
                 spline: new LineCurve(
                     new Vector3d(244.0, 10.0, -6.0),

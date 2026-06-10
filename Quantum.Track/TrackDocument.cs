@@ -63,8 +63,12 @@ namespace Quantum.Track
         public IList<TrackSection> Sections { get; }
 
         /// <summary>
-        /// Sum of segment lengths in station-distance units.
+        /// Sum of declared segment lengths in authoring station-distance units.
         /// </summary>
+        /// <remarks>
+        /// Sampling validates spline-backed declarations against measured geometric
+        /// lengths and uses the measured values through <see cref="TrackEvaluator"/>.
+        /// </remarks>
         public double TotalLength
         {
             get

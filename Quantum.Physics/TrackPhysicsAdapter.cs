@@ -50,7 +50,11 @@ namespace Quantum.Physics
             double totalLength;
             try
             {
-                totalLength = doc.TotalLength;
+                totalLength = _evaluator.GetTrackTotalLength(doc);
+            }
+            catch (ArgumentOutOfRangeException)
+            {
+                return false;
             }
             catch (InvalidOperationException)
             {

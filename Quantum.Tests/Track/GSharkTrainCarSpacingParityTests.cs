@@ -22,8 +22,11 @@ public sealed class GSharkTrainCarSpacingParityTests
         const double carSpacing = 2.5;
         const int carCount = 6;
 
-        IParamCurve legacyCurve = new NurbsCurve(controlPoints, weights, degree);
-        IParamCurve gSharkCurve = new GSharkNurbsCurveAdapter(controlPoints, weights, degree);
+        IParamCurve unscaledLegacyCurve = new NurbsCurve(controlPoints, weights, degree);
+        double scale = segmentLength / new ArcLengthLUT(unscaledLegacyCurve).TotalLength;
+        List<Vector3d> scaledControlPoints = ScaleControlPoints(controlPoints, scale);
+        IParamCurve legacyCurve = new NurbsCurve(scaledControlPoints, weights, degree);
+        IParamCurve gSharkCurve = new GSharkNurbsCurveAdapter(scaledControlPoints, weights, degree);
 
         var legacyProvider = new TrainCarTransformProvider(new TrackEvaluator(
             BuildSingleSegmentDocument(segmentLength, rollRadians, legacyCurve)));
@@ -72,6 +75,19 @@ public sealed class GSharkTrainCarSpacingParityTests
     private static List<double> CreateWeights()
     {
         return new List<double> { 1.0, 0.9, 1.2, 1.0 };
+    }
+
+    private static List<Vector3d> ScaleControlPoints(
+        IReadOnlyList<Vector3d> controlPoints,
+        double scale)
+    {
+        var scaled = new List<Vector3d>(controlPoints.Count);
+        for (int i = 0; i < controlPoints.Count; i++)
+        {
+            scaled.Add(controlPoints[i] * scale);
+        }
+
+        return scaled;
     }
 
     private static void AssertVectorNear(Vector3d expected, Vector3d actual, double tolerance)

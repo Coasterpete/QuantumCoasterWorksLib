@@ -88,18 +88,20 @@ public sealed class TrackEvaluatorBatchSamplingParityTests
     [Fact]
     public void TrackEvaluator_EvaluateFramesAtDistances_DocumentOverload_DuplicateSplineSegmentReferences_MatchesScalarBehavior()
     {
+        var repeatedSpline = new LineCurve(
+            new Vector3d(0.0, 0.0, 0.0),
+            new Vector3d(5.0, 1.0, 0.0));
         TrackSegment repeated = new StraightSegment(
-            length: 5.0,
+            length: repeatedSpline.Length,
             id: "shared-spline",
-            spline: new LineCurve(
-                new Vector3d(0.0, 0.0, 0.0),
-                new Vector3d(5.0, 1.0, 0.0)));
+            spline: repeatedSpline);
+        var middleSpline = new LineCurve(
+            new Vector3d(100.0, -5.0, 2.0),
+            new Vector3d(103.0, -3.0, 2.0));
         TrackSegment middle = new StraightSegment(
-            length: 3.0,
+            length: middleSpline.Length,
             id: "middle-spline",
-            spline: new LineCurve(
-                new Vector3d(100.0, -5.0, 2.0),
-                new Vector3d(103.0, -3.0, 2.0)));
+            spline: middleSpline);
         var document = new TrackDocument(new[] { repeated, middle, repeated });
         var evaluator = new TrackEvaluator();
         double[] distances = { 0.0, 4.0, 5.0, 6.5, 9.0, 12.5 };
@@ -254,12 +256,13 @@ public sealed class TrackEvaluatorBatchSamplingParityTests
                 new Vector3d(0.0, 0.0, 0.0),
                 new Vector3d(8.0, 0.0, 0.0)));
 
+        var secondSpline = new LineCurve(
+            new Vector3d(100.0, 5.0, -2.0),
+            new Vector3d(104.0, 7.0, -2.0));
         TrackSegment second = new CurvedSegment(
-            length: 4.0,
+            length: secondSpline.Length,
             id: "second",
-            spline: new LineCurve(
-                new Vector3d(100.0, 5.0, -2.0),
-                new Vector3d(104.0, 7.0, -2.0)));
+            spline: secondSpline);
 
         return new TrackDocument(new[] { first, second });
     }

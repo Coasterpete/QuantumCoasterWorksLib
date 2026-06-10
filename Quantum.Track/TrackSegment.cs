@@ -30,7 +30,8 @@ namespace Quantum.Track
         }
 
         /// <summary>
-        /// Segment length in station-distance units.
+        /// Declared segment length in station-distance units. Spline-backed segments
+        /// must match their measured geometric length when sampled.
         /// </summary>
         public double Length { get; }
 
