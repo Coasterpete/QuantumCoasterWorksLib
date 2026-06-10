@@ -160,12 +160,6 @@ the snapshot visualizers. It lets a user assign a `DebugViewportSnapshotV1` JSON
 `TextAsset`, browse discovered snapshots under `Assets`, parse the selected
 snapshot, inspect metadata and role counts, create or update a scene viewer
 GameObject named `Quantum Snapshot Viewer`, select that viewer, and call the
-
-transform visualizer `Rebuild` and `Clear` actions. It also has a Generated
-Artifacts workflow that copies backend output from `artifacts/debug-viewport`
-into `Assets/DebugData` without adding CSV parsing or backend dependencies to
-Unity.
-=======
 transform visualizer `Rebuild` and `Clear` actions. It also reports transform
 visualizer prefab slot status and exposes selection actions for
 `GeneratedSnapshot`, generated `train.body` wrappers, and generated
@@ -293,11 +287,7 @@ Use `C:\Dev4\TestingGrounds` only as a local manual validation project. Do not c
 .\tools\demo-technical-preview-0.1.cmd
 ```
 
-<<<<<<< HEAD
-2. In `TestingGrounds`, copy the snapshot-only runtime scripts into the Unity project's `Assets/Scripts/QuantumVisualizer`: `DebugViewportSnapshotV1Dtos.cs`, `DebugViewportSnapshotV1JsonLoader.cs`, `DebugViewportSnapshotV1GizmoVisualizer.cs`, `DebugViewportSnapshotV1TransformVisualizer.cs`, and `TrainPoseExportV1Dtos.cs`. Copy `Assets/Editor/QuantumVisualizer/DebugViewportSnapshotBrowserWindow.cs` into the Unity project's `Assets/Editor/QuantumVisualizer`. Do not copy `BackendTrainPipelineGizmoVisualizer.cs` unless the backend DLLs from the earlier handoff section are also installed.
-=======
 2. In `TestingGrounds`, copy the snapshot-only runtime scripts into the Unity project's `Assets/Scripts/QuantumVisualizer`: `DebugViewportSnapshotV1Dtos.cs`, `DebugViewportSnapshotV1JsonLoader.cs`, `DebugViewportSnapshotV1GizmoVisualizer.cs`, `DebugViewportSnapshotV1TransformVisualizer.cs`, and `TrainPoseExportV1Dtos.cs`. Copy `Assets/Editor/QuantumVisualizer/DebugViewportSnapshotBrowserWindow.cs` and `Assets/Editor/QuantumVisualizer/DebugViewportSnapshotV1TransformVisualizerEditor.cs` into the Unity project's `Assets/Editor/QuantumVisualizer`. Do not copy `BackendTrainPipelineGizmoVisualizer.cs` unless the backend DLLs from the earlier handoff section are also installed.
->>>>>>> milestone-63-unity-csv-snapshot-workflow
 3. Import the generated debug viewport artifacts into Unity. In the Snapshot
    Browser, use the Generated Artifacts source folder `artifacts/debug-viewport`
    when the folder is under the Unity project root, or browse to the repository
