@@ -1,6 +1,6 @@
 # Unity Visualizer Inventory
 
-Last updated: 2026-06-02
+Last updated: 2026-06-10
 
 Scope audited:
 - Current repo: `Assets/Scripts/QuantumVisualizer`
@@ -26,6 +26,7 @@ Reference implementation: `Assets/Scripts/QuantumVisualizer/BackendTrainPipeline
 
 | Script | Backend System Visualized | Status | Required DLLs | Overlap with `BackendTrainPipelineGizmoVisualizer` | Recommended |
 |---|---|---|---|---|---|
+| `Assets/Scripts/QuantumVisualizer/LiveBackendTrainPoseVisualizer.cs` | Focused M139 Play Mode handoff: constructs a self-authored cubic Bezier `TrackDocument` inside Unity, evaluates `TrackEvaluator` and `TrainCarTransformProvider` live every frame, creates distance-placed train body cubes, and draws sampled centerline/frame gizmos. It does not consume snapshot/export JSON or `TextAsset` playback data. | Current | `UnityEngine.CoreModule.dll`; `Quantum.Math.dll`; `Quantum.Splines.dll`; `Quantum.Track.dll`; `GShark.dll` (transitive spline dependency). | Narrower live path: overlaps centerline, frame, body-box, and playback validation, but omits rails, ties, heartline, hierarchy markers, and HUD. | Keep as the focused M139 live backend smoke path |
 | `Assets/Scripts/QuantumVisualizer/BackendTrainPipelineGizmoVisualizer.cs` | Live backend wireframe viewer on deterministic `TrackDocument` -> `TrackEvaluator` -> `TrainCarTransformProvider`; renders rails, cross ties, banking ribbon, heartline, distance-based train placement, train hierarchy debug markers, and playback/HUD diagnostics. | Current | `UnityEngine.CoreModule.dll`; `Quantum.Math.dll`; `Quantum.Splines.dll`; `Quantum.Track.dll`; `UnityEditor.dll` (editor-only code path). | Baseline script (self). | Keep |
 | `Assets/Scripts/QuantumVisualizer/DebugViewportSnapshotV1GizmoVisualizer.cs` | File-based Scene-view gizmo visualizer for `quantum.debug_viewport_snapshot` JSON; renders centerline polyline, frame axes, stable-kind debug lines, stable-role oriented boxes, and logs nested train-pose presence/car count only. | Current | `UnityEngine.CoreModule.dll` (plus local support scripts in same folder). | Complements the live backend viewer: consumes renderer-neutral artifacts instead of evaluating backend code in Unity. | Keep |
 | `Assets/Scripts/QuantumVisualizer/DebugViewportSnapshotV1TransformVisualizer.cs` | File-based transform hierarchy visualizer for `quantum.debug_viewport_snapshot` boxes; creates generated role groups and wrapper GameObjects whose local +X/+Y/+Z axes map to backend tangent/normal/binormal, with optional Unity prefabs or fallback cubes as local-identity children and read-only editor helpers for generated group selection. | Current | `UnityEngine.CoreModule.dll` (plus local support scripts in same folder). | Complements the gizmo visualizer by creating inspectable scene objects for snapshot boxes; does not evaluate backend code or own backend dimensions beyond wrapper scale. | Keep |
@@ -54,5 +55,7 @@ These are not gizmo visualizers themselves, but are dependencies for visualizer 
 
 ## Consolidation Notes
 
+- `LiveBackendTrainPoseVisualizer` is the focused M139 handoff and manual smoke-test component. It proves direct Play Mode backend evaluation without snapshot/export playback, while keeping the rendered surface intentionally small.
 - There are two `TrainPoseGizmoVisualizer` implementations across two projects. The one under `QuantumCoasterWorks` is the better candidate for the active path; the `QuantumCoasterWorksUnity` copy is a legacy duplicate.
 - `BackendTrainPipelineGizmoVisualizer` should remain the reference visualizer for the current milestone (stable centerline/frame/distance-based car placement plus rails/cross ties/banking ribbon/heartline/train hierarchy markers/playback HUD).
+- All Unity visualizers remain optional debug/prototype adapters. They must not define `Quantum.*` backend architecture or introduce Unity dependencies into backend projects.
