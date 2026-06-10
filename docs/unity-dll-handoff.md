@@ -1,10 +1,16 @@
-# Unity DLL Handoff (Backend Visualizer)
+# Unity DLL Handoff (Backend Visualizers)
 
-This helper copies only the DLLs needed by the live backend `BackendTrainPipelineGizmoVisualizer` into a Unity project.
+This guide covers the DLL handoff shared by the live backend Unity visualizers. The focused M139 path is `LiveBackendTrainPoseVisualizer`; the older, broader `BackendTrainPipelineGizmoVisualizer` uses the same backend DLL set.
+
+## M139 Live Backend Train Pose Visualizer
+
+`LiveBackendTrainPoseVisualizer` is a Play Mode debug component that executes the Quantum backend inside Unity. It constructs a self-authored cubic Bezier centerline, creates a `TrackDocument` and `TrackEvaluator`, and calls `TrainCarTransformProvider.EvaluateTrainPose(...)` every frame as the lead distance advances.
+
+This is a live backend path. It does **not** load `TrainPoseExportV1`, `DebugViewportSnapshotV1`, JSON, a Unity `TextAsset`, or previously exported playback data. The snapshot and export visualizers documented later in this file remain separate replay/inspection paths.
 
 ## Required DLLs
 
-The live backend visualizer evaluates Quantum backend code inside Unity, so all four of these DLLs must sit together in the Unity plugin folder:
+The live backend visualizers evaluate Quantum backend code inside Unity, so all four of these DLLs must sit together in the Unity plugin folder:
 
 - `Quantum.Math.dll`
 - `Quantum.Splines.dll`
@@ -12,6 +18,8 @@ The live backend visualizer evaluates Quantum backend code inside Unity, so all 
 - `GShark.dll`
 
 `GShark.dll` is the external spline/NURBS dependency used by `Quantum.Splines`. The copy helper includes it automatically: it first looks beside the Release `Quantum.Track` output, then resolves the restored NuGet package path from `Quantum.Splines.deps.json`.
+
+`LiveBackendTrainPoseVisualizer` does not require `Quantum.IO.dll`, `Quantum.Debug.dll`, any DTO/JSON loader script, or generated files under `artifacts/`.
 
 Not copied by default:
 - `Quantum.IO.dll` (optional, only when explicitly requested)
@@ -66,7 +74,64 @@ Example (include `Quantum.IO.dll`):
 powershell -ExecutionPolicy Bypass -File .\tools\copy-quantum-unity-dlls.ps1 -IncludeQuantumIO
 ```
 
-## 3) Use with `BackendTrainPipelineGizmoVisualizer`
+## 3) Install the M139 component
+
+1. Confirm these files exist together in the Unity project under `Assets/Plugins/Quantum`:
+   - `Quantum.Math.dll`
+   - `Quantum.Splines.dll`
+   - `Quantum.Track.dll`
+   - `GShark.dll`
+2. Copy `Assets/Scripts/QuantumVisualizer/LiveBackendTrainPoseVisualizer.cs` from this repository into the Unity project's `Assets/Scripts/QuantumVisualizer` folder. Preserve the filename so Unity can attach the `MonoBehaviour` normally.
+3. Let Unity refresh and compile. Resolve any duplicate assembly or stale DLL copies before continuing; only one copy of each Quantum/GShark assembly should be active in the project.
+4. Use a Unity version/project configuration that can load the backend's `netstandard2.1` assemblies.
+
+No scene, prefab, material, render-pipeline, JSON, or exported snapshot setup is required.
+
+## 4) Attach and run
+
+1. Open or create a Unity scene.
+2. Create an empty GameObject, for example `Live Backend Train Pose Viewer`.
+3. Add the `LiveBackendTrainPoseVisualizer` component.
+4. Keep the default train, playback, and gizmo values for the first run.
+5. Enable **Gizmos** in the Scene view.
+6. Enter Play Mode.
+
+The component creates child cubes named `Live Backend Train Car 0`, `Live Backend Train Car 1`, and so on. It positions and rotates those cubes from the live `TrainPoseResult` body frames. The cyan centerline and red/green/blue tangent/normal/binormal axes are Scene-view gizmos and are drawn only in Play Mode.
+
+The serialized fields have these roles:
+
+- `carCount`, `carSpacing`, `carLength`, `carWidth`, `carHeight`, and `bogieSpacing` define the backend `TrainConsistDefinition` and placeholder cube dimensions.
+- `speed` advances the lead distance in meters per second; `0` pauses movement.
+- `centerlineSampleCount`, `frameAxisStride`, and `frameAxisLength` control only the sampled centerline/frame gizmos.
+
+Train-definition changes are applied during initialization. After changing count, spacing, dimensions, or bogie spacing in Play Mode, disable/re-enable the component or leave and re-enter Play Mode to rebuild the consist and cubes.
+
+## 5) Manual smoke-test checklist
+
+- Unity compiles with no missing assembly, namespace, or type errors.
+- Entering Play Mode creates the configured number of `Live Backend Train Car <index>` child cubes.
+- With Scene-view Gizmos enabled, a cyan curved centerline and red/green/blue frame axes appear.
+- The cubes move continuously along the curve, preserve distance-based ordering/spacing, and rotate smoothly with the backend articulated body frames.
+- Setting `speed` to `0` stops distance advancement; restoring a positive value resumes it.
+- Moving or rotating the viewer GameObject moves or rotates the complete train and gizmo visualization as one local-space group.
+- Increasing the requested consist beyond the built-in track's usable length produces one readable Console warning instead of partially placing the train.
+- Leaving Play Mode or disabling the component removes its generated runtime cubes.
+- The component runs without assigning a JSON `TextAsset` and without generating or importing snapshot/export artifacts. This confirms the live backend path is active.
+
+## 6) Known limitations
+
+- The component uses one hard-coded, self-authored cubic Bezier `TrackDocument`; there is no Unity track asset, file import, or authoring UI.
+- It draws simple Unity cube bodies only. Bogies and wheels are evaluated by the backend pose result but are not visualized by this component.
+- Playback advances forward at a constant non-negative speed and wraps within the valid lead-distance range. There is no reverse, scrubber, pause button, or physics-driven speed model.
+- Centerline and frame axes are Scene-view gizmos only and require Play Mode plus the Scene-view Gizmos toggle.
+- Runtime cubes use `GameObject.CreatePrimitive`, so they are placeholder Unity objects with the primitive's default renderer, material, and collider.
+- Inspector changes to train definition fields do not rebuild the active consist until the component is reinitialized.
+- Coordinate conversion and placeholder orientation are local to this Unity adapter; they do not define backend coordinate or rendering policy.
+- This is a debug/prototype handoff, not a production renderer, editor, ride simulation, or committed frontend architecture.
+
+Unity remains an optional debug/prototype frontend. `LiveBackendTrainPoseVisualizer` is a thin consumer of engine-agnostic backend APIs; no Unity lifecycle, scene, object, material, or rendering concepts belong in `Quantum.*` projects.
+
+## 7) Use with `BackendTrainPipelineGizmoVisualizer`
 
 1. In Unity, confirm `Quantum.Math.dll`, `Quantum.Splines.dll`, `Quantum.Track.dll`, and `GShark.dll` all exist in `Assets/Plugins/Quantum`.
 2. Add `BackendTrainPipelineGizmoVisualizer` to a GameObject.

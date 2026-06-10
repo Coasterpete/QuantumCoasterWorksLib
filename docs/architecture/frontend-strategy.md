@@ -8,6 +8,8 @@ No final frontend, renderer, or engine choice is locked yet. A coaster editor ne
 
 Unity, Unreal, Avalonia, Silk.NET, OpenTK, or another host may be evaluated through optional adapters as the product shape becomes clearer. Those hosts should consume backend outputs, not own backend data or architecture.
 
+The current Unity prototype demonstrates two distinct adapter styles. `LiveBackendTrainPoseVisualizer` calls the engine-agnostic track and train-pose APIs directly during Play Mode, while the snapshot/export visualizers replay renderer-neutral JSON artifacts. The live path is not snapshot or export playback, but both styles remain optional debug/prototype frontends and neither makes Unity the product architecture or backend source of truth.
+
 ## Standalone Editor Candidate
 
 Avalonia is being considered for a future desktop UI shell because it is a mature cross-platform .NET UI framework and fits a C# backend-first project. It can host editor panels, property inspectors, graphs, timelines, and file workflows without forcing the backend into a game-object model.
