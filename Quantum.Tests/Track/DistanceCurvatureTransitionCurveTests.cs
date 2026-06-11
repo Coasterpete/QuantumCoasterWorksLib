@@ -1,5 +1,6 @@
 using Quantum.Math;
 using Quantum.Splines;
+using Quantum.Track.Authoring;
 using Quantum.Track.Authoring.Internal;
 using Xunit;
 
@@ -97,7 +98,7 @@ public sealed class DistanceCurvatureTransitionCurveTests
             18.0,
             -0.08,
             0.14,
-            DistanceCurvatureTransitionInterpolationMode.Linear);
+            CurvatureTransitionInterpolationMode.Linear);
 
         for (int i = 0; i <= 100; i++)
         {
@@ -144,10 +145,13 @@ public sealed class DistanceCurvatureTransitionCurveTests
     }
 
     [Fact]
-    public void CurveFoundation_RemainsInternal()
+    public void CurveFoundation_RemainsInternalAndUsesPublicInterpolationMode()
     {
         Assert.False(typeof(DistanceCurvatureTransitionCurve).IsPublic);
-        Assert.False(typeof(DistanceCurvatureTransitionInterpolationMode).IsPublic);
+        Assert.True(typeof(CurvatureTransitionInterpolationMode).IsPublic);
+        Assert.Equal(
+            CurvatureTransitionInterpolationMode.Linear,
+            new DistanceCurvatureTransitionCurve(1.0, 0.0, 0.0).InterpolationMode);
     }
 
     private static void AssertCurvatureNear(

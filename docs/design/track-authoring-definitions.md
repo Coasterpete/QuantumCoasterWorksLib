@@ -3,9 +3,10 @@
 ## Purpose
 
 `Quantum.Track.Authoring` is a small engine-agnostic input layer for creating
-simple evaluator-ready `TrackDocument` instances. It describes ordered straight
-and planar constant-curvature sections without exposing spline implementation
-types or adding editor, UI, persistence, or engine concepts.
+simple evaluator-ready `TrackDocument` instances. It describes ordered straight,
+planar constant-curvature, and planar curvature-transition sections without
+exposing spline implementation types or adding editor, UI, persistence, or
+engine concepts.
 
 This layer does not replace or redesign `TrackDocument`. It validates authoring
 input and adapts that input into the existing segment and evaluator contracts.
@@ -19,6 +20,7 @@ The supported section definitions are:
 
 - `StraightSectionDefinition`
 - `ConstantCurvatureSectionDefinition`
+- `CurvatureTransitionSectionDefinition`
 
 Every section has:
 
@@ -34,9 +36,40 @@ Constant-curvature sections also have `Radius`. Radius is signed and non-zero:
 
 `SignedRadius` is an explicit alias for the same value.
 
+Curvature-transition sections have:
+
+- `StartCurvature`: signed curvature at section distance `s = 0`
+- `EndCurvature`: signed curvature at section distance `s = Length`
+- `InterpolationMode`: currently `CurvatureTransitionInterpolationMode.Linear`
+
+Curvature uses inverse station-distance units. If length is measured in meters,
+curvature is measured in inverse meters. The sign convention matches signed
+radius: positive curvature turns from positive X toward positive Y, and negative
+curvature turns toward negative Y.
+
+For section length `L`, local section distance `s`, start curvature `k0`, and end
+curvature `k1`, linear interpolation is:
+
+```text
+t = s / L
+k(s) = k0 + (k1 - k0) * t
+heading(s) = k0 * s + (k1 - k0) * s^2 / (2 * L)
+```
+
+The centerline point is the distance integral of the unit tangent defined by
+that heading. Equal zero endpoints reduce to a straight line. Equal nonzero
+endpoints reduce to a constant-curvature arc. `SmoothStep` and other transition
+modes are not part of this milestone.
+
+`RollRadians` remains constant across each authored transition section. Curvature
+interpolation does not interpolate or otherwise modify roll.
+
 ## Validation
 
-Section constructors reject invalid IDs, lengths, radii, and roll values.
+Section constructors reject invalid IDs, lengths, radii, curvatures, interpolation
+modes, and roll values. Transition definitions also reject a non-finite curvature
+delta or total heading sweep.
+
 `TrackAuthoringDefinition` rejects:
 
 - a null section sequence
@@ -85,15 +118,20 @@ same `TrackDocument` shape:
 - one `TrackSegment` per authoring section
 - original section order and exact IDs
 - `StraightSegment` for straight definitions
-- `CurvedSegment` for constant-curvature definitions
+- `CurvedSegment` for constant-curvature and curvature-transition definitions
 - exact authored segment lengths and constant roll values
 - one generated `GeometricSection` per authoring section in `TrackDocument.Sections`
 
-The builder reuses the existing geometric section assembly path to compose each
-section from the prior section's endpoint and tangent. A narrow internal curve
-window presents each composed section to the existing `TrackEvaluator` as its own
-segment. This preserves point and tangent continuity while leaving evaluator,
-spline, FVD, IO, and `TrackDocument` contracts unchanged.
+The builder composes each section from the prior section's endpoint and tangent.
+Documents containing only M140 straight and constant-curvature definitions retain
+the existing geometric section assembly path. Documents containing a transition
+use the real distance-curvature transition curve behind the generated
+`CurvedSegment`. This preserves point and tangent continuity while leaving
+evaluator, spline, FVD, IO, and `TrackDocument` contracts unchanged.
+
+`TrackDocument.Sections` still contains one `GeometricSection` metadata entry per
+authored definition. A transition entry has no single constant curvature value,
+so its `GeometricSection.Curvature` is null rather than an inaccurate scalar.
 
 Repeated compilations from the same definition are deterministic and produce
 equivalent canonical frame samples through `TrackEvaluator`.
@@ -138,6 +176,12 @@ using Quantum.Track.Authoring;
 var definition = new TrackAuthoringDefinition(new GeometricSectionDefinition[]
 {
     new StraightSectionDefinition("entry", length: 12.0),
+    new CurvatureTransitionSectionDefinition(
+        "transition-in",
+        length: 10.0,
+        startCurvature: 0.0,
+        endCurvature: 1.0 / 30.0,
+        rollRadians: 0.2),
     new ConstantCurvatureSectionDefinition(
         "left-turn",
         length: 15.0,
@@ -153,6 +197,6 @@ var evaluator = new TrackEvaluator(document);
 TrackFrame frame = evaluator.EvaluateFrameAtDistance(18.0);
 ```
 
-This PR intentionally supports only simple straight and planar
-constant-curvature authoring. More advanced interpolation, NURBS authoring,
+This produces a straight followed by a linear curvature transition into a
+constant-radius left arc. More advanced interpolation, NURBS authoring,
 force-driven geometry, UI workflows, and persistence remain outside this layer.

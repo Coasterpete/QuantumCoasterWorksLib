@@ -4,11 +4,6 @@ using Quantum.Splines;
 
 namespace Quantum.Track.Authoring.Internal
 {
-    internal enum DistanceCurvatureTransitionInterpolationMode
-    {
-        Linear = 0
-    }
-
     internal sealed class DistanceCurvatureTransitionCurve : IArcLengthCurve, IParamCurveCurvature
     {
         private readonly double _startCurvature;
@@ -22,7 +17,7 @@ namespace Quantum.Track.Authoring.Internal
                 length,
                 startCurvature,
                 endCurvature,
-                DistanceCurvatureTransitionInterpolationMode.Linear)
+                CurvatureTransitionInterpolationMode.Linear)
         {
         }
 
@@ -30,7 +25,7 @@ namespace Quantum.Track.Authoring.Internal
             double length,
             double startCurvature,
             double endCurvature,
-            DistanceCurvatureTransitionInterpolationMode interpolationMode)
+            CurvatureTransitionInterpolationMode interpolationMode)
         {
             if (!IsFinite(length) || length <= 0.0)
             {
@@ -56,7 +51,7 @@ namespace Quantum.Track.Authoring.Internal
                     "End curvature must be finite.");
             }
 
-            if (interpolationMode != DistanceCurvatureTransitionInterpolationMode.Linear)
+            if (interpolationMode != CurvatureTransitionInterpolationMode.Linear)
             {
                 throw new ArgumentOutOfRangeException(
                     nameof(interpolationMode),
@@ -73,6 +68,15 @@ namespace Quantum.Track.Authoring.Internal
                     "Curvature range must be finite.");
             }
 
+            double headingSweep = length * (startCurvature + (0.5 * curvatureDelta));
+            if (!IsFinite(headingSweep))
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(endCurvature),
+                    endCurvature,
+                    "Transition curvature must produce a finite heading sweep.");
+            }
+
             Length = length;
             _startCurvature = startCurvature;
             _curvatureDelta = curvatureDelta;
@@ -81,7 +85,7 @@ namespace Quantum.Track.Authoring.Internal
 
         public double Length { get; }
 
-        public DistanceCurvatureTransitionInterpolationMode InterpolationMode { get; }
+        public CurvatureTransitionInterpolationMode InterpolationMode { get; }
 
         public Vector3d Evaluate(double t)
         {
