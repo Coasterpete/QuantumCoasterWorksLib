@@ -229,6 +229,8 @@ public sealed class CoasterApiBoundaryContractTests
             typeof(GeometricSectionDefinition),
             typeof(StraightSectionDefinition),
             typeof(ConstantCurvatureSectionDefinition),
+            typeof(CurvatureTransitionSectionDefinition),
+            typeof(CurvatureTransitionInterpolationMode),
             typeof(TrackAuthoringCompilation),
             typeof(TrackAuthoringDocumentBuilder)
         };
@@ -265,6 +267,37 @@ public sealed class CoasterApiBoundaryContractTests
                 }
             }
         }
+    }
+
+    [Fact]
+    public void CurvatureTransitionAuthoring_ExposesPublicScalarContract()
+    {
+        Assert.True(typeof(CurvatureTransitionSectionDefinition).IsPublic);
+        Assert.True(typeof(CurvatureTransitionInterpolationMode).IsPublic);
+        Assert.Equal(
+            new[] { CurvatureTransitionInterpolationMode.Linear },
+            Enum.GetValues<CurvatureTransitionInterpolationMode>());
+
+        AssertConstructor(
+            typeof(CurvatureTransitionSectionDefinition),
+            typeof(string),
+            typeof(double),
+            typeof(double),
+            typeof(double),
+            typeof(CurvatureTransitionInterpolationMode),
+            typeof(double));
+        AssertProperty(
+            typeof(CurvatureTransitionSectionDefinition),
+            nameof(CurvatureTransitionSectionDefinition.StartCurvature),
+            typeof(double));
+        AssertProperty(
+            typeof(CurvatureTransitionSectionDefinition),
+            nameof(CurvatureTransitionSectionDefinition.EndCurvature),
+            typeof(double));
+        AssertProperty(
+            typeof(CurvatureTransitionSectionDefinition),
+            nameof(CurvatureTransitionSectionDefinition.InterpolationMode),
+            typeof(CurvatureTransitionInterpolationMode));
     }
 
     [Fact]

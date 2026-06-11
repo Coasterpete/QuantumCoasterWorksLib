@@ -20,6 +20,23 @@ public sealed class TrackAuthoringDefinitionTests
         Assert.Equal("turn-02", definition.Sections[1].Id);
     }
 
+    [Fact]
+    public void CurvatureTransitionDefinition_PreservesValuesAndDefaults()
+    {
+        var definition = new CurvatureTransitionSectionDefinition(
+            "transition",
+            length: 12.0,
+            startCurvature: -0.05,
+            endCurvature: 0.1);
+
+        Assert.Equal("transition", definition.Id);
+        Assert.Equal(12.0, definition.Length);
+        Assert.Equal(-0.05, definition.StartCurvature);
+        Assert.Equal(0.1, definition.EndCurvature);
+        Assert.Equal(CurvatureTransitionInterpolationMode.Linear, definition.InterpolationMode);
+        Assert.Equal(0.0, definition.RollRadians);
+    }
+
     [Theory]
     [InlineData(null)]
     [InlineData("")]
@@ -29,6 +46,8 @@ public sealed class TrackAuthoringDefinitionTests
         Assert.Throws<ArgumentException>(() => new StraightSectionDefinition(id!, 1.0));
         Assert.Throws<ArgumentException>(
             () => new ConstantCurvatureSectionDefinition(id!, 1.0, 10.0));
+        Assert.Throws<ArgumentException>(
+            () => new CurvatureTransitionSectionDefinition(id!, 1.0, 0.0, 0.1));
     }
 
     [Fact]
@@ -67,6 +86,8 @@ public sealed class TrackAuthoringDefinitionTests
             () => new StraightSectionDefinition("straight", length));
         Assert.Throws<ArgumentOutOfRangeException>(
             () => new ConstantCurvatureSectionDefinition("arc", length, 10.0));
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => new CurvatureTransitionSectionDefinition("transition", length, 0.0, 0.1));
     }
 
     [Theory]
@@ -84,12 +105,65 @@ public sealed class TrackAuthoringDefinitionTests
     [InlineData(double.NaN)]
     [InlineData(double.PositiveInfinity)]
     [InlineData(double.NegativeInfinity)]
+    public void CurvatureTransitionDefinition_RejectsInvalidStartCurvature(double curvature)
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => new CurvatureTransitionSectionDefinition("transition", 10.0, curvature, 0.1));
+    }
+
+    [Theory]
+    [InlineData(double.NaN)]
+    [InlineData(double.PositiveInfinity)]
+    [InlineData(double.NegativeInfinity)]
+    public void CurvatureTransitionDefinition_RejectsInvalidEndCurvature(double curvature)
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => new CurvatureTransitionSectionDefinition("transition", 10.0, 0.1, curvature));
+    }
+
+    [Fact]
+    public void CurvatureTransitionDefinition_RejectsNonFiniteDeltaAndHeadingSweep()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() => new CurvatureTransitionSectionDefinition(
+            "delta",
+            1.0,
+            double.MaxValue,
+            -double.MaxValue));
+        Assert.Throws<ArgumentOutOfRangeException>(() => new CurvatureTransitionSectionDefinition(
+            "sweep",
+            double.MaxValue,
+            2.0,
+            2.0));
+    }
+
+    [Fact]
+    public void CurvatureTransitionDefinition_RejectsUnsupportedInterpolationMode()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() => new CurvatureTransitionSectionDefinition(
+            "transition",
+            10.0,
+            0.0,
+            0.1,
+            (CurvatureTransitionInterpolationMode)99));
+    }
+
+    [Theory]
+    [InlineData(double.NaN)]
+    [InlineData(double.PositiveInfinity)]
+    [InlineData(double.NegativeInfinity)]
     public void SectionDefinitions_RejectInvalidRoll(double rollRadians)
     {
         Assert.Throws<ArgumentOutOfRangeException>(
             () => new StraightSectionDefinition("straight", 10.0, rollRadians));
         Assert.Throws<ArgumentOutOfRangeException>(
             () => new ConstantCurvatureSectionDefinition("arc", 10.0, 20.0, rollRadians));
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => new CurvatureTransitionSectionDefinition(
+                "transition",
+                10.0,
+                0.0,
+                0.1,
+                rollRadians: rollRadians));
     }
 
     [Fact]
