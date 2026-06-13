@@ -232,7 +232,13 @@ public sealed class CoasterApiBoundaryContractTests
             typeof(CurvatureTransitionSectionDefinition),
             typeof(CurvatureTransitionInterpolationMode),
             typeof(TrackAuthoringCompilation),
-            typeof(TrackAuthoringDocumentBuilder)
+            typeof(TrackAuthoringDocumentBuilder),
+            typeof(TrackAuthoringBoundaryContinuityDiagnostics),
+            typeof(TrackAuthoringBoundaryContinuityTolerances),
+            typeof(TrackAuthoringBoundaryContinuityDiagnosticKind),
+            typeof(TrackAuthoringBoundaryContinuityBoundary),
+            typeof(TrackAuthoringBoundaryContinuityDiagnostic),
+            typeof(TrackAuthoringBoundaryContinuityReport)
         };
 
         foreach (Type type in authoringTypes)
@@ -267,6 +273,94 @@ public sealed class CoasterApiBoundaryContractTests
                 }
             }
         }
+    }
+
+    [Fact]
+    public void TrackAuthoringBoundaryContinuityDiagnostics_ExposeBackendScalarContract()
+    {
+        Assert.Equal(
+            new[]
+            {
+                TrackAuthoringBoundaryContinuityDiagnosticKind.CurvatureDiscontinuity,
+                TrackAuthoringBoundaryContinuityDiagnosticKind.RollDiscontinuity
+            },
+            Enum.GetValues<TrackAuthoringBoundaryContinuityDiagnosticKind>());
+
+        AssertConstructor(
+            typeof(TrackAuthoringBoundaryContinuityTolerances),
+            typeof(double),
+            typeof(double));
+        AssertProperty(
+            typeof(TrackAuthoringBoundaryContinuityTolerances),
+            nameof(TrackAuthoringBoundaryContinuityTolerances.CurvatureTolerance),
+            typeof(double));
+        AssertProperty(
+            typeof(TrackAuthoringBoundaryContinuityTolerances),
+            nameof(TrackAuthoringBoundaryContinuityTolerances.RollToleranceRadians),
+            typeof(double));
+
+        AssertProperty(
+            typeof(TrackAuthoringBoundaryContinuityBoundary),
+            nameof(TrackAuthoringBoundaryContinuityBoundary.PreviousSectionId),
+            typeof(string));
+        AssertProperty(
+            typeof(TrackAuthoringBoundaryContinuityBoundary),
+            nameof(TrackAuthoringBoundaryContinuityBoundary.NextSectionId),
+            typeof(string));
+        AssertProperty(
+            typeof(TrackAuthoringBoundaryContinuityBoundary),
+            nameof(TrackAuthoringBoundaryContinuityBoundary.Station),
+            typeof(double));
+        AssertProperty(
+            typeof(TrackAuthoringBoundaryContinuityBoundary),
+            nameof(TrackAuthoringBoundaryContinuityBoundary.CurvatureDelta),
+            typeof(double));
+        AssertProperty(
+            typeof(TrackAuthoringBoundaryContinuityBoundary),
+            nameof(TrackAuthoringBoundaryContinuityBoundary.RollDeltaRadians),
+            typeof(double));
+
+        AssertProperty(
+            typeof(TrackAuthoringBoundaryContinuityDiagnostic),
+            nameof(TrackAuthoringBoundaryContinuityDiagnostic.Kind),
+            typeof(TrackAuthoringBoundaryContinuityDiagnosticKind));
+        AssertProperty(
+            typeof(TrackAuthoringBoundaryContinuityDiagnostic),
+            nameof(TrackAuthoringBoundaryContinuityDiagnostic.Boundary),
+            typeof(TrackAuthoringBoundaryContinuityBoundary));
+        AssertProperty(
+            typeof(TrackAuthoringBoundaryContinuityDiagnostic),
+            nameof(TrackAuthoringBoundaryContinuityDiagnostic.Delta),
+            typeof(double));
+        AssertProperty(
+            typeof(TrackAuthoringBoundaryContinuityDiagnostic),
+            nameof(TrackAuthoringBoundaryContinuityDiagnostic.Tolerance),
+            typeof(double));
+
+        AssertProperty(
+            typeof(TrackAuthoringBoundaryContinuityReport),
+            nameof(TrackAuthoringBoundaryContinuityReport.Boundaries),
+            typeof(IReadOnlyList<TrackAuthoringBoundaryContinuityBoundary>));
+        AssertProperty(
+            typeof(TrackAuthoringBoundaryContinuityReport),
+            nameof(TrackAuthoringBoundaryContinuityReport.Diagnostics),
+            typeof(IReadOnlyList<TrackAuthoringBoundaryContinuityDiagnostic>));
+        AssertProperty(
+            typeof(TrackAuthoringBoundaryContinuityReport),
+            nameof(TrackAuthoringBoundaryContinuityReport.Tolerances),
+            typeof(TrackAuthoringBoundaryContinuityTolerances));
+
+        AssertMethod(
+            typeof(TrackAuthoringBoundaryContinuityDiagnostics),
+            nameof(TrackAuthoringBoundaryContinuityDiagnostics.Analyze),
+            typeof(TrackAuthoringBoundaryContinuityReport),
+            typeof(TrackAuthoringDefinition));
+        AssertMethod(
+            typeof(TrackAuthoringBoundaryContinuityDiagnostics),
+            nameof(TrackAuthoringBoundaryContinuityDiagnostics.Analyze),
+            typeof(TrackAuthoringBoundaryContinuityReport),
+            typeof(TrackAuthoringDefinition),
+            typeof(TrackAuthoringBoundaryContinuityTolerances));
     }
 
     [Fact]

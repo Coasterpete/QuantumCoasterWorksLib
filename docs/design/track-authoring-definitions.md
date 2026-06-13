@@ -85,6 +85,48 @@ Validation completes before `TrackAuthoringDocumentBuilder` is called. The
 definitions are immutable and the input sequence is copied, so later mutations
 to the caller's collection do not alter the validated authoring definition.
 
+## Boundary Continuity Diagnostics
+
+`TrackAuthoringBoundaryContinuityDiagnostics` inspects authored values at every
+adjacent section boundary without compiling geometry or changing the definition.
+Diagnostics are non-fatal: the report describes discontinuities but does not
+correct authored curvature or roll values and does not affect document building.
+
+For `N` authored sections, the report contains `N - 1` ordered boundaries. A
+boundary's `Station` is the cumulative end distance of its previous section.
+Each boundary preserves the exact previous and next section IDs.
+
+Curvature endpoints are mapped directly from the authoring definitions:
+
+- `StraightSectionDefinition`: start and end curvature are `0`
+- `ConstantCurvatureSectionDefinition`: start and end curvature are `1 / Radius`
+- `CurvatureTransitionSectionDefinition`: start is `StartCurvature` and end is
+  `EndCurvature`
+
+The signed boundary curvature delta is:
+
+```text
+curvatureDelta = nextStartCurvature - previousEndCurvature
+```
+
+The signed roll delta starts with `nextRollRadians - previousRollRadians` and is
+wrapped to the shortest full-turn-equivalent difference in `(-pi, pi]`. Values
+that differ by a whole number of turns are therefore continuous. At the exact
+half-turn tie, the reported delta is positive `pi`.
+
+`TrackAuthoringBoundaryContinuityTolerances` configures independent non-negative,
+finite tolerances for curvature and roll. The default curvature tolerance is
+`1e-9` inverse station-distance units and the default roll tolerance is `1e-9`
+radians. A diagnostic is emitted only when the absolute delta is strictly greater
+than its tolerance; equality is accepted. Invalid negative or non-finite
+tolerances throw during tolerance construction.
+
+Reports are deterministic and expose defensive read-only boundary and diagnostic
+collections. Boundaries are ordered by authored section order. Diagnostics are
+ordered by boundary, with `CurvatureDiscontinuity` before `RollDiscontinuity` when
+both are present at the same boundary. Repeated analysis of the same definition
+and tolerances produces equivalent values and ordering.
+
 ## Compilation
 
 `TrackAuthoringDocumentBuilder.Compile` produces a
@@ -195,6 +237,21 @@ TrackAuthoringCompilation compilation =
 TrackDocument document = compilation.Document;
 var evaluator = new TrackEvaluator(document);
 TrackFrame frame = evaluator.EvaluateFrameAtDistance(18.0);
+
+TrackAuthoringBoundaryContinuityReport continuity =
+    TrackAuthoringBoundaryContinuityDiagnostics.Analyze(
+        definition,
+        new TrackAuthoringBoundaryContinuityTolerances(
+            curvatureTolerance: 1e-8,
+            rollToleranceRadians: 1e-6));
+
+foreach (TrackAuthoringBoundaryContinuityDiagnostic diagnostic in continuity.Diagnostics)
+{
+    Console.WriteLine(
+        $"{diagnostic.Kind} at station {diagnostic.Station}: " +
+        $"{diagnostic.PreviousSectionId} -> {diagnostic.NextSectionId}, " +
+        $"delta={diagnostic.Delta}");
+}
 ```
 
 This produces a straight followed by a linear curvature transition into a
