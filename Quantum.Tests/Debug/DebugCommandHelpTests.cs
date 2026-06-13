@@ -26,6 +26,7 @@ public sealed class DebugCommandHelpTests
         Assert.Contains("debug-viewport-snapshot-v1-from-csv <inputCsvPath> [outputJsonPath]", output);
         Assert.Contains("debug-viewport-snapshot-v1-gallery [artifactDirectory] [outputHtmlPath]", output);
         Assert.Contains("debug-viewport-snapshot-v1-browser [artifactDirectory] [outputHtmlPath]", output);
+        Assert.Contains("debug-viewport-snapshot-v1-transition-authoring [outputPath]", output);
         Assert.Contains("debug-viewport-snapshot-v1-banking-profile [outputPath]", output);
         Assert.Contains("centerline-frame-continuity [outputPath]", output);
         Assert.Contains("transported-frame-comparison [outputPath]", output);
@@ -165,6 +166,27 @@ public sealed class DebugCommandHelpTests
         Assert.Contains("tiny self-authored quad mesh", output);
         Assert.Contains("not a real mesh exporter", output);
         Assert.Contains("Blender importer", output);
+    }
+
+    [Fact]
+    public void TryWriteRequestedHelp_DebugViewportTransitionAuthoring_PrintsScenarioDetails()
+    {
+        var writer = new StringWriter(CultureInfo.InvariantCulture);
+
+        bool handled = DebugCommandHelp.TryWriteRequestedHelp(
+            new[] { "help", "debug-viewport-snapshot-v1-transition-authoring" },
+            writer,
+            out int exitCode);
+
+        Assert.True(handled);
+        Assert.Equal(0, exitCode);
+
+        string output = writer.ToString();
+        Assert.Contains("debug-viewport-snapshot-v1-transition-authoring [outputPath]", output);
+        Assert.Contains("straight, transition-in, constant arc, transition-out, and straight", output);
+        Assert.Contains("17 frames at 3 m intervals", output);
+        Assert.Contains("36, 30, 24, 18, and 12 m", output);
+        Assert.Contains("reuses DebugViewportSnapshotV1 and TrainPoseExportV1 unchanged", output);
     }
 
     [Fact]

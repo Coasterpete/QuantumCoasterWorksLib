@@ -161,6 +161,24 @@ namespace Quantum.Debug
                     "dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1-browser artifacts/debug-viewport artifacts/debug-viewport/browser.html"
                 }),
             new DebugCommandHelpEntry(
+                name: DebugViewportSnapshotV1TransitionAuthoringSampleCommand.CommandName,
+                usage: "debug-viewport-snapshot-v1-transition-authoring [outputPath]",
+                summary: "Write the end-to-end transition-authoring DebugViewportSnapshotV1 sample.",
+                arguments: new[]
+                {
+                    "outputPath: Optional JSON output path. Defaults to " +
+                    DebugViewportSnapshotV1TransitionAuthoringSampleCommand.DefaultRelativeOutputPath + ".",
+                    "The sample authors a zero-roll straight, transition-in, constant arc, transition-out, and straight centerline.",
+                    "It samples 17 frames at 3 m intervals and places five train cars at 36, 30, 24, 18, and 12 m.",
+                    "The command reuses DebugViewportSnapshotV1 and TrainPoseExportV1 unchanged.",
+                    DebugViewportPreviewIndexNote
+                },
+                examples: new[]
+                {
+                    "dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1-transition-authoring",
+                    "dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1-transition-authoring artifacts/debug-viewport/DebugViewportSnapshotV1.transition-authoring.sample.json"
+                }),
+            new DebugCommandHelpEntry(
                 name: DebugViewportSnapshotV1BankingProfileSampleCommand.CommandName,
                 usage: "debug-viewport-snapshot-v1-banking-profile [outputPath]",
                 summary: "Write a DebugViewportSnapshotV1 sample from the opt-in BankingProfile train-pose path.",
