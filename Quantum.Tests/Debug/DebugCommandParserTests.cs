@@ -116,6 +116,17 @@ public sealed class DebugCommandParserTests
     }
 
     [Fact]
+    public void TryParse_DebugViewportSnapshotV1TransitionAuthoringCommand_ParsesCaseInsensitive()
+    {
+        bool parsed = DebugCommandParser.TryParse(
+            new[] { "DeBuG-ViEwPoRt-SnApShOt-V1-TrAnSiTiOn-AuThOrInG" },
+            out DebugCommandKind command);
+
+        Assert.True(parsed);
+        Assert.Equal(DebugCommandKind.DebugViewportSnapshotV1TransitionAuthoring, command);
+    }
+
+    [Fact]
     public void TryParse_LongitudinalForcePreviewCommand_ParsesCaseInsensitive()
     {
         bool parsed = DebugCommandParser.TryParse(new[] { "LoNgItUdInAl-FoRcE-PrEvIeW" }, out DebugCommandKind command);

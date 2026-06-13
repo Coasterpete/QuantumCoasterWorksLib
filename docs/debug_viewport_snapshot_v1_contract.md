@@ -70,6 +70,14 @@ dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1
 
 The default output path is `artifacts/debug-viewport/DebugViewportSnapshotV1.sample.json`. An explicit path can be passed as the first command argument.
 
+Generate the transition-authoring end-to-end proof sample with:
+
+```powershell
+dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1-transition-authoring
+```
+
+The default output path is `artifacts/debug-viewport/DebugViewportSnapshotV1.transition-authoring.sample.json`. This dedicated sample uses the sibling `TransitionAuthoringProofScenario`: a zero-roll 12 m straight, 6 m curvature transition from 0 to `1/20`, 12 m constant arc, 6 m transition back to 0, and 12 m straight. It exports 17 frames at 3 m intervals and five train cars centered at 36, 30, 24, 18, and 12 m. The default sample command and `AuthoringPipelineProofScenario` remain unchanged.
+
 Generate a BankingProfile train-pose inspection sample with:
 
 ```powershell
@@ -107,6 +115,13 @@ It includes:
 Generated SVG previews are still renderer-neutral debug artifacts. Their top-down panel now draws `lines` keyed by debug kind where practical and draws `boxes` as oriented train/body rectangles using each box frame's tangent and binormal. This does not change the JSON contract or introduce renderer/frontend dependencies.
 
 The BankingProfile sample follows the same `DebugViewportSnapshotV1` contract and uses the existing nested `TrainPoseExportV1` shape. Its fixture is self-authored and deterministic so current browser/debug tooling can inspect profile-backed body, bogie, wheel, and articulated frames without a renderer or UI change.
+
+The transition-authoring sample also follows the same `DebugViewportSnapshotV1`
+contract and existing nested `TrainPoseExportV1` shape. It is the deterministic
+end-to-end proof for five-section transition compilation, continuous authored
+boundaries, frame sampling, distance-based train placement, and current debug
+snapshot tooling. It adds no new IO fields, interpolation modes, section types,
+or visualization behavior.
 
 ## Fixture Regression Path
 

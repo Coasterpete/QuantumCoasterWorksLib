@@ -148,6 +148,18 @@ namespace Quantum.Debug
                 return DebugViewportSnapshotV1BankingProfileSampleCommand.Run(outputPath);
             }
 
+            if (command == DebugCommandKind.DebugViewportSnapshotV1TransitionAuthoring)
+            {
+                if (args.Length > 2)
+                {
+                    Console.WriteLine("Usage: debug-viewport-snapshot-v1-transition-authoring [outputPath]");
+                    return 1;
+                }
+
+                string? outputPath = args.Length == 2 ? args[1] : null;
+                return DebugViewportSnapshotV1TransitionAuthoringSampleCommand.Run(outputPath);
+            }
+
             if (command == DebugCommandKind.LongitudinalForcePreview)
             {
                 if (!TryParseLongitudinalForcePreviewArgs(args, out LongitudinalForcePreviewPreset preset, out string? outputPath))

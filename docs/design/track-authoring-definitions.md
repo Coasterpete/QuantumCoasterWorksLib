@@ -189,6 +189,24 @@ uses the existing `TrainPoseExportV1Mapper` and
 `DebugViewportSnapshotV1Mapper` boundaries without changing either V1
 contract.
 
+`Quantum.Debug.TransitionAuthoringProofScenario` is the sibling end-to-end proof
+for transition authoring. It compiles a zero-roll 12 m entry straight, 6 m
+linear transition from curvature 0 to `1/20`, 12 m constant-curvature arc, 6 m
+linear transition back to curvature 0, and 12 m exit straight. The four authored
+boundaries at 12, 18, 30, and 36 m are curvature- and roll-continuous. It samples
+17 frames every 3 m from 0 through 48 m and evaluates five train cars centered at
+36, 30, 24, 18, and 12 m, with bogie pairs straddling each section boundary.
+Generate its existing-contract debug snapshot with:
+
+```powershell
+dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1-transition-authoring
+```
+
+This dedicated command leaves `AuthoringPipelineProofScenario` and the default
+`debug-viewport-snapshot-v1` sample unchanged. It reuses `TrainPoseExportV1` and
+`DebugViewportSnapshotV1` without adding contract fields or visualization
+behavior.
+
 `TrackDocument` remains mutable under its existing contract. Mutating the
 document returned by a compilation can break its index and distance alignment
 with `Definition` and `ResolvedSections`. Compile the definition again to obtain
