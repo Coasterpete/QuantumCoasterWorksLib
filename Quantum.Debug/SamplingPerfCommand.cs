@@ -13,6 +13,12 @@ namespace Quantum.Debug
         private const string SmokeScenarioName = "smoke";
         private const string TrackScalarBenchmarkName = "track_scalar";
         private const string TrackBatchBenchmarkName = "track_batch";
+        private const string BodyBatchDocumentBenchmarkName = "body_batch_document";
+        private const string BodyBatchRuntimeBenchmarkName = "body_batch_runtime";
+        private const string BogieBatchDocumentBenchmarkName = "bogie_batch_document";
+        private const string BogieBatchRuntimeBenchmarkName = "bogie_batch_runtime";
+        private const string TrainPoseDocumentBenchmarkName = "train_pose_document";
+        private const string TrainPoseRuntimeBenchmarkName = "train_pose_runtime";
 
         public static void Run()
         {
@@ -61,19 +67,47 @@ namespace Quantum.Debug
                     operationsPerIteration: scenario.Distances.Length,
                     execute: () => EvaluateTrackBatch(scenario)),
                 RunBenchmark(
-                    name: "body_batch",
+                    name: BodyBatchDocumentBenchmarkName,
                     scenario: SmokeScenarioName,
                     warmupIterations,
                     timedIterations,
                     operationsPerIteration: scenario.CarCount,
-                    execute: () => EvaluateBodyBatch(scenario)),
+                    execute: () => EvaluateBodyBatch(scenario, scenario.DocumentProvider)),
                 RunBenchmark(
-                    name: "bogie_batch",
+                    name: BodyBatchRuntimeBenchmarkName,
+                    scenario: SmokeScenarioName,
+                    warmupIterations,
+                    timedIterations,
+                    operationsPerIteration: scenario.CarCount,
+                    execute: () => EvaluateBodyBatch(scenario, scenario.RuntimeProvider)),
+                RunBenchmark(
+                    name: BogieBatchDocumentBenchmarkName,
                     scenario: SmokeScenarioName,
                     warmupIterations,
                     timedIterations,
                     operationsPerIteration: scenario.CarCount * 3,
-                    execute: () => EvaluateBogieBatch(scenario))
+                    execute: () => EvaluateBogieBatch(scenario, scenario.DocumentProvider)),
+                RunBenchmark(
+                    name: BogieBatchRuntimeBenchmarkName,
+                    scenario: SmokeScenarioName,
+                    warmupIterations,
+                    timedIterations,
+                    operationsPerIteration: scenario.CarCount * 3,
+                    execute: () => EvaluateBogieBatch(scenario, scenario.RuntimeProvider)),
+                RunBenchmark(
+                    name: TrainPoseDocumentBenchmarkName,
+                    scenario: SmokeScenarioName,
+                    warmupIterations,
+                    timedIterations,
+                    operationsPerIteration: scenario.CarCount,
+                    execute: () => EvaluateTrainPose(scenario, scenario.DocumentProvider)),
+                RunBenchmark(
+                    name: TrainPoseRuntimeBenchmarkName,
+                    scenario: SmokeScenarioName,
+                    warmupIterations,
+                    timedIterations,
+                    operationsPerIteration: scenario.CarCount,
+                    execute: () => EvaluateTrainPose(scenario, scenario.RuntimeProvider))
             };
         }
 
@@ -148,10 +182,12 @@ namespace Quantum.Debug
             return checksum;
         }
 
-        private static double EvaluateBodyBatch(SamplingPerfSmokeScenario scenario)
+        private static double EvaluateBodyBatch(
+            SamplingPerfSmokeScenario scenario,
+            TrainCarTransformProvider provider)
         {
             double checksum = 0.0;
-            IReadOnlyList<TrainCarTransform> cars = scenario.Provider.EvaluateCarTransforms(
+            IReadOnlyList<TrainCarTransform> cars = provider.EvaluateCarTransforms(
                 scenario.LeadDistance,
                 scenario.CarSpacing,
                 scenario.CarCount);
@@ -166,10 +202,12 @@ namespace Quantum.Debug
             return checksum;
         }
 
-        private static double EvaluateBogieBatch(SamplingPerfSmokeScenario scenario)
+        private static double EvaluateBogieBatch(
+            SamplingPerfSmokeScenario scenario,
+            TrainCarTransformProvider provider)
         {
             double checksum = 0.0;
-            IReadOnlyList<TrainCarWithBogiesTransform> cars = scenario.Provider.EvaluateTrainWithBogies(
+            IReadOnlyList<TrainCarWithBogiesTransform> cars = provider.EvaluateTrainWithBogies(
                 scenario.LeadDistance,
                 scenario.ConsistDefinition);
 
@@ -182,6 +220,39 @@ namespace Quantum.Debug
             }
 
             return checksum;
+        }
+
+        private static double EvaluateTrainPose(
+            SamplingPerfSmokeScenario scenario,
+            TrainCarTransformProvider provider)
+        {
+            TrainPoseResult pose = provider.EvaluateTrainPose(
+                scenario.LeadDistance,
+                scenario.ConsistDefinition);
+            double checksum = pose.LeadDistance;
+
+            for (int i = 0; i < pose.CarsReadOnly.Count; i++)
+            {
+                ArticulatedTrainCarWithWheelsTransform car = pose.CarsReadOnly[i];
+                checksum += SumFrame(car.Body.ArticulatedFrame);
+                checksum += SumFrame(car.FrontBogie.Bogie.Frame);
+                checksum += SumFrame(car.RearBogie.Bogie.Frame);
+
+                for (int wheelIndex = 0; wheelIndex < car.FrontBogie.WheelsReadOnly.Count; wheelIndex++)
+                {
+                    checksum += SumFrame(car.FrontBogie.WheelsReadOnly[wheelIndex].Frame);
+                    checksum += SumFrame(car.RearBogie.WheelsReadOnly[wheelIndex].Frame);
+                }
+            }
+
+            return checksum;
+        }
+
+        private static double SumFrame(TrackFrame frame)
+        {
+            return frame.Distance +
+                   frame.Position.X + frame.Position.Y + frame.Position.Z +
+                   frame.Tangent.X + frame.Tangent.Y + frame.Tangent.Z;
         }
 
         private static void WriteTable(IReadOnlyList<SamplingPerfBenchmarkResult> results)
@@ -264,6 +335,21 @@ namespace Quantum.Debug
                 resultsByBenchmark.TryGetValue(TrackScalarBenchmarkName, out SamplingPerfBenchmarkResult baseline))
             {
                 double factor = result.Timing.ComputeRelativeSpeedupAgainst(baseline.Timing);
+                return FormatRelativeSpeedupFactor(factor);
+            }
+
+            string? documentBaselineName = result.Name switch
+            {
+                BodyBatchRuntimeBenchmarkName => BodyBatchDocumentBenchmarkName,
+                BogieBatchRuntimeBenchmarkName => BogieBatchDocumentBenchmarkName,
+                TrainPoseRuntimeBenchmarkName => TrainPoseDocumentBenchmarkName,
+                _ => null
+            };
+
+            if (documentBaselineName != null &&
+                resultsByBenchmark.TryGetValue(documentBaselineName, out SamplingPerfBenchmarkResult documentBaseline))
+            {
+                double factor = result.Timing.ComputeRelativeSpeedupAgainst(documentBaseline.Timing);
                 return FormatRelativeSpeedupFactor(factor);
             }
 

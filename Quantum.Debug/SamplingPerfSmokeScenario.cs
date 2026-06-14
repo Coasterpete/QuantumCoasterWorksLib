@@ -8,8 +8,11 @@ namespace Quantum.Debug
     {
         private SamplingPerfSmokeScenario(
             TrackDocument document,
-            TrackEvaluator evaluator,
-            TrainCarTransformProvider provider,
+            CompiledTrackRuntime runtime,
+            TrackEvaluator documentEvaluator,
+            TrackEvaluator runtimeEvaluator,
+            TrainCarTransformProvider documentProvider,
+            TrainCarTransformProvider runtimeProvider,
             double[] distances,
             double leadDistance,
             double carSpacing,
@@ -17,8 +20,11 @@ namespace Quantum.Debug
             TrainConsistDefinition consistDefinition)
         {
             Document = document;
-            Evaluator = evaluator;
-            Provider = provider;
+            Runtime = runtime;
+            DocumentEvaluator = documentEvaluator;
+            RuntimeEvaluator = runtimeEvaluator;
+            DocumentProvider = documentProvider;
+            RuntimeProvider = runtimeProvider;
             Distances = distances;
             LeadDistance = leadDistance;
             CarSpacing = carSpacing;
@@ -28,9 +34,19 @@ namespace Quantum.Debug
 
         public TrackDocument Document { get; }
 
-        public TrackEvaluator Evaluator { get; }
+        public CompiledTrackRuntime Runtime { get; }
 
-        public TrainCarTransformProvider Provider { get; }
+        public TrackEvaluator DocumentEvaluator { get; }
+
+        public TrackEvaluator RuntimeEvaluator { get; }
+
+        public TrainCarTransformProvider DocumentProvider { get; }
+
+        public TrainCarTransformProvider RuntimeProvider { get; }
+
+        public TrackEvaluator Evaluator => DocumentEvaluator;
+
+        public TrainCarTransformProvider Provider => DocumentProvider;
 
         public double[] Distances { get; }
 
@@ -71,8 +87,11 @@ namespace Quantum.Debug
             };
 
             var document = new TrackDocument(segments);
-            var evaluator = new TrackEvaluator(document);
-            var provider = new TrainCarTransformProvider(evaluator);
+            var runtime = new CompiledTrackRuntime(document);
+            var documentEvaluator = new TrackEvaluator(document);
+            var runtimeEvaluator = new TrackEvaluator(runtime);
+            var documentProvider = new TrainCarTransformProvider(documentEvaluator);
+            var runtimeProvider = new TrainCarTransformProvider(runtimeEvaluator);
 
             const int distanceSampleCount = 512;
             double totalLength = document.TotalLength;
@@ -93,14 +112,22 @@ namespace Quantum.Debug
                 carLength: 8.0,
                 carWidth: 1.8,
                 carHeight: 2.2,
-                bogieSpacing: 4.0);
+                bogieSpacing: 4.0,
+                wheelLayout: new TrainWheelLayout(
+                    wheelCountPerBogie: 4,
+                    wheelRadius: 0.45,
+                    wheelWidth: 0.3,
+                    axleSpacing: 1.2));
 
             const double leadDistance = 150.0;
 
             return new SamplingPerfSmokeScenario(
                 document,
-                evaluator,
-                provider,
+                runtime,
+                documentEvaluator,
+                runtimeEvaluator,
+                documentProvider,
+                runtimeProvider,
                 distances,
                 leadDistance,
                 carSpacing,
