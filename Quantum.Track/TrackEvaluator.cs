@@ -14,7 +14,8 @@ namespace Quantum.Track
     /// </summary>
     /// <remarks>
     /// The preferred coaster-facing lane is station-distance sampling from a
-    /// bound <see cref="TrackDocument"/> into <see cref="Quantum.Track.TrackFrame"/>
+    /// bound <see cref="TrackDocument"/> or <see cref="CompiledTrackRuntime"/> into
+    /// <see cref="Quantum.Track.TrackFrame"/>
     /// values whose <see cref="Quantum.Track.TrackFrame.Distance"/> is the
     /// clamped global station distance. Overloads that return
     /// <see cref="Quantum.Splines.TrackFrame"/> are support-layer compatibility
@@ -26,6 +27,8 @@ namespace Quantum.Track
         private const double MinimumVectorMagnitude = 1e-9;
         private const double ParallelAxisThreshold = 0.99;
         private readonly TrackDocument? _boundDocument;
+        private readonly CompiledTrackSamplingContext? _boundSamplingContext;
+        private readonly int _boundSegmentCount;
 
         /// <summary>
         /// Creates an evaluator for explicit-document evaluation calls.
@@ -35,11 +38,29 @@ namespace Quantum.Track
         }
 
         /// <summary>
-        /// Creates an evaluator bound to one track document for station-distance frame sampling.
+        /// Creates an evaluator bound to one live track document for station-distance sampling.
         /// </summary>
+        /// <remarks>
+        /// Later mutations to the document are observed by subsequent evaluation calls.
+        /// Use <see cref="CompiledTrackRuntime"/> for compile-once snapshot semantics.
+        /// </remarks>
         public TrackEvaluator(TrackDocument document)
         {
             _boundDocument = document ?? throw new System.ArgumentNullException(nameof(document));
+        }
+
+        /// <summary>
+        /// Creates an evaluator bound to compile-once sampling state.
+        /// </summary>
+        public TrackEvaluator(CompiledTrackRuntime runtime)
+        {
+            if (runtime is null)
+            {
+                throw new System.ArgumentNullException(nameof(runtime));
+            }
+
+            _boundSamplingContext = runtime.SamplingContext;
+            _boundSegmentCount = runtime.SegmentCount;
         }
 
         public TrackEvaluationResult Evaluate(TrackDocument document)
@@ -117,8 +138,15 @@ namespace Quantum.Track
         /// <returns>A <see cref="Quantum.Track.TrackFrame"/> with finite, orthonormalized axes and <see cref="Quantum.Track.TrackFrame.Distance"/> equal to the requested clamped global station distance.</returns>
         public TrackFrame EvaluateFrameAtDistance(double distance)
         {
-            TrackDocument doc = ResolveBoundDocument();
-            return EvaluateTrackFrameAtDistance(doc, distance);
+            if (_boundSamplingContext is null)
+            {
+                TrackDocument doc = ResolveBoundDocument();
+                return EvaluateTrackFrameAtDistance(doc, distance);
+            }
+
+            ThrowIfDistanceNonFinite(distance);
+            ThrowIfEmptyTrack(_boundSegmentCount, distance);
+            return _boundSamplingContext.SampleCanonicalFrame(distance, ResolveRollRadians);
         }
 
         /// <summary>
@@ -142,6 +170,11 @@ namespace Quantum.Track
         /// </summary>
         public double GetBoundTrackTotalLength()
         {
+            if (_boundSamplingContext != null)
+            {
+                return _boundSamplingContext.TotalLength;
+            }
+
             TrackDocument doc = ResolveBoundDocument();
             return CompiledTrackSamplingContext.Compile(doc).TotalLength;
         }
@@ -331,8 +364,13 @@ namespace Quantum.Track
         /// <param name="distances">Finite station distances. Current behavior clamps finite out-of-range values to the track extents.</param>
         public TrackFrame[] EvaluateFramesAtDistances(IReadOnlyList<double> distances)
         {
-            TrackDocument doc = ResolveBoundDocument();
-            return EvaluateTrackFramesAtDistances(doc, distances);
+            if (_boundSamplingContext is null)
+            {
+                TrackDocument doc = ResolveBoundDocument();
+                return EvaluateTrackFramesAtDistances(doc, distances);
+            }
+
+            return EvaluateCanonicalFramesAtDistances(distances, ResolveRollRadians);
         }
 
         /// <summary>
@@ -372,6 +410,112 @@ namespace Quantum.Track
         {
             TrackFrame frame = EvaluateTrackFrameAtDistance(doc, distance);
             return Transform3d.FromTrackFrame(frame, frame.Position);
+        }
+
+        /// <summary>
+        /// Samples a transform from the bound document or compiled runtime.
+        /// </summary>
+        public Transform3d EvaluateTransformAtDistance(double distance)
+        {
+            TrackFrame frame = EvaluateFrameAtDistance(distance);
+            return Transform3d.FromTrackFrame(frame, frame.Position);
+        }
+
+        /// <summary>
+        /// Resolves a station distance against the bound document or compiled runtime.
+        /// </summary>
+        public TrackEvaluationPoint EvaluateAtDistance(double distance)
+        {
+            if (_boundSamplingContext is null)
+            {
+                return EvaluateAtDistance(ResolveBoundDocument(), distance);
+            }
+
+            ThrowIfDistanceNonFinite(distance);
+            ThrowIfEmptyTrack(_boundSegmentCount, distance);
+            return BuildEvaluationPoint(_boundSamplingContext.Resolve(distance));
+        }
+
+        /// <summary>
+        /// Resolves station distances against the bound document or compiled runtime.
+        /// </summary>
+        public TrackEvaluationPoint[] EvaluateAtDistances(IReadOnlyList<double> distances)
+        {
+            if (_boundSamplingContext is null)
+            {
+                return EvaluateAtDistances(ResolveBoundDocument(), distances);
+            }
+
+            ValidateDistances(distances);
+            if (distances.Count == 0)
+            {
+                return System.Array.Empty<TrackEvaluationPoint>();
+            }
+
+            ThrowIfEmptyTrack(_boundSegmentCount, distances[0]);
+            var points = new TrackEvaluationPoint[distances.Count];
+            for (int i = 0; i < distances.Count; i++)
+            {
+                points[i] = BuildEvaluationPoint(_boundSamplingContext.Resolve(distances[i]));
+            }
+
+            return points;
+        }
+
+        /// <summary>
+        /// Attempts to sample unsigned centerline curvature from the bound document
+        /// or compiled runtime.
+        /// </summary>
+        public bool TryGetCurvatureAtDistance(double distance, out double curvature)
+        {
+            curvature = 0.0;
+            if (double.IsNaN(distance) || double.IsInfinity(distance))
+            {
+                return false;
+            }
+
+            CompiledTrackSamplingContext samplingContext;
+            try
+            {
+                samplingContext = ResolveBoundSamplingContext(distance);
+            }
+            catch (System.ArgumentOutOfRangeException)
+            {
+                return false;
+            }
+            catch (System.InvalidOperationException)
+            {
+                return false;
+            }
+
+            return TryGetCurvatureAtDistance(samplingContext, distance, out curvature);
+        }
+
+        internal TrackFrame[] EvaluateCanonicalFramesAtDistances(
+            IReadOnlyList<double> distances,
+            System.Func<ResolvedTrackDistance, double> rollRadiansResolver)
+        {
+            if (_boundSamplingContext is null)
+            {
+                return EvaluateCanonicalFramesAtDistances(
+                    ResolveBoundDocument(),
+                    distances,
+                    rollRadiansResolver);
+            }
+
+            if (rollRadiansResolver is null)
+            {
+                throw new System.ArgumentNullException(nameof(rollRadiansResolver));
+            }
+
+            ValidateDistances(distances);
+            if (distances.Count == 0)
+            {
+                return System.Array.Empty<TrackFrame>();
+            }
+
+            ThrowIfEmptyTrack(_boundSegmentCount, distances[0]);
+            return _boundSamplingContext.SampleCanonicalFrames(distances, rollRadiansResolver);
         }
 
         internal TrackFrame[] EvaluateCanonicalFramesAtDistances(
@@ -671,6 +815,17 @@ namespace Quantum.Track
             return _boundDocument;
         }
 
+        private CompiledTrackSamplingContext ResolveBoundSamplingContext(double distance)
+        {
+            if (_boundSamplingContext != null)
+            {
+                ThrowIfEmptyTrack(_boundSegmentCount, distance);
+                return _boundSamplingContext;
+            }
+
+            return CompileForDistance(ResolveBoundDocument(), distance);
+        }
+
         /// <summary>
         /// Resolves a station distance into the segment and local parameter used for
         /// centerline evaluation.
@@ -697,22 +852,98 @@ namespace Quantum.Track
 
             CompiledTrackSamplingContext samplingContext = CompileForDistance(doc, distance);
             ResolvedTrackDistance resolvedDistance = samplingContext.Resolve(distance);
-            return new TrackEvaluationPoint(resolvedDistance.Segment, resolvedDistance.LocalT);
+            return BuildEvaluationPoint(resolvedDistance);
         }
 
         private static CompiledTrackSamplingContext CompileForDistance(
             TrackDocument doc,
             double distance)
         {
-            if (doc.Segments.Count == 0)
+            ThrowIfEmptyTrack(doc.Segments.Count, distance);
+
+            return CompiledTrackSamplingContext.Compile(doc);
+        }
+
+        private static TrackEvaluationPoint BuildEvaluationPoint(
+            ResolvedTrackDistance resolvedDistance)
+        {
+            return new TrackEvaluationPoint(
+                resolvedDistance.Segment,
+                resolvedDistance.LocalT);
+        }
+
+        private static void ValidateDistances(IReadOnlyList<double> distances)
+        {
+            if (distances is null)
+            {
+                throw new System.ArgumentNullException(nameof(distances));
+            }
+
+            for (int i = 0; i < distances.Count; i++)
+            {
+                ThrowIfDistanceNonFinite(distances[i]);
+            }
+        }
+
+        private static void ThrowIfEmptyTrack(int segmentCount, double distance)
+        {
+            if (segmentCount == 0)
             {
                 throw new System.ArgumentOutOfRangeException(
                     nameof(distance),
                     distance,
                     "Distance cannot be evaluated for an empty track document.");
             }
+        }
 
-            return CompiledTrackSamplingContext.Compile(doc);
+        private static bool TryGetCurvatureAtDistance(
+            CompiledTrackSamplingContext samplingContext,
+            double distance,
+            out double curvature)
+        {
+            curvature = 0.0;
+            ResolvedTrackDistance resolvedDistance = samplingContext.Resolve(distance);
+
+            if (resolvedDistance.Segment.Spline is IParamCurveCurvature curvatureCurve &&
+                curvatureCurve.TryGetCurvature(resolvedDistance.LocalT, out double splineCurvature) &&
+                !double.IsNaN(splineCurvature) &&
+                !double.IsInfinity(splineCurvature))
+            {
+                curvature = System.Math.Abs(splineCurvature);
+                return true;
+            }
+
+            double totalLength = samplingContext.TotalLength;
+            if (totalLength <= MathUtil.Epsilon)
+            {
+                return true;
+            }
+
+            double clampedDistance = MathUtil.Clamp(distance, 0.0, totalLength);
+            double deltaS = System.Math.Max(totalLength * 1e-3, 1e-4);
+            double previousDistance = MathUtil.Clamp(clampedDistance - deltaS, 0.0, totalLength);
+            double nextDistance = MathUtil.Clamp(clampedDistance + deltaS, 0.0, totalLength);
+            double span = nextDistance - previousDistance;
+            if (span <= MathUtil.Epsilon)
+            {
+                return true;
+            }
+
+            TrackFrame previousFrame = samplingContext.SampleCanonicalFrame(
+                previousDistance,
+                ResolveRollRadians);
+            TrackFrame nextFrame = samplingContext.SampleCanonicalFrame(
+                nextDistance,
+                ResolveRollRadians);
+            curvature = (nextFrame.Tangent - previousFrame.Tangent).Length / span;
+
+            if (double.IsNaN(curvature) || double.IsInfinity(curvature))
+            {
+                curvature = 0.0;
+                return false;
+            }
+
+            return true;
         }
 
         private static void ThrowIfDistanceNonFinite(double distance)

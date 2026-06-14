@@ -121,6 +121,34 @@ namespace Quantum.Track
             return SampleFramesAtDistances(document, new TrackEvaluator(document), profile, distances);
         }
 
+        /// <summary>
+        /// Samples profile-banked frames through a bound document or compiled runtime evaluator.
+        /// </summary>
+        public static TrackFrame[] SampleFramesAtDistances(
+            TrackEvaluator evaluator,
+            BankingProfile profile,
+            IReadOnlyList<double> distances)
+        {
+            if (evaluator is null)
+            {
+                throw new ArgumentNullException(nameof(evaluator));
+            }
+
+            if (profile is null)
+            {
+                throw new ArgumentNullException(nameof(profile));
+            }
+
+            if (distances is null)
+            {
+                throw new ArgumentNullException(nameof(distances));
+            }
+
+            return evaluator.EvaluateCanonicalFramesAtDistances(
+                distances,
+                resolvedDistance => SampleRollRadians(profile, resolvedDistance.ClampedDistance));
+        }
+
         public static TrackFrame[] SampleFramesAtDistances(
             TrackDocument document,
             TrackEvaluator evaluator,
