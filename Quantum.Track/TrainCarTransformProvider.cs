@@ -291,11 +291,10 @@ namespace Quantum.Track
                     "Bogie spacing must be finite and non-negative.");
             }
 
-            ResolveDocumentAndValidateBodyInputs(
+            double totalLength = ResolveTotalLengthAndValidateBodyInputs(
                 leadDistance,
                 carSpacing,
                 carCount);
-            double totalLength = _evaluator.GetBoundTrackTotalLength();
             double[] bodyDistances = BuildBodyDistances(
                 leadDistance,
                 carSpacing,
@@ -315,7 +314,7 @@ namespace Quantum.Track
             int carCount,
             BankingProfile bankingProfile)
         {
-            TrackDocument document = ResolveDocumentAndValidateBodyInputs(
+            double totalLength = ResolveTotalLengthAndValidateBodyInputs(
                 leadDistance,
                 carSpacing,
                 carCount);
@@ -323,9 +322,8 @@ namespace Quantum.Track
                 leadDistance,
                 carSpacing,
                 carCount,
-                _evaluator.GetBoundTrackTotalLength());
+                totalLength);
             TrackFrame[] frames = BankingProfileSampler.SampleFramesAtDistances(
-                document,
                 _evaluator,
                 bankingProfile,
                 distances);
@@ -350,11 +348,10 @@ namespace Quantum.Track
             TrainWheelLayout wheelLayout,
             BankingProfile bankingProfile)
         {
-            TrackDocument document = ResolveDocumentAndValidateBodyInputs(
+            double totalLength = ResolveTotalLengthAndValidateBodyInputs(
                 leadDistance,
                 definition.CarSpacing,
                 definition.CarCount);
-            double totalLength = _evaluator.GetBoundTrackTotalLength();
             double[] bodyDistances = BuildBodyDistances(
                 leadDistance,
                 definition.CarSpacing,
@@ -365,7 +362,6 @@ namespace Quantum.Track
                 definition.BogieSpacing,
                 totalLength,
                 distances => BankingProfileSampler.SampleFramesAtDistances(
-                    document,
                     _evaluator,
                     bankingProfile,
                     distances));
@@ -446,7 +442,7 @@ namespace Quantum.Track
             return carsWithBogies;
         }
 
-        private TrackDocument ResolveDocumentAndValidateBodyInputs(
+        private double ResolveTotalLengthAndValidateBodyInputs(
             double leadDistance,
             double carSpacing,
             int carCount)
@@ -475,12 +471,12 @@ namespace Quantum.Track
                     "Car count must be non-negative.");
             }
 
-            TrackDocument document = _evaluator.GetBoundTrackDocument();
+            double totalLength = _evaluator.GetBoundTrackTotalLength();
             ValidateDistanceInRange(
                 leadDistance,
-                document.TotalLength,
+                totalLength,
                 "Lead car distance is out of range.");
-            return document;
+            return totalLength;
         }
 
         private static double[] BuildBodyDistances(

@@ -47,7 +47,7 @@ public sealed class SamplingPerfCommandTests
             headers);
 
         string[][] dataRows = tableRows.Skip(1).Select(ParseCells).ToArray();
-        Assert.Equal(4, dataRows.Length);
+        Assert.Equal(8, dataRows.Length);
 
         for (int i = 0; i < dataRows.Length; i++)
         {
@@ -63,11 +63,19 @@ public sealed class SamplingPerfCommandTests
             batchRow[7].EndsWith("x slower", StringComparison.Ordinal),
             "track_batch should report relative speedup/slowdown against track_scalar.");
 
-        string[] bodyRow = Assert.Single(dataRows, static row => row[0] == "body_batch");
-        Assert.Equal("-", bodyRow[7]);
+        string[] bodyDocument = Assert.Single(dataRows, static row => row[0] == "body_batch_document");
+        string[] bodyRuntime = Assert.Single(dataRows, static row => row[0] == "body_batch_runtime");
+        string[] bogieDocument = Assert.Single(dataRows, static row => row[0] == "bogie_batch_document");
+        string[] bogieRuntime = Assert.Single(dataRows, static row => row[0] == "bogie_batch_runtime");
+        string[] poseDocument = Assert.Single(dataRows, static row => row[0] == "train_pose_document");
+        string[] poseRuntime = Assert.Single(dataRows, static row => row[0] == "train_pose_runtime");
 
-        string[] bogieRow = Assert.Single(dataRows, static row => row[0] == "bogie_batch");
-        Assert.Equal("-", bogieRow[7]);
+        Assert.Equal("-", bodyDocument[7]);
+        Assert.Equal("-", bogieDocument[7]);
+        Assert.Equal("-", poseDocument[7]);
+        Assert.Equal(bodyDocument[6], bodyRuntime[6]);
+        Assert.Equal(bogieDocument[6], bogieRuntime[6]);
+        Assert.Equal(poseDocument[6], poseRuntime[6]);
     }
 
     private static string[] ParseCells(string row)

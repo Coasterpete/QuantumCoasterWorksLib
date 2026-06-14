@@ -78,7 +78,7 @@ namespace Quantum.Debug
             TrackAuthoringCompilation compilation = TrackAuthoringDocumentBuilder.Compile(definition);
             TrackAuthoringBoundaryContinuityReport continuity =
                 TrackAuthoringBoundaryContinuityDiagnostics.Analyze(definition);
-            var evaluator = new TrackEvaluator(compilation.Document);
+            var evaluator = new TrackEvaluator(compilation.Runtime);
             TrackFrame[] frames = evaluator.EvaluateFramesAtDistances(BuildFrameDistances());
 
             var trainDefinition = new TrainConsistDefinition(
