@@ -13,11 +13,14 @@ namespace Quantum.Track
     ///
     /// Documents are intentionally mutable during authoring and the current backend
     /// prototype. The public lists are live authoring collections rather than
-    /// immutable views or snapshots. Evaluators read the current segment list when
-    /// an evaluation call starts; they do not take ownership of, or freeze, the
-    /// document. Avoid mutating a document while it is being evaluated, and treat
-    /// mutations as affecting later evaluations, including evaluations from an
-    /// already-bound <see cref="TrackEvaluator"/>.
+    /// immutable views or snapshots. A <see cref="TrackEvaluator"/> bound directly
+    /// to a document reads the current segment list when each evaluation call starts,
+    /// so later document mutations are observed by that evaluator.
+    ///
+    /// <see cref="CompiledTrackRuntime"/> provides the explicit sampling-snapshot
+    /// boundary. It captures the current ordered segment list and compiled sampling
+    /// state once; recompile a new runtime after authoring or document mutation.
+    /// Avoid mutating a document while an evaluation call is in progress.
     /// </remarks>
     public class TrackDocument
     {
@@ -45,8 +48,10 @@ namespace Quantum.Track
         /// This list is mutable by design for authoring and prototype workflows.
         /// Callers may add, remove, replace, or reorder entries before evaluation.
         /// Mutating it changes <see cref="TotalLength"/> and the station-distance
-        /// coordinate for future evaluation calls. The backend does not currently
-        /// provide concurrent mutation safety.
+        /// coordinate for future document-bound evaluation calls. Existing
+        /// <see cref="CompiledTrackRuntime"/> instances remain snapshots and must be
+        /// recompiled to observe the change. The backend does not currently provide
+        /// concurrent mutation safety.
         /// </remarks>
         public IList<TrackSegment> Segments { get; }
 
