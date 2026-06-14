@@ -7,16 +7,22 @@ namespace Quantum.Track.Authoring.Internal
     {
         private readonly IArcLengthCurve _localCurve;
         private readonly Vector3d _startPosition;
-        private readonly double _startHeadingRadians;
+        private readonly Vector3d _startTangent;
+        private readonly Vector3d _startNormal;
+        private readonly Vector3d _startBinormal;
 
         public PlacedAuthoringSectionCurve(
             IArcLengthCurve localCurve,
             Vector3d startPosition,
-            double startHeadingRadians)
+            Vector3d startTangent,
+            Vector3d startNormal,
+            Vector3d startBinormal)
         {
             _localCurve = localCurve;
             _startPosition = startPosition;
-            _startHeadingRadians = startHeadingRadians;
+            _startTangent = startTangent;
+            _startNormal = startNormal;
+            _startBinormal = startBinormal;
         }
 
         public double Length => _localCurve.Length;
@@ -30,7 +36,7 @@ namespace Quantum.Track.Authoring.Internal
         public Vector3d Tangent(double t)
         {
             double clampedT = MathUtil.Clamp(t, 0.0, 1.0);
-            return RotateAroundZ(_localCurve.Tangent(clampedT), _startHeadingRadians);
+            return PlaceDirection(_localCurve.Tangent(clampedT));
         }
 
         public Vector3d EvaluateByLength(double s)
@@ -42,25 +48,19 @@ namespace Quantum.Track.Authoring.Internal
         public Vector3d TangentByLength(double s)
         {
             double clampedDistance = MathUtil.Clamp(s, 0.0, Length);
-            return RotateAroundZ(
-                _localCurve.TangentByLength(clampedDistance),
-                _startHeadingRadians);
+            return PlaceDirection(_localCurve.TangentByLength(clampedDistance));
         }
 
         private Vector3d PlacePosition(Vector3d localPosition)
         {
-            return _startPosition + RotateAroundZ(localPosition, _startHeadingRadians);
+            return _startPosition + PlaceDirection(localPosition);
         }
 
-        private static Vector3d RotateAroundZ(Vector3d vector, double radians)
+        private Vector3d PlaceDirection(Vector3d localDirection)
         {
-            double cos = System.Math.Cos(radians);
-            double sin = System.Math.Sin(radians);
-
-            return new Vector3d(
-                (vector.X * cos) - (vector.Y * sin),
-                (vector.X * sin) + (vector.Y * cos),
-                vector.Z);
+            return (_startTangent * localDirection.X) +
+                   (_startNormal * localDirection.Y) +
+                   (_startBinormal * localDirection.Z);
         }
     }
 }

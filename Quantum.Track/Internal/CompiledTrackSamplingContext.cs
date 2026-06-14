@@ -14,18 +14,24 @@ namespace Quantum.Track.Internal
 
         private readonly CompiledTrackSegment[] _segments;
         private readonly Lazy<CanonicalTransportedFrameSampler>? _canonicalFrameSampler;
+        private readonly Vector3d? _authoredStartNormal;
 
         private CompiledTrackSamplingContext(
             CompiledTrackSegment[] segments,
             double totalLength,
-            IReadOnlyList<double> transportNodeDistances)
+            IReadOnlyList<double> transportNodeDistances,
+            Vector3d? authoredStartNormal)
         {
             _segments = segments;
             TotalLength = totalLength;
+            _authoredStartNormal = authoredStartNormal;
             if (segments.Length > 0)
             {
                 _canonicalFrameSampler = new Lazy<CanonicalTransportedFrameSampler>(
-                    () => new CanonicalTransportedFrameSampler(this, transportNodeDistances),
+                    () => new CanonicalTransportedFrameSampler(
+                        this,
+                        transportNodeDistances,
+                        _authoredStartNormal),
                     isThreadSafe: true);
             }
         }
@@ -94,7 +100,8 @@ namespace Quantum.Track.Internal
             return new CompiledTrackSamplingContext(
                 segments,
                 totalLength,
-                BuildTransportNodeDistances(segments, totalLength));
+                BuildTransportNodeDistances(segments, totalLength),
+                document.StartPose?.Normal);
         }
 
         public static CompiledTrackSamplingContext Compile(
@@ -169,7 +176,8 @@ namespace Quantum.Track.Internal
                 BuildTransportNodeDistances(
                     segments,
                     totalLength,
-                    options.TransportSamplesPerSegment));
+                    options.TransportSamplesPerSegment),
+                document.StartPose?.Normal);
         }
 
         public static CompiledTrackSamplingContext? TryCompile(
@@ -400,7 +408,8 @@ namespace Quantum.Track.Internal
                 BuildTransportNodeDistances(
                     segments,
                     totalLength,
-                    options.TransportSamplesPerSegment));
+                    options.TransportSamplesPerSegment),
+                document.StartPose?.Normal);
         }
 
         public TrackFrame SampleCanonicalFrame(

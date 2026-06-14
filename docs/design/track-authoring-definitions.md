@@ -14,7 +14,25 @@ input and adapts that input into the existing segment and evaluator contracts.
 ## Public Definitions
 
 `TrackAuthoringDefinition` contains an ordered, copied list of
-`GeometricSectionDefinition` values.
+`GeometricSectionDefinition` values and a validated `TrackStartPose`.
+
+The legacy constructor accepts only sections and delegates to
+`TrackStartPose.Identity`. The explicit overload accepts sections plus a start
+pose. `Identity` is the origin with positive-X tangent, positive-Y normal, and
+positive-Z binormal, so existing M140-M142 authored layouts retain their prior
+coordinate convention.
+
+`TrackStartPose` contains:
+
+- `Position`: the world-space start point
+- `Tangent`: the local positive-X forward axis
+- `Normal`: the local positive-Y bend-reference axis
+- `Binormal`: the local positive-Z right/lateral axis
+
+The basis is the unbanked construction frame. Its axes must be finite,
+non-near-zero, unit length, mutually orthogonal, and consistently right-handed
+with `Tangent x Normal = Binormal`. Invalid or left-handed bases are rejected.
+Inputs are never silently normalized.
 
 The supported section definitions are:
 
@@ -69,6 +87,9 @@ interpolation does not interpolate or otherwise modify roll.
 Section constructors reject invalid IDs, lengths, radii, curvatures, interpolation
 modes, and roll values. Transition definitions also reject a non-finite curvature
 delta or total heading sweep.
+
+`TrackStartPose` rejects non-finite positions and basis vectors, near-zero or
+non-unit axes, non-orthogonal axes, and left-handed or inconsistent bases.
 
 `TrackAuthoringDefinition` rejects:
 
@@ -166,12 +187,38 @@ same `TrackDocument` shape:
 - exact authored segment lengths and constant roll values
 - one generated `GeometricSection` per authoring section in `TrackDocument.Sections`
 
-The builder composes each section from the prior section's endpoint and tangent.
-Documents containing only M140 straight and constant-curvature definitions retain
-the existing geometric section assembly path. Documents containing a transition
-use the real distance-curvature transition curve behind the generated
-`CurvedSegment`. This preserves point and tangent continuity while leaving
-evaluator, spline, FVD, IO, and `TrackDocument` contracts unchanged.
+The builder composes each section from the prior section's endpoint and unbanked
+construction frame. Section curves remain planar in local coordinates:
+
+```text
++X = forward / tangent
++Y = normal / bend reference
++Z = binormal / right
+
+worldPoint     = P + T*x  + N*y  + B*z
+worldDirection =     T*dx + N*dy + B*dz
+```
+
+For a planar section whose endpoint tangent is `(tx, ty, 0)`, the following
+section starts from:
+
+```text
+P' = section endpoint
+T' =  tx*T + ty*N
+N' = -ty*T + tx*N
+B' = B
+```
+
+This full-basis placement applies to straight, constant-curvature, and
+curvature-transition sections. Positive curvature bends from `T` toward `N`;
+negative curvature bends toward `-N`. All samples remain in the plane whose
+normal is the start binormal. Point and tangent continuity are preserved at
+section boundaries.
+
+`RollRadians` is not applied during centerline construction and does not alter
+section placement. It remains segment metadata and is applied afterward by the
+runtime frame evaluator, preserving the distinction between the unbanked
+construction frame and the banked sampled frame.
 
 `TrackDocument.Sections` still contains one `GeometricSection` metadata entry per
 authored definition. A transition entry has no single constant curvature value,
@@ -181,6 +228,19 @@ Every `Compile` call builds a new document and a new runtime. Repeated
 compilations from the same definition are deterministic and produce equivalent
 canonical frame samples through `TrackEvaluator`, but the returned `Document`
 and `Runtime` objects are distinct snapshots.
+
+Authoring-generated documents populate nullable `TrackDocument.StartPose` with
+the exact pose reference from the definition. Manually constructed documents
+retain `StartPose == null`. During runtime compilation, the authored start normal
+is copied into the compiled sampling context. Canonical frame transport for an
+authored document begins by projecting that unbanked normal onto the first
+centerline tangent; segment roll is then applied through the existing runtime
+path. Null-pose documents retain the previous canonical reference-axis seeding.
+
+This split is the compatibility boundary: the legacy authoring constructor and
+an explicit identity pose produce equivalent geometry and canonical frames,
+while existing manually constructed documents, train fixtures, and export
+snapshots remain on their unchanged null-pose behavior.
 
 The runtime captures segment membership, order, measured lengths, rolls, and
 sampling state at compile time. It is not a deep clone of the segment curves:
@@ -248,25 +308,34 @@ Spline composition remains an internal implementation detail behind the existing
 ## Example
 
 ```csharp
+using Quantum.Math;
 using Quantum.Track;
 using Quantum.Track.Authoring;
 
-var definition = new TrackAuthoringDefinition(new GeometricSectionDefinition[]
-{
-    new StraightSectionDefinition("entry", length: 12.0),
-    new CurvatureTransitionSectionDefinition(
-        "transition-in",
-        length: 10.0,
-        startCurvature: 0.0,
-        endCurvature: 1.0 / 30.0,
-        rollRadians: 0.2),
-    new ConstantCurvatureSectionDefinition(
-        "left-turn",
-        length: 15.0,
-        radius: 30.0,
-        rollRadians: 0.2),
-    new StraightSectionDefinition("exit", length: 8.0, rollRadians: 0.2)
-});
+var startPose = new TrackStartPose(
+    position: new Vector3d(10.0, 2.0, 5.0),
+    tangent: Vector3d.UnitZ,
+    normal: Vector3d.UnitY,
+    binormal: new Vector3d(-1.0, 0.0, 0.0));
+
+var definition = new TrackAuthoringDefinition(
+    new GeometricSectionDefinition[]
+    {
+        new StraightSectionDefinition("entry", length: 12.0),
+        new CurvatureTransitionSectionDefinition(
+            "transition-in",
+            length: 10.0,
+            startCurvature: 0.0,
+            endCurvature: 1.0 / 30.0,
+            rollRadians: 0.2),
+        new ConstantCurvatureSectionDefinition(
+            "left-turn",
+            length: 15.0,
+            radius: 30.0,
+            rollRadians: 0.2),
+        new StraightSectionDefinition("exit", length: 8.0, rollRadians: 0.2)
+    },
+    startPose);
 
 TrackAuthoringCompilation compilation =
     TrackAuthoringDocumentBuilder.Compile(definition);
