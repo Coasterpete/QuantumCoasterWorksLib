@@ -34,6 +34,39 @@ namespace Quantum.Track
 
             SegmentCount = document.Segments.Count;
             _samplingContext = CompiledTrackSamplingContext.Compile(document);
+            SamplingOptions = TrackSamplingOptions.Default;
+        }
+
+        /// <summary>
+        /// Compiles reusable sampling state using the supplied sampling controls.
+        /// </summary>
+        public CompiledTrackRuntime(
+            TrackDocument document,
+            TrackSamplingOptions options)
+        {
+            if (document is null)
+            {
+                throw new ArgumentNullException(nameof(document));
+            }
+
+            if (options is null)
+            {
+                throw new ArgumentNullException(nameof(options));
+            }
+
+            SegmentCount = document.Segments.Count;
+            _samplingContext = CompiledTrackSamplingContext.Compile(document, options);
+            SamplingOptions = options;
+        }
+
+        internal CompiledTrackRuntime(
+            CompiledTrackSamplingContext samplingContext,
+            int segmentCount,
+            TrackSamplingOptions options)
+        {
+            _samplingContext = samplingContext ?? throw new ArgumentNullException(nameof(samplingContext));
+            SamplingOptions = options ?? throw new ArgumentNullException(nameof(options));
+            SegmentCount = segmentCount;
         }
 
         /// <summary>
@@ -45,6 +78,11 @@ namespace Quantum.Track
         /// Number of ordered centerline segments captured during compilation.
         /// </summary>
         public int SegmentCount { get; }
+
+        /// <summary>
+        /// Sampling controls captured when this runtime was compiled.
+        /// </summary>
+        public TrackSamplingOptions SamplingOptions { get; }
 
         internal CompiledTrackSamplingContext SamplingContext => _samplingContext;
     }
