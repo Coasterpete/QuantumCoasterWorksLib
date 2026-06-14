@@ -53,12 +53,51 @@ namespace Quantum.Track.Authoring
 
             var document = new TrackDocument(segments, geometricSections);
             double totalLength = resolvedSections[resolvedSections.Count - 1].EndDistance;
+            TrackRuntimeCompileResult runtimeCompilation = TrackRuntimeCompiler.Compile(
+                document,
+                TrackSamplingOptions.Default);
+
+            if (!runtimeCompilation.Success || runtimeCompilation.Runtime is null)
+            {
+                throw CreateRuntimeCompilationException(runtimeCompilation);
+            }
 
             return new TrackAuthoringCompilation(
                 definition,
                 document,
+                runtimeCompilation.Runtime,
                 resolvedSections,
                 totalLength);
+        }
+
+        private static InvalidOperationException CreateRuntimeCompilationException(
+            TrackRuntimeCompileResult runtimeCompilation)
+        {
+            TrackRuntimeDiagnostic? firstError = null;
+            for (int i = 0; i < runtimeCompilation.Diagnostics.Count; i++)
+            {
+                TrackRuntimeDiagnostic diagnostic = runtimeCompilation.Diagnostics[i];
+                if (diagnostic.Severity == TrackRuntimeDiagnosticSeverity.Error)
+                {
+                    firstError = diagnostic;
+                    break;
+                }
+            }
+
+            if (firstError is null)
+            {
+                return new InvalidOperationException(
+                    "Track runtime compilation failed without an error diagnostic.");
+            }
+
+            string segmentContext = firstError.SegmentIndex.HasValue
+                ? $"segment index {firstError.SegmentIndex.Value}" +
+                  (firstError.SegmentId is null ? string.Empty : $" (ID '{firstError.SegmentId}')")
+                : "global track context";
+
+            return new InvalidOperationException(
+                $"Track runtime compilation failed with {firstError.Code} at " +
+                $"{segmentContext}: {firstError.Message}");
         }
 
         private static GeometricSection CreateGeometricSection(

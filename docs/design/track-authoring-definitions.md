@@ -134,6 +134,8 @@ and tolerances produces equivalent values and ordering.
 
 - `Definition`: the exact validated `TrackAuthoringDefinition` instance
 - `Document`: the evaluator-ready `TrackDocument` snapshot
+- `Runtime`: a non-null `CompiledTrackRuntime` sampling snapshot compiled from
+  that document with `TrackSamplingOptions.Default`
 - `ResolvedSections`: one ordered
   `ResolvedSectionInterval<GeometricSectionDefinition>` per authored section
 - `TotalLength`: the compiled total in station-distance units
@@ -175,8 +177,16 @@ evaluator, spline, FVD, IO, and `TrackDocument` contracts unchanged.
 authored definition. A transition entry has no single constant curvature value,
 so its `GeometricSection.Curvature` is null rather than an inaccurate scalar.
 
-Repeated compilations from the same definition are deterministic and produce
-equivalent canonical frame samples through `TrackEvaluator`.
+Every `Compile` call builds a new document and a new runtime. Repeated
+compilations from the same definition are deterministic and produce equivalent
+canonical frame samples through `TrackEvaluator`, but the returned `Document`
+and `Runtime` objects are distinct snapshots.
+
+The runtime captures segment membership, order, measured lengths, rolls, and
+sampling state at compile time. It is not a deep clone of the segment curves:
+curve objects are retained by reference and should be treated as immutable for
+the lifetime of the runtime. Mutating a referenced curve can invalidate the
+runtime's compiled measurements. Recompile after curve mutation.
 
 `Quantum.Debug.AuthoringPipelineProofScenario` is the built-in end-to-end proof
 for this compilation path. It authors a zero-roll 12 m straight, 24 m
@@ -207,11 +217,19 @@ This dedicated command leaves `AuthoringPipelineProofScenario` and the default
 `DebugViewportSnapshotV1` without adding contract fields or visualization
 behavior.
 
-`TrackDocument` remains mutable under its existing contract. Mutating the
-document returned by a compilation can break its index and distance alignment
-with `Definition` and `ResolvedSections`. Compile the definition again to obtain
-a fresh aligned document snapshot; the compilation does not silently track or
-rewrite later document mutations.
+`TrackDocument` remains mutable under its existing contract. A
+`TrackEvaluator` constructed from `compilation.Document` remains live and
+observes later segment-list mutations on subsequent calls. A `TrackEvaluator`
+constructed from `compilation.Runtime` uses the compile-time sampling snapshot
+instead.
+
+Adding, removing, replacing, clearing, or reordering `Document.Segments` does
+not update `Runtime`, `ResolvedSections`, or `TotalLength`. Such mutations can
+therefore break the compilation's index, distance, and geometry alignment. The
+runtime continues to sample its captured segment state, while the live document
+evaluator follows the mutated document. Compile the definition again to obtain
+a fresh aligned document/runtime pair; the compilation does not silently track
+or rewrite later document mutations.
 
 ## API Boundary
 
@@ -253,8 +271,9 @@ var definition = new TrackAuthoringDefinition(new GeometricSectionDefinition[]
 TrackAuthoringCompilation compilation =
     TrackAuthoringDocumentBuilder.Compile(definition);
 TrackDocument document = compilation.Document;
-var evaluator = new TrackEvaluator(document);
-TrackFrame frame = evaluator.EvaluateFrameAtDistance(18.0);
+var runtimeEvaluator = new TrackEvaluator(compilation.Runtime);
+var liveDocumentEvaluator = new TrackEvaluator(document);
+TrackFrame frame = runtimeEvaluator.EvaluateFrameAtDistance(18.0);
 
 TrackAuthoringBoundaryContinuityReport continuity =
     TrackAuthoringBoundaryContinuityDiagnostics.Analyze(

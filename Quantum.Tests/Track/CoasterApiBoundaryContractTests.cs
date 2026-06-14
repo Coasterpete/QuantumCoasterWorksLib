@@ -407,6 +407,10 @@ public sealed class CoasterApiBoundaryContractTests
             typeof(TrackDocument));
         AssertProperty(
             typeof(TrackAuthoringCompilation),
+            nameof(TrackAuthoringCompilation.Runtime),
+            typeof(CompiledTrackRuntime));
+        AssertProperty(
+            typeof(TrackAuthoringCompilation),
             nameof(TrackAuthoringCompilation.ResolvedSections),
             typeof(IReadOnlyList<ResolvedSectionInterval<GeometricSectionDefinition>>));
         AssertProperty(

@@ -9,9 +9,10 @@ namespace Quantum.Track.Authoring
     /// <remarks>
     /// Resolved section intervals retain the exact source definition instances and
     /// align by index with both <see cref="TrackDocument.Segments"/> and
-    /// <see cref="TrackDocument.Sections"/>. The document remains mutable by its
-    /// existing contract; compile the definition again after mutation to restore
-    /// that alignment.
+    /// <see cref="TrackDocument.Sections"/>. <see cref="Runtime"/> captures the
+    /// document's sampling state at compilation time. The document remains mutable
+    /// by its existing contract; compile the definition again after mutation to
+    /// restore alignment with the runtime and resolved intervals.
     /// </remarks>
     public sealed class TrackAuthoringCompilation
     {
@@ -21,11 +22,13 @@ namespace Quantum.Track.Authoring
         internal TrackAuthoringCompilation(
             TrackAuthoringDefinition definition,
             TrackDocument document,
+            CompiledTrackRuntime runtime,
             IEnumerable<ResolvedSectionInterval<GeometricSectionDefinition>> resolvedSections,
             double totalLength)
         {
             Definition = definition ?? throw new ArgumentNullException(nameof(definition));
             Document = document ?? throw new ArgumentNullException(nameof(document));
+            Runtime = runtime ?? throw new ArgumentNullException(nameof(runtime));
 
             if (resolvedSections is null)
             {
@@ -46,6 +49,11 @@ namespace Quantum.Track.Authoring
         /// Mutable evaluator-ready document snapshot produced by this compilation.
         /// </summary>
         public TrackDocument Document { get; }
+
+        /// <summary>
+        /// Compile-once sampling snapshot produced from <see cref="Document"/>.
+        /// </summary>
+        public CompiledTrackRuntime Runtime { get; }
 
         /// <summary>
         /// Ordered source-definition ranges in station-distance units.
