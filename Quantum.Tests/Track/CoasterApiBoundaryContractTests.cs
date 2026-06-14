@@ -212,6 +212,7 @@ public sealed class CoasterApiBoundaryContractTests
     {
         AssertProperty(typeof(TrackDocument), nameof(TrackDocument.Segments), typeof(IList<TrackSegment>));
         AssertProperty(typeof(TrackDocument), nameof(TrackDocument.Sections), typeof(IList<TrackSection>));
+        AssertProperty(typeof(TrackDocument), nameof(TrackDocument.StartPose), typeof(TrackStartPose));
         AssertProperty(typeof(TrackDocument), nameof(TrackDocument.TotalLength), typeof(double));
 
         AssertProperty(typeof(TrackSegment), nameof(TrackSegment.Length), typeof(double));
@@ -225,6 +226,7 @@ public sealed class CoasterApiBoundaryContractTests
     {
         Type[] authoringTypes =
         {
+            typeof(TrackStartPose),
             typeof(TrackAuthoringDefinition),
             typeof(GeometricSectionDefinition),
             typeof(StraightSectionDefinition),
@@ -273,6 +275,40 @@ public sealed class CoasterApiBoundaryContractTests
                 }
             }
         }
+    }
+
+    [Fact]
+    public void TrackSpatialAuthoring_ExposesBackendPoseContract()
+    {
+        Assert.True(typeof(TrackStartPose).IsSealed);
+        AssertConstructor(
+            typeof(TrackStartPose),
+            typeof(Vector3d),
+            typeof(Vector3d),
+            typeof(Vector3d),
+            typeof(Vector3d));
+        AssertProperty(typeof(TrackStartPose), nameof(TrackStartPose.Position), typeof(Vector3d));
+        AssertProperty(typeof(TrackStartPose), nameof(TrackStartPose.Tangent), typeof(Vector3d));
+        AssertProperty(typeof(TrackStartPose), nameof(TrackStartPose.Normal), typeof(Vector3d));
+        AssertProperty(typeof(TrackStartPose), nameof(TrackStartPose.Binormal), typeof(Vector3d));
+
+        PropertyInfo? identity = typeof(TrackStartPose).GetProperty(
+            nameof(TrackStartPose.Identity),
+            BindingFlags.Public | BindingFlags.Static);
+        Assert.NotNull(identity);
+        Assert.Equal(typeof(TrackStartPose), identity.PropertyType);
+
+        AssertConstructor(
+            typeof(TrackAuthoringDefinition),
+            typeof(IEnumerable<GeometricSectionDefinition>));
+        AssertConstructor(
+            typeof(TrackAuthoringDefinition),
+            typeof(IEnumerable<GeometricSectionDefinition>),
+            typeof(TrackStartPose));
+        AssertProperty(
+            typeof(TrackAuthoringDefinition),
+            nameof(TrackAuthoringDefinition.StartPose),
+            typeof(TrackStartPose));
     }
 
     [Fact]

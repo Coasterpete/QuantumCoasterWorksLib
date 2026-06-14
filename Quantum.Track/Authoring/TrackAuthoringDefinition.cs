@@ -11,11 +11,20 @@ namespace Quantum.Track.Authoring
         private readonly IReadOnlyList<GeometricSectionDefinition> _sections;
 
         public TrackAuthoringDefinition(IEnumerable<GeometricSectionDefinition> sections)
+            : this(sections, TrackStartPose.Identity)
+        {
+        }
+
+        public TrackAuthoringDefinition(
+            IEnumerable<GeometricSectionDefinition> sections,
+            TrackStartPose startPose)
         {
             if (sections is null)
             {
                 throw new ArgumentNullException(nameof(sections));
             }
+
+            StartPose = startPose ?? throw new ArgumentNullException(nameof(startPose));
 
             var copiedSections = new List<GeometricSectionDefinition>();
             var ids = new HashSet<string>(StringComparer.Ordinal);
@@ -60,5 +69,10 @@ namespace Quantum.Track.Authoring
         /// Ordered validated sections. The input sequence is copied at construction.
         /// </summary>
         public IReadOnlyList<GeometricSectionDefinition> Sections => _sections;
+
+        /// <summary>
+        /// Unbanked construction frame used to place the first authored section.
+        /// </summary>
+        public TrackStartPose StartPose { get; }
     }
 }

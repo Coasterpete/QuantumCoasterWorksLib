@@ -47,11 +47,15 @@ namespace Quantum.Track.Authoring
                 geometricSections.Add(CreateGeometricSection(definitions[i]));
             }
 
-            List<TrackSegment> segments = ContainsTransition(definitions)
-                ? CreateTransitionAwareSegments(definitions, geometricSections)
-                : CreateM140Segments(definitions, resolvedSections, geometricSections);
+            List<TrackSegment> segments = CreatePlacedSegments(
+                definitions,
+                geometricSections,
+                definition.StartPose);
 
-            var document = new TrackDocument(segments, geometricSections);
+            var document = new TrackDocument(
+                segments,
+                geometricSections,
+                definition.StartPose);
             double totalLength = resolvedSections[resolvedSections.Count - 1].EndDistance;
             TrackRuntimeCompileResult runtimeCompilation = TrackRuntimeCompiler.Compile(
                 document,
@@ -131,49 +135,16 @@ namespace Quantum.Track.Authoring
                 $"Unsupported geometric section definition type '{definition.GetType().FullName}'.");
         }
 
-        private static bool ContainsTransition(
-            IReadOnlyList<GeometricSectionDefinition> definitions)
-        {
-            for (int i = 0; i < definitions.Count; i++)
-            {
-                if (definitions[i] is CurvatureTransitionSectionDefinition)
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        private static List<TrackSegment> CreateM140Segments(
+        private static List<TrackSegment> CreatePlacedSegments(
             IReadOnlyList<GeometricSectionDefinition> definitions,
-            IReadOnlyList<ResolvedSectionInterval<GeometricSectionDefinition>> resolvedSections,
-            IReadOnlyList<GeometricSection> geometricSections)
-        {
-            CompositeSectionCurve assembledCurve = SectionCurveAssembler.Assemble(geometricSections);
-            var segments = new List<TrackSegment>(definitions.Count);
-
-            for (int i = 0; i < definitions.Count; i++)
-            {
-                ResolvedSectionInterval<GeometricSectionDefinition> resolvedSection = resolvedSections[i];
-                var curve = new AuthoringSectionCurve(
-                    assembledCurve,
-                    resolvedSection.StartDistance,
-                    resolvedSection.Length);
-
-                segments.Add(CreateSegment(definitions[i], curve));
-            }
-
-            return segments;
-        }
-
-        private static List<TrackSegment> CreateTransitionAwareSegments(
-            IReadOnlyList<GeometricSectionDefinition> definitions,
-            IReadOnlyList<GeometricSection> geometricSections)
+            IReadOnlyList<GeometricSection> geometricSections,
+            TrackStartPose startPose)
         {
             var segments = new List<TrackSegment>(definitions.Count);
-            Vector3d currentPosition = Vector3d.Zero;
-            double currentHeadingRadians = 0.0;
+            Vector3d currentPosition = startPose.Position;
+            Vector3d currentTangent = startPose.Tangent;
+            Vector3d currentNormal = startPose.Normal;
+            Vector3d currentBinormal = startPose.Binormal;
 
             for (int i = 0; i < definitions.Count; i++)
             {
@@ -181,13 +152,20 @@ namespace Quantum.Track.Authoring
                 var placedCurve = new PlacedAuthoringSectionCurve(
                     localCurve,
                     currentPosition,
-                    currentHeadingRadians);
+                    currentTangent,
+                    currentNormal,
+                    currentBinormal);
 
                 segments.Add(CreateSegment(definitions[i], placedCurve));
 
                 currentPosition = placedCurve.Evaluate(1.0);
-                Vector3d endTangent = placedCurve.Tangent(1.0);
-                currentHeadingRadians = System.Math.Atan2(endTangent.Y, endTangent.X);
+                Vector3d localEndTangent = localCurve.Tangent(1.0);
+                Vector3d previousTangent = currentTangent;
+                Vector3d previousNormal = currentNormal;
+                currentTangent = (previousTangent * localEndTangent.X) +
+                                 (previousNormal * localEndTangent.Y);
+                currentNormal = (previousTangent * -localEndTangent.Y) +
+                                (previousNormal * localEndTangent.X);
             }
 
             return segments;

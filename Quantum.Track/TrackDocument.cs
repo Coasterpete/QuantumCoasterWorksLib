@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Quantum.Track.Authoring;
 
 namespace Quantum.Track
 {
@@ -31,6 +32,14 @@ namespace Quantum.Track
         public TrackDocument(
             IEnumerable<TrackSegment>? segments = null,
             IEnumerable<TrackSection>? sections = null)
+            : this(segments, sections, startPose: null)
+        {
+        }
+
+        internal TrackDocument(
+            IEnumerable<TrackSegment>? segments,
+            IEnumerable<TrackSection>? sections,
+            TrackStartPose? startPose)
         {
             Segments = segments is null
                 ? new List<TrackSegment>()
@@ -39,7 +48,15 @@ namespace Quantum.Track
             Sections = sections is null
                 ? new List<TrackSection>()
                 : new List<TrackSection>(sections);
+
+            StartPose = startPose;
         }
+
+        /// <summary>
+        /// Optional authored unbanked construction frame. Manually constructed
+        /// documents retain null and use legacy canonical frame seeding.
+        /// </summary>
+        public TrackStartPose? StartPose { get; }
 
         /// <summary>
         /// Live ordered centerline segments whose lengths define station-distance sampling.

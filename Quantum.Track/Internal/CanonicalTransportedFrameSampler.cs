@@ -12,12 +12,15 @@ namespace Quantum.Track.Internal
 
         private readonly CompiledTrackSamplingContext _samplingContext;
         private readonly TransportNode[] _nodes;
+        private readonly Vector3d? _authoredStartNormal;
 
         public CanonicalTransportedFrameSampler(
             CompiledTrackSamplingContext samplingContext,
-            IReadOnlyList<double> nodeDistances)
+            IReadOnlyList<double> nodeDistances,
+            Vector3d? authoredStartNormal)
         {
             _samplingContext = samplingContext ?? throw new ArgumentNullException(nameof(samplingContext));
+            _authoredStartNormal = authoredStartNormal;
             if (nodeDistances is null)
             {
                 throw new ArgumentNullException(nameof(nodeDistances));
@@ -97,7 +100,9 @@ namespace Quantum.Track.Internal
             ResolvedTrackDistance firstResolved = _samplingContext.Resolve(nodeDistances[0]);
             CenterlineSample firstSample = EvaluateCenterline(firstResolved);
             Vector3d previousTangent = firstSample.Tangent;
-            Vector3d previousNormal = BuildInitialNormal(previousTangent);
+            Vector3d previousNormal = _authoredStartNormal.HasValue
+                ? ResolveProjectedNormal(_authoredStartNormal.Value, previousTangent)
+                : BuildInitialNormal(previousTangent);
             nodes[0] = new TransportNode(firstResolved.ClampedDistance, previousTangent, previousNormal);
 
             for (int i = 1; i < nodeDistances.Count; i++)
