@@ -17,6 +17,7 @@ namespace Quantum.Debug
         DebugViewportSnapshotV1Gallery,
         DebugViewportSnapshotV1Browser,
         DebugViewportSnapshotV1TransitionAuthoring,
+        DebugViewportSnapshotV1SpatialLayout,
         DebugViewportSnapshotV1BankingProfile,
         LongitudinalForcePreview,
         LongitudinalSpeedPreview,
@@ -111,6 +112,12 @@ namespace Quantum.Debug
             if (string.Equals(args[0], DebugViewportSnapshotV1TransitionAuthoringSampleCommand.CommandName, StringComparison.OrdinalIgnoreCase))
             {
                 command = DebugCommandKind.DebugViewportSnapshotV1TransitionAuthoring;
+                return true;
+            }
+
+            if (string.Equals(args[0], DebugViewportSnapshotV1SpatialLayoutSampleCommand.CommandName, StringComparison.OrdinalIgnoreCase))
+            {
+                command = DebugCommandKind.DebugViewportSnapshotV1SpatialLayout;
                 return true;
             }
 

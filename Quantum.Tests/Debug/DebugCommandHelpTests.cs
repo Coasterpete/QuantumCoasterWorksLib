@@ -27,6 +27,7 @@ public sealed class DebugCommandHelpTests
         Assert.Contains("debug-viewport-snapshot-v1-gallery [artifactDirectory] [outputHtmlPath]", output);
         Assert.Contains("debug-viewport-snapshot-v1-browser [artifactDirectory] [outputHtmlPath]", output);
         Assert.Contains("debug-viewport-snapshot-v1-transition-authoring [outputPath]", output);
+        Assert.Contains("debug-viewport-snapshot-v1-spatial-layout [outputPath]", output);
         Assert.Contains("debug-viewport-snapshot-v1-banking-profile [outputPath]", output);
         Assert.Contains("centerline-frame-continuity [outputPath]", output);
         Assert.Contains("transported-frame-comparison [outputPath]", output);
@@ -186,6 +187,28 @@ public sealed class DebugCommandHelpTests
         Assert.Contains("straight, transition-in, constant arc, transition-out, and straight", output);
         Assert.Contains("17 frames at 3 m intervals", output);
         Assert.Contains("36, 30, 24, 18, and 12 m", output);
+        Assert.Contains("reuses DebugViewportSnapshotV1 and TrainPoseExportV1 unchanged", output);
+    }
+
+    [Fact]
+    public void TryWriteRequestedHelp_DebugViewportSpatialLayout_PrintsScenarioDetails()
+    {
+        var writer = new StringWriter(CultureInfo.InvariantCulture);
+
+        bool handled = DebugCommandHelp.TryWriteRequestedHelp(
+            new[] { "help", "debug-viewport-snapshot-v1-spatial-layout" },
+            writer,
+            out int exitCode);
+
+        Assert.True(handled);
+        Assert.Equal(0, exitCode);
+
+        string output = writer.ToString();
+        Assert.Contains("debug-viewport-snapshot-v1-spatial-layout [outputPath]", output);
+        Assert.Contains("translated 45-degree yawed start pose", output);
+        Assert.Contains("25 frames at 3 m intervals", output);
+        Assert.Contains("60, 54, 48, 42, 36, 30, 24, 18, and 12 m", output);
+        Assert.Contains("compiled-geometry continuity diagnostics", output);
         Assert.Contains("reuses DebugViewportSnapshotV1 and TrainPoseExportV1 unchanged", output);
     }
 
@@ -428,6 +451,7 @@ public sealed class DebugCommandHelpTests
         Assert.Contains("debug-viewport-snapshot-v1 [outputPath]", output);
         Assert.Contains("debug-viewport-snapshot-v1-gallery [artifactDirectory] [outputHtmlPath]", output);
         Assert.Contains("debug-viewport-snapshot-v1-browser [artifactDirectory] [outputHtmlPath]", output);
+        Assert.Contains("debug-viewport-snapshot-v1-spatial-layout [outputPath]", output);
         Assert.Contains("debug-viewport-snapshot-v1-banking-profile [outputPath]", output);
         Assert.Contains("longitudinal-speed-preview [preset] [outputPath] [initialSpeedMps]", output);
         Assert.Contains("centerline-frame-continuity [outputPath]", output);

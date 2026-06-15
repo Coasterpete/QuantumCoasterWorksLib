@@ -179,6 +179,25 @@ namespace Quantum.Debug
                     "dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1-transition-authoring artifacts/debug-viewport/DebugViewportSnapshotV1.transition-authoring.sample.json"
                 }),
             new DebugCommandHelpEntry(
+                name: DebugViewportSnapshotV1SpatialLayoutSampleCommand.CommandName,
+                usage: "debug-viewport-snapshot-v1-spatial-layout [outputPath]",
+                summary: "Write the deterministic three-dimensional spatial-layout DebugViewportSnapshotV1 sample.",
+                arguments: new[]
+                {
+                    "outputPath: Optional JSON output path. Defaults to " +
+                    DebugViewportSnapshotV1SpatialLayoutSampleCommand.DefaultRelativeOutputPath + ".",
+                    "The sample uses a translated 45-degree yawed start pose and five zero-roll straight/spatial sections over 72 m.",
+                    "It samples 25 frames at 3 m intervals and places nine train cars at 60, 54, 48, 42, 36, 30, 24, 18, and 12 m.",
+                    "All four joins pass the default compiled-geometry continuity diagnostics.",
+                    "The command reuses DebugViewportSnapshotV1 and TrainPoseExportV1 unchanged.",
+                    DebugViewportPreviewIndexNote
+                },
+                examples: new[]
+                {
+                    "dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1-spatial-layout",
+                    "dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1-spatial-layout artifacts/debug-viewport/DebugViewportSnapshotV1.spatial-layout.sample.json"
+                }),
+            new DebugCommandHelpEntry(
                 name: DebugViewportSnapshotV1BankingProfileSampleCommand.CommandName,
                 usage: "debug-viewport-snapshot-v1-banking-profile [outputPath]",
                 summary: "Write a DebugViewportSnapshotV1 sample from the opt-in BankingProfile train-pose path.",
