@@ -2,8 +2,34 @@
 
 Purpose: quick plain-language map of how backend track data becomes engine-agnostic train pose output for debug frontends, export adapters, physics systems, and other consumers.
 
-Pipeline:
-`TrackDocument -> TrackEvaluator -> TrackFrame -> TrainCarTransformProvider -> TrainPoseResult -> debug/export/physics/frontend consumers`
+Authoring / compilation / runtime lane:
+`TrackAuthoringDefinition -> TrackAuthoringDocumentBuilder.Compile -> TrackAuthoringCompilation -> TrackDocument or CompiledTrackRuntime`
+
+Evaluation lane:
+`TrackDocument or CompiledTrackRuntime -> TrackEvaluator -> TrackFrame -> TrainCarTransformProvider -> TrainPoseResult -> debug/export/physics/frontend consumers`
+
+Geometry continuity diagnostics can compile a `TrackAuthoringDefinition`
+internally or reuse an existing `TrackAuthoringCompilation`. Reuse avoids a
+duplicate document/runtime compilation and reads the supplied compiled document
+curves without changing evaluator, runtime, train, IO, export, or frontend
+behavior.
+
+## 0) Track Authoring / Compilation / Runtime
+What it owns:
+- `TrackAuthoringDefinition` is the validated, engine-agnostic authored section input.
+- `TrackAuthoringDocumentBuilder.Compile` creates one aligned `TrackAuthoringCompilation`.
+- The compilation groups the evaluator-ready mutable `TrackDocument`, compile-time
+  `CompiledTrackRuntime`, resolved section intervals, and total length.
+
+What it assumes:
+- Definition section order and lengths are valid and deterministic.
+- Compiled document segment order remains aligned with source and resolved sections.
+- Referenced curves are treated as immutable for the lifetime of the runtime snapshot.
+
+What breaks if changed:
+- Later document mutation can diverge from the runtime and resolved interval snapshot.
+- Diagnostics or evaluators using different sides of a stale compilation can disagree.
+- Recompile after mutation to restore one aligned authoring/document/runtime snapshot.
 
 ## 1) TrackDocument
 What it owns:

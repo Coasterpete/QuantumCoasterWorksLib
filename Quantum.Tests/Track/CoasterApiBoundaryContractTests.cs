@@ -466,6 +466,17 @@ public sealed class CoasterApiBoundaryContractTests
             nameof(TrackAuthoringDocumentBuilder.Compile),
             typeof(TrackAuthoringCompilation),
             typeof(TrackAuthoringDefinition));
+        AssertMethod(
+            typeof(TrackAuthoringGeometryContinuityDiagnostics),
+            nameof(TrackAuthoringGeometryContinuityDiagnostics.Analyze),
+            typeof(TrackAuthoringGeometryContinuityReport),
+            typeof(TrackAuthoringCompilation));
+        AssertMethod(
+            typeof(TrackAuthoringGeometryContinuityDiagnostics),
+            nameof(TrackAuthoringGeometryContinuityDiagnostics.Analyze),
+            typeof(TrackAuthoringGeometryContinuityReport),
+            typeof(TrackAuthoringCompilation),
+            typeof(TrackAuthoringGeometryContinuityTolerances));
     }
 
     [Fact]

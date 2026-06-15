@@ -287,6 +287,19 @@ namespace Quantum.Track.Authoring
             return AnalyzeCompilation(compilation, tolerances);
         }
 
+        public static TrackAuthoringGeometryContinuityReport Analyze(
+            TrackAuthoringCompilation compilation)
+        {
+            return Analyze(compilation, TrackAuthoringGeometryContinuityTolerances.Default);
+        }
+
+        public static TrackAuthoringGeometryContinuityReport Analyze(
+            TrackAuthoringCompilation compilation,
+            TrackAuthoringGeometryContinuityTolerances tolerances)
+        {
+            return AnalyzeCompilation(compilation, tolerances);
+        }
+
         internal static TrackAuthoringGeometryContinuityReport AnalyzeCompilation(
             TrackAuthoringCompilation compilation,
             TrackAuthoringGeometryContinuityTolerances tolerances)
