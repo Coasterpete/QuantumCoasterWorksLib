@@ -127,6 +127,17 @@ public sealed class DebugCommandParserTests
     }
 
     [Fact]
+    public void TryParse_DebugViewportSnapshotV1SpatialLayoutCommand_ParsesCaseInsensitive()
+    {
+        bool parsed = DebugCommandParser.TryParse(
+            new[] { "DeBuG-ViEwPoRt-SnApShOt-V1-SpAtIaL-LaYoUt" },
+            out DebugCommandKind command);
+
+        Assert.True(parsed);
+        Assert.Equal(DebugCommandKind.DebugViewportSnapshotV1SpatialLayout, command);
+    }
+
+    [Fact]
     public void TryParse_LongitudinalForcePreviewCommand_ParsesCaseInsensitive()
     {
         bool parsed = DebugCommandParser.TryParse(new[] { "LoNgItUdInAl-FoRcE-PrEvIeW" }, out DebugCommandKind command);

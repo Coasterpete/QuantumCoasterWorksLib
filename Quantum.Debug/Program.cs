@@ -160,6 +160,18 @@ namespace Quantum.Debug
                 return DebugViewportSnapshotV1TransitionAuthoringSampleCommand.Run(outputPath);
             }
 
+            if (command == DebugCommandKind.DebugViewportSnapshotV1SpatialLayout)
+            {
+                if (args.Length > 2)
+                {
+                    Console.WriteLine("Usage: debug-viewport-snapshot-v1-spatial-layout [outputPath]");
+                    return 1;
+                }
+
+                string? outputPath = args.Length == 2 ? args[1] : null;
+                return DebugViewportSnapshotV1SpatialLayoutSampleCommand.Run(outputPath);
+            }
+
             if (command == DebugCommandKind.LongitudinalForcePreview)
             {
                 if (!TryParseLongitudinalForcePreviewArgs(args, out LongitudinalForcePreviewPreset preset, out string? outputPath))

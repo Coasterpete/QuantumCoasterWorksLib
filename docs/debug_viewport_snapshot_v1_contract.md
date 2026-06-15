@@ -78,6 +78,18 @@ dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1-transition-auth
 
 The default output path is `artifacts/debug-viewport/DebugViewportSnapshotV1.transition-authoring.sample.json`. This dedicated sample uses the sibling `TransitionAuthoringProofScenario`: a zero-roll 12 m straight, 6 m curvature transition from 0 to `1/20`, 12 m constant arc, 6 m transition back to 0, and 12 m straight. It exports 17 frames at 3 m intervals and five train cars centered at 36, 30, 24, 18, and 12 m. The default sample command and `AuthoringPipelineProofScenario` remain unchanged.
 
+Generate the spatial-layout proof sample with:
+
+```powershell
+dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1-spatial-layout
+```
+
+The default output path is `artifacts/debug-viewport/DebugViewportSnapshotV1.spatial-layout.sample.json`. The `spatial-layout-proof` fixture uses a translated, 45-degree yawed start pose and five zero-roll sections with stations at 0, 12, 30, 42, 60, and 72 m. Its two 18 m spatial sections rise/turn and descend/counter-turn between three straight sections, with straight endpoint control-point runs so all four joins pass the default compiled-geometry continuity diagnostics. The sample evaluates the compiled runtime and exports 25 centerline points, 25 frames, three axis lines, nine train-body boxes, and an unchanged nested `TrainPoseExportV1` payload with nine cars centered at 60, 54, 48, 42, 36, 30, 24, 18, and 12 m.
+
+The generated JSON uses the existing validation, SVG, preview-index, gallery,
+and browser paths unchanged. No spatial-layout-specific IO fields or viewer
+behavior are added, and generated JSON/SVG files remain local ignored artifacts.
+
 Generate a BankingProfile train-pose inspection sample with:
 
 ```powershell
@@ -122,6 +134,11 @@ end-to-end proof for five-section transition compilation, continuous authored
 boundaries, frame sampling, distance-based train placement, and current debug
 snapshot tooling. It adds no new IO fields, interpolation modes, section types,
 or visualization behavior.
+
+The spatial-layout sample follows those same contracts and proves authored 3D
+extent, stable runtime frames, geometry-continuous straight/spatial joins, and
+nine-car distance placement. Existing snapshot validators and converters consume
+it without special cases.
 
 ## Fixture Regression Path
 

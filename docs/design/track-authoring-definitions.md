@@ -395,6 +395,33 @@ This dedicated command leaves `AuthoringPipelineProofScenario` and the default
 `DebugViewportSnapshotV1` without adding contract fields or visualization
 behavior.
 
+`Quantum.Debug.SpatialLayoutProofScenario` is the deterministic three-dimensional
+authoring proof. It starts from a translated pose yawed 45 degrees with world-up
+as the authored normal, then compiles five zero-roll sections: a 12 m entry
+straight, an 18 m rising/turning `SpatialSectionDefinition`, a 12 m elevated
+straight, an 18 m descending/counter-turning spatial section, and a 12 m exit
+straight. The exact section stations are 0, 12, 30, 42, 60, and 72 m. Each
+spatial section uses collinear control-point runs at its start and end so its
+curvature approaches zero at the neighboring straight joins. The existing
+compiled-geometry continuity diagnostics report all four boundaries and no
+default diagnostics.
+
+The scenario evaluates `compilation.Runtime`, samples 25 frames every 3 m from
+0 through 72 m, and verifies displacement along both the authored normal and
+binormal axes. Its nine-car train uses 6 m center spacing at stations 60, 54,
+48, 42, 36, 30, 24, 18, and 12 m. Cars centered at 60, 42, 30, and 12 m have
+bogies on opposite sides of those four section boundaries. Generate the proof
+snapshot with:
+
+```powershell
+dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1-spatial-layout
+```
+
+The command exports the existing `DebugViewportSnapshotV1` shape with nine
+train-body boxes and the unchanged nested `TrainPoseExportV1` payload. It does
+not add geometry types, alter IO contracts, or change runtime, viewer, renderer,
+or persistence behavior.
+
 `TrackDocument` remains mutable under its existing contract. A
 `TrackEvaluator` constructed from `compilation.Document` remains live and
 observes later segment-list mutations on subsequent calls. A `TrackEvaluator`
