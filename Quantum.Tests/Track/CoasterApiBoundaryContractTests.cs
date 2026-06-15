@@ -232,6 +232,7 @@ public sealed class CoasterApiBoundaryContractTests
             typeof(StraightSectionDefinition),
             typeof(ConstantCurvatureSectionDefinition),
             typeof(CurvatureTransitionSectionDefinition),
+            typeof(SpatialSectionDefinition),
             typeof(CurvatureTransitionInterpolationMode),
             typeof(TrackAuthoringCompilation),
             typeof(TrackAuthoringDocumentBuilder),
