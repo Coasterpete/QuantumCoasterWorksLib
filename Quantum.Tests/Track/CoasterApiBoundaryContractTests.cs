@@ -241,7 +241,13 @@ public sealed class CoasterApiBoundaryContractTests
             typeof(TrackAuthoringBoundaryContinuityDiagnosticKind),
             typeof(TrackAuthoringBoundaryContinuityBoundary),
             typeof(TrackAuthoringBoundaryContinuityDiagnostic),
-            typeof(TrackAuthoringBoundaryContinuityReport)
+            typeof(TrackAuthoringBoundaryContinuityReport),
+            typeof(TrackAuthoringGeometryContinuityDiagnostics),
+            typeof(TrackAuthoringGeometryContinuityTolerances),
+            typeof(TrackAuthoringGeometryContinuityDiagnosticKind),
+            typeof(TrackAuthoringGeometryContinuityBoundary),
+            typeof(TrackAuthoringGeometryContinuityDiagnostic),
+            typeof(TrackAuthoringGeometryContinuityReport)
         };
 
         foreach (Type type in authoringTypes)

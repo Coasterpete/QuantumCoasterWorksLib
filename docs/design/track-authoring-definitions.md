@@ -166,9 +166,9 @@ Curvature endpoints are mapped directly from the authoring definitions:
 
 Spatial geometry does not have one authored scalar boundary curvature, so
 `TrackAuthoringBoundaryContinuityDiagnostics` does not support definitions that
-contain `SpatialSectionDefinition` in this milestone. No spatial C0, G1, or
-higher-order geometry diagnostic contract is added here; compilation still
-places valid mixed sections continuously by construction.
+contain `SpatialSectionDefinition`. Use the compiled-geometry diagnostics below
+when a layout includes spatial sections or when actual generated centerline
+continuity matters.
 
 The signed boundary curvature delta is:
 
@@ -193,6 +193,69 @@ collections. Boundaries are ordered by authored section order. Diagnostics are
 ordered by boundary, with `CurvatureDiscontinuity` before `RollDiscontinuity` when
 both are present at the same boundary. Repeated analysis of the same definition
 and tolerances produces equivalent values and ordering.
+
+## Geometry Continuity Diagnostics
+
+`TrackAuthoringGeometryContinuityDiagnostics` measures the actual generated
+centerline geometry at every adjacent authored boundary. Unlike the scalar
+boundary diagnostics, it first calls `TrackAuthoringDocumentBuilder.Compile`
+and treats the resulting document curves as the source of truth. It supports
+straight, constant-curvature, curvature-transition, and spatial definitions in
+the same mixed layout.
+
+The two diagnostic paths answer different questions:
+
+- `TrackAuthoringBoundaryContinuityDiagnostics` compares authored scalar
+  curvature and roll values without compiling, and does not support spatial
+  definitions.
+- `TrackAuthoringGeometryContinuityDiagnostics` compiles the definition and
+  measures generated positions, tangent directions, three-dimensional
+  curvature vectors, and roll values.
+
+For `N` sections, the geometry report contains `N - 1` ordered boundaries with
+the same authored IDs, indices, and cumulative previous-end stations used by
+the compilation. Measurements are:
+
+```text
+positionGap          = nextStartPosition - previousEndPosition
+tangentAngle         = atan2(length(cross(previousEndTangent, nextStartTangent)),
+                              dot(previousEndTangent, nextStartTangent))
+curvatureVectorDelta = nextStartCurvatureVector - previousEndCurvatureVector
+rollDelta            = shortest full-turn-wrapped(nextRoll - previousRoll)
+```
+
+Endpoint curvature vectors approximate `dT/ds` independently on each curve
+with second-order one-sided three-point derivatives. The distance step is the
+smaller of `1e-3` station units and `sectionLength / 1024`. Each derivative is
+projected perpendicular to its normalized endpoint tangent before the two
+vectors are compared. This removes finite-difference drift parallel to the
+tangent and allows spatial curvature direction changes to be diagnosed in
+world coordinates.
+
+`TrackAuthoringGeometryContinuityTolerances` defaults are:
+
+- position gap magnitude: `1e-7` station-distance units
+- tangent angle: `1e-7` radians
+- curvature-vector delta magnitude: `1e-4` inverse station-distance units
+- wrapped roll delta magnitude: `1e-9` radians
+
+A diagnostic is emitted only when its non-negative measured magnitude or angle
+is strictly greater than the matching tolerance; equality is accepted.
+Negative and non-finite tolerances are rejected. Diagnostics are ordered by
+boundary, then position, tangent, curvature vector, and roll. Reports copy their
+boundary and diagnostic collections into read-only snapshots and repeated
+analysis is deterministic.
+
+Geometry diagnostics are non-fatal and read-only. They do not modify authored
+values, repair boundaries, alter compilation, or change generated curves. Each
+analysis pays the full normal authoring compile cost, including document and
+runtime compilation, before doing the endpoint measurements.
+
+Curvature vectors are numerical estimates, not exact symbolic derivatives.
+Their accuracy is limited by the finite-difference step, curve tangent quality,
+arc-length parameterization accuracy, floating-point scale, and very short or
+high-curvature sections. Tolerances should account for those approximation
+limits; the defaults are intended for the current authoring curve generators.
 
 ## Compilation
 
@@ -415,10 +478,13 @@ foreach (TrackAuthoringBoundaryContinuityDiagnostic diagnostic in continuity.Dia
         $"{diagnostic.PreviousSectionId} -> {diagnostic.NextSectionId}, " +
         $"delta={diagnostic.Delta}");
 }
+
+TrackAuthoringGeometryContinuityReport geometryContinuity =
+    TrackAuthoringGeometryContinuityDiagnostics.Analyze(definition);
 ```
 
 This produces a straight followed by a linear curvature transition into a
 constant-radius left arc. `SpatialSectionDefinition` can be inserted in the same
 ordered section list when an explicitly measured three-dimensional NURBS section
-is needed. Custom knots, spatial continuity diagnostics, force-driven geometry,
-UI workflows, and persistence remain outside this layer.
+is needed. Custom knots, force-driven geometry, UI workflows, and persistence
+remain outside this layer.
