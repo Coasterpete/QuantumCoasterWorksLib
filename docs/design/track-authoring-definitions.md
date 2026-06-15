@@ -197,20 +197,24 @@ and tolerances produces equivalent values and ordering.
 ## Geometry Continuity Diagnostics
 
 `TrackAuthoringGeometryContinuityDiagnostics` measures the actual generated
-centerline geometry at every adjacent authored boundary. Unlike the scalar
-boundary diagnostics, it first calls `TrackAuthoringDocumentBuilder.Compile`
-and treats the resulting document curves as the source of truth. It supports
+centerline geometry at every adjacent authored boundary. The definition
+overloads call `TrackAuthoringDocumentBuilder.Compile` internally and treat the
+resulting document curves as the source of truth. The compilation overloads
+accept an existing `TrackAuthoringCompilation` and reuse its document/runtime
+snapshot instead of compiling the definition again. Both paths support
 straight, constant-curvature, curvature-transition, and spatial definitions in
-the same mixed layout.
+the same mixed layout and produce equivalent reports for the same compilation
+state and tolerances.
 
 The two diagnostic paths answer different questions:
 
 - `TrackAuthoringBoundaryContinuityDiagnostics` compares authored scalar
   curvature and roll values without compiling, and does not support spatial
   definitions.
-- `TrackAuthoringGeometryContinuityDiagnostics` compiles the definition and
-  measures generated positions, tangent directions, three-dimensional
-  curvature vectors, and roll values.
+- `TrackAuthoringGeometryContinuityDiagnostics` measures generated positions,
+  tangent directions, three-dimensional curvature vectors, and roll values,
+  either by compiling a definition internally or by reusing a supplied
+  compilation.
 
 For `N` sections, the geometry report contains `N - 1` ordered boundaries with
 the same authored IDs, indices, and cumulative previous-end stations used by
@@ -247,9 +251,21 @@ boundary and diagnostic collections into read-only snapshots and repeated
 analysis is deterministic.
 
 Geometry diagnostics are non-fatal and read-only. They do not modify authored
-values, repair boundaries, alter compilation, or change generated curves. Each
-analysis pays the full normal authoring compile cost, including document and
-runtime compilation, before doing the endpoint measurements.
+values, repair boundaries, alter compilation, or change generated curves. A
+definition overload pays the full normal authoring compile cost, including
+document and runtime compilation, before doing the endpoint measurements. A
+compilation overload skips that duplicate compile and measures the supplied
+compilation's current document curves using its source definitions and resolved
+section intervals.
+
+The compilation overloads do not refresh or repair a compilation after
+mutation. `TrackDocument` is mutable under its existing contract, while
+`Runtime`, `ResolvedSections`, and `TotalLength` remain the compile-time
+snapshot. Replacing a document segment changes the geometry measured by these
+diagnostics. Adding or removing segments fails the alignment check; replacing or
+reordering segments can produce measurements that no longer match the source
+definition or resolved intervals. Treat compiled curves and segment ordering as
+immutable, or compile the definition again before analyzing.
 
 Curvature vectors are numerical estimates, not exact symbolic derivatives.
 Their accuracy is limited by the finite-difference step, curve tangent quality,
@@ -403,8 +419,8 @@ straight, an 18 m descending/counter-turning spatial section, and a 12 m exit
 straight. The exact section stations are 0, 12, 30, 42, 60, and 72 m. Each
 spatial section uses collinear control-point runs at its start and end so its
 curvature approaches zero at the neighboring straight joins. The existing
-compiled-geometry continuity diagnostics report all four boundaries and no
-default diagnostics.
+compiled-geometry continuity diagnostics reuse this compilation and report all
+four boundaries with no default diagnostics.
 
 The scenario evaluates `compilation.Runtime`, samples 25 frames every 3 m from
 0 through 72 m, and verifies displacement along both the authored normal and

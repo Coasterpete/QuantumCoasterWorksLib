@@ -29,6 +29,43 @@ public sealed class TrackAuthoringGeometryContinuityDiagnosticsTests
         Assert.Equal(1e-7, tolerances.TangentAngleToleranceRadians);
         Assert.Equal(1e-4, tolerances.CurvatureVectorTolerance);
         Assert.Equal(1e-9, tolerances.RollToleranceRadians);
+
+        Assert.Equal(
+            typeof(TrackAuthoringGeometryContinuityReport),
+            typeof(TrackAuthoringGeometryContinuityDiagnostics).GetMethod(
+                nameof(TrackAuthoringGeometryContinuityDiagnostics.Analyze),
+                new[] { typeof(TrackAuthoringCompilation) })?.ReturnType);
+        Assert.Equal(
+            typeof(TrackAuthoringGeometryContinuityReport),
+            typeof(TrackAuthoringGeometryContinuityDiagnostics).GetMethod(
+                nameof(TrackAuthoringGeometryContinuityDiagnostics.Analyze),
+                new[]
+                {
+                    typeof(TrackAuthoringCompilation),
+                    typeof(TrackAuthoringGeometryContinuityTolerances)
+                })?.ReturnType);
+    }
+
+    [Fact]
+    public void Analyze_DefinitionAndCompilationOverloadsProduceEquivalentReports()
+    {
+        TrackAuthoringDefinition definition =
+            CreateMixedSpatialDefinition(CreateArbitraryStartPose());
+        TrackAuthoringCompilation compilation = TrackAuthoringDocumentBuilder.Compile(definition);
+        var tolerances = new TrackAuthoringGeometryContinuityTolerances(
+            1e-8,
+            1e-8,
+            1e-5,
+            1e-8);
+
+        TrackAuthoringGeometryContinuityReport definitionReport =
+            TrackAuthoringGeometryContinuityDiagnostics.Analyze(definition, tolerances);
+        TrackAuthoringGeometryContinuityReport compilationReport =
+            TrackAuthoringGeometryContinuityDiagnostics.Analyze(compilation, tolerances);
+
+        Assert.Equal(definitionReport.Boundaries, compilationReport.Boundaries);
+        Assert.Equal(definitionReport.Diagnostics, compilationReport.Diagnostics);
+        Assert.Equal(definitionReport.Tolerances, compilationReport.Tolerances);
     }
 
     [Fact]
@@ -154,14 +191,12 @@ public sealed class TrackAuthoringGeometryContinuityDiagnosticsTests
     }
 
     [Fact]
-    public void AnalyzeCompilation_SyntheticCurvesEmitPositionAndTangentDiagnostics()
+    public void Analyze_CompilationOverloadUsesSuppliedCompiledDocument()
     {
         TrackAuthoringCompilation compilation = CreateSyntheticDiscontinuousCompilation();
 
         TrackAuthoringGeometryContinuityReport report =
-            TrackAuthoringGeometryContinuityDiagnostics.AnalyzeCompilation(
-                compilation,
-                TrackAuthoringGeometryContinuityTolerances.Default);
+            TrackAuthoringGeometryContinuityDiagnostics.Analyze(compilation);
 
         Assert.Contains(
             report.Diagnostics,
@@ -207,11 +242,11 @@ public sealed class TrackAuthoringGeometryContinuityDiagnosticsTests
     }
 
     [Fact]
-    public void AnalyzeCompilation_EqualityWithEveryToleranceDoesNotEmitDiagnostics()
+    public void Analyze_CompilationOverloadAppliesCustomTolerances()
     {
         TrackAuthoringCompilation compilation = CreateSyntheticDiscontinuousCompilation();
         TrackAuthoringGeometryContinuityBoundary measured = Assert.Single(
-            TrackAuthoringGeometryContinuityDiagnostics.AnalyzeCompilation(
+            TrackAuthoringGeometryContinuityDiagnostics.Analyze(
                 compilation,
                 new TrackAuthoringGeometryContinuityTolerances(0.0, 0.0, 0.0, 0.0))
             .Boundaries);
@@ -222,18 +257,19 @@ public sealed class TrackAuthoringGeometryContinuityDiagnosticsTests
             measured.AbsoluteRollDeltaRadians);
 
         TrackAuthoringGeometryContinuityReport report =
-            TrackAuthoringGeometryContinuityDiagnostics.AnalyzeCompilation(
+            TrackAuthoringGeometryContinuityDiagnostics.Analyze(
                 compilation,
                 exactTolerances);
 
         Assert.Empty(report.Diagnostics);
+        Assert.Equal(exactTolerances, report.Tolerances);
     }
 
     [Fact]
-    public void AnalyzeCompilation_OrdersDiagnosticsByBoundaryThenGeometryKind()
+    public void Analyze_CompilationOverloadOrdersDiagnosticsByBoundaryThenGeometryKind()
     {
         TrackAuthoringGeometryContinuityReport report =
-            TrackAuthoringGeometryContinuityDiagnostics.AnalyzeCompilation(
+            TrackAuthoringGeometryContinuityDiagnostics.Analyze(
                 CreateSyntheticDiscontinuousCompilation(),
                 new TrackAuthoringGeometryContinuityTolerances(0.0, 0.0, 0.0, 0.0));
 
@@ -292,11 +328,27 @@ public sealed class TrackAuthoringGeometryContinuityDiagnosticsTests
     public void Analyze_NullDefinitionThrows()
     {
         Assert.Throws<ArgumentNullException>(
-            () => TrackAuthoringGeometryContinuityDiagnostics.Analyze(null!));
+            () => TrackAuthoringGeometryContinuityDiagnostics.Analyze(
+                (TrackAuthoringDefinition)null!));
         Assert.Throws<ArgumentNullException>(() =>
             TrackAuthoringGeometryContinuityDiagnostics.Analyze(
-                null!,
+                (TrackAuthoringDefinition)null!,
                 TrackAuthoringGeometryContinuityTolerances.Default));
+    }
+
+    [Fact]
+    public void Analyze_NullCompilationThrowsClearly()
+    {
+        ArgumentNullException defaultException = Assert.Throws<ArgumentNullException>(
+            () => TrackAuthoringGeometryContinuityDiagnostics.Analyze(
+                (TrackAuthoringCompilation)null!));
+        ArgumentNullException customException = Assert.Throws<ArgumentNullException>(() =>
+            TrackAuthoringGeometryContinuityDiagnostics.Analyze(
+                (TrackAuthoringCompilation)null!,
+                TrackAuthoringGeometryContinuityTolerances.Default));
+
+        Assert.Equal("compilation", defaultException.ParamName);
+        Assert.Equal("compilation", customException.ParamName);
     }
 
     [Theory]
@@ -326,7 +378,8 @@ public sealed class TrackAuthoringGeometryContinuityDiagnosticsTests
             typeof(TrackAuthoringGeometryContinuityBoundary),
             typeof(TrackAuthoringGeometryContinuityDiagnostic),
             typeof(TrackAuthoringGeometryContinuityDiagnosticKind),
-            typeof(TrackAuthoringGeometryContinuityTolerances)
+            typeof(TrackAuthoringGeometryContinuityTolerances),
+            typeof(TrackAuthoringCompilation)
         };
 
         foreach (Type type in types)

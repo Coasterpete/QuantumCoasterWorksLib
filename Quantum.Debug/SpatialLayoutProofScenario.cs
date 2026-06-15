@@ -97,7 +97,7 @@ namespace Quantum.Debug
 
             TrackAuthoringCompilation compilation = TrackAuthoringDocumentBuilder.Compile(definition);
             TrackAuthoringGeometryContinuityReport geometryContinuity =
-                TrackAuthoringGeometryContinuityDiagnostics.Analyze(definition);
+                TrackAuthoringGeometryContinuityDiagnostics.Analyze(compilation);
             var evaluator = new TrackEvaluator(compilation.Runtime);
             TrackFrame[] frames = evaluator.EvaluateFramesAtDistances(BuildFrameDistances());
 

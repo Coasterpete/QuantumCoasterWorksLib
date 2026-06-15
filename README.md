@@ -195,6 +195,8 @@ Generated JSON, SVG, Markdown, and HTML under `artifacts/` are local output by d
 - `dotnet run --project Quantum.Debug -- train-pose-export-v1 [outputPath]`: write a deterministic `TrainPoseExportV1` sample JSON matching `Quantum.Tests/IO/Fixtures/TrainPoseExportV1.golden.json`.
 - `dotnet run --project Quantum.Debug -- mesh-export-v1-sample [outputPath]`: write a deterministic `MeshExportV1` sample JSON file.
 - `dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1 [outputPath]`: write the built-in `DebugViewportSnapshotV1` sample JSON.
+- `dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1-transition-authoring [outputPath]`: write the deterministic transition-authoring `DebugViewportSnapshotV1` sample JSON.
+- `dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1-spatial-layout [outputPath]`: write the deterministic three-dimensional spatial-layout `DebugViewportSnapshotV1` sample JSON.
 - `dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1-from-csv <inputCsvPath> [outputJsonPath]`: bridge a sampled-frame CSV fixture to `DebugViewportSnapshotV1` JSON.
 - `dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1-validate <snapshotJsonPath>`: validate and summarize a snapshot JSON file.
 - `dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1-svg <snapshotJsonPath> [outputSvgPath]`: write a multi-panel backend-only SVG preview from snapshot JSON.
