@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Quantum.Math;
 using Quantum.Splines;
 using Quantum.Track.Authoring.Internal;
+using Quantum.Track.Internal;
 
 namespace Quantum.Track.Authoring
 {
@@ -131,6 +132,14 @@ namespace Quantum.Track.Authoring
                     roll: definition.RollRadians);
             }
 
+            if (definition is SpatialSectionDefinition)
+            {
+                return new GeometricSection(
+                    definition.Length,
+                    curvature: null,
+                    roll: definition.RollRadians);
+            }
+
             throw new NotSupportedException(
                 $"Unsupported geometric section definition type '{definition.GetType().FullName}'.");
         }
@@ -159,13 +168,24 @@ namespace Quantum.Track.Authoring
                 segments.Add(CreateSegment(definitions[i], placedCurve));
 
                 currentPosition = placedCurve.Evaluate(1.0);
-                Vector3d localEndTangent = localCurve.Tangent(1.0);
-                Vector3d previousTangent = currentTangent;
-                Vector3d previousNormal = currentNormal;
-                currentTangent = (previousTangent * localEndTangent.X) +
-                                 (previousNormal * localEndTangent.Y);
-                currentNormal = (previousTangent * -localEndTangent.Y) +
-                                (previousNormal * localEndTangent.X);
+                if (definitions[i] is SpatialSectionDefinition)
+                {
+                    AdvanceSpatialConstructionBasis(
+                        placedCurve,
+                        ref currentTangent,
+                        ref currentNormal,
+                        ref currentBinormal);
+                }
+                else
+                {
+                    Vector3d localEndTangent = localCurve.Tangent(1.0);
+                    Vector3d previousTangent = currentTangent;
+                    Vector3d previousNormal = currentNormal;
+                    currentTangent = (previousTangent * localEndTangent.X) +
+                                     (previousNormal * localEndTangent.Y);
+                    currentNormal = (previousTangent * -localEndTangent.Y) +
+                                    (previousNormal * localEndTangent.X);
+                }
             }
 
             return segments;
@@ -182,6 +202,18 @@ namespace Quantum.Track.Authoring
                     transition.StartCurvature,
                     transition.EndCurvature,
                     transition.InterpolationMode);
+            }
+
+            if (definition is SpatialSectionDefinition spatial)
+            {
+                var curve = new GSharkNurbsCurveAdapter(
+                    new List<Vector3d>(spatial.ControlPoints),
+                    new List<double>(spatial.Weights),
+                    spatial.Degree);
+                return new ArcLengthCurveAdapter(
+                    curve,
+                    TrackSamplingOptions.DefaultArcLengthSamples,
+                    TrackSamplingOptions.DefaultArcLengthTolerance);
             }
 
             IParamCurve generatedCurve = geometricSection.GenerateCurve();
@@ -208,7 +240,8 @@ namespace Quantum.Track.Authoring
             }
 
             if (definition is ConstantCurvatureSectionDefinition ||
-                definition is CurvatureTransitionSectionDefinition)
+                definition is CurvatureTransitionSectionDefinition ||
+                definition is SpatialSectionDefinition)
             {
                 return new CurvedSegment(
                     definition.Length,
@@ -219,6 +252,34 @@ namespace Quantum.Track.Authoring
 
             throw new NotSupportedException(
                 $"Unsupported geometric section definition type '{definition.GetType().FullName}'.");
+        }
+
+        private static void AdvanceSpatialConstructionBasis(
+            IArcLengthCurve curve,
+            ref Vector3d tangent,
+            ref Vector3d normal,
+            ref Vector3d binormal)
+        {
+            Vector3d previousTangent = curve.TangentByLength(0.0);
+            Vector3d transportedNormal = normal;
+            double curveLength = curve.Length;
+
+            for (int i = 1; i <= TrackSamplingOptions.DefaultTransportSamplesPerSegment; i++)
+            {
+                double fraction =
+                    (double)i / TrackSamplingOptions.DefaultTransportSamplesPerSegment;
+                Vector3d currentTangent = curve.TangentByLength(curveLength * fraction);
+                transportedNormal = RotationMinimizingFrameTransport.TransportNormal(
+                    transportedNormal,
+                    previousTangent,
+                    currentTangent);
+                previousTangent = currentTangent;
+            }
+
+            tangent = previousTangent.Normalized();
+            normal = transportedNormal.Normalized();
+            binormal = Vector3d.Cross(tangent, normal).Normalized();
+            normal = Vector3d.Cross(binormal, tangent).Normalized();
         }
     }
 }

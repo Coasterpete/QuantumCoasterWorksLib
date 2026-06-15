@@ -192,39 +192,10 @@ namespace Quantum.Track.Internal
             Vector3d previousTangent,
             Vector3d currentTangent)
         {
-            Vector3d normalizedPreviousTangent = NormalizeOrThrow(previousTangent, "previous tangent");
-            Vector3d normalizedCurrentTangent = NormalizeOrThrow(currentTangent, "current tangent");
-            Vector3d rotationAxis = Vector3d.Cross(normalizedPreviousTangent, normalizedCurrentTangent);
-            Vector3d transportedNormal = previousNormal;
-            double axisLength = rotationAxis.Length;
-
-            if (axisLength > MinimumVectorMagnitude)
-            {
-                rotationAxis /= axisLength;
-                double tangentDot = Clamp(
-                    Vector3d.Dot(normalizedPreviousTangent, normalizedCurrentTangent),
-                    -1.0,
-                    1.0);
-                transportedNormal = RotateAroundAxis(
-                    previousNormal,
-                    rotationAxis,
-                    System.Math.Acos(tangentDot));
-            }
-            else if (Vector3d.Dot(normalizedPreviousTangent, normalizedCurrentTangent) < 0.0)
-            {
-                rotationAxis = ResolveProjectedNormal(
-                    SelectFallbackAxis(normalizedPreviousTangent),
-                    normalizedPreviousTangent);
-                transportedNormal = RotateAroundAxis(previousNormal, rotationAxis, System.Math.PI);
-            }
-
-            Vector3d normal = ResolveProjectedNormal(transportedNormal, normalizedCurrentTangent);
-            if (Vector3d.Dot(normal, transportedNormal) < 0.0)
-            {
-                normal *= -1.0;
-            }
-
-            return normal;
+            return RotationMinimizingFrameTransport.TransportNormal(
+                previousNormal,
+                previousTangent,
+                currentTangent);
         }
 
         private static Vector3d ResolveProjectedNormal(Vector3d candidateNormal, Vector3d tangent)

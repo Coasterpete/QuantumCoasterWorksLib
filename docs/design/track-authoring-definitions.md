@@ -4,9 +4,9 @@
 
 `Quantum.Track.Authoring` is a small engine-agnostic input layer for creating
 simple evaluator-ready `TrackDocument` instances. It describes ordered straight,
-planar constant-curvature, and planar curvature-transition sections without
-exposing spline implementation types or adding editor, UI, persistence, or
-engine concepts.
+planar constant-curvature, planar curvature-transition, and opt-in spatial
+sections without exposing spline implementation types or adding editor, UI,
+persistence, or engine concepts.
 
 This layer does not replace or redesign `TrackDocument`. It validates authoring
 input and adapts that input into the existing segment and evaluator contracts.
@@ -39,6 +39,7 @@ The supported section definitions are:
 - `StraightSectionDefinition`
 - `ConstantCurvatureSectionDefinition`
 - `CurvatureTransitionSectionDefinition`
+- `SpatialSectionDefinition`
 
 Every section has:
 
@@ -82,11 +83,50 @@ modes are not part of this milestone.
 `RollRadians` remains constant across each authored transition section. Curvature
 interpolation does not interpolate or otherwise modify roll.
 
+`SpatialSectionDefinition` describes one local three-dimensional NURBS
+centerline with:
+
+- `ControlPoints`: a copied read-only list of backend `Vector3d` values
+- `Weights`: a copied read-only list with one positive finite value per point
+- `Degree`: the NURBS polynomial degree, defaulting to `3`
+
+Omitting weights creates unit weights. Degree must be at least `1`, and the
+control point count must be at least `Degree + 1`. The authoring API does not
+expose GShark or `Quantum.Splines` types. Compilation adapts these backend values
+to the existing GShark-backed curve implementation internally.
+
+Spatial control points use section-local construction coordinates:
+
+```text
++X = incoming tangent / forward
++Y = incoming unbanked normal
++Z = incoming unbanked binormal
+```
+
+The first control point must be exactly the local origin. The local start
+tangent must point along positive X; with the existing clamped adapter knot
+policy this is validated from the first control-point direction. Invalid input
+is rejected rather than silently translated, rotated, or normalized. Custom
+knot vectors are not part of this API.
+
+Spatial sections retain an explicit authored `Length`. During compilation the
+GShark curve is wrapped by the existing arc-length adapter, and normal runtime
+compilation validates the declared section length against measured geometry.
+The existing length policy accepts the greater of `1e-3` absolute tolerance or
+`1e-6` relative tolerance. A mismatch fails compilation; control points are not
+scaled to force the requested length.
+
 ## Validation
 
 Section constructors reject invalid IDs, lengths, radii, curvatures, interpolation
 modes, and roll values. Transition definitions also reject a non-finite curvature
 delta or total heading sweep.
+
+Spatial definitions reject null or empty control-point sequences, non-finite
+points, invalid degree/count combinations, invalid weight counts, non-finite or
+non-positive weights, and violations of the local origin/positive-X start
+contract. Both input sequences are copied before being exposed as read-only
+collections.
 
 `TrackStartPose` rejects non-finite positions and basis vectors, near-zero or
 non-unit axes, non-orthogonal axes, and left-handed or inconsistent bases.
@@ -123,6 +163,12 @@ Curvature endpoints are mapped directly from the authoring definitions:
 - `ConstantCurvatureSectionDefinition`: start and end curvature are `1 / Radius`
 - `CurvatureTransitionSectionDefinition`: start is `StartCurvature` and end is
   `EndCurvature`
+
+Spatial geometry does not have one authored scalar boundary curvature, so
+`TrackAuthoringBoundaryContinuityDiagnostics` does not support definitions that
+contain `SpatialSectionDefinition` in this milestone. No spatial C0, G1, or
+higher-order geometry diagnostic contract is added here; compilation still
+places valid mixed sections continuously by construction.
 
 The signed boundary curvature delta is:
 
@@ -183,12 +229,13 @@ same `TrackDocument` shape:
 - one `TrackSegment` per authoring section
 - original section order and exact IDs
 - `StraightSegment` for straight definitions
-- `CurvedSegment` for constant-curvature and curvature-transition definitions
+- `CurvedSegment` for constant-curvature, curvature-transition, and spatial
+  definitions
 - exact authored segment lengths and constant roll values
 - one generated `GeometricSection` per authoring section in `TrackDocument.Sections`
 
 The builder composes each section from the prior section's endpoint and unbanked
-construction frame. Section curves remain planar in local coordinates:
+construction frame. Every local section uses the same placement transform:
 
 ```text
 +X = forward / tangent
@@ -199,8 +246,8 @@ worldPoint     = P + T*x  + N*y  + B*z
 worldDirection =     T*dx + N*dy + B*dz
 ```
 
-For a planar section whose endpoint tangent is `(tx, ty, 0)`, the following
-section starts from:
+Planar section curves retain `z = 0`. For a planar section whose endpoint tangent
+is `(tx, ty, 0)`, the following section starts from:
 
 ```text
 P' = section endpoint
@@ -214,6 +261,14 @@ curvature-transition sections. Positive curvature bends from `T` toward `N`;
 negative curvature bends toward `-N`. All samples remain in the plane whose
 normal is the start binormal. Point and tangent continuity are preserved at
 section boundaries.
+
+Spatial sections use the same transform but may have nonzero local Z and leave
+the incoming construction plane. Their outgoing unbanked normal is advanced
+through the curve with the same rotation-minimizing transport operation and
+default per-segment transport sampling density used by canonical runtime frame
+compilation. The outgoing tangent, transported normal, and derived binormal then
+become the construction basis for the next planar or spatial section. Roll is
+not included in this construction-basis transport.
 
 `RollRadians` is not applied during centerline construction and does not alter
 section placement. It remains segment metadata and is applied afterward by the
@@ -303,7 +358,9 @@ standard collection interfaces. They do not expose:
 - persistence or serialization contracts
 
 Spline composition remains an internal implementation detail behind the existing
-`TrackDocument` and `TrackEvaluator` boundary.
+`TrackDocument` and `TrackEvaluator` boundary. Spatial authoring currently uses
+only the existing adapter knot policy: custom knots, interpolation constraints,
+and alternative spline backends are outside this milestone.
 
 ## Example
 
@@ -361,5 +418,7 @@ foreach (TrackAuthoringBoundaryContinuityDiagnostic diagnostic in continuity.Dia
 ```
 
 This produces a straight followed by a linear curvature transition into a
-constant-radius left arc. More advanced interpolation, NURBS authoring,
-force-driven geometry, UI workflows, and persistence remain outside this layer.
+constant-radius left arc. `SpatialSectionDefinition` can be inserted in the same
+ordered section list when an explicitly measured three-dimensional NURBS section
+is needed. Custom knots, spatial continuity diagnostics, force-driven geometry,
+UI workflows, and persistence remain outside this layer.
