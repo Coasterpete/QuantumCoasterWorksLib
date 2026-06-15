@@ -2,11 +2,10 @@
 
 Date: 2026-05-31
 
-Status: design note plus Milestone 48 backend prototype. This document proposes
-coaster-domain behavior for banking and roll interpolation. Milestone 48 adds
-an opt-in backend-only `BankingProfile` model and sampler; it does not change
-default `TrackEvaluator` behavior, `TrackFrame`, `DebugViewportSnapshotV1`,
-`TrainPoseExportV1`, or dependencies.
+Status: design note plus Milestone 48 backend prototype and M144 PR1 authored
+banking foundation. The profile and sampler remain opt-in; default
+`TrackEvaluator` behavior, `TrackFrame`, `DebugViewportSnapshotV1`,
+`TrainPoseExportV1`, and dependencies are unchanged.
 
 ## Context
 
@@ -37,6 +36,36 @@ Milestone 48 introduces the first backend-only runtime prototype:
 This keeps authored banking separate from the default evaluator path. Existing
 segment `RollRadians` behavior remains the compatibility baseline unless a
 caller explicitly chooses the BankingProfile sampler.
+
+## M144 PR1 Authored Banking Foundation
+
+M144 PR1 adds `TrackBankingDefinition` to `Quantum.Track.Authoring`. It accepts
+the existing `BankingProfileKey` and `BankingProfileInterpolationMode` types,
+defensively copies at least two keys, and exposes them as a read-only sequence.
+No duplicate authored banking key type is introduced.
+
+The new `TrackAuthoringDefinition` overload accepts sections, a start pose, and
+authored banking. Explicit authored banking must cover the complete authored
+station domain exactly from distance `0` through total length. Its roll values
+are absolute and unwrapped. They are not normalized and are not added to section
+`RollRadians`.
+
+Every successful `TrackAuthoringCompilation` now exposes a non-null
+`BankingProfile`:
+
+- Explicit banking compiles to an exact copied profile, preserving keys,
+  interpolation modes, and unwrapped values.
+- Without explicit banking, compilation creates constant-mode boundary keys
+  from section `RollRadians`, including distance `0`, every following section
+  start, and total length. Exact boundaries use the following section's roll,
+  matching current section ownership.
+
+Section `RollRadians` still compiles into segments unchanged. Default
+`TrackEvaluator` continues to use those segment rolls, so authored banking does
+not alter centerline positions, tangents, default frames, or default train
+placement in PR1. The new authored profile affects frames only when a caller
+opts in through `BankingProfileSampler`, for example with
+`compilation.BankingProfile`.
 
 ## Milestone 49 Diagnostics Update
 

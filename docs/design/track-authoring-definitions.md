@@ -14,13 +14,22 @@ input and adapts that input into the existing segment and evaluator contracts.
 ## Public Definitions
 
 `TrackAuthoringDefinition` contains an ordered, copied list of
-`GeometricSectionDefinition` values and a validated `TrackStartPose`.
+`GeometricSectionDefinition` values, a validated `TrackStartPose`, and optional
+first-class authored banking.
 
 The legacy constructor accepts only sections and delegates to
 `TrackStartPose.Identity`. The explicit overload accepts sections plus a start
-pose. `Identity` is the origin with positive-X tangent, positive-Y normal, and
-positive-Z binormal, so existing M140-M142 authored layouts retain their prior
-coordinate convention.
+pose. M144 PR1 adds an overload accepting sections, a start pose, and a non-null
+`TrackBankingDefinition`. Existing constructors leave `Banking` null and remain
+source-compatible. `Identity` is the origin with positive-X tangent, positive-Y
+normal, and positive-Z binormal, so existing M140-M142 authored layouts retain
+their prior coordinate convention.
+
+`TrackBankingDefinition` contains a defensively copied, read-only sequence of
+existing `BankingProfileKey` values. It does not introduce a second authored key
+or interpolation type. Key roll values are absolute unwrapped radians, not
+offsets added to section `RollRadians`. Constant, linear, and smoothstep modes
+reuse `BankingProfileInterpolationMode`.
 
 `TrackStartPose` contains:
 
@@ -139,12 +148,22 @@ non-unit axes, non-orthogonal axes, and left-handed or inconsistent bases.
 - duplicate IDs using ordinal, case-sensitive comparison
 - a combined length that is not finite
 
+`TrackBankingDefinition` rejects null input, fewer than two keys, non-finite
+distances or rolls, duplicate or descending distances, and unsupported
+interpolation modes. Compilation additionally requires explicit banking to
+cover the authored station domain exactly: the first key is exactly `0`, the
+last key is exactly the authored total length, and every key lies within that
+closed interval. Steep slopes, constant-mode discontinuities, inversions, and
+unwrapped values outside `[-pi, pi]` are valid authoring.
+
 IDs are checked with `string.IsNullOrWhiteSpace`, but valid IDs are not trimmed or
 normalized. This keeps ID preservation exact.
 
-Validation completes before `TrackAuthoringDocumentBuilder` is called. The
-definitions are immutable and the input sequence is copied, so later mutations
-to the caller's collection do not alter the validated authoring definition.
+Collection and key-shape validation completes before
+`TrackAuthoringDocumentBuilder` is called. Full-domain banking validation occurs
+during compilation because it depends on the authored total length. The
+definitions are immutable and input sequences are copied, so later mutations to
+the caller's collections do not alter the validated authoring definition.
 
 ## Boundary Continuity Diagnostics
 
@@ -282,6 +301,7 @@ limits; the defaults are intended for the current authoring curve generators.
 - `Document`: the evaluator-ready `TrackDocument` snapshot
 - `Runtime`: a non-null `CompiledTrackRuntime` sampling snapshot compiled from
   that document with `TrackSamplingOptions.Default`
+- `BankingProfile`: a non-null opt-in banking snapshot
 - `ResolvedSections`: one ordered
   `ResolvedSectionInterval<GeometricSectionDefinition>` per authored section
 - `TotalLength`: the compiled total in station-distance units
@@ -312,6 +332,22 @@ same `TrackDocument` shape:
   definitions
 - exact authored segment lengths and constant roll values
 - one generated `GeometricSection` per authoring section in `TrackDocument.Sections`
+
+When explicit banking is present, `BankingProfile` copies those authored keys
+exactly, including interpolation modes and unwrapped roll values. It is the
+absolute roll source for opt-in profile sampling and is not combined with
+section `RollRadians`.
+
+When explicit banking is absent, compilation creates a compatibility profile
+from section rolls. For `N` sections it contains `N + 1` constant-mode keys:
+
+- distance `0` with the first section roll
+- every following section start with that following section's roll
+- total length with the final section roll
+
+This reproduces existing boundary ownership: immediately before a shared
+boundary the preceding roll is held, while the exact boundary and distances
+after it use the following section roll.
 
 The builder composes each section from the prior section's endpoint and unbanked
 construction frame. Every local section uses the same placement transform:
@@ -354,14 +390,23 @@ section placement. It remains segment metadata and is applied afterward by the
 runtime frame evaluator, preserving the distinction between the unbanked
 construction frame and the banked sampled frame.
 
+M144 PR1 does not connect the compiled profile to default evaluation.
+`TrackEvaluator` continues to read `TrackSegment.RollRadians`, and compilation
+continues to copy each authored section roll into its generated segment
+unchanged. Callers opt in by passing `compilation.BankingProfile` to
+`BankingProfileSampler`. Centerline positions, tangents, default frames, and
+default train placement therefore remain unchanged whether explicit banking is
+present or absent.
+
 `TrackDocument.Sections` still contains one `GeometricSection` metadata entry per
 authored definition. A transition entry has no single constant curvature value,
 so its `GeometricSection.Curvature` is null rather than an inaccurate scalar.
 
-Every `Compile` call builds a new document and a new runtime. Repeated
+Every `Compile` call builds a new document, runtime, and banking profile. Repeated
 compilations from the same definition are deterministic and produce equivalent
-canonical frame samples through `TrackEvaluator`, but the returned `Document`
-and `Runtime` objects are distinct snapshots.
+canonical frame samples through `TrackEvaluator` and equivalent banking keys,
+but the returned `Document`, `Runtime`, and `BankingProfile` objects are distinct
+snapshots.
 
 Authoring-generated documents populate nullable `TrackDocument.StartPose` with
 the exact pose reference from the definition. Manually constructed documents
