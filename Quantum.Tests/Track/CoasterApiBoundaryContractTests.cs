@@ -248,7 +248,14 @@ public sealed class CoasterApiBoundaryContractTests
             typeof(TrackAuthoringGeometryContinuityDiagnosticKind),
             typeof(TrackAuthoringGeometryContinuityBoundary),
             typeof(TrackAuthoringGeometryContinuityDiagnostic),
-            typeof(TrackAuthoringGeometryContinuityReport)
+            typeof(TrackAuthoringGeometryContinuityReport),
+            typeof(TrackAuthoringBankingDiagnostics),
+            typeof(TrackAuthoringBankingDiagnosticsOptions),
+            typeof(TrackAuthoringBankingDiagnosticKind),
+            typeof(TrackAuthoringBankingProfileSourceKind),
+            typeof(TrackAuthoringBankingCoverage),
+            typeof(TrackAuthoringBankingDiagnostic),
+            typeof(TrackAuthoringBankingDiagnosticsReport)
         };
 
         foreach (Type type in authoringTypes)
@@ -499,6 +506,28 @@ public sealed class CoasterApiBoundaryContractTests
             typeof(TrackAuthoringGeometryContinuityReport),
             typeof(TrackAuthoringCompilation),
             typeof(TrackAuthoringGeometryContinuityTolerances));
+        AssertMethod(
+            typeof(TrackAuthoringBankingDiagnostics),
+            nameof(TrackAuthoringBankingDiagnostics.Analyze),
+            typeof(TrackAuthoringBankingDiagnosticsReport),
+            typeof(TrackAuthoringDefinition));
+        AssertMethod(
+            typeof(TrackAuthoringBankingDiagnostics),
+            nameof(TrackAuthoringBankingDiagnostics.Analyze),
+            typeof(TrackAuthoringBankingDiagnosticsReport),
+            typeof(TrackAuthoringDefinition),
+            typeof(TrackAuthoringBankingDiagnosticsOptions));
+        AssertMethod(
+            typeof(TrackAuthoringBankingDiagnostics),
+            nameof(TrackAuthoringBankingDiagnostics.Analyze),
+            typeof(TrackAuthoringBankingDiagnosticsReport),
+            typeof(TrackAuthoringCompilation));
+        AssertMethod(
+            typeof(TrackAuthoringBankingDiagnostics),
+            nameof(TrackAuthoringBankingDiagnostics.Analyze),
+            typeof(TrackAuthoringBankingDiagnosticsReport),
+            typeof(TrackAuthoringCompilation),
+            typeof(TrackAuthoringBankingDiagnosticsOptions));
     }
 
     [Fact]

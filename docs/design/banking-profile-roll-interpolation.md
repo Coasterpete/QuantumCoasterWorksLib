@@ -2,8 +2,9 @@
 
 Date: 2026-05-31
 
-Status: design note plus Milestone 48 backend prototype and M144 PR1 authored
-banking foundation. The profile and sampler remain opt-in; default
+Status: design note plus Milestone 48 backend prototype, M144 PR1 authored
+banking foundation, and M144 PR2 authored banking diagnostics. The profile and
+sampler remain opt-in; default
 `TrackEvaluator` behavior, `TrackFrame`, `DebugViewportSnapshotV1`,
 `TrainPoseExportV1`, and dependencies are unchanged.
 
@@ -66,6 +67,43 @@ not alter centerline positions, tangents, default frames, or default train
 placement in PR1. The new authored profile affects frames only when a caller
 opts in through `BankingProfileSampler`, for example with
 `compilation.BankingProfile`.
+
+## M144 PR2 Authored Banking Diagnostics
+
+M144 PR2 adds `TrackAuthoringBankingDiagnostics` as an authoring-facing
+inspection layer over `TrackAuthoringCompilation.BankingProfile`. It is
+diagnostic-only: it does not normalize, smooth, repair, or mutate authored
+banking values, and it does not change `TrackEvaluator`,
+`CompiledTrackRuntime`, default train placement, geometry, heartline behavior,
+IO/schema contracts, Unity, FVD, physics, editor, rendering, or persistence.
+
+The report identifies whether the compiled profile came from explicit authored
+banking (`ExplicitAuthored`) or from section `RollRadians` fallback
+(`SectionRollFallback`). It builds one deterministic station-distance sample
+set from distance `0`, total length, every compiled banking key, and fixed
+subdivisions inside each profile interval. The same sample distances are used
+for both underlying diagnostics:
+
+- `BankingProfileDiagnostics.Sample(...)` supplies sampled roll values,
+  interpolation mode, source key metadata, and roll-slope summary values.
+- `ContinuousRollDiagnostics.AnalyzeRollRadians(...)` receives those exact
+  sample distances and roll values, then produces roll-delta and roll-rate
+  warnings.
+
+Authoring diagnostics map continuous-roll warnings into authoring-facing kinds:
+`RollDelta` becomes `RollDiscontinuity`, and `RollRate` becomes `RollSlope`.
+PR2 also adds endpoint coverage checks that compare the first compiled banking
+profile key against station `0` and the last key against
+`compilation.TotalLength`.
+
+`TrackAuthoringBankingDiagnosticsOptions` defaults to an endpoint distance
+tolerance of `1e-9`, `8` samples per profile interval, and
+`ContinuousRollDiagnosticsOptions.NoWrap`. The NoWrap default is intentional
+for authored banking because authored roll values are absolute and unwrapped:
+a designer may intentionally author a full roll, multiple turns, or a value
+outside the normalized `[-pi, pi]` / `[0, 2*pi]` range. The diagnostics should
+show that authored motion directly unless a caller explicitly opts into
+full-turn wrap handling.
 
 ## Milestone 49 Diagnostics Update
 
