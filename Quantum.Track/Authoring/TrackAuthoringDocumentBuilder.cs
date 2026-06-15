@@ -58,6 +58,10 @@ namespace Quantum.Track.Authoring
                 geometricSections,
                 definition.StartPose);
             double totalLength = resolvedSections[resolvedSections.Count - 1].EndDistance;
+            BankingProfile bankingProfile = CreateBankingProfile(
+                definition,
+                resolvedSections,
+                totalLength);
             TrackRuntimeCompileResult runtimeCompilation = TrackRuntimeCompiler.Compile(
                 document,
                 TrackSamplingOptions.Default);
@@ -71,8 +75,84 @@ namespace Quantum.Track.Authoring
                 definition,
                 document,
                 runtimeCompilation.Runtime,
+                bankingProfile,
                 resolvedSections,
                 totalLength);
+        }
+
+        private static BankingProfile CreateBankingProfile(
+            TrackAuthoringDefinition definition,
+            IReadOnlyList<ResolvedSectionInterval<GeometricSectionDefinition>> resolvedSections,
+            double totalLength)
+        {
+            if (definition.Banking != null)
+            {
+                ValidateAuthoredBankingDomain(definition.Banking, totalLength);
+                return new BankingProfile(definition.Banking.Keys);
+            }
+
+            IReadOnlyList<GeometricSectionDefinition> definitions = definition.Sections;
+            var keys = new List<BankingProfileKey>(definitions.Count + 1)
+            {
+                new BankingProfileKey(
+                    0.0,
+                    definitions[0].RollRadians,
+                    BankingProfileInterpolationMode.Constant)
+            };
+
+            for (int i = 1; i < definitions.Count; i++)
+            {
+                keys.Add(new BankingProfileKey(
+                    resolvedSections[i].StartDistance,
+                    definitions[i].RollRadians,
+                    BankingProfileInterpolationMode.Constant));
+            }
+
+            keys.Add(new BankingProfileKey(
+                totalLength,
+                definitions[definitions.Count - 1].RollRadians,
+                BankingProfileInterpolationMode.Constant));
+
+            return new BankingProfile(keys);
+        }
+
+        private static void ValidateAuthoredBankingDomain(
+            TrackBankingDefinition banking,
+            double totalLength)
+        {
+            IReadOnlyList<BankingProfileKey> keys = banking.Keys;
+            if (keys.Count < 2)
+            {
+                throw new ArgumentException(
+                    "Authored banking requires at least two keys.",
+                    nameof(banking));
+            }
+
+            for (int i = 0; i < keys.Count; i++)
+            {
+                double distance = keys[i].Distance;
+                if (distance < 0.0 || distance > totalLength)
+                {
+                    throw new ArgumentOutOfRangeException(
+                        nameof(banking),
+                        distance,
+                        $"Authored banking key distance at index {i} must be within [0, {totalLength}].");
+                }
+            }
+
+            if (keys[0].Distance != 0.0)
+            {
+                throw new ArgumentException(
+                    "Authored banking must start exactly at distance 0.",
+                    nameof(banking));
+            }
+
+            if (keys[keys.Count - 1].Distance != totalLength)
+            {
+                throw new ArgumentException(
+                    $"Authored banking must end exactly at total length {totalLength}.",
+                    nameof(banking));
+            }
         }
 
         private static InvalidOperationException CreateRuntimeCompilationException(

@@ -227,6 +227,7 @@ public sealed class CoasterApiBoundaryContractTests
         Type[] authoringTypes =
         {
             typeof(TrackStartPose),
+            typeof(TrackBankingDefinition),
             typeof(TrackAuthoringDefinition),
             typeof(GeometricSectionDefinition),
             typeof(StraightSectionDefinition),
@@ -312,10 +313,27 @@ public sealed class CoasterApiBoundaryContractTests
             typeof(TrackAuthoringDefinition),
             typeof(IEnumerable<GeometricSectionDefinition>),
             typeof(TrackStartPose));
+        Assert.True(typeof(TrackBankingDefinition).IsSealed);
+        AssertConstructor(
+            typeof(TrackBankingDefinition),
+            typeof(IEnumerable<BankingProfileKey>));
+        AssertProperty(
+            typeof(TrackBankingDefinition),
+            nameof(TrackBankingDefinition.Keys),
+            typeof(IReadOnlyList<BankingProfileKey>));
+        AssertConstructor(
+            typeof(TrackAuthoringDefinition),
+            typeof(IEnumerable<GeometricSectionDefinition>),
+            typeof(TrackStartPose),
+            typeof(TrackBankingDefinition));
         AssertProperty(
             typeof(TrackAuthoringDefinition),
             nameof(TrackAuthoringDefinition.StartPose),
             typeof(TrackStartPose));
+        AssertProperty(
+            typeof(TrackAuthoringDefinition),
+            nameof(TrackAuthoringDefinition.Banking),
+            typeof(TrackBankingDefinition));
     }
 
     [Fact]
@@ -452,6 +470,10 @@ public sealed class CoasterApiBoundaryContractTests
             typeof(TrackAuthoringCompilation),
             nameof(TrackAuthoringCompilation.Runtime),
             typeof(CompiledTrackRuntime));
+        AssertProperty(
+            typeof(TrackAuthoringCompilation),
+            nameof(TrackAuthoringCompilation.BankingProfile),
+            typeof(BankingProfile));
         AssertProperty(
             typeof(TrackAuthoringCompilation),
             nameof(TrackAuthoringCompilation.ResolvedSections),

@@ -65,6 +65,15 @@ namespace Quantum.Track.Authoring
             _sections = copiedSections.AsReadOnly();
         }
 
+        public TrackAuthoringDefinition(
+            IEnumerable<GeometricSectionDefinition> sections,
+            TrackStartPose startPose,
+            TrackBankingDefinition banking)
+            : this(sections, startPose)
+        {
+            Banking = banking ?? throw new ArgumentNullException(nameof(banking));
+        }
+
         /// <summary>
         /// Ordered validated sections. The input sequence is copied at construction.
         /// </summary>
@@ -74,5 +83,10 @@ namespace Quantum.Track.Authoring
         /// Unbanked construction frame used to place the first authored section.
         /// </summary>
         public TrackStartPose StartPose { get; }
+
+        /// <summary>
+        /// Optional authored absolute banking over the full station-distance domain.
+        /// </summary>
+        public TrackBankingDefinition? Banking { get; }
     }
 }

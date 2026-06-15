@@ -1,3 +1,4 @@
+using Quantum.Track;
 using Quantum.Track.Authoring;
 
 namespace Quantum.Tests;
@@ -174,5 +175,27 @@ public sealed class TrackAuthoringDefinitionTests
             () => new TrackAuthoringDefinition(Array.Empty<GeometricSectionDefinition>()));
         Assert.Throws<ArgumentException>(
             () => new TrackAuthoringDefinition(new GeometricSectionDefinition[] { null! }));
+    }
+
+    [Fact]
+    public void TrackDefinition_ExplicitBankingConstructorPreservesBankingReference()
+    {
+        var banking = new TrackBankingDefinition(new[]
+        {
+            new BankingProfileKey(0.0, 0.0),
+            new BankingProfileKey(5.0, 0.5)
+        });
+        var definition = new TrackAuthoringDefinition(
+            new[] { new StraightSectionDefinition("track", 5.0) },
+            TrackStartPose.Identity,
+            banking);
+
+        Assert.Same(banking, definition.Banking);
+        Assert.Null(new TrackAuthoringDefinition(
+            new[] { new StraightSectionDefinition("legacy", 5.0) }).Banking);
+        Assert.Throws<ArgumentNullException>(() => new TrackAuthoringDefinition(
+            new[] { new StraightSectionDefinition("invalid", 5.0) },
+            TrackStartPose.Identity,
+            null!));
     }
 }

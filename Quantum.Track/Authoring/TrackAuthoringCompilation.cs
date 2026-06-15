@@ -23,12 +23,14 @@ namespace Quantum.Track.Authoring
             TrackAuthoringDefinition definition,
             TrackDocument document,
             CompiledTrackRuntime runtime,
+            BankingProfile bankingProfile,
             IEnumerable<ResolvedSectionInterval<GeometricSectionDefinition>> resolvedSections,
             double totalLength)
         {
             Definition = definition ?? throw new ArgumentNullException(nameof(definition));
             Document = document ?? throw new ArgumentNullException(nameof(document));
             Runtime = runtime ?? throw new ArgumentNullException(nameof(runtime));
+            BankingProfile = bankingProfile ?? throw new ArgumentNullException(nameof(bankingProfile));
 
             if (resolvedSections is null)
             {
@@ -54,6 +56,11 @@ namespace Quantum.Track.Authoring
         /// Compile-once sampling snapshot produced from <see cref="Document"/>.
         /// </summary>
         public CompiledTrackRuntime Runtime { get; }
+
+        /// <summary>
+        /// Compiled opt-in banking snapshot for this authored track.
+        /// </summary>
+        public BankingProfile BankingProfile { get; }
 
         /// <summary>
         /// Ordered source-definition ranges in station-distance units.
