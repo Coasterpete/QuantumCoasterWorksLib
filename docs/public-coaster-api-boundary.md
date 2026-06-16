@@ -22,7 +22,41 @@ spline sampling uses `Quantum.Splines.CurveFrame`. The old
 `Quantum.Splines.TrackFrame` name remains available only as an obsolete
 compatibility type.
 
-### 2) `TrackEvaluator` Station-Distance Sampling
+### 2) Opt-In `HeartlineOffset` Sampling
+
+`HeartlineOffset`, `HeartlineFrame`, and `HeartlineSampler` are backend-only
+`Quantum.Track` contracts for deriving an optional rider-reference point from
+sampled frames.
+
+- `HeartlineOffset.NormalOffsetMeters`: offset along the sampled frame normal.
+- `HeartlineOffset.LateralOffsetMeters`: offset along the sampled frame
+  binormal/lateral axis.
+- `HeartlineFrame.Distance`: sampled centerline station distance.
+- `HeartlineFrame.CenterlinePosition`: source centerline position.
+- `HeartlineFrame.Position`: offset heartline/rider-reference point.
+- `HeartlineFrame.Tangent`, `Normal`, `Binormal`: inherited source-frame axes.
+- `HeartlineFrame.ToMatrix4x4()`: same basis-column and translation convention
+  as `TrackFrame.ToMatrix4x4()`.
+
+Heartline offsets are relative to sampled frame axes, not world-up/world-right.
+`HeartlineFrame.Tangent` is the sampled source-frame tangent, not the
+mathematical derivative of the offset curve when curvature or banking changes.
+
+PR3 heartline sampling uses centerline station distance. No heartline
+arc-length domain exists yet.
+
+The default heartline sampler overloads use `TrackEvaluator` frames. Banking
+affects offset direction only through the explicit
+`HeartlineSampler.SampleAtDistances(TrackEvaluator, BankingProfile,
+HeartlineOffset, IReadOnlyList<double>)` overload, which samples frames through
+`BankingProfileSampler`.
+
+Trains still run on the current centerline/default frame path. Heartline
+sampling is not the default train/path behavior and is not stored on
+`TrackDocument`, runtime compilation, IO/schema contracts, or debug/export
+artifacts.
+
+### 3) `TrackEvaluator` Station-Distance Sampling
 
 The public station-distance lane is:
 
@@ -59,7 +93,7 @@ contract.
 `TransportedTrackFrameSampler` also remains as an obsolete compatibility facade.
 Canonical `TrackEvaluator` frame sampling already uses transported-frame behavior.
 
-### 3) `TrackDocument` / `TrackSegment` Centerline Evaluation
+### 4) `TrackDocument` / `TrackSegment` Centerline Evaluation
 
 `TrackDocument` owns the ordered coaster track content. Its segment order and
 segment lengths define the station-distance coordinate consumed by
@@ -75,7 +109,7 @@ segment lengths define the station-distance coordinate consumed by
 The current `Spline` property is a support-layer centerline carrier. Consumers
 should enter through `TrackEvaluator` instead of depending on spline internals.
 
-### 4) `TrainCarTransformProvider.EvaluateTrainPose`
+### 5) `TrainCarTransformProvider.EvaluateTrainPose`
 
 `EvaluateTrainPose(double leadDistance, TrainConsistDefinition definition)` is
 the public train-pose entrypoint. It evaluates the existing distance-based body,
@@ -97,7 +131,7 @@ not own a `BankingProfile`.
 `EvaluateCarTransforms(...)` is the preferred body-only API.
 `GetCarTransforms(...)` remains available as an obsolete forwarding alias.
 
-### 5) `TrainPoseExportV1`
+### 6) `TrainPoseExportV1`
 
 `TrainPoseExportV1` is the public JSON snapshot contract:
 
@@ -110,7 +144,7 @@ not own a `BankingProfile`.
 Schema and field semantics remain documented in
 `docs/train_pose_export_v1_contract.md`.
 
-### 6) Geometry Interchange Roadmap
+### 7) Geometry Interchange Roadmap
 
 `Quantum.IO.GeometryInterchange` is the backend-only holding boundary for future
 external curve import/export adapters. The current surface models external curve

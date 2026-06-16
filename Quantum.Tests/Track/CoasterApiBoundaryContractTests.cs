@@ -39,6 +39,71 @@ public sealed class CoasterApiBoundaryContractTests
     }
 
     [Fact]
+    public void HeartlineOffsetAndSampler_AreOptInTrackContracts()
+    {
+        Type offsetType = typeof(HeartlineOffset);
+        ConstructorInfo? offsetConstructor = offsetType.GetConstructor(new[] { typeof(double), typeof(double) });
+        Assert.NotNull(offsetConstructor);
+        ParameterInfo[] offsetParameters = offsetConstructor.GetParameters();
+
+        Assert.Equal("Quantum.Track", offsetType.Namespace);
+        Assert.True(offsetType.IsValueType);
+        Assert.True(offsetParameters[1].HasDefaultValue);
+        Assert.Equal(0.0, offsetParameters[1].DefaultValue);
+        AssertProperty(offsetType, nameof(HeartlineOffset.NormalOffsetMeters), typeof(double));
+        AssertProperty(offsetType, nameof(HeartlineOffset.LateralOffsetMeters), typeof(double));
+
+        PropertyInfo? zeroProperty = offsetType.GetProperty(
+            nameof(HeartlineOffset.Zero),
+            BindingFlags.Public | BindingFlags.Static);
+        Assert.NotNull(zeroProperty);
+        Assert.Equal(typeof(HeartlineOffset), zeroProperty.PropertyType);
+
+        Type frameType = typeof(HeartlineFrame);
+        Assert.Equal("Quantum.Track", frameType.Namespace);
+        Assert.True(frameType.IsValueType);
+        Assert.True(typeof(ITrackFrameBasis).IsAssignableFrom(frameType));
+        AssertProperty(frameType, nameof(HeartlineFrame.Distance), typeof(double));
+        AssertProperty(frameType, nameof(HeartlineFrame.CenterlinePosition), typeof(Vector3d));
+        AssertProperty(frameType, nameof(HeartlineFrame.Position), typeof(Vector3d));
+        AssertProperty(frameType, nameof(HeartlineFrame.Tangent), typeof(Vector3d));
+        AssertProperty(frameType, nameof(HeartlineFrame.Normal), typeof(Vector3d));
+        AssertProperty(frameType, nameof(HeartlineFrame.Binormal), typeof(Vector3d));
+        AssertMethod(
+            frameType,
+            nameof(HeartlineFrame.ToMatrix4x4),
+            typeof(System.Numerics.Matrix4x4),
+            Type.EmptyTypes);
+
+        Type samplerType = typeof(HeartlineSampler);
+        Assert.Equal("Quantum.Track", samplerType.Namespace);
+        AssertMethod(
+            samplerType,
+            nameof(HeartlineSampler.SampleAtDistance),
+            typeof(HeartlineFrame),
+            typeof(TrackEvaluator),
+            typeof(HeartlineOffset),
+            typeof(double));
+        AssertMethod(
+            samplerType,
+            nameof(HeartlineSampler.SampleAtDistances),
+            typeof(HeartlineFrame[]),
+            typeof(TrackEvaluator),
+            typeof(HeartlineOffset),
+            typeof(IReadOnlyList<double>));
+        AssertMethod(
+            samplerType,
+            nameof(HeartlineSampler.SampleAtDistances),
+            typeof(HeartlineFrame[]),
+            typeof(TrackEvaluator),
+            typeof(BankingProfile),
+            typeof(HeartlineOffset),
+            typeof(IReadOnlyList<double>));
+
+        AssertPublicSurfaceDoesNotExposeIntegrationTypes(offsetType, frameType, samplerType);
+    }
+
+    [Fact]
     public void TrackEvaluator_BoundStationDistanceSampling_ReturnsCoasterTrackFrames()
     {
         Type evaluatorType = typeof(TrackEvaluator);
@@ -763,6 +828,84 @@ public sealed class CoasterApiBoundaryContractTests
     {
         return string.Equals(type.Namespace, "Quantum.Splines", StringComparison.Ordinal) ||
                (type.Namespace?.StartsWith("Quantum.Splines.", StringComparison.Ordinal) ?? false);
+    }
+
+    private static void AssertPublicSurfaceDoesNotExposeIntegrationTypes(params Type[] declaringTypes)
+    {
+        foreach (Type declaringType in declaringTypes)
+        {
+            foreach (ConstructorInfo constructor in declaringType.GetConstructors())
+            {
+                foreach (ParameterInfo parameter in constructor.GetParameters())
+                {
+                    AssertDoesNotExposeIntegrationType(parameter.ParameterType, constructor.Name);
+                }
+            }
+
+            foreach (PropertyInfo property in declaringType.GetProperties(
+                BindingFlags.Public |
+                BindingFlags.Instance |
+                BindingFlags.Static |
+                BindingFlags.DeclaredOnly))
+            {
+                AssertDoesNotExposeIntegrationType(property.PropertyType, property.Name);
+            }
+
+            foreach (MethodInfo method in declaringType.GetMethods(
+                BindingFlags.Public |
+                BindingFlags.Instance |
+                BindingFlags.Static |
+                BindingFlags.DeclaredOnly))
+            {
+                AssertDoesNotExposeIntegrationType(method.ReturnType, method.Name);
+                foreach (ParameterInfo parameter in method.GetParameters())
+                {
+                    AssertDoesNotExposeIntegrationType(parameter.ParameterType, method.Name);
+                }
+            }
+        }
+    }
+
+    private static void AssertDoesNotExposeIntegrationType(Type type, string memberName)
+    {
+        string typeNamespace = type.Namespace ?? string.Empty;
+        string[] forbiddenNamespacePrefixes =
+        {
+            "Quantum.IO",
+            "Quantum.FVD",
+            "Quantum.Physics",
+            "Quantum.Splines",
+            "Quantum.Debug",
+            "UnityEngine",
+            "UnityEditor",
+            "GShark",
+            "Avalonia",
+            "Silk.NET",
+            "OpenTK"
+        };
+
+        foreach (string prefix in forbiddenNamespacePrefixes)
+        {
+            Assert.False(
+                string.Equals(typeNamespace, prefix, StringComparison.Ordinal) ||
+                typeNamespace.StartsWith(prefix + ".", StringComparison.Ordinal),
+                $"{memberName} exposes forbidden integration dependency type {type.FullName}.");
+        }
+
+        if (type.IsGenericType)
+        {
+            foreach (Type argumentType in type.GetGenericArguments())
+            {
+                AssertDoesNotExposeIntegrationType(argumentType, memberName);
+            }
+        }
+
+        if (type.HasElementType)
+        {
+            Type? elementType = type.GetElementType();
+            Assert.NotNull(elementType);
+            AssertDoesNotExposeIntegrationType(elementType, memberName);
+        }
     }
 }
 
