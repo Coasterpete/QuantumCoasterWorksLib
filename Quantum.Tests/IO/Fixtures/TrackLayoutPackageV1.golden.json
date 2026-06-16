@@ -1,0 +1,113 @@
+{
+  "contract": "quantum.track_layout_package",
+  "version": 1,
+  "metadata": {
+    "units": "meters",
+    "sourceName": "track-layout-v1-golden"
+  },
+  "startPose": {
+    "position": {
+      "x": 1,
+      "y": 2,
+      "z": 3
+    },
+    "tangent": {
+      "x": 0,
+      "y": 1,
+      "z": 0
+    },
+    "normal": {
+      "x": 0,
+      "y": 0,
+      "z": 1
+    },
+    "binormal": {
+      "x": 1,
+      "y": 0,
+      "z": 0
+    }
+  },
+  "sections": [
+    {
+      "kind": "straight",
+      "id": "entry",
+      "length": 10,
+      "rollRadians": 0.1
+    },
+    {
+      "kind": "constantCurvature",
+      "id": "turn",
+      "length": 12,
+      "rollRadians": -0.2,
+      "radius": -30
+    },
+    {
+      "kind": "curvatureTransition",
+      "id": "transition",
+      "length": 8,
+      "rollRadians": 0.05,
+      "startCurvature": 0.02,
+      "endCurvature": -0.01,
+      "interpolationMode": "linear"
+    },
+    {
+      "kind": "spatial",
+      "id": "spatial",
+      "length": 6,
+      "rollRadians": 0.25,
+      "degree": 3,
+      "controlPoints": [
+        {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        {
+          "x": 2,
+          "y": 0,
+          "z": 0
+        },
+        {
+          "x": 4,
+          "y": 0,
+          "z": 0
+        },
+        {
+          "x": 6,
+          "y": 0,
+          "z": 0
+        }
+      ],
+      "weights": [
+        1,
+        1,
+        1,
+        1
+      ]
+    }
+  ],
+  "banking": {
+    "keys": [
+      {
+        "distance": 0,
+        "rollRadians": 0,
+        "interpolationToNext": "linear"
+      },
+      {
+        "distance": 10,
+        "rollRadians": 0.2,
+        "interpolationToNext": "smoothStep"
+      },
+      {
+        "distance": 22,
+        "rollRadians": -0.35,
+        "interpolationToNext": "constant"
+      },
+      {
+        "distance": 36,
+        "rollRadians": 0.1,
+        "interpolationToNext": "constant"
+      }
+    ]
+  }
+}

@@ -4,6 +4,7 @@ using Quantum.IO.ContinuousRollDiagnostics.V1;
 using Quantum.IO.DebugViewport.V1;
 using Quantum.IO.DistanceInspection.V1;
 using Quantum.IO.MeshExport.V1;
+using Quantum.IO.TrackLayout.V1;
 using Quantum.IO.TrackFrameContinuity.V1;
 using Quantum.IO.TrainPose.V1;
 using Quantum.IO.TransportedFrameComparison.V1;
@@ -71,6 +72,13 @@ public sealed class VersionedDtoContractTests
             MeshExportV1Dto.ContractVersion,
             new MeshExportV1Dto().Contract,
             new MeshExportV1Dto().Version);
+        AssertContractIdentity(
+            "quantum.track_layout_package",
+            1,
+            TrackLayoutPackageV1Dto.ContractName,
+            TrackLayoutPackageV1Dto.ContractVersion,
+            new TrackLayoutPackageV1Dto().Contract,
+            new TrackLayoutPackageV1Dto().Version);
     }
 
     [Fact]
@@ -131,6 +139,20 @@ public sealed class VersionedDtoContractTests
             meshDiagnostics,
             d => d.Code == MeshExportV1ValidationCode.InvalidContract ||
                  d.Code == MeshExportV1ValidationCode.InvalidVersion);
+
+        var trackLayout = new TrackLayoutPackageV1Dto();
+        Assert.Equal("meters", trackLayout.Metadata.Units);
+        Assert.Empty(trackLayout.Sections);
+        Assert.Null(trackLayout.Banking);
+        Assert.False(TrackLayoutPackageV1Validator.TryValidate(trackLayout, out var trackLayoutDiagnostics));
+        Assert.Contains(
+            trackLayoutDiagnostics,
+            d => d.Code == TrackLayoutPackageV1ValidationCode.EmptySections &&
+                 d.Path == "sections");
+        Assert.DoesNotContain(
+            trackLayoutDiagnostics,
+            d => d.Code == TrackLayoutPackageV1ValidationCode.InvalidContract ||
+                 d.Code == TrackLayoutPackageV1ValidationCode.InvalidVersion);
     }
 
     [Fact]
@@ -317,6 +339,44 @@ public sealed class VersionedDtoContractTests
               "contract": "quantum.mesh_export",
               "version": 1,
               "meshes": []
+            }
+            """);
+        AssertStableJson(
+            new TrackLayoutPackageV1Dto(),
+            TrackLayoutPackageV1Json.Serialize,
+            TrackLayoutPackageV1Json.Deserialize,
+            """
+            {
+              "contract": "quantum.track_layout_package",
+              "version": 1,
+              "metadata": {
+                "units": "meters",
+                "sourceName": null
+              },
+              "startPose": {
+                "position": {
+                  "x": 0,
+                  "y": 0,
+                  "z": 0
+                },
+                "tangent": {
+                  "x": 1,
+                  "y": 0,
+                  "z": 0
+                },
+                "normal": {
+                  "x": 0,
+                  "y": 1,
+                  "z": 0
+                },
+                "binormal": {
+                  "x": 0,
+                  "y": 0,
+                  "z": 1
+                }
+              },
+              "sections": [],
+              "banking": null
             }
             """);
     }

@@ -1,0 +1,315 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quantumcoasterworks.dev/schemas/track-layout-package-v1.schema.json",
+  "title": "TrackLayoutPackageV1",
+  "description": "Stable backend-only JSON contract for authored coaster track layouts.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract",
+    "version",
+    "metadata",
+    "startPose",
+    "sections",
+    "banking"
+  ],
+  "properties": {
+    "contract": {
+      "description": "Stable contract discriminator.",
+      "type": "string",
+      "const": "quantum.track_layout_package"
+    },
+    "version": {
+      "description": "Contract version.",
+      "type": "integer",
+      "const": 1
+    },
+    "metadata": {
+      "$ref": "#/$defs/metadata"
+    },
+    "startPose": {
+      "$ref": "#/$defs/startPose"
+    },
+    "sections": {
+      "description": "Ordered authored geometric section definitions.",
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "oneOf": [
+          {
+            "$ref": "#/$defs/straightSection"
+          },
+          {
+            "$ref": "#/$defs/constantCurvatureSection"
+          },
+          {
+            "$ref": "#/$defs/curvatureTransitionSection"
+          },
+          {
+            "$ref": "#/$defs/spatialSection"
+          }
+        ]
+      }
+    },
+    "banking": {
+      "description": "Optional explicit authored banking. Null means no explicit banking is persisted.",
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "#/$defs/banking"
+        }
+      ]
+    }
+  },
+  "$defs": {
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "units",
+        "sourceName"
+      ],
+      "properties": {
+        "units": {
+          "description": "Distance units used by authored scalar values.",
+          "type": "string"
+        },
+        "sourceName": {
+          "description": "Optional source label for the authored layout package.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "startPose": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "position",
+        "tangent",
+        "normal",
+        "binormal"
+      ],
+      "properties": {
+        "position": {
+          "$ref": "#/$defs/vector3d"
+        },
+        "tangent": {
+          "$ref": "#/$defs/vector3d"
+        },
+        "normal": {
+          "$ref": "#/$defs/vector3d"
+        },
+        "binormal": {
+          "$ref": "#/$defs/vector3d"
+        }
+      }
+    },
+    "vector3d": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "x",
+        "y",
+        "z"
+      ],
+      "properties": {
+        "x": {
+          "type": "number"
+        },
+        "y": {
+          "type": "number"
+        },
+        "z": {
+          "type": "number"
+        }
+      }
+    },
+    "straightSection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "id",
+        "length",
+        "rollRadians"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "straight"
+        },
+        "id": {
+          "type": "string"
+        },
+        "length": {
+          "type": "number"
+        },
+        "rollRadians": {
+          "type": "number"
+        }
+      }
+    },
+    "constantCurvatureSection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "id",
+        "length",
+        "rollRadians",
+        "radius"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "constantCurvature"
+        },
+        "id": {
+          "type": "string"
+        },
+        "length": {
+          "type": "number"
+        },
+        "rollRadians": {
+          "type": "number"
+        },
+        "radius": {
+          "type": "number"
+        }
+      }
+    },
+    "curvatureTransitionSection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "id",
+        "length",
+        "rollRadians",
+        "startCurvature",
+        "endCurvature",
+        "interpolationMode"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "curvatureTransition"
+        },
+        "id": {
+          "type": "string"
+        },
+        "length": {
+          "type": "number"
+        },
+        "rollRadians": {
+          "type": "number"
+        },
+        "startCurvature": {
+          "type": "number"
+        },
+        "endCurvature": {
+          "type": "number"
+        },
+        "interpolationMode": {
+          "type": "string",
+          "enum": [
+            "linear"
+          ]
+        }
+      }
+    },
+    "spatialSection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "id",
+        "length",
+        "rollRadians",
+        "degree",
+        "controlPoints",
+        "weights"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "spatial"
+        },
+        "id": {
+          "type": "string"
+        },
+        "length": {
+          "type": "number"
+        },
+        "rollRadians": {
+          "type": "number"
+        },
+        "degree": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "controlPoints": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "$ref": "#/$defs/vector3d"
+          }
+        },
+        "weights": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          }
+        }
+      }
+    },
+    "banking": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "keys"
+      ],
+      "properties": {
+        "keys": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "$ref": "#/$defs/bankingKey"
+          }
+        }
+      }
+    },
+    "bankingKey": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "distance",
+        "rollRadians",
+        "interpolationToNext"
+      ],
+      "properties": {
+        "distance": {
+          "type": "number"
+        },
+        "rollRadians": {
+          "type": "number"
+        },
+        "interpolationToNext": {
+          "type": "string",
+          "enum": [
+            "constant",
+            "linear",
+            "smoothStep"
+          ]
+        }
+      }
+    }
+  }
+}
