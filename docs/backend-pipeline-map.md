@@ -8,6 +8,12 @@ Authoring / compilation / runtime lane:
 Evaluation lane:
 `TrackDocument or CompiledTrackRuntime -> TrackEvaluator -> TrackFrame -> TrainCarTransformProvider -> TrainPoseResult -> debug/export/physics/frontend consumers`
 
+Opt-in heartline sampling lane:
+`TrackEvaluator + HeartlineOffset -> HeartlineSampler -> HeartlineFrame`
+
+Opt-in profile-banked heartline sampling lane:
+`TrackEvaluator + BankingProfile + HeartlineOffset -> BankingProfileSampler -> HeartlineSampler -> HeartlineFrame`
+
 Geometry continuity diagnostics can compile a `TrackAuthoringDefinition`
 internally or reuse an existing `TrackAuthoringCompilation`. Reuse avoids a
 duplicate document/runtime compilation and reads the supplied compiled document
@@ -75,7 +81,27 @@ What breaks if changed:
 - Unity/debug orientation can flip or skew.
 - Exported matrix/frame interpretation becomes incompatible with existing consumers.
 
-## 4) TrainCarTransformProvider
+## 4) HeartlineSampler
+What it owns:
+- Optional rider-reference point sampling from existing track frames.
+- Centerline station-distance semantics for `HeartlineFrame.Distance`.
+- Normal/lateral offset application along sampled frame axes.
+- An explicit profile-banked path that first samples frames through
+  `BankingProfileSampler`.
+
+What it assumes:
+- `TrackEvaluator` and `BankingProfileSampler` own frame sampling and distance
+  validation.
+- Normal and lateral offsets are finite meter values.
+- No separate heartline arc-length domain exists in PR3.
+
+What breaks if changed:
+- Rider-reference debug sampling can diverge from frame axes or banking
+  conventions.
+- Accidentally routing train placement through heartline positions would change
+  the current centerline/default train path.
+
+## 5) TrainCarTransformProvider
 What it owns:
 - Distance-based car placement orchestration over sampled track frames.
 - Composition of body/bogie/wheel/articulated transforms into one pose result.
@@ -91,7 +117,7 @@ What breaks if changed:
 - Car ordering, spacing, and articulation can regress.
 - Wheel/bogie placement and matrix parity expectations can fail.
 
-## 5) TrainPoseResult
+## 6) TrainPoseResult
 What it owns:
 - The backend pose snapshot handed to external consumers.
 - The final hierarchy produced by transform provider evaluation.
@@ -104,7 +130,7 @@ What breaks if changed:
 - Export mappers/validators and downstream readers can break.
 - Unity/debug/physics adapters may misread or reject pose data.
 
-## 6) Debug / Export / Physics / Frontend Consumers
+## 7) Debug / Export / Physics / Frontend Consumers
 What they own:
 - Presentation, diagnostics, serialization, simulation usage, and host integration built on backend output.
 - Host-specific behavior such as drawing, schema validation, runtime integration, and optional visualization adapters.
