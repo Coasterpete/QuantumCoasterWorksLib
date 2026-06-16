@@ -72,6 +72,20 @@ samples frames through `BankingProfileSampler`, then applies the offset to
 those profile-banked axes. Banking affects heartline offset direction only
 through this opt-in overload.
 
+## M144 PR4 Profile-Banked Proof
+
+M144 PR4 adds a backend-only `ProfileBankedHeartlineProofScenario` in
+`Quantum.Debug`. The scenario combines self-authored spatial centerline
+sections, explicit authored `TrackBankingDefinition` keys, authoring geometry
+continuity diagnostics, authoring banking diagnostics, default centerline
+frames, profile-banked frames, and default/profile-banked heartline samples.
+
+This is a deterministic proof scenario and test fixture only. It is not a new
+debug command, export schema, IO contract, persistence path, Unity path, train
+placement default, evaluator default, renderer path, physics path, FVD path, or
+editor feature. The proof continues to use centerline station distance for
+heartline samples and does not introduce a heartline arc-length domain.
+
 ## Train And Runtime Behavior
 
 Trains still run on the current centerline/default frame path. PR3 does not
