@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 
 namespace Quantum.IO.TrackLayout.V1
 {
@@ -63,6 +64,107 @@ namespace Quantum.IO.TrackLayout.V1
         public double? Expected { get; }
 
         public double? Tolerance { get; }
+    }
+
+    internal static class TrackLayoutPackageV1DiagnosticMessages
+    {
+        public static string Section(
+            TrackLayoutSectionV1Dto section,
+            int sectionIndex,
+            string detail)
+        {
+            return WithContext(detail, SectionContext(section, sectionIndex));
+        }
+
+        public static string DuplicateSectionId(
+            TrackLayoutSectionV1Dto section,
+            int sectionIndex,
+            int previousSectionIndex)
+        {
+            return WithContext(
+                "Section IDs must be unique using ordinal comparison.",
+                SectionContext(section, sectionIndex)) +
+                " Previous section index " +
+                previousSectionIndex.ToString(CultureInfo.InvariantCulture) +
+                " used the same id.";
+        }
+
+        public static string SectionContext(
+            TrackLayoutSectionV1Dto section,
+            int sectionIndex)
+        {
+            string context = "Section index " + sectionIndex.ToString(CultureInfo.InvariantCulture);
+            if (!string.IsNullOrWhiteSpace(section.Id))
+            {
+                context += ", id '" + section.Id + "'";
+            }
+
+            if (!string.IsNullOrWhiteSpace(section.Kind))
+            {
+                context += ", kind '" + section.Kind + "'";
+            }
+
+            return context + ".";
+        }
+
+        public static string BankingKey(int keyIndex, string detail)
+        {
+            return WithContext(detail, BankingKeyContext(keyIndex));
+        }
+
+        public static string BankingKeyOrder(
+            int keyIndex,
+            int previousKeyIndex,
+            double previousDistance)
+        {
+            return WithContext(
+                "Banking key distances must be strictly increasing.",
+                "Banking key index " +
+                keyIndex.ToString(CultureInfo.InvariantCulture) +
+                "; previous key index " +
+                previousKeyIndex.ToString(CultureInfo.InvariantCulture) +
+                " distance " +
+                FormatDouble(previousDistance) +
+                ".");
+        }
+
+        public static string BankingFinalDomain(
+            int keyIndex,
+            double expectedTotalLength)
+        {
+            return WithContext(
+                "Authored banking must end exactly at total section length.",
+                "Banking key index " +
+                keyIndex.ToString(CultureInfo.InvariantCulture) +
+                "; expected total length " +
+                FormatDouble(expectedTotalLength) +
+                ".");
+        }
+
+        public static string WithContext(string detail, string? context)
+        {
+            if (string.IsNullOrWhiteSpace(context))
+            {
+                return detail;
+            }
+
+            if (string.IsNullOrWhiteSpace(detail))
+            {
+                return context;
+            }
+
+            return detail + " " + context;
+        }
+
+        public static string BankingKeyContext(int keyIndex)
+        {
+            return "Banking key index " + keyIndex.ToString(CultureInfo.InvariantCulture) + ".";
+        }
+
+        private static string FormatDouble(double value)
+        {
+            return value.ToString("R", CultureInfo.InvariantCulture);
+        }
     }
 
     public static class TrackLayoutPackageV1Validator
@@ -227,7 +329,7 @@ namespace Quantum.IO.TrackLayout.V1
                 return false;
             }
 
-            var ids = new HashSet<string>(StringComparer.Ordinal);
+            var sectionIdIndexes = new Dictionary<string, int>(StringComparer.Ordinal);
             for (int i = 0; i < sections.Length; i++)
             {
                 string path = "sections[" + i + "]";
@@ -238,8 +340,8 @@ namespace Quantum.IO.TrackLayout.V1
                     continue;
                 }
 
-                ValidateSectionCommon(section, path, ids, diagnostics);
-                ValidateSectionByKind(section, path, diagnostics);
+                ValidateSectionCommon(section, i, path, sectionIdIndexes, diagnostics);
+                ValidateSectionByKind(section, i, path, diagnostics);
 
                 if (IsFinite(section.Length))
                 {
@@ -266,8 +368,9 @@ namespace Quantum.IO.TrackLayout.V1
 
         private static void ValidateSectionCommon(
             TrackLayoutSectionV1Dto section,
+            int sectionIndex,
             string path,
-            HashSet<string> ids,
+            Dictionary<string, int> sectionIdIndexes,
             List<TrackLayoutPackageV1ValidationDiagnostic> diagnostics)
         {
             if (string.IsNullOrWhiteSpace(section.Kind))
@@ -276,7 +379,10 @@ namespace Quantum.IO.TrackLayout.V1
                     new TrackLayoutPackageV1ValidationDiagnostic(
                         TrackLayoutPackageV1ValidationCode.MissingRequiredField,
                         path + ".kind",
-                        "Section kind is required."));
+                        TrackLayoutPackageV1DiagnosticMessages.Section(
+                            section,
+                            sectionIndex,
+                            "Section kind is required.")));
             }
 
             if (string.IsNullOrWhiteSpace(section.Id))
@@ -285,53 +391,67 @@ namespace Quantum.IO.TrackLayout.V1
                     new TrackLayoutPackageV1ValidationDiagnostic(
                         TrackLayoutPackageV1ValidationCode.MissingSectionId,
                         path + ".id",
-                        "Section ID is required and must not be blank."));
+                        TrackLayoutPackageV1DiagnosticMessages.Section(
+                            section,
+                            sectionIndex,
+                            "Section ID is required and must not be blank.")));
             }
-            else if (!ids.Add(section.Id))
+            else if (sectionIdIndexes.TryGetValue(section.Id, out int previousSectionIndex))
             {
                 diagnostics.Add(
                     new TrackLayoutPackageV1ValidationDiagnostic(
                         TrackLayoutPackageV1ValidationCode.DuplicateSectionId,
                         path + ".id",
-                        "Section IDs must be unique using ordinal comparison."));
+                        TrackLayoutPackageV1DiagnosticMessages.DuplicateSectionId(
+                            section,
+                            sectionIndex,
+                            previousSectionIndex)));
+            }
+            else
+            {
+                sectionIdIndexes.Add(section.Id, sectionIndex);
             }
 
-            bool lengthFinite = ValidateFinite(section.Length, path + ".length", diagnostics);
+            string sectionContext = TrackLayoutPackageV1DiagnosticMessages.SectionContext(section, sectionIndex);
+            bool lengthFinite = ValidateFinite(section.Length, path + ".length", diagnostics, sectionContext);
             if (lengthFinite && section.Length <= 0.0)
             {
                 diagnostics.Add(
                     new TrackLayoutPackageV1ValidationDiagnostic(
                         TrackLayoutPackageV1ValidationCode.NonPositiveLength,
                         path + ".length",
-                        "Section length must be finite and greater than zero.",
+                        TrackLayoutPackageV1DiagnosticMessages.WithContext(
+                            "Section length must be finite and greater than zero.",
+                            sectionContext),
                         section.Length,
                         0.0));
             }
 
-            ValidateFinite(section.RollRadians, path + ".rollRadians", diagnostics);
+            ValidateFinite(section.RollRadians, path + ".rollRadians", diagnostics, sectionContext);
         }
 
         private static void ValidateSectionByKind(
             TrackLayoutSectionV1Dto section,
+            int sectionIndex,
             string path,
             List<TrackLayoutPackageV1ValidationDiagnostic> diagnostics)
         {
             switch (section.Kind)
             {
                 case TrackLayoutPackageV1Vocabulary.StraightSectionKind:
-                    ValidateStraightSection(section, path, diagnostics);
+                    ValidateStraightSection(section, sectionIndex, path, diagnostics);
                     return;
 
                 case TrackLayoutPackageV1Vocabulary.ConstantCurvatureSectionKind:
-                    ValidateConstantCurvatureSection(section, path, diagnostics);
+                    ValidateConstantCurvatureSection(section, sectionIndex, path, diagnostics);
                     return;
 
                 case TrackLayoutPackageV1Vocabulary.CurvatureTransitionSectionKind:
-                    ValidateCurvatureTransitionSection(section, path, diagnostics);
+                    ValidateCurvatureTransitionSection(section, sectionIndex, path, diagnostics);
                     return;
 
                 case TrackLayoutPackageV1Vocabulary.SpatialSectionKind:
-                    ValidateSpatialSection(section, path, diagnostics);
+                    ValidateSpatialSection(section, sectionIndex, path, diagnostics);
                     return;
 
                 default:
@@ -339,44 +459,57 @@ namespace Quantum.IO.TrackLayout.V1
                         new TrackLayoutPackageV1ValidationDiagnostic(
                             TrackLayoutPackageV1ValidationCode.UnknownSectionKind,
                             path + ".kind",
-                            "Section kind must use the TrackLayoutPackageV1 stable vocabulary."));
+                            TrackLayoutPackageV1DiagnosticMessages.Section(
+                                section,
+                                sectionIndex,
+                                "Section kind must use the TrackLayoutPackageV1 stable vocabulary.")));
                     return;
             }
         }
 
         private static void ValidateStraightSection(
             TrackLayoutSectionV1Dto section,
+            int sectionIndex,
             string path,
             List<TrackLayoutPackageV1ValidationDiagnostic> diagnostics)
         {
-            ValidateFieldAbsent(section.Radius, path + ".radius", diagnostics);
-            ValidateFieldAbsent(section.StartCurvature, path + ".startCurvature", diagnostics);
-            ValidateFieldAbsent(section.EndCurvature, path + ".endCurvature", diagnostics);
-            ValidateFieldAbsent(section.InterpolationMode, path + ".interpolationMode", diagnostics);
-            ValidateFieldAbsent(section.Degree, path + ".degree", diagnostics);
-            ValidateFieldAbsent(section.ControlPoints, path + ".controlPoints", diagnostics);
-            ValidateFieldAbsent(section.Weights, path + ".weights", diagnostics);
+            string sectionContext = TrackLayoutPackageV1DiagnosticMessages.SectionContext(section, sectionIndex);
+            ValidateFieldAbsent(section.Radius, path + ".radius", diagnostics, sectionContext);
+            ValidateFieldAbsent(section.StartCurvature, path + ".startCurvature", diagnostics, sectionContext);
+            ValidateFieldAbsent(section.EndCurvature, path + ".endCurvature", diagnostics, sectionContext);
+            ValidateFieldAbsent(section.InterpolationMode, path + ".interpolationMode", diagnostics, sectionContext);
+            ValidateFieldAbsent(section.Degree, path + ".degree", diagnostics, sectionContext);
+            ValidateFieldAbsent(section.ControlPoints, path + ".controlPoints", diagnostics, sectionContext);
+            ValidateFieldAbsent(section.Weights, path + ".weights", diagnostics, sectionContext);
         }
 
         private static void ValidateConstantCurvatureSection(
             TrackLayoutSectionV1Dto section,
+            int sectionIndex,
             string path,
             List<TrackLayoutPackageV1ValidationDiagnostic> diagnostics)
         {
+            string sectionContext = TrackLayoutPackageV1DiagnosticMessages.SectionContext(section, sectionIndex);
             if (!section.Radius.HasValue)
             {
-                AddMissingField(path + ".radius", "Constant-curvature section radius is required.", diagnostics);
+                AddMissingField(
+                    path + ".radius",
+                    "Constant-curvature section radius is required.",
+                    diagnostics,
+                    sectionContext);
             }
             else
             {
-                bool finite = ValidateFinite(section.Radius.Value, path + ".radius", diagnostics);
+                bool finite = ValidateFinite(section.Radius.Value, path + ".radius", diagnostics, sectionContext);
                 if (finite && section.Radius.Value == 0.0)
                 {
                     diagnostics.Add(
                         new TrackLayoutPackageV1ValidationDiagnostic(
                             TrackLayoutPackageV1ValidationCode.InvalidRadius,
                             path + ".radius",
-                            "Constant-curvature section radius must be non-zero.",
+                            TrackLayoutPackageV1DiagnosticMessages.WithContext(
+                                "Constant-curvature section radius must be non-zero.",
+                                sectionContext),
                             section.Radius.Value));
                 }
 
@@ -390,47 +523,54 @@ namespace Quantum.IO.TrackLayout.V1
                             new TrackLayoutPackageV1ValidationDiagnostic(
                                 TrackLayoutPackageV1ValidationCode.InvalidRadius,
                                 path + ".radius",
-                                "Constant-curvature section radius must produce finite curvature and sweep values.",
+                                TrackLayoutPackageV1DiagnosticMessages.WithContext(
+                                    "Constant-curvature section radius must produce finite curvature and sweep values.",
+                                    sectionContext),
                                 section.Radius.Value));
                     }
                 }
             }
 
-            ValidateFieldAbsent(section.StartCurvature, path + ".startCurvature", diagnostics);
-            ValidateFieldAbsent(section.EndCurvature, path + ".endCurvature", diagnostics);
-            ValidateFieldAbsent(section.InterpolationMode, path + ".interpolationMode", diagnostics);
-            ValidateFieldAbsent(section.Degree, path + ".degree", diagnostics);
-            ValidateFieldAbsent(section.ControlPoints, path + ".controlPoints", diagnostics);
-            ValidateFieldAbsent(section.Weights, path + ".weights", diagnostics);
+            ValidateFieldAbsent(section.StartCurvature, path + ".startCurvature", diagnostics, sectionContext);
+            ValidateFieldAbsent(section.EndCurvature, path + ".endCurvature", diagnostics, sectionContext);
+            ValidateFieldAbsent(section.InterpolationMode, path + ".interpolationMode", diagnostics, sectionContext);
+            ValidateFieldAbsent(section.Degree, path + ".degree", diagnostics, sectionContext);
+            ValidateFieldAbsent(section.ControlPoints, path + ".controlPoints", diagnostics, sectionContext);
+            ValidateFieldAbsent(section.Weights, path + ".weights", diagnostics, sectionContext);
         }
 
         private static void ValidateCurvatureTransitionSection(
             TrackLayoutSectionV1Dto section,
+            int sectionIndex,
             string path,
             List<TrackLayoutPackageV1ValidationDiagnostic> diagnostics)
         {
-            ValidateFieldAbsent(section.Radius, path + ".radius", diagnostics);
-            ValidateFieldAbsent(section.Degree, path + ".degree", diagnostics);
-            ValidateFieldAbsent(section.ControlPoints, path + ".controlPoints", diagnostics);
-            ValidateFieldAbsent(section.Weights, path + ".weights", diagnostics);
+            string sectionContext = TrackLayoutPackageV1DiagnosticMessages.SectionContext(section, sectionIndex);
+            ValidateFieldAbsent(section.Radius, path + ".radius", diagnostics, sectionContext);
+            ValidateFieldAbsent(section.Degree, path + ".degree", diagnostics, sectionContext);
+            ValidateFieldAbsent(section.ControlPoints, path + ".controlPoints", diagnostics, sectionContext);
+            ValidateFieldAbsent(section.Weights, path + ".weights", diagnostics, sectionContext);
 
             bool startValid = ValidateRequiredFinite(
                 section.StartCurvature,
                 path + ".startCurvature",
                 "Curvature-transition start curvature is required.",
-                diagnostics);
+                diagnostics,
+                sectionContext);
             bool endValid = ValidateRequiredFinite(
                 section.EndCurvature,
                 path + ".endCurvature",
                 "Curvature-transition end curvature is required.",
-                diagnostics);
+                diagnostics,
+                sectionContext);
 
             if (string.IsNullOrWhiteSpace(section.InterpolationMode))
             {
                 AddMissingField(
                     path + ".interpolationMode",
                     "Curvature-transition interpolation mode is required.",
-                    diagnostics);
+                    diagnostics,
+                    sectionContext);
             }
             else if (!TrackLayoutPackageV1Vocabulary.IsKnownCurvatureTransitionInterpolation(
                          section.InterpolationMode))
@@ -439,7 +579,9 @@ namespace Quantum.IO.TrackLayout.V1
                     new TrackLayoutPackageV1ValidationDiagnostic(
                         TrackLayoutPackageV1ValidationCode.InvalidCurvatureInterpolation,
                         path + ".interpolationMode",
-                        "Curvature-transition interpolation mode must be linear."));
+                        TrackLayoutPackageV1DiagnosticMessages.WithContext(
+                            "Curvature-transition interpolation mode must be linear.",
+                            sectionContext)));
             }
 
             if (startValid && endValid && IsFinite(section.Length))
@@ -453,7 +595,9 @@ namespace Quantum.IO.TrackLayout.V1
                         new TrackLayoutPackageV1ValidationDiagnostic(
                             TrackLayoutPackageV1ValidationCode.NonFiniteNumber,
                             path + ".curvatureDelta",
-                            "Curvature range must be finite.",
+                            TrackLayoutPackageV1DiagnosticMessages.WithContext(
+                                "Curvature range must be finite.",
+                                sectionContext),
                             curvatureDelta));
                 }
 
@@ -463,7 +607,9 @@ namespace Quantum.IO.TrackLayout.V1
                         new TrackLayoutPackageV1ValidationDiagnostic(
                             TrackLayoutPackageV1ValidationCode.NonFiniteNumber,
                             path + ".headingSweep",
-                            "Transition curvature must produce a finite heading sweep.",
+                            TrackLayoutPackageV1DiagnosticMessages.WithContext(
+                                "Transition curvature must produce a finite heading sweep.",
+                                sectionContext),
                             headingSweep));
                 }
             }
@@ -471,17 +617,19 @@ namespace Quantum.IO.TrackLayout.V1
 
         private static void ValidateSpatialSection(
             TrackLayoutSectionV1Dto section,
+            int sectionIndex,
             string path,
             List<TrackLayoutPackageV1ValidationDiagnostic> diagnostics)
         {
-            ValidateFieldAbsent(section.Radius, path + ".radius", diagnostics);
-            ValidateFieldAbsent(section.StartCurvature, path + ".startCurvature", diagnostics);
-            ValidateFieldAbsent(section.EndCurvature, path + ".endCurvature", diagnostics);
-            ValidateFieldAbsent(section.InterpolationMode, path + ".interpolationMode", diagnostics);
+            string sectionContext = TrackLayoutPackageV1DiagnosticMessages.SectionContext(section, sectionIndex);
+            ValidateFieldAbsent(section.Radius, path + ".radius", diagnostics, sectionContext);
+            ValidateFieldAbsent(section.StartCurvature, path + ".startCurvature", diagnostics, sectionContext);
+            ValidateFieldAbsent(section.EndCurvature, path + ".endCurvature", diagnostics, sectionContext);
+            ValidateFieldAbsent(section.InterpolationMode, path + ".interpolationMode", diagnostics, sectionContext);
 
             if (!section.Degree.HasValue)
             {
-                AddMissingField(path + ".degree", "Spatial section degree is required.", diagnostics);
+                AddMissingField(path + ".degree", "Spatial section degree is required.", diagnostics, sectionContext);
             }
             else if (section.Degree.Value < 1)
             {
@@ -489,7 +637,9 @@ namespace Quantum.IO.TrackLayout.V1
                     new TrackLayoutPackageV1ValidationDiagnostic(
                         TrackLayoutPackageV1ValidationCode.InvalidSpatialDegree,
                         path + ".degree",
-                        "Spatial section degree must be at least 1.",
+                        TrackLayoutPackageV1DiagnosticMessages.WithContext(
+                            "Spatial section degree must be at least 1.",
+                            sectionContext),
                         section.Degree.Value,
                         1.0));
             }
@@ -500,26 +650,32 @@ namespace Quantum.IO.TrackLayout.V1
                 AddMissingField(
                     path + ".controlPoints",
                     "Spatial section control points are required.",
-                    diagnostics);
+                    diagnostics,
+                    sectionContext);
             }
             else
             {
-                ValidateSpatialControlPoints(controlPoints, section.Degree, path + ".controlPoints", diagnostics);
+                ValidateSpatialControlPoints(
+                    controlPoints,
+                    section.Degree,
+                    path + ".controlPoints",
+                    diagnostics,
+                    sectionContext);
             }
 
             double[]? weights = section.Weights;
             if (weights == null)
             {
-                AddMissingField(path + ".weights", "Spatial section weights are required.", diagnostics);
+                AddMissingField(path + ".weights", "Spatial section weights are required.", diagnostics, sectionContext);
             }
             else
             {
-                ValidateSpatialWeights(weights, controlPoints, path + ".weights", diagnostics);
+                ValidateSpatialWeights(weights, controlPoints, path + ".weights", diagnostics, sectionContext);
             }
 
             if (controlPoints != null)
             {
-                ValidateSpatialStartContract(controlPoints, path + ".controlPoints", diagnostics);
+                ValidateSpatialStartContract(controlPoints, path + ".controlPoints", diagnostics, sectionContext);
             }
         }
 
@@ -527,7 +683,8 @@ namespace Quantum.IO.TrackLayout.V1
             TrackLayoutVector3dV1Dto[] controlPoints,
             int? degree,
             string path,
-            List<TrackLayoutPackageV1ValidationDiagnostic> diagnostics)
+            List<TrackLayoutPackageV1ValidationDiagnostic> diagnostics,
+            string sectionContext)
         {
             if (controlPoints.Length == 0)
             {
@@ -535,7 +692,9 @@ namespace Quantum.IO.TrackLayout.V1
                     new TrackLayoutPackageV1ValidationDiagnostic(
                         TrackLayoutPackageV1ValidationCode.InvalidSpatialControlPoints,
                         path,
-                        "Spatial section control points cannot be empty."));
+                        TrackLayoutPackageV1DiagnosticMessages.WithContext(
+                            "Spatial section control points cannot be empty.",
+                            sectionContext)));
             }
 
             if (degree.HasValue && degree.Value >= 1 && controlPoints.Length <= degree.Value)
@@ -544,14 +703,16 @@ namespace Quantum.IO.TrackLayout.V1
                     new TrackLayoutPackageV1ValidationDiagnostic(
                         TrackLayoutPackageV1ValidationCode.InvalidSpatialControlPoints,
                         path,
-                        "Spatial section control point count must be at least degree + 1.",
+                        TrackLayoutPackageV1DiagnosticMessages.WithContext(
+                            "Spatial section control point count must be at least degree + 1.",
+                            sectionContext),
                         controlPoints.Length,
                         degree.Value + 1.0));
             }
 
             for (int i = 0; i < controlPoints.Length; i++)
             {
-                ValidateFiniteVector(controlPoints[i], path + "[" + i + "]", diagnostics);
+                ValidateFiniteVector(controlPoints[i], path + "[" + i + "]", diagnostics, sectionContext);
             }
         }
 
@@ -559,7 +720,8 @@ namespace Quantum.IO.TrackLayout.V1
             double[] weights,
             TrackLayoutVector3dV1Dto[]? controlPoints,
             string path,
-            List<TrackLayoutPackageV1ValidationDiagnostic> diagnostics)
+            List<TrackLayoutPackageV1ValidationDiagnostic> diagnostics,
+            string sectionContext)
         {
             if (controlPoints != null && weights.Length != controlPoints.Length)
             {
@@ -567,21 +729,25 @@ namespace Quantum.IO.TrackLayout.V1
                     new TrackLayoutPackageV1ValidationDiagnostic(
                         TrackLayoutPackageV1ValidationCode.InvalidSpatialWeights,
                         path,
-                        "Spatial section weight count must match control point count.",
+                        TrackLayoutPackageV1DiagnosticMessages.WithContext(
+                            "Spatial section weight count must match control point count.",
+                            sectionContext),
                         weights.Length,
                         controlPoints.Length));
             }
 
             for (int i = 0; i < weights.Length; i++)
             {
-                bool finite = ValidateFinite(weights[i], path + "[" + i + "]", diagnostics);
+                bool finite = ValidateFinite(weights[i], path + "[" + i + "]", diagnostics, sectionContext);
                 if (finite && weights[i] <= 0.0)
                 {
                     diagnostics.Add(
                         new TrackLayoutPackageV1ValidationDiagnostic(
                             TrackLayoutPackageV1ValidationCode.InvalidSpatialWeights,
                             path + "[" + i + "]",
-                            "Spatial section weights must be finite and greater than zero.",
+                            TrackLayoutPackageV1DiagnosticMessages.WithContext(
+                                "Spatial section weights must be finite and greater than zero.",
+                                sectionContext),
                             weights[i],
                             0.0));
                 }
@@ -591,7 +757,8 @@ namespace Quantum.IO.TrackLayout.V1
         private static void ValidateSpatialStartContract(
             TrackLayoutVector3dV1Dto[] controlPoints,
             string path,
-            List<TrackLayoutPackageV1ValidationDiagnostic> diagnostics)
+            List<TrackLayoutPackageV1ValidationDiagnostic> diagnostics,
+            string sectionContext)
         {
             if (controlPoints.Length < 2 || controlPoints[0] == null || controlPoints[1] == null)
             {
@@ -611,7 +778,9 @@ namespace Quantum.IO.TrackLayout.V1
                     new TrackLayoutPackageV1ValidationDiagnostic(
                         TrackLayoutPackageV1ValidationCode.InvalidSpatialStartContract,
                         path + "[0]",
-                        "Spatial section local start point must be the origin."));
+                        TrackLayoutPackageV1DiagnosticMessages.WithContext(
+                            "Spatial section local start point must be the origin.",
+                            sectionContext)));
             }
 
             double dx = next.X - start.X;
@@ -624,7 +793,9 @@ namespace Quantum.IO.TrackLayout.V1
                     new TrackLayoutPackageV1ValidationDiagnostic(
                         TrackLayoutPackageV1ValidationCode.InvalidSpatialStartContract,
                         path + "[1]",
-                        "Spatial section local start tangent must have non-zero magnitude and point along positive X.",
+                        TrackLayoutPackageV1DiagnosticMessages.WithContext(
+                            "Spatial section local start tangent must have non-zero magnitude and point along positive X.",
+                            sectionContext),
                         directionLength,
                         MinimumSpatialStartTangentMagnitude,
                         MinimumSpatialStartTangentMagnitude));
@@ -642,7 +813,9 @@ namespace Quantum.IO.TrackLayout.V1
                     new TrackLayoutPackageV1ValidationDiagnostic(
                         TrackLayoutPackageV1ValidationCode.InvalidSpatialStartContract,
                         path + "[1]",
-                        "Spatial section local start tangent must point along positive X.",
+                        TrackLayoutPackageV1DiagnosticMessages.WithContext(
+                            "Spatial section local start tangent must point along positive X.",
+                            sectionContext),
                         tangentX,
                         1.0,
                         SpatialStartTangentAlignmentTolerance));
@@ -680,27 +853,40 @@ namespace Quantum.IO.TrackLayout.V1
 
             bool keyDistancesValid = true;
             double previousDistance = double.NegativeInfinity;
+            int previousDistanceIndex = -1;
             for (int i = 0; i < keys.Length; i++)
             {
                 string path = "banking.keys[" + i + "]";
                 TrackBankingKeyV1Dto? key = keys[i];
                 if (key == null)
                 {
-                    AddMissingObject(path, diagnostics);
+                    AddMissingObject(
+                        path,
+                        diagnostics,
+                        TrackLayoutPackageV1DiagnosticMessages.BankingKeyContext(i));
                     keyDistancesValid = false;
                     continue;
                 }
 
-                bool distanceFinite = ValidateFinite(key.Distance, path + ".distance", diagnostics);
+                bool distanceFinite = ValidateFinite(
+                    key.Distance,
+                    path + ".distance",
+                    diagnostics,
+                    TrackLayoutPackageV1DiagnosticMessages.BankingKeyContext(i));
                 keyDistancesValid &= distanceFinite;
-                ValidateFinite(key.RollRadians, path + ".rollRadians", diagnostics);
+                ValidateFinite(
+                    key.RollRadians,
+                    path + ".rollRadians",
+                    diagnostics,
+                    TrackLayoutPackageV1DiagnosticMessages.BankingKeyContext(i));
 
                 if (string.IsNullOrWhiteSpace(key.InterpolationToNext))
                 {
                     AddMissingField(
                         path + ".interpolationToNext",
                         "Banking interpolationToNext is required.",
-                        diagnostics);
+                        diagnostics,
+                        TrackLayoutPackageV1DiagnosticMessages.BankingKeyContext(i));
                 }
                 else if (!TrackLayoutPackageV1Vocabulary.IsKnownBankingInterpolation(key.InterpolationToNext))
                 {
@@ -708,7 +894,9 @@ namespace Quantum.IO.TrackLayout.V1
                         new TrackLayoutPackageV1ValidationDiagnostic(
                             TrackLayoutPackageV1ValidationCode.InvalidBankingInterpolation,
                             path + ".interpolationToNext",
-                            "Banking interpolationToNext must use the TrackLayoutPackageV1 stable vocabulary."));
+                            TrackLayoutPackageV1DiagnosticMessages.BankingKey(
+                                i,
+                                "Banking interpolationToNext must use the TrackLayoutPackageV1 stable vocabulary.")));
                 }
 
                 if (distanceFinite)
@@ -719,12 +907,16 @@ namespace Quantum.IO.TrackLayout.V1
                             new TrackLayoutPackageV1ValidationDiagnostic(
                                 TrackLayoutPackageV1ValidationCode.InvalidBankingKeyOrder,
                                 path + ".distance",
-                                "Banking key distances must be strictly increasing.",
+                                TrackLayoutPackageV1DiagnosticMessages.BankingKeyOrder(
+                                    i,
+                                    previousDistanceIndex,
+                                    previousDistance),
                                 key.Distance,
                                 previousDistance));
                     }
 
                     previousDistance = key.Distance;
+                    previousDistanceIndex = i;
                 }
             }
 
@@ -746,7 +938,9 @@ namespace Quantum.IO.TrackLayout.V1
                     new TrackLayoutPackageV1ValidationDiagnostic(
                         TrackLayoutPackageV1ValidationCode.InvalidBankingDomain,
                         "banking.keys[0].distance",
-                        "Authored banking must start exactly at distance 0.",
+                        TrackLayoutPackageV1DiagnosticMessages.BankingKey(
+                            0,
+                            "Authored banking must start exactly at distance 0."),
                         first.Distance,
                         0.0));
             }
@@ -757,7 +951,9 @@ namespace Quantum.IO.TrackLayout.V1
                     new TrackLayoutPackageV1ValidationDiagnostic(
                         TrackLayoutPackageV1ValidationCode.InvalidBankingDomain,
                         "banking.keys[" + (keys.Length - 1) + "].distance",
-                        "Authored banking must end exactly at total section length.",
+                        TrackLayoutPackageV1DiagnosticMessages.BankingFinalDomain(
+                            keys.Length - 1,
+                            totalLength),
                         last.Distance,
                         totalLength));
             }
@@ -767,21 +963,23 @@ namespace Quantum.IO.TrackLayout.V1
             double? value,
             string path,
             string missingMessage,
-            List<TrackLayoutPackageV1ValidationDiagnostic> diagnostics)
+            List<TrackLayoutPackageV1ValidationDiagnostic> diagnostics,
+            string? context = null)
         {
             if (!value.HasValue)
             {
-                AddMissingField(path, missingMessage, diagnostics);
+                AddMissingField(path, missingMessage, diagnostics, context);
                 return false;
             }
 
-            return ValidateFinite(value.Value, path, diagnostics);
+            return ValidateFinite(value.Value, path, diagnostics, context);
         }
 
         private static void ValidateFieldAbsent(
             object? value,
             string path,
-            List<TrackLayoutPackageV1ValidationDiagnostic> diagnostics)
+            List<TrackLayoutPackageV1ValidationDiagnostic> diagnostics,
+            string? context = null)
         {
             if (value == null)
             {
@@ -792,30 +990,36 @@ namespace Quantum.IO.TrackLayout.V1
                 new TrackLayoutPackageV1ValidationDiagnostic(
                     TrackLayoutPackageV1ValidationCode.UnexpectedSectionField,
                     path,
-                    "Section field is not valid for the selected section kind."));
+                    TrackLayoutPackageV1DiagnosticMessages.WithContext(
+                        "Section field is not valid for the selected section kind.",
+                        context)));
         }
 
         private static void AddMissingField(
             string path,
             string message,
-            List<TrackLayoutPackageV1ValidationDiagnostic> diagnostics)
+            List<TrackLayoutPackageV1ValidationDiagnostic> diagnostics,
+            string? context = null)
         {
             diagnostics.Add(
                 new TrackLayoutPackageV1ValidationDiagnostic(
                     TrackLayoutPackageV1ValidationCode.MissingRequiredField,
                     path,
-                    message));
+                    TrackLayoutPackageV1DiagnosticMessages.WithContext(message, context)));
         }
 
         private static void AddMissingObject(
             string path,
-            List<TrackLayoutPackageV1ValidationDiagnostic> diagnostics)
+            List<TrackLayoutPackageV1ValidationDiagnostic> diagnostics,
+            string? context = null)
         {
             diagnostics.Add(
                 new TrackLayoutPackageV1ValidationDiagnostic(
                     TrackLayoutPackageV1ValidationCode.MissingObject,
                     path,
-                    "Required object is missing."));
+                    TrackLayoutPackageV1DiagnosticMessages.WithContext(
+                        "Required object is missing.",
+                        context)));
         }
 
         private static bool ValidateBasisVector(
@@ -888,25 +1092,27 @@ namespace Quantum.IO.TrackLayout.V1
         private static bool ValidateFiniteVector(
             TrackLayoutVector3dV1Dto? vector,
             string path,
-            List<TrackLayoutPackageV1ValidationDiagnostic> diagnostics)
+            List<TrackLayoutPackageV1ValidationDiagnostic> diagnostics,
+            string? context = null)
         {
             if (vector == null)
             {
-                AddMissingObject(path, diagnostics);
+                AddMissingObject(path, diagnostics, context);
                 return false;
             }
 
             bool finite = true;
-            finite &= ValidateFinite(vector.X, path + ".x", diagnostics);
-            finite &= ValidateFinite(vector.Y, path + ".y", diagnostics);
-            finite &= ValidateFinite(vector.Z, path + ".z", diagnostics);
+            finite &= ValidateFinite(vector.X, path + ".x", diagnostics, context);
+            finite &= ValidateFinite(vector.Y, path + ".y", diagnostics, context);
+            finite &= ValidateFinite(vector.Z, path + ".z", diagnostics, context);
             return finite;
         }
 
         private static bool ValidateFinite(
             double value,
             string path,
-            List<TrackLayoutPackageV1ValidationDiagnostic> diagnostics)
+            List<TrackLayoutPackageV1ValidationDiagnostic> diagnostics,
+            string? context = null)
         {
             if (IsFinite(value))
             {
@@ -917,7 +1123,9 @@ namespace Quantum.IO.TrackLayout.V1
                 new TrackLayoutPackageV1ValidationDiagnostic(
                     TrackLayoutPackageV1ValidationCode.NonFiniteNumber,
                     path,
-                    "Numeric value must be finite.",
+                    TrackLayoutPackageV1DiagnosticMessages.WithContext(
+                        "Numeric value must be finite.",
+                        context),
                     value));
             return false;
         }

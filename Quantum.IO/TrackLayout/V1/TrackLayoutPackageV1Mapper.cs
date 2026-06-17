@@ -81,7 +81,8 @@ namespace Quantum.IO.TrackLayout.V1
                         new TrackLayoutPackageV1ValidationDiagnostic(
                             TrackLayoutPackageV1ValidationCode.MappingFailed,
                             "dto",
-                            "Validated TrackLayoutPackageV1 DTO could not be mapped: " + ex.Message)
+                            "Validated TrackLayoutPackageV1 DTO could not be mapped; this likely indicates " +
+                            "validator/mapper parity drift. Mapper detail: " + ex.Message)
                     });
             }
         }
