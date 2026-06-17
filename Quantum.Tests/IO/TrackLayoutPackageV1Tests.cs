@@ -102,9 +102,38 @@ public sealed class TrackLayoutPackageV1Tests
                  d.Path == "contract");
 
         Assert.False(malformed.Success);
-        Assert.Contains(
+        Assert.Null(malformed.Definition);
+        TrackLayoutPackageV1ValidationDiagnostic malformedDiagnostic = AssertDiagnostic(
             malformed.Diagnostics,
-            d => d.Code == TrackLayoutPackageV1ValidationCode.MalformedJson);
+            TrackLayoutPackageV1ValidationCode.MalformedJson,
+            "json");
+        AssertMessageContains(
+            malformedDiagnostic,
+            "Failed to deserialize TrackLayoutPackageV1Dto",
+            "JSON parser detail",
+            "line",
+            "byte position");
+    }
+
+    [Fact]
+    public void JsonImport_UnmappedMember_ReturnsMalformedJsonDiagnosticWithParserContext()
+    {
+        JsonObject json = ParseJsonObject(TrackLayoutPackageV1Json.Serialize(CreateRepresentativeDto()));
+        json["debugOnly"] = true;
+
+        TrackLayoutPackageV1ImportResult result = TrackLayoutPackageV1Json.Import(json.ToJsonString());
+
+        Assert.False(result.Success);
+        Assert.Null(result.Definition);
+        TrackLayoutPackageV1ValidationDiagnostic diagnostic = AssertDiagnostic(
+            result.Diagnostics,
+            TrackLayoutPackageV1ValidationCode.MalformedJson,
+            "json");
+        AssertMessageContains(
+            diagnostic,
+            "Failed to deserialize TrackLayoutPackageV1Dto",
+            "debugOnly",
+            "could not be mapped");
     }
 
     [Fact]
@@ -164,6 +193,83 @@ public sealed class TrackLayoutPackageV1Tests
             TrackLayoutPackageV1Validator.Validate(badStartPose),
             d => d.Code == TrackLayoutPackageV1ValidationCode.InvalidStartPoseBasis &&
                  d.Path == "startPose.tangent");
+    }
+
+    [Fact]
+    public void Validator_SectionDiagnostics_IncludeIndexIdKindAndDuplicateSource()
+    {
+        TrackLayoutPackageV1Dto duplicate = CreateRepresentativeDto();
+        duplicate.Sections[1].Id = duplicate.Sections[0].Id;
+
+        TrackLayoutPackageV1ValidationDiagnostic duplicateId = AssertDiagnostic(
+            TrackLayoutPackageV1Validator.Validate(duplicate),
+            TrackLayoutPackageV1ValidationCode.DuplicateSectionId,
+            "sections[1].id");
+        AssertMessageContains(
+            duplicateId,
+            "Section index 1",
+            "id 'entry'",
+            "kind 'constantCurvature'",
+            "Previous section index 0");
+
+        TrackLayoutPackageV1Dto invalid = CreateRepresentativeDto();
+        invalid.Sections[0].Radius = 10.0;
+        invalid.Sections[1].Radius = 0.0;
+        invalid.Sections[2].InterpolationMode = "smoothStep";
+        invalid.Sections[3].Length = -1.0;
+        invalid.Sections = invalid.Sections.Concat(new[]
+        {
+            new TrackLayoutSectionV1Dto
+            {
+                Kind = "legacy",
+                Id = "legacy",
+                Length = 1.0
+            }
+        }).ToArray();
+
+        IReadOnlyList<TrackLayoutPackageV1ValidationDiagnostic> diagnostics =
+            TrackLayoutPackageV1Validator.Validate(invalid);
+
+        AssertMessageContains(
+            AssertDiagnostic(
+                diagnostics,
+                TrackLayoutPackageV1ValidationCode.UnexpectedSectionField,
+                "sections[0].radius"),
+            "Section index 0",
+            "id 'entry'",
+            "kind 'straight'");
+        AssertMessageContains(
+            AssertDiagnostic(
+                diagnostics,
+                TrackLayoutPackageV1ValidationCode.InvalidRadius,
+                "sections[1].radius"),
+            "Section index 1",
+            "id 'turn'",
+            "kind 'constantCurvature'");
+        AssertMessageContains(
+            AssertDiagnostic(
+                diagnostics,
+                TrackLayoutPackageV1ValidationCode.InvalidCurvatureInterpolation,
+                "sections[2].interpolationMode"),
+            "Section index 2",
+            "id 'transition'",
+            "kind 'curvatureTransition'");
+        AssertMessageContains(
+            AssertDiagnostic(
+                diagnostics,
+                TrackLayoutPackageV1ValidationCode.NonPositiveLength,
+                "sections[3].length"),
+            "Section index 3",
+            "id 'spatial'",
+            "kind 'spatial'");
+        AssertMessageContains(
+            AssertDiagnostic(
+                diagnostics,
+                TrackLayoutPackageV1ValidationCode.UnknownSectionKind,
+                "sections[4].kind"),
+            "Section index 4",
+            "id 'legacy'",
+            "kind 'legacy'");
     }
 
     [Fact]
@@ -240,6 +346,46 @@ public sealed class TrackLayoutPackageV1Tests
     }
 
     [Fact]
+    public void Validator_SpatialDiagnostics_IncludeSectionContext()
+    {
+        TrackLayoutPackageV1Dto invalid = CreateRepresentativeDto();
+        TrackLayoutSectionV1Dto spatial = invalid.Sections[3];
+        spatial.Degree = 4;
+        spatial.ControlPoints![1].Y = 0.1;
+        spatial.Weights = new[] { 1.0, 0.0 };
+
+        IReadOnlyList<TrackLayoutPackageV1ValidationDiagnostic> diagnostics =
+            TrackLayoutPackageV1Validator.Validate(invalid);
+
+        foreach (TrackLayoutPackageV1ValidationDiagnostic diagnostic in new[]
+                 {
+                     AssertDiagnostic(
+                         diagnostics,
+                         TrackLayoutPackageV1ValidationCode.InvalidSpatialControlPoints,
+                         "sections[3].controlPoints"),
+                     AssertDiagnostic(
+                         diagnostics,
+                         TrackLayoutPackageV1ValidationCode.InvalidSpatialStartContract,
+                         "sections[3].controlPoints[1]"),
+                     AssertDiagnostic(
+                         diagnostics,
+                         TrackLayoutPackageV1ValidationCode.InvalidSpatialWeights,
+                         "sections[3].weights"),
+                     AssertDiagnostic(
+                         diagnostics,
+                         TrackLayoutPackageV1ValidationCode.InvalidSpatialWeights,
+                         "sections[3].weights[1]")
+                 })
+        {
+            AssertMessageContains(
+                diagnostic,
+                "Section index 3",
+                "id 'spatial'",
+                "kind 'spatial'");
+        }
+    }
+
+    [Fact]
     public void Validator_CatchesInvalidBankingDomainOrderAndInterpolation()
     {
         TrackLayoutPackageV1Dto invalid = CreateRepresentativeDto();
@@ -267,6 +413,107 @@ public sealed class TrackLayoutPackageV1Tests
             diagnostics,
             d => d.Code == TrackLayoutPackageV1ValidationCode.InvalidBankingDomain &&
                  d.Path == "banking.keys[3].distance");
+    }
+
+    [Fact]
+    public void Validator_BankingDiagnostics_IncludeKeyContextAndDomainDetails()
+    {
+        TrackLayoutPackageV1Dto invalid = CreateRepresentativeDto();
+        invalid.Banking!.Keys[0].Distance = 1.0;
+        invalid.Banking.Keys[1].Distance = 0.5;
+        invalid.Banking.Keys[2].InterpolationToNext = "cubic";
+        invalid.Banking.Keys[3].Distance = 35.0;
+
+        IReadOnlyList<TrackLayoutPackageV1ValidationDiagnostic> diagnostics =
+            TrackLayoutPackageV1Validator.Validate(invalid);
+
+        AssertMessageContains(
+            AssertDiagnostic(
+                diagnostics,
+                TrackLayoutPackageV1ValidationCode.InvalidBankingDomain,
+                "banking.keys[0].distance"),
+            "Banking key index 0");
+        AssertMessageContains(
+            AssertDiagnostic(
+                diagnostics,
+                TrackLayoutPackageV1ValidationCode.InvalidBankingKeyOrder,
+                "banking.keys[1].distance"),
+            "Banking key index 1",
+            "previous key index 0",
+            "distance 1");
+        AssertMessageContains(
+            AssertDiagnostic(
+                diagnostics,
+                TrackLayoutPackageV1ValidationCode.InvalidBankingInterpolation,
+                "banking.keys[2].interpolationToNext"),
+            "Banking key index 2");
+        AssertMessageContains(
+            AssertDiagnostic(
+                diagnostics,
+                TrackLayoutPackageV1ValidationCode.InvalidBankingDomain,
+                "banking.keys[3].distance"),
+            "Banking key index 3",
+            "expected total length 36");
+    }
+
+    [Fact]
+    public void Validator_DiagnosticPaths_RemainStableForRepresentativeFailures()
+    {
+        TrackLayoutPackageV1Dto invalid = CreateRepresentativeDto();
+        invalid.StartPose.Tangent = new TrackLayoutVector3dV1Dto { X = 2.0 };
+        invalid.Sections[0].Radius = 10.0;
+        invalid.Sections[3].ControlPoints![1].Y = 0.1;
+        invalid.Banking!.Keys[1].Distance = 0.0;
+
+        IReadOnlyList<TrackLayoutPackageV1ValidationDiagnostic> diagnostics =
+            TrackLayoutPackageV1Validator.Validate(invalid);
+
+        AssertDiagnostic(
+            diagnostics,
+            TrackLayoutPackageV1ValidationCode.UnexpectedSectionField,
+            "sections[0].radius");
+        AssertDiagnostic(
+            diagnostics,
+            TrackLayoutPackageV1ValidationCode.InvalidSpatialStartContract,
+            "sections[3].controlPoints[1]");
+        AssertDiagnostic(
+            diagnostics,
+            TrackLayoutPackageV1ValidationCode.InvalidStartPoseBasis,
+            "startPose.tangent");
+        AssertDiagnostic(
+            diagnostics,
+            TrackLayoutPackageV1ValidationCode.InvalidBankingKeyOrder,
+            "banking.keys[1].distance");
+    }
+
+    [Fact]
+    public void SchemaAndValidator_RejectSharedInvalidCases()
+    {
+        foreach ((string name, string json) in CreateSharedSchemaAndValidatorInvalidCases())
+        {
+            Assert.False(IsValidAgainstSchema(json), name + " should be rejected by schema validation.");
+
+            TrackLayoutPackageV1ImportResult result = TrackLayoutPackageV1Json.Import(json);
+
+            Assert.False(result.Success);
+            Assert.Null(result.Definition);
+            Assert.NotEmpty(result.Diagnostics);
+        }
+    }
+
+    [Fact]
+    public void SchemaAndValidator_CharacterizeDtoDefaultGapsWithoutChangingBehavior()
+    {
+        foreach ((string name, string json) in CreateKnownDtoDefaultSchemaGapCases())
+        {
+            Assert.False(IsValidAgainstSchema(json), name + " should remain a schema-only rejection.");
+
+            TrackLayoutPackageV1ImportResult result = TrackLayoutPackageV1Json.Import(json);
+
+            Assert.True(result.Success, name + " should still import through existing DTO defaults.");
+            Assert.NotNull(result.Definition);
+            Assert.Empty(result.Diagnostics);
+        }
     }
 
     [Fact]
@@ -496,6 +743,57 @@ public sealed class TrackLayoutPackageV1Tests
         return result.Definition!;
     }
 
+    private static IEnumerable<(string Name, string Json)> CreateSharedSchemaAndValidatorInvalidCases()
+    {
+        JsonObject wrongContract = ParseJsonObject(TrackLayoutPackageV1Json.Serialize(CreateRepresentativeDto()));
+        wrongContract["contract"] = "wrong.contract";
+        yield return ("wrong contract", wrongContract.ToJsonString());
+
+        JsonObject emptySections = ParseJsonObject(TrackLayoutPackageV1Json.Serialize(CreateRepresentativeDto()));
+        emptySections["sections"] = new JsonArray();
+        yield return ("empty sections", emptySections.ToJsonString());
+
+        JsonObject unexpectedStraightRadius =
+            ParseJsonObject(TrackLayoutPackageV1Json.Serialize(CreateRepresentativeDto()));
+        unexpectedStraightRadius["sections"]![0]!["radius"] = 10.0;
+        yield return ("straight section radius", unexpectedStraightRadius.ToJsonString());
+
+        JsonObject spatialZeroWeight =
+            ParseJsonObject(TrackLayoutPackageV1Json.Serialize(CreateRepresentativeDto()));
+        spatialZeroWeight["sections"]![3]!["weights"]![1] = 0.0;
+        yield return ("spatial zero weight", spatialZeroWeight.ToJsonString());
+
+        JsonObject shortBanking = ParseJsonObject(TrackLayoutPackageV1Json.Serialize(CreateRepresentativeDto()));
+        shortBanking["banking"]!["keys"] = new JsonArray(shortBanking["banking"]!["keys"]![0]!.DeepClone());
+        yield return ("short banking keys", shortBanking.ToJsonString());
+    }
+
+    private static IEnumerable<(string Name, string Json)> CreateKnownDtoDefaultSchemaGapCases()
+    {
+        JsonObject missingSourceName =
+            ParseJsonObject(TrackLayoutPackageV1Json.Serialize(CreateRepresentativeDto()));
+        Assert.True(missingSourceName["metadata"]!.AsObject().Remove("sourceName"));
+        yield return ("missing metadata.sourceName", missingSourceName.ToJsonString());
+
+        JsonObject missingBankingRoot =
+            ParseJsonObject(TrackLayoutPackageV1Json.Serialize(CreateRepresentativeDto()));
+        Assert.True(missingBankingRoot.Remove("banking"));
+        yield return ("missing root banking", missingBankingRoot.ToJsonString());
+
+        JsonObject missingPositionZ =
+            ParseJsonObject(TrackLayoutPackageV1Json.Serialize(CreateRepresentativeDto()));
+        Assert.True(missingPositionZ["startPose"]!["position"]!.AsObject().Remove("z"));
+        yield return ("missing startPose.position.z", missingPositionZ.ToJsonString());
+
+        JsonObject missingBankingInterpolation =
+            ParseJsonObject(TrackLayoutPackageV1Json.Serialize(CreateRepresentativeDto()));
+        Assert.True(
+            missingBankingInterpolation["banking"]!["keys"]![1]!
+                .AsObject()
+                .Remove("interpolationToNext"));
+        yield return ("missing banking interpolationToNext", missingBankingInterpolation.ToJsonString());
+    }
+
     private static void AssertAuthoringEquivalent(
         TrackAuthoringDefinition expected,
         TrackAuthoringDefinition actual)
@@ -612,6 +910,37 @@ public sealed class TrackLayoutPackageV1Tests
         JsonNode? node = JsonNode.Parse(json);
         Assert.NotNull(node);
         return Assert.IsType<JsonObject>(node);
+    }
+
+    private static TrackLayoutPackageV1ValidationDiagnostic AssertDiagnostic(
+        IReadOnlyList<TrackLayoutPackageV1ValidationDiagnostic> diagnostics,
+        TrackLayoutPackageV1ValidationCode code,
+        string path)
+    {
+        TrackLayoutPackageV1ValidationDiagnostic? diagnostic = diagnostics.FirstOrDefault(
+            d => d.Code == code && d.Path == path);
+
+        Assert.NotNull(diagnostic);
+        return diagnostic!;
+    }
+
+    private static void AssertMessageContains(
+        TrackLayoutPackageV1ValidationDiagnostic diagnostic,
+        params string[] substrings)
+    {
+        foreach (string substring in substrings)
+        {
+            Assert.True(
+                diagnostic.Message.Contains(substring, StringComparison.Ordinal),
+                "Expected diagnostic message for " +
+                diagnostic.Code +
+                " at '" +
+                diagnostic.Path +
+                "' to contain '" +
+                substring +
+                "', but was: " +
+                diagnostic.Message);
+        }
     }
 
     private static string NormalizeLineEndings(string value)
