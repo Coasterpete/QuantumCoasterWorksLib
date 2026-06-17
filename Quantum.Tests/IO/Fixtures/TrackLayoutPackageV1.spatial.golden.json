@@ -1,0 +1,134 @@
+{
+  "contract": "quantum.track_layout_package",
+  "version": 1,
+  "metadata": {
+    "units": "meters",
+    "sourceName": null
+  },
+  "startPose": {
+    "position": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "tangent": {
+      "x": 1,
+      "y": 0,
+      "z": 0
+    },
+    "normal": {
+      "x": 0,
+      "y": 1,
+      "z": 0
+    },
+    "binormal": {
+      "x": 0,
+      "y": 0,
+      "z": 1
+    }
+  },
+  "sections": [
+    {
+      "kind": "straight",
+      "id": "spatial-entry",
+      "length": 8,
+      "rollRadians": 0
+    },
+    {
+      "kind": "spatial",
+      "id": "spatial-rise-turn",
+      "length": 14.920890842180137,
+      "rollRadians": 0,
+      "degree": 3,
+      "controlPoints": [
+        {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        {
+          "x": 3,
+          "y": 0,
+          "z": 0
+        },
+        {
+          "x": 6,
+          "y": 1.8,
+          "z": 0.9
+        },
+        {
+          "x": 10,
+          "y": 3.4,
+          "z": 2.4
+        },
+        {
+          "x": 14,
+          "y": 2.8,
+          "z": 3.2
+        }
+      ],
+      "weights": [
+        1,
+        0.95,
+        1.1,
+        0.9,
+        1
+      ]
+    },
+    {
+      "kind": "constantCurvature",
+      "id": "spatial-arc",
+      "length": 12,
+      "rollRadians": 0,
+      "radius": 24
+    },
+    {
+      "kind": "spatial",
+      "id": "spatial-drop-turn",
+      "length": 12.911434582882723,
+      "rollRadians": 0,
+      "degree": 3,
+      "controlPoints": [
+        {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        {
+          "x": 2.5,
+          "y": 0,
+          "z": 0
+        },
+        {
+          "x": 5.5,
+          "y": -1.6,
+          "z": -0.7
+        },
+        {
+          "x": 9,
+          "y": -3,
+          "z": -2
+        },
+        {
+          "x": 12,
+          "y": -2.2,
+          "z": -3
+        }
+      ],
+      "weights": [
+        1,
+        1.05,
+        0.92,
+        1.15,
+        1
+      ]
+    },
+    {
+      "kind": "straight",
+      "id": "spatial-exit",
+      "length": 8,
+      "rollRadians": 0
+    }
+  ],
+  "banking": null
+}

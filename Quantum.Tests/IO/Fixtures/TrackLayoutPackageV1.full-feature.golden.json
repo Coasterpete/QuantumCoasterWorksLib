@@ -1,0 +1,137 @@
+{
+  "contract": "quantum.track_layout_package",
+  "version": 1,
+  "metadata": {
+    "units": "meters",
+    "sourceName": null
+  },
+  "startPose": {
+    "position": {
+      "x": 3,
+      "y": 2,
+      "z": -5
+    },
+    "tangent": {
+      "x": 0.7071067811865475,
+      "y": 0,
+      "z": 0.7071067811865475
+    },
+    "normal": {
+      "x": 0,
+      "y": 1,
+      "z": 0
+    },
+    "binormal": {
+      "x": -0.7071067811865475,
+      "y": 0,
+      "z": 0.7071067811865475
+    }
+  },
+  "sections": [
+    {
+      "kind": "straight",
+      "id": "full-entry",
+      "length": 9,
+      "rollRadians": 0.05
+    },
+    {
+      "kind": "constantCurvature",
+      "id": "full-negative-arc",
+      "length": 12,
+      "rollRadians": -0.08,
+      "radius": -22
+    },
+    {
+      "kind": "curvatureTransition",
+      "id": "full-signed-transition",
+      "length": 7,
+      "rollRadians": 0.03,
+      "startCurvature": -0.025,
+      "endCurvature": 0.015,
+      "interpolationMode": "linear"
+    },
+    {
+      "kind": "spatial",
+      "id": "full-weighted-spatial",
+      "length": 13.817124096281423,
+      "rollRadians": 0.12,
+      "degree": 3,
+      "controlPoints": [
+        {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        {
+          "x": 2.8,
+          "y": 0,
+          "z": 0
+        },
+        {
+          "x": 5.6,
+          "y": -1.2,
+          "z": 1.4
+        },
+        {
+          "x": 9.2,
+          "y": -2.6,
+          "z": 3
+        },
+        {
+          "x": 13,
+          "y": -1.8,
+          "z": 1.2
+        }
+      ],
+      "weights": [
+        1,
+        0.85,
+        1.2,
+        0.95,
+        1.1
+      ]
+    },
+    {
+      "kind": "constantCurvature",
+      "id": "full-positive-arc",
+      "length": 10,
+      "rollRadians": 0.18,
+      "radius": 18
+    },
+    {
+      "kind": "straight",
+      "id": "full-exit",
+      "length": 7,
+      "rollRadians": -0.04
+    }
+  ],
+  "banking": {
+    "keys": [
+      {
+        "distance": 0,
+        "rollRadians": 0.02,
+        "interpolationToNext": "linear"
+      },
+      {
+        "distance": 9,
+        "rollRadians": -0.18,
+        "interpolationToNext": "smoothStep"
+      },
+      {
+        "distance": 21,
+        "rollRadians": 0.31,
+        "interpolationToNext": "constant"
+      },
+      {
+        "distance": 41.817124096281425,
+        "rollRadians": 0.31,
+        "interpolationToNext": "linear"
+      },
+      {
+        "distance": 58.817124096281425,
+        "rollRadians": -0.12,
+        "interpolationToNext": "constant"
+      }
+    ]
+  }
+}
