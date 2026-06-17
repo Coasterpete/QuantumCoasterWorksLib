@@ -306,7 +306,12 @@
           "enum": [
             "constant",
             "linear",
-            "smoothStep"
+            "smoothStep",
+            "quadratic",
+            "cubic",
+            "quartic",
+            "quintic",
+            "sinusoidal"
           ]
         }
       }

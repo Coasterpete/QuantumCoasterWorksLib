@@ -391,7 +391,7 @@ public sealed class TrackLayoutPackageV1Tests
         TrackLayoutPackageV1Dto invalid = CreateRepresentativeDto();
         invalid.Banking!.Keys[0].Distance = 1.0;
         invalid.Banking.Keys[1].Distance = 0.5;
-        invalid.Banking.Keys[2].InterpolationToNext = "cubic";
+        invalid.Banking.Keys[2].InterpolationToNext = "legacyCubic";
         invalid.Banking.Keys[3].Distance = 35.0;
 
         IReadOnlyList<TrackLayoutPackageV1ValidationDiagnostic> diagnostics =
@@ -421,7 +421,7 @@ public sealed class TrackLayoutPackageV1Tests
         TrackLayoutPackageV1Dto invalid = CreateRepresentativeDto();
         invalid.Banking!.Keys[0].Distance = 1.0;
         invalid.Banking.Keys[1].Distance = 0.5;
-        invalid.Banking.Keys[2].InterpolationToNext = "cubic";
+        invalid.Banking.Keys[2].InterpolationToNext = "legacyCubic";
         invalid.Banking.Keys[3].Distance = 35.0;
 
         IReadOnlyList<TrackLayoutPackageV1ValidationDiagnostic> diagnostics =
@@ -561,6 +561,69 @@ public sealed class TrackLayoutPackageV1Tests
         Assert.NotNull(result.Definition);
         TrackAuthoringDefinition actual = result.Definition!;
         AssertAuthoringEquivalent(source, actual);
+    }
+
+    [Fact]
+    public void ExpandedBankingInterpolationModes_ValidateExportSchemaAndImport()
+    {
+        (BankingProfileInterpolationMode Mode, string Token)[] modes =
+        {
+            (
+                BankingProfileInterpolationMode.Quadratic,
+                TrackLayoutPackageV1Vocabulary.BankingInterpolationQuadratic),
+            (
+                BankingProfileInterpolationMode.Cubic,
+                TrackLayoutPackageV1Vocabulary.BankingInterpolationCubic),
+            (
+                BankingProfileInterpolationMode.Quartic,
+                TrackLayoutPackageV1Vocabulary.BankingInterpolationQuartic),
+            (
+                BankingProfileInterpolationMode.Quintic,
+                TrackLayoutPackageV1Vocabulary.BankingInterpolationQuintic),
+            (
+                BankingProfileInterpolationMode.Sinusoidal,
+                TrackLayoutPackageV1Vocabulary.BankingInterpolationSinusoidal)
+        };
+
+        double totalLength = modes.Length * 10.0;
+        var keys = new BankingProfileKey[modes.Length + 1];
+        for (int i = 0; i < modes.Length; i++)
+        {
+            keys[i] = new BankingProfileKey(i * 10.0, i * 0.1, modes[i].Mode);
+        }
+
+        keys[keys.Length - 1] = new BankingProfileKey(
+            totalLength,
+            0.5,
+            BankingProfileInterpolationMode.Constant);
+        var source = new TrackAuthoringDefinition(
+            new[] { new StraightSectionDefinition("expanded-banking", totalLength) },
+            TrackStartPose.Identity,
+            new TrackBankingDefinition(keys));
+
+        TrackLayoutPackageV1Dto exported = TrackLayoutPackageV1Mapper.Export(source);
+        string json = TrackLayoutPackageV1Json.Serialize(exported);
+        IReadOnlyList<TrackLayoutPackageV1ValidationDiagnostic> diagnostics =
+            TrackLayoutPackageV1Validator.Validate(exported);
+
+        Assert.Empty(diagnostics);
+        Assert.True(IsValidAgainstSchema(json));
+        Assert.NotNull(exported.Banking);
+        for (int i = 0; i < modes.Length; i++)
+        {
+            Assert.Equal(modes[i].Token, exported.Banking!.Keys[i].InterpolationToNext);
+        }
+
+        TrackLayoutPackageV1Dto dtoRoundTrip = TrackLayoutPackageV1Json.Deserialize(json);
+        TrackLayoutPackageV1ImportResult result = TrackLayoutPackageV1Mapper.Import(dtoRoundTrip);
+
+        Assert.True(result.Success);
+        Assert.NotNull(result.Definition);
+        Assert.NotNull(result.Definition!.Banking);
+        for (int i = 0; i < modes.Length; i++)
+        {
+            Assert.Equal(modes[i].Mode, result.Definition.Banking!.Keys[i].InterpolationToNext);
+        }
     }
 
     [Fact]

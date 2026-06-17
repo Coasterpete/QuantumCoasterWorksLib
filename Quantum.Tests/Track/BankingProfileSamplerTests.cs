@@ -68,6 +68,23 @@ public sealed class BankingProfileSamplerTests
         AssertNear(8.4375, BankingProfileSampler.SampleRollRadians(profile, 7.5));
     }
 
+    [Theory]
+    [InlineData(BankingProfileInterpolationMode.Quadratic, 2.5)]
+    [InlineData(BankingProfileInterpolationMode.Cubic, 1.25)]
+    [InlineData(BankingProfileInterpolationMode.Quartic, 0.625)]
+    [InlineData(BankingProfileInterpolationMode.Quintic, 0.3125)]
+    [InlineData(BankingProfileInterpolationMode.Sinusoidal, 2.928932188134524)]
+    public void SampleRollRadians_ExpandedInterpolationModes_MatchScalarEasingConvention(
+        BankingProfileInterpolationMode mode,
+        double expectedMidpointRoll)
+    {
+        BankingProfile profile = CreateProfile(
+            new BankingProfileKey(0.0, 0.0, mode),
+            new BankingProfileKey(10.0, 10.0, BankingProfileInterpolationMode.Linear));
+
+        AssertNear(expectedMidpointRoll, BankingProfileSampler.SampleRollRadians(profile, 5.0));
+    }
+
     [Fact]
     public void SampleRollRadians_ValuesGreaterThanTwoPi_AreNotWrapped()
     {
