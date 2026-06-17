@@ -1,0 +1,89 @@
+{
+  "contract": "quantum.track_layout_package",
+  "version": 1,
+  "metadata": {
+    "units": "meters",
+    "sourceName": null
+  },
+  "startPose": {
+    "position": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "tangent": {
+      "x": 1,
+      "y": 0,
+      "z": 0
+    },
+    "normal": {
+      "x": 0,
+      "y": 1,
+      "z": 0
+    },
+    "binormal": {
+      "x": 0,
+      "y": 0,
+      "z": 1
+    }
+  },
+  "sections": [
+    {
+      "kind": "straight",
+      "id": "banked-entry",
+      "length": 10,
+      "rollRadians": 0
+    },
+    {
+      "kind": "constantCurvature",
+      "id": "banked-arc",
+      "length": 12,
+      "rollRadians": 0,
+      "radius": 30
+    },
+    {
+      "kind": "curvatureTransition",
+      "id": "banked-transition",
+      "length": 8,
+      "rollRadians": 0,
+      "startCurvature": 0.03333333333333333,
+      "endCurvature": 0,
+      "interpolationMode": "linear"
+    },
+    {
+      "kind": "straight",
+      "id": "banked-exit",
+      "length": 6,
+      "rollRadians": 0
+    }
+  ],
+  "banking": {
+    "keys": [
+      {
+        "distance": 0,
+        "rollRadians": 0,
+        "interpolationToNext": "constant"
+      },
+      {
+        "distance": 10,
+        "rollRadians": 0.25,
+        "interpolationToNext": "linear"
+      },
+      {
+        "distance": 22,
+        "rollRadians": -0.15,
+        "interpolationToNext": "smoothStep"
+      },
+      {
+        "distance": 30,
+        "rollRadians": 0.4,
+        "interpolationToNext": "constant"
+      },
+      {
+        "distance": 36,
+        "rollRadians": 0.1,
+        "interpolationToNext": "constant"
+      }
+    ]
+  }
+}

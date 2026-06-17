@@ -1,0 +1,55 @@
+{
+  "contract": "quantum.track_layout_package",
+  "version": 1,
+  "metadata": {
+    "units": "meters",
+    "sourceName": null
+  },
+  "startPose": {
+    "position": {
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "tangent": {
+      "x": 1,
+      "y": 0,
+      "z": 0
+    },
+    "normal": {
+      "x": 0,
+      "y": 1,
+      "z": 0
+    },
+    "binormal": {
+      "x": 0,
+      "y": 0,
+      "z": 1
+    }
+  },
+  "sections": [
+    {
+      "kind": "straight",
+      "id": "planar-entry",
+      "length": 12,
+      "rollRadians": 0
+    },
+    {
+      "kind": "constantCurvature",
+      "id": "planar-arc",
+      "length": 14,
+      "rollRadians": 0,
+      "radius": 28
+    },
+    {
+      "kind": "curvatureTransition",
+      "id": "planar-transition",
+      "length": 10,
+      "rollRadians": 0,
+      "startCurvature": 0.03571428571428571,
+      "endCurvature": 0,
+      "interpolationMode": "linear"
+    }
+  ],
+  "banking": null
+}
