@@ -48,7 +48,7 @@ Each key stores:
 - `rollRadians`
 - `interpolationToNext`
 
-Supported banking interpolation values are `constant`, `linear`, and `smoothStep`. Banking must start exactly at distance `0` and end exactly at the authored total section length.
+Supported banking interpolation values are `constant`, `linear`, `smoothStep`, `quadratic`, `cubic`, `quartic`, `quintic`, and `sinusoidal`. Banking must start exactly at distance `0` and end exactly at the authored total section length.
 
 ## Import Behavior
 

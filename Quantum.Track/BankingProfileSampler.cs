@@ -8,6 +8,9 @@ namespace Quantum.Track
     /// </summary>
     public static class BankingProfileSampler
     {
+        private static readonly ForceInterpolationEvaluator InterpolationEvaluator =
+            new ForceInterpolationEvaluator();
+
         public static double SampleRollRadians(BankingProfile profile, double distance)
         {
             return SampleRollInfo(profile, distance).RollRadians;
@@ -187,17 +190,41 @@ namespace Quantum.Track
             double t,
             BankingProfileInterpolationMode mode)
         {
+            return Lerp(left, right, InterpolationEvaluator.Evaluate(t, MapForceInterpolation(mode)));
+        }
+
+        private static double Lerp(double left, double right, double t)
+        {
+            return left + ((right - left) * t);
+        }
+
+        private static ForceInterpolationMode MapForceInterpolation(BankingProfileInterpolationMode mode)
+        {
             switch (mode)
             {
                 case BankingProfileInterpolationMode.Constant:
-                    return left;
+                    return ForceInterpolationMode.Constant;
 
                 case BankingProfileInterpolationMode.Linear:
-                    return Lerp(left, right, t);
+                    return ForceInterpolationMode.Linear;
 
                 case BankingProfileInterpolationMode.SmoothStep:
-                    double smoothT = t * t * (3.0 - (2.0 * t));
-                    return Lerp(left, right, smoothT);
+                    return ForceInterpolationMode.SmoothStep;
+
+                case BankingProfileInterpolationMode.Quadratic:
+                    return ForceInterpolationMode.Quadratic;
+
+                case BankingProfileInterpolationMode.Cubic:
+                    return ForceInterpolationMode.Cubic;
+
+                case BankingProfileInterpolationMode.Quartic:
+                    return ForceInterpolationMode.Quartic;
+
+                case BankingProfileInterpolationMode.Quintic:
+                    return ForceInterpolationMode.Quintic;
+
+                case BankingProfileInterpolationMode.Sinusoidal:
+                    return ForceInterpolationMode.Sinusoidal;
 
                 default:
                     throw new ArgumentOutOfRangeException(
@@ -205,11 +232,6 @@ namespace Quantum.Track
                         mode,
                         "Unsupported banking profile interpolation mode.");
             }
-        }
-
-        private static double Lerp(double left, double right, double t)
-        {
-            return left + ((right - left) * t);
         }
 
         private static bool IsFinite(double value)

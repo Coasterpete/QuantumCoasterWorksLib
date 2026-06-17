@@ -171,6 +171,11 @@ public sealed class BankingProfileFixtureTests
             case BankingProfileInterpolationMode.Constant:
             case BankingProfileInterpolationMode.Linear:
             case BankingProfileInterpolationMode.SmoothStep:
+            case BankingProfileInterpolationMode.Quadratic:
+            case BankingProfileInterpolationMode.Cubic:
+            case BankingProfileInterpolationMode.Quartic:
+            case BankingProfileInterpolationMode.Quintic:
+            case BankingProfileInterpolationMode.Sinusoidal:
                 return true;
 
             default:

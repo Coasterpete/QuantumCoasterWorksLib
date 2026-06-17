@@ -324,6 +324,21 @@ namespace Quantum.IO.TrackLayout.V1
                 case TrackLayoutPackageV1Vocabulary.BankingInterpolationSmoothStep:
                     return BankingProfileInterpolationMode.SmoothStep;
 
+                case TrackLayoutPackageV1Vocabulary.BankingInterpolationQuadratic:
+                    return BankingProfileInterpolationMode.Quadratic;
+
+                case TrackLayoutPackageV1Vocabulary.BankingInterpolationCubic:
+                    return BankingProfileInterpolationMode.Cubic;
+
+                case TrackLayoutPackageV1Vocabulary.BankingInterpolationQuartic:
+                    return BankingProfileInterpolationMode.Quartic;
+
+                case TrackLayoutPackageV1Vocabulary.BankingInterpolationQuintic:
+                    return BankingProfileInterpolationMode.Quintic;
+
+                case TrackLayoutPackageV1Vocabulary.BankingInterpolationSinusoidal:
+                    return BankingProfileInterpolationMode.Sinusoidal;
+
                 default:
                     throw new ArgumentOutOfRangeException(
                         nameof(interpolationToNext),
@@ -345,6 +360,21 @@ namespace Quantum.IO.TrackLayout.V1
 
                 case BankingProfileInterpolationMode.SmoothStep:
                     return TrackLayoutPackageV1Vocabulary.BankingInterpolationSmoothStep;
+
+                case BankingProfileInterpolationMode.Quadratic:
+                    return TrackLayoutPackageV1Vocabulary.BankingInterpolationQuadratic;
+
+                case BankingProfileInterpolationMode.Cubic:
+                    return TrackLayoutPackageV1Vocabulary.BankingInterpolationCubic;
+
+                case BankingProfileInterpolationMode.Quartic:
+                    return TrackLayoutPackageV1Vocabulary.BankingInterpolationQuartic;
+
+                case BankingProfileInterpolationMode.Quintic:
+                    return TrackLayoutPackageV1Vocabulary.BankingInterpolationQuintic;
+
+                case BankingProfileInterpolationMode.Sinusoidal:
+                    return TrackLayoutPackageV1Vocabulary.BankingInterpolationSinusoidal;
 
                 default:
                     throw new ArgumentOutOfRangeException(

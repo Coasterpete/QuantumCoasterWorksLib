@@ -14,6 +14,11 @@ namespace Quantum.IO.TrackLayout.V1
         public const string BankingInterpolationConstant = "constant";
         public const string BankingInterpolationLinear = "linear";
         public const string BankingInterpolationSmoothStep = "smoothStep";
+        public const string BankingInterpolationQuadratic = "quadratic";
+        public const string BankingInterpolationCubic = "cubic";
+        public const string BankingInterpolationQuartic = "quartic";
+        public const string BankingInterpolationQuintic = "quintic";
+        public const string BankingInterpolationSinusoidal = "sinusoidal";
 
         public static bool IsKnownSectionKind(string? value)
         {
@@ -32,7 +37,12 @@ namespace Quantum.IO.TrackLayout.V1
         {
             return string.Equals(value, BankingInterpolationConstant, StringComparison.Ordinal) ||
                    string.Equals(value, BankingInterpolationLinear, StringComparison.Ordinal) ||
-                   string.Equals(value, BankingInterpolationSmoothStep, StringComparison.Ordinal);
+                   string.Equals(value, BankingInterpolationSmoothStep, StringComparison.Ordinal) ||
+                   string.Equals(value, BankingInterpolationQuadratic, StringComparison.Ordinal) ||
+                   string.Equals(value, BankingInterpolationCubic, StringComparison.Ordinal) ||
+                   string.Equals(value, BankingInterpolationQuartic, StringComparison.Ordinal) ||
+                   string.Equals(value, BankingInterpolationQuintic, StringComparison.Ordinal) ||
+                   string.Equals(value, BankingInterpolationSinusoidal, StringComparison.Ordinal);
         }
     }
 }
