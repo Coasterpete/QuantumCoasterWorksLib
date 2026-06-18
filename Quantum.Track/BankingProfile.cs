@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Quantum.Track.Internal;
 
 namespace Quantum.Track
 {
@@ -74,21 +75,7 @@ namespace Quantum.Track
 
         internal static bool IsValidInterpolationMode(BankingProfileInterpolationMode mode)
         {
-            switch (mode)
-            {
-                case BankingProfileInterpolationMode.Constant:
-                case BankingProfileInterpolationMode.Linear:
-                case BankingProfileInterpolationMode.SmoothStep:
-                case BankingProfileInterpolationMode.Quadratic:
-                case BankingProfileInterpolationMode.Cubic:
-                case BankingProfileInterpolationMode.Quartic:
-                case BankingProfileInterpolationMode.Quintic:
-                case BankingProfileInterpolationMode.Sinusoidal:
-                    return true;
-
-                default:
-                    return false;
-            }
+            return ScalarEasing.IsSupported(mode);
         }
 
         private static bool IsFinite(double value)

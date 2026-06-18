@@ -180,6 +180,29 @@ public sealed class SectionNormalizerTests
         Assert.Equal(-0.2, normalized.EvaluateAt(SectionChannel.LateralG, 2.5), 10);
     }
 
+    [Theory]
+    [InlineData(ForceInterpolationMode.SmoothStep, 5.0)]
+    [InlineData(ForceInterpolationMode.Quadratic, 2.5)]
+    [InlineData(ForceInterpolationMode.Cubic, 1.25)]
+    [InlineData(ForceInterpolationMode.Quartic, 0.625)]
+    [InlineData(ForceInterpolationMode.Quintic, 0.3125)]
+    [InlineData(ForceInterpolationMode.Sinusoidal, 2.928932188134524)]
+    public void SectionNormalizer_ForceValueScalarFields_UseNonlinearFallbackModes(
+        ForceInterpolationMode mode,
+        double expectedMidpoint)
+    {
+        var source = new ForceSection(
+            length: 10.0,
+            interpolationMode: mode,
+            startNormalG: 0.0,
+            endNormalG: 10.0);
+
+        SectionDefinition normalized = SectionNormalizer.Normalize(
+            new ResolvedSectionInterval<ForceSection>(source, 0.0, 10.0));
+
+        Assert.Equal(expectedMidpoint, normalized.EvaluateAt(SectionChannel.NormalG, 5.0), 10);
+    }
+
     [Fact]
     public void SectionNormalizer_DirectRollRateChannelDoesNotRequireScalarForceValues()
     {
