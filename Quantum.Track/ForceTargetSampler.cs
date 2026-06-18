@@ -1,13 +1,12 @@
 using System;
 using System.Collections.Generic;
 using Quantum.Math;
+using Quantum.Track.Internal;
 
 namespace Quantum.Track
 {
     public static class ForceTargetSampler
     {
-        private static readonly ForceInterpolationEvaluator InterpolationEvaluator = new ForceInterpolationEvaluator();
-
         public static SampledForceTarget Sample(
             IEnumerable<(ForceSection Section, double Length)> sections,
             double distance)
@@ -247,35 +246,19 @@ namespace Quantum.Track
                 return constantValue;
             }
 
-            switch (mode)
+            ScalarEasingMode scalarMode = ScalarEasing.MapForceInterpolationMode(mode);
+            double? scalarStart = startValue ?? constantValue;
+            double? scalarEnd = endValue ?? constantValue;
+
+            if (!scalarStart.HasValue || !scalarEnd.HasValue)
             {
-                case ForceInterpolationMode.Constant:
-                case ForceInterpolationMode.Linear:
-                case ForceInterpolationMode.SmoothStep:
-                case ForceInterpolationMode.Quadratic:
-                case ForceInterpolationMode.Cubic:
-                case ForceInterpolationMode.Quartic:
-                case ForceInterpolationMode.Quintic:
-                case ForceInterpolationMode.Sinusoidal:
-                    double? resolvedStart = startValue ?? constantValue;
-                    double? resolvedEnd = endValue ?? constantValue;
-
-                    if (!resolvedStart.HasValue || !resolvedEnd.HasValue)
-                    {
-                        return null;
-                    }
-
-                    double adjustedT = easingFunction?.Evaluate(normalizedT)
-                        ?? InterpolationEvaluator.Evaluate(normalizedT, mode);
-
-                    return MathUtil.Lerp(resolvedStart.Value, resolvedEnd.Value, adjustedT);
-
-                default:
-                    throw new ArgumentOutOfRangeException(
-                        nameof(mode),
-                        mode,
-                        "Unsupported force interpolation mode.");
+                return null;
             }
+
+            double scalarT = easingFunction?.Evaluate(normalizedT)
+                ?? ScalarEasing.Evaluate(normalizedT, scalarMode);
+
+            return MathUtil.Lerp(scalarStart.Value, scalarEnd.Value, scalarT);
         }
 
         private static double? SampleDirectChannel(
