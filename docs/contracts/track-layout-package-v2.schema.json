@@ -1,0 +1,370 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://quantumcoasterworks.dev/schemas/track-layout-package-v2.schema.json",
+  "title": "TrackLayoutPackageV2",
+  "description": "Backend-only JSON contract skeleton for authored coaster track layouts with nullable banking and heartline roots.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract",
+    "version",
+    "metadata",
+    "startPose",
+    "sections",
+    "banking",
+    "heartline"
+  ],
+  "properties": {
+    "contract": {
+      "description": "Stable contract discriminator.",
+      "type": "string",
+      "const": "quantum.track_layout_package"
+    },
+    "version": {
+      "description": "Contract version.",
+      "type": "integer",
+      "const": 2
+    },
+    "metadata": {
+      "$ref": "#/$defs/metadata"
+    },
+    "startPose": {
+      "$ref": "#/$defs/startPose"
+    },
+    "sections": {
+      "description": "Ordered authored geometric section definitions.",
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "oneOf": [
+          {
+            "$ref": "#/$defs/straightSection"
+          },
+          {
+            "$ref": "#/$defs/constantCurvatureSection"
+          },
+          {
+            "$ref": "#/$defs/curvatureTransitionSection"
+          },
+          {
+            "$ref": "#/$defs/spatialSection"
+          }
+        ]
+      }
+    },
+    "banking": {
+      "description": "Optional explicit authored banking. Null means no explicit banking is persisted.",
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "#/$defs/banking"
+        }
+      ]
+    },
+    "heartline": {
+      "description": "Optional authored heartline offset. Null means no authored heartline offset is persisted.",
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "#/$defs/constantHeartline"
+        }
+      ]
+    }
+  },
+  "$defs": {
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "units",
+        "sourceName"
+      ],
+      "properties": {
+        "units": {
+          "description": "Distance units used by authored scalar values.",
+          "type": "string"
+        },
+        "sourceName": {
+          "description": "Optional source label for the authored layout package.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "layoutId": {
+          "description": "Optional stable layout identity for companion contracts and manifests.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "startPose": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "position",
+        "tangent",
+        "normal",
+        "binormal"
+      ],
+      "properties": {
+        "position": {
+          "$ref": "#/$defs/vector3d"
+        },
+        "tangent": {
+          "$ref": "#/$defs/vector3d"
+        },
+        "normal": {
+          "$ref": "#/$defs/vector3d"
+        },
+        "binormal": {
+          "$ref": "#/$defs/vector3d"
+        }
+      }
+    },
+    "vector3d": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "x",
+        "y",
+        "z"
+      ],
+      "properties": {
+        "x": {
+          "type": "number"
+        },
+        "y": {
+          "type": "number"
+        },
+        "z": {
+          "type": "number"
+        }
+      }
+    },
+    "straightSection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "id",
+        "length",
+        "rollRadians"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "straight"
+        },
+        "id": {
+          "type": "string"
+        },
+        "length": {
+          "type": "number"
+        },
+        "rollRadians": {
+          "type": "number"
+        }
+      }
+    },
+    "constantCurvatureSection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "id",
+        "length",
+        "rollRadians",
+        "radius"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "constantCurvature"
+        },
+        "id": {
+          "type": "string"
+        },
+        "length": {
+          "type": "number"
+        },
+        "rollRadians": {
+          "type": "number"
+        },
+        "radius": {
+          "type": "number"
+        }
+      }
+    },
+    "curvatureTransitionSection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "id",
+        "length",
+        "rollRadians",
+        "startCurvature",
+        "endCurvature",
+        "interpolationMode"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "curvatureTransition"
+        },
+        "id": {
+          "type": "string"
+        },
+        "length": {
+          "type": "number"
+        },
+        "rollRadians": {
+          "type": "number"
+        },
+        "startCurvature": {
+          "type": "number"
+        },
+        "endCurvature": {
+          "type": "number"
+        },
+        "interpolationMode": {
+          "type": "string",
+          "enum": [
+            "linear"
+          ]
+        }
+      }
+    },
+    "spatialSection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "id",
+        "length",
+        "rollRadians",
+        "degree",
+        "controlPoints",
+        "weights"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "spatial"
+        },
+        "id": {
+          "type": "string"
+        },
+        "length": {
+          "type": "number"
+        },
+        "rollRadians": {
+          "type": "number"
+        },
+        "degree": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "controlPoints": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "$ref": "#/$defs/vector3d"
+          }
+        },
+        "weights": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          }
+        }
+      }
+    },
+    "banking": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "keys"
+      ],
+      "properties": {
+        "keys": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "$ref": "#/$defs/bankingKey"
+          }
+        }
+      }
+    },
+    "bankingKey": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "distance",
+        "rollRadians",
+        "interpolationToNext"
+      ],
+      "properties": {
+        "distance": {
+          "type": "number"
+        },
+        "rollRadians": {
+          "type": "number"
+        },
+        "interpolationToNext": {
+          "type": "string",
+          "enum": [
+            "constant",
+            "linear",
+            "smoothStep",
+            "quadratic",
+            "cubic",
+            "quartic",
+            "quintic",
+            "sinusoidal"
+          ]
+        }
+      }
+    },
+    "constantHeartline": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "distanceDomain",
+        "axisSource",
+        "normalOffset",
+        "lateralOffset"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "constantOffset"
+        },
+        "distanceDomain": {
+          "type": "string",
+          "const": "centerlineStation"
+        },
+        "axisSource": {
+          "type": "string",
+          "const": "sampledFrame"
+        },
+        "normalOffset": {
+          "type": "number"
+        },
+        "lateralOffset": {
+          "type": "number"
+        }
+      }
+    }
+  }
+}
