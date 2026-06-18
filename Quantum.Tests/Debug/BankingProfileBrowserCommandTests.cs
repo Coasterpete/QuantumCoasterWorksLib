@@ -115,7 +115,8 @@ public sealed class BankingProfileBrowserCommandTests
             Assert.Equal("Linear", samples[1].GetProperty("interpolationMode").GetString());
             Assert.Equal("Constant", samples[3].GetProperty("interpolationMode").GetString());
             Assert.True(samples[1].TryGetProperty("approximateRollSlopeRadPerMeter", out _));
-            Assert.Contains("banking-profile-diagnostics.sample.json", root.GetProperty("sourcePath").GetString());
+            Assert.Equal("banking-profile-diagnostics.sample.json", root.GetProperty("sourcePath").GetString());
+            Assert.Equal("banking-profile.browser.html", root.GetProperty("outputPath").GetString());
         }
         finally
         {
@@ -142,6 +143,10 @@ public sealed class BankingProfileBrowserCommandTests
             string secondHtml = File.ReadAllText(browserPath);
 
             Assert.Equal(firstHtml, secondHtml);
+            AssertEmbeddedPayloadPaths(
+                secondHtml,
+                "banking-profile-diagnostics.sample.json",
+                "banking-profile.browser.html");
         }
         finally
         {
@@ -169,6 +174,20 @@ public sealed class BankingProfileBrowserCommandTests
         {
             DeleteDirectoryIfPresent(tempDirectory);
         }
+    }
+
+    private static void AssertEmbeddedPayloadPaths(
+        string html,
+        string expectedSourcePath,
+        string expectedOutputPath)
+    {
+        string payloadJson = ExtractEmbeddedJson(html);
+
+        using JsonDocument document = JsonDocument.Parse(payloadJson);
+        JsonElement root = document.RootElement;
+
+        Assert.Equal(expectedSourcePath, root.GetProperty("sourcePath").GetString());
+        Assert.Equal(expectedOutputPath, root.GetProperty("outputPath").GetString());
     }
 
     private static string ExtractEmbeddedJson(string html)

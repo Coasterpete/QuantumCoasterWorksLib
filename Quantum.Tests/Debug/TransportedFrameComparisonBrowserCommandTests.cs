@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.IO;
+using System.Text.Json;
 using Quantum.Debug;
 using Quantum.IO.TransportedFrameComparison.V1;
 
@@ -96,6 +97,10 @@ public sealed class TransportedFrameComparisonBrowserCommandTests
             string secondHtml = File.ReadAllText(browserPath);
 
             Assert.Equal(firstHtml, secondHtml);
+            AssertEmbeddedPayloadPaths(
+                secondHtml,
+                "transported-frame-comparison.sample.json",
+                "transported-frame-comparison.browser.html");
         }
         finally
         {
@@ -123,6 +128,32 @@ public sealed class TransportedFrameComparisonBrowserCommandTests
         {
             DeleteDirectoryIfPresent(tempDirectory);
         }
+    }
+
+    private static void AssertEmbeddedPayloadPaths(
+        string html,
+        string expectedSourcePath,
+        string expectedOutputPath)
+    {
+        string payloadJson = ExtractEmbeddedJson(html);
+
+        using JsonDocument document = JsonDocument.Parse(payloadJson);
+        JsonElement root = document.RootElement;
+
+        Assert.Equal(expectedSourcePath, root.GetProperty("sourcePath").GetString());
+        Assert.Equal(expectedOutputPath, root.GetProperty("outputPath").GetString());
+    }
+
+    private static string ExtractEmbeddedJson(string html)
+    {
+        const string Start = "<script id=\"comparison-data\" type=\"application/json\">";
+        const string End = "</script>";
+        int startIndex = html.IndexOf(Start, StringComparison.Ordinal);
+        Assert.True(startIndex >= 0);
+        startIndex += Start.Length;
+        int endIndex = html.IndexOf(End, startIndex, StringComparison.Ordinal);
+        Assert.True(endIndex > startIndex);
+        return html.Substring(startIndex, endIndex - startIndex).Trim();
     }
 
     private static string CreateTempDirectoryPath()

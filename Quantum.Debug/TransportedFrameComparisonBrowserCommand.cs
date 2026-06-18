@@ -103,8 +103,8 @@ namespace Quantum.Debug
         {
             var payload = new TransportedFrameComparisonBrowserPayload
             {
-                SourcePath = ToDisplayPath(Path.GetRelativePath(Environment.CurrentDirectory, comparisonJsonPath)),
-                OutputPath = ToDisplayPath(Path.GetRelativePath(Environment.CurrentDirectory, outputHtmlPath)),
+                SourcePath = ToViewerRelativeDisplayPath(comparisonJsonPath, outputHtmlPath),
+                OutputPath = ToViewerRelativeDisplayPath(outputHtmlPath, outputHtmlPath),
                 Artifact = artifactRoot
             };
 
@@ -509,6 +509,12 @@ namespace Quantum.Debug
         private static string ToDisplayPath(string path)
         {
             return path.Replace(Path.DirectorySeparatorChar, '/').Replace(Path.AltDirectorySeparatorChar, '/');
+        }
+
+        private static string ToViewerRelativeDisplayPath(string path, string outputHtmlPath)
+        {
+            string outputDirectory = Path.GetDirectoryName(outputHtmlPath) ?? Path.GetPathRoot(outputHtmlPath) ?? ".";
+            return ToDisplayPath(Path.GetRelativePath(outputDirectory, path));
         }
 
         private static string EscapeJsonForHtml(string json)
