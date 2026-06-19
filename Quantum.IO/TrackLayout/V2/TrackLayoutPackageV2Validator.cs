@@ -33,7 +33,9 @@ namespace Quantum.IO.TrackLayout.V2
         InvalidBankingDomain = 24,
         InvalidHeartlineKind = 25,
         InvalidHeartlineDistanceDomain = 26,
-        InvalidHeartlineAxisSource = 27
+        InvalidHeartlineAxisSource = 27,
+        MalformedJson = 28,
+        MappingFailed = 29
     }
 
     public sealed class TrackLayoutPackageV2ValidationDiagnostic
