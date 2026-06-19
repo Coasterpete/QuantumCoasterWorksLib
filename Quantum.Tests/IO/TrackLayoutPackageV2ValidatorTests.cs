@@ -46,6 +46,8 @@ public sealed class TrackLayoutPackageV2ValidatorTests
         Assert.Equal(25, (int)TrackLayoutPackageV2ValidationCode.InvalidHeartlineKind);
         Assert.Equal(26, (int)TrackLayoutPackageV2ValidationCode.InvalidHeartlineDistanceDomain);
         Assert.Equal(27, (int)TrackLayoutPackageV2ValidationCode.InvalidHeartlineAxisSource);
+        Assert.Equal(28, (int)TrackLayoutPackageV2ValidationCode.MalformedJson);
+        Assert.Equal(29, (int)TrackLayoutPackageV2ValidationCode.MappingFailed);
     }
 
     [Fact]
