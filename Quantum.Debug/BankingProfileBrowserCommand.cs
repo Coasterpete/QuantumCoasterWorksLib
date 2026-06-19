@@ -101,10 +101,15 @@ namespace Quantum.Debug
             string outputHtmlPath,
             JsonElement artifactRoot)
         {
+            string? outputDirectory = Path.GetDirectoryName(outputHtmlPath);
+            string payloadPathBase = string.IsNullOrEmpty(outputDirectory)
+                ? Environment.CurrentDirectory
+                : outputDirectory;
+
             var payload = new BankingProfileBrowserPayload
             {
-                SourcePath = ToDisplayPath(Path.GetRelativePath(Environment.CurrentDirectory, diagnosticsJsonPath)),
-                OutputPath = ToDisplayPath(Path.GetRelativePath(Environment.CurrentDirectory, outputHtmlPath)),
+                SourcePath = ToDisplayPath(Path.GetRelativePath(payloadPathBase, diagnosticsJsonPath)),
+                OutputPath = ToDisplayPath(Path.GetRelativePath(payloadPathBase, outputHtmlPath)),
                 Artifact = artifactRoot
             };
 

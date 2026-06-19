@@ -115,7 +115,12 @@ public sealed class BankingProfileBrowserCommandTests
             Assert.Equal("Linear", samples[1].GetProperty("interpolationMode").GetString());
             Assert.Equal("Constant", samples[3].GetProperty("interpolationMode").GetString());
             Assert.True(samples[1].TryGetProperty("approximateRollSlopeRadPerMeter", out _));
-            Assert.Contains("banking-profile-diagnostics.sample.json", root.GetProperty("sourcePath").GetString());
+            Assert.Equal(
+                "banking-profile-diagnostics.sample.json",
+                root.GetProperty("sourcePath").GetString());
+            Assert.Equal(
+                "banking-profile.browser.html",
+                root.GetProperty("outputPath").GetString());
         }
         finally
         {
