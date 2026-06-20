@@ -71,6 +71,17 @@ public sealed class DebugCommandParserTests
     }
 
     [Fact]
+    public void TryParse_DebugViewportSnapshotV1FromTrackLayoutPackageV2Command_ParsesCaseInsensitive()
+    {
+        bool parsed = DebugCommandParser.TryParse(
+            new[] { "DeBuG-ViEwPoRt-SnApShOt-V1-FrOm-TrAcK-LaYoUt-PaCkAgE-V2" },
+            out DebugCommandKind command);
+
+        Assert.True(parsed);
+        Assert.Equal(DebugCommandKind.DebugViewportSnapshotV1FromTrackLayoutPackageV2, command);
+    }
+
+    [Fact]
     public void TryParse_DebugViewportSnapshotV1ValidateCommand_ParsesCaseInsensitive()
     {
         bool parsed = DebugCommandParser.TryParse(new[] { "DeBuG-ViEwPoRt-SnApShOt-V1-VaLiDaTe" }, out DebugCommandKind command);

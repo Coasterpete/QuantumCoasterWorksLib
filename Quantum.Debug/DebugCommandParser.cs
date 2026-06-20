@@ -12,6 +12,7 @@ namespace Quantum.Debug
         MeshExportV1Sample,
         DebugViewportSnapshotV1,
         DebugViewportSnapshotV1FromCsv,
+        DebugViewportSnapshotV1FromTrackLayoutPackageV2,
         DebugViewportSnapshotV1Validate,
         DebugViewportSnapshotV1Svg,
         DebugViewportSnapshotV1Gallery,
@@ -82,6 +83,12 @@ namespace Quantum.Debug
             if (string.Equals(args[0], "debug-viewport-snapshot-v1-from-csv", StringComparison.OrdinalIgnoreCase))
             {
                 command = DebugCommandKind.DebugViewportSnapshotV1FromCsv;
+                return true;
+            }
+
+            if (string.Equals(args[0], DebugViewportSnapshotV1FromTrackLayoutPackageV2Command.CommandName, StringComparison.OrdinalIgnoreCase))
+            {
+                command = DebugCommandKind.DebugViewportSnapshotV1FromTrackLayoutPackageV2;
                 return true;
             }
 
