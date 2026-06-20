@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 
 const ui = {
   viewport: document.getElementById("viewport"),
@@ -10,6 +11,7 @@ const ui = {
   overlayTitle: document.getElementById("overlayTitle"),
   overlayMessage: document.getElementById("overlayMessage"),
   snapshotSelect: document.getElementById("snapshotSelect"),
+  styleSelect: document.getElementById("styleSelect"),
   reloadButton: document.getElementById("reloadButton"),
   fileButton: document.getElementById("fileButton"),
   fileInput: document.getElementById("fileInput"),
@@ -81,6 +83,12 @@ const state = {
   playing: false,
   playSpeed: 8,
   dynamicBoxes: [],
+  styleManifest: null,
+  trainStyles: [],
+  selectedTrainStyleId: "",
+  assetCache: new Map(),
+  trainVisualGeneration: 0,
+  trainVisualStats: createEmptyTrainVisualStats(),
   axisScale: 1,
   bounds: new THREE.Box3(),
   boundsCenter: new THREE.Vector3(),
@@ -102,6 +110,7 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 ui.viewport.appendChild(renderer.domElement);
 
+const gltfLoader = new GLTFLoader();
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.dampingFactor = 0.08;
@@ -133,6 +142,11 @@ ui.snapshotSelect.addEventListener("change", () => {
   }
 });
 
+ui.styleSelect.addEventListener("change", () => {
+  state.selectedTrainStyleId = ui.styleSelect.value;
+  rebuildTrainVisuals();
+});
+
 ui.reloadButton.addEventListener("click", () => loadCatalog({ reloadCurrent: true }));
 ui.fileInput.addEventListener("change", loadFileSnapshot);
 ui.playButton.addEventListener("click", () => setPlaying(!state.playing));
@@ -156,8 +170,71 @@ ui.recordButton.addEventListener("click", toggleRecording);
 });
 
 resizeRenderer();
-loadCatalog();
+loadStyles().finally(() => loadCatalog());
 requestAnimationFrame(tick);
+
+async function loadStyles() {
+  try {
+    const response = await fetch("/api/styles");
+    if (!response.ok) {
+      throw new Error(`Style manifest request failed (${response.status})`);
+    }
+
+    state.styleManifest = normalizeStyleManifest(await response.json());
+  } catch (error) {
+    state.styleManifest = normalizeStyleManifest({
+      version: 1,
+      defaultTrainStyle: "debug-boxes",
+      trainStyles: [{ id: "debug-boxes", name: "Debug boxes", roles: {} }],
+      trackStyles: [],
+      diagnostics: [{ severity: "warning", message: error instanceof Error ? error.message : String(error) }]
+    });
+  }
+
+  state.trainStyles = state.styleManifest.trainStyles;
+  state.selectedTrainStyleId = state.styleManifest.defaultTrainStyle;
+  populateStyleSelect();
+}
+
+function normalizeStyleManifest(manifest) {
+  const trainStyles = Array.isArray(manifest?.trainStyles)
+    ? manifest.trainStyles.filter((style) => getString(style, "id"))
+    : [];
+  if (trainStyles.length === 0) {
+    trainStyles.push({ id: "debug-boxes", name: "Debug boxes", roles: {} });
+  }
+
+  trainStyles.forEach((style) => {
+    style.roles = style.roles && typeof style.roles === "object" ? style.roles : {};
+  });
+
+  const defaultTrainStyle = getString(manifest, "defaultTrainStyle") || getString(trainStyles[0], "id");
+  const hasDefault = trainStyles.some((style) => getString(style, "id") === defaultTrainStyle);
+
+  return {
+    version: getNumber(manifest ?? {}, "version") || 1,
+    defaultTrainStyle: hasDefault ? defaultTrainStyle : getString(trainStyles[0], "id"),
+    manifestPath: getString(manifest ?? {}, "manifestPath"),
+    assetRoot: getString(manifest ?? {}, "assetRoot"),
+    trainStyles,
+    trackStyles: Array.isArray(manifest?.trackStyles) ? manifest.trackStyles : [],
+    diagnostics: Array.isArray(manifest?.diagnostics) ? manifest.diagnostics : []
+  };
+}
+
+function populateStyleSelect() {
+  ui.styleSelect.replaceChildren();
+
+  state.trainStyles.forEach((style) => {
+    const option = document.createElement("option");
+    option.value = getString(style, "id");
+    option.textContent = getString(style, "name") || getString(style, "id");
+    ui.styleSelect.appendChild(option);
+  });
+
+  ui.styleSelect.value = state.selectedTrainStyleId;
+  ui.styleSelect.disabled = state.trainStyles.length === 0;
+}
 
 async function loadCatalog(options = {}) {
   const requestedPath = options.reloadCurrent
@@ -290,6 +367,8 @@ function loadSnapshotFromText(json, label) {
   state.frames = getFrames(snapshot);
   state.frameDistances = state.frames.map((frame) => frame.distance);
   state.dynamicBoxes = [];
+  state.trainVisualGeneration += 1;
+  state.trainVisualStats = createEmptyTrainVisualStats();
   state.centerlineMarkerStride = 1;
   state.frameAxisStride = 1;
 
@@ -349,6 +428,8 @@ function clearSnapshot() {
   state.frames = [];
   state.frameDistances = [];
   state.dynamicBoxes = [];
+  state.trainVisualGeneration += 1;
+  state.trainVisualStats = createEmptyTrainVisualStats();
   setPlaying(false);
 
   Object.values(groups).forEach(clearGroup);
@@ -486,7 +567,7 @@ function buildTrainBoxes(snapshot) {
     const shouldLabel = Boolean(box.label) &&
       isTrainRole(box.role) &&
       labelCount < renderLimits.maxTrainLabels;
-    const group = createBoxGroup(size, box.role, shouldLabel ? box.label : "", isLead);
+    const group = createTrainVisualGroup(size, box.role, shouldLabel ? box.label : "", isLead);
     if (shouldLabel) {
       labelCount += 1;
     }
@@ -505,6 +586,154 @@ function buildTrainBoxes(snapshot) {
       applyFrameToGroup(group, parseFrame(box.frame));
     }
   });
+}
+
+function rebuildTrainVisuals() {
+  if (!state.snapshot) {
+    updateMetrics();
+    updateControlAvailability();
+    return;
+  }
+
+  state.trainVisualGeneration += 1;
+  state.trainVisualStats = createEmptyTrainVisualStats();
+  state.dynamicBoxes = [];
+  clearGroup(groups.train);
+  clearGroup(groups.cursor);
+  buildTrainBoxes(state.snapshot);
+  buildCursor();
+  configureScrubber(state.snapshot);
+  updateDynamicObjects();
+  updateLayerVisibility();
+  updateMetrics();
+  setStatus(`Train style: ${getSelectedTrainStyleName()}`, "ready");
+}
+
+function createTrainVisualGroup(size, role, label, isLead) {
+  if (!isTrainRole(role)) {
+    return createBoxGroup(size, role, label, isLead);
+  }
+
+  state.trainVisualStats.trainBoxes += 1;
+  const roleStyle = getTrainRoleStyle(role);
+  const assetUrl = getString(roleStyle, "assetUrl");
+  if (!assetUrl) {
+    return createBoxGroup(size, role, label, isLead);
+  }
+
+  state.trainVisualStats.assetRequested += 1;
+  const generation = state.trainVisualGeneration;
+  const group = new THREE.Group();
+  group.name = label || role || "train asset";
+  group.userData.assetStatus = "loading";
+  group.userData.assetUrl = assetUrl;
+  group.add(createBoxGroup(size, role, label, isLead));
+
+  loadStyleAsset(assetUrl)
+    .then((asset) => {
+      if (generation !== state.trainVisualGeneration || group.parent !== groups.train) {
+        return;
+      }
+
+      replaceFallbackWithAsset(group, asset, roleStyle, size, label, isLead);
+      state.trainVisualStats.assetLoaded += 1;
+      updateMetrics();
+    })
+    .catch((error) => {
+      if (generation !== state.trainVisualGeneration || group.parent !== groups.train) {
+        return;
+      }
+
+      group.userData.assetStatus = "fallback";
+      group.userData.assetError = error instanceof Error ? error.message : String(error);
+      state.trainVisualStats.assetFailed += 1;
+      updateMetrics();
+      setStatus(`Train style asset unavailable; using debug boxes for ${label || role}`, "warning");
+    });
+
+  return group;
+}
+
+function replaceFallbackWithAsset(group, asset, roleStyle, size, label, isLead) {
+  disposeChildren(group);
+  const assetGroup = createAssetVisualGroup(asset, roleStyle, size);
+  group.add(assetGroup);
+  if (label) {
+    const labelSprite = createLabelSprite(label, isLead);
+    labelSprite.position.set(0, size.height * 0.9, 0);
+    group.add(labelSprite);
+  }
+
+  group.userData.assetStatus = "loaded";
+}
+
+async function loadStyleAsset(assetUrl) {
+  if (!state.assetCache.has(assetUrl)) {
+    const loadPromise = gltfLoader.loadAsync(assetUrl)
+      .then((gltf) => ({ url: assetUrl, scene: gltf.scene }))
+      .catch((error) => {
+        state.assetCache.delete(assetUrl);
+        throw error;
+      });
+    state.assetCache.set(assetUrl, loadPromise);
+  }
+
+  return state.assetCache.get(assetUrl);
+}
+
+function createAssetVisualGroup(asset, roleStyle, size) {
+  const wrapper = new THREE.Group();
+  wrapper.name = getString(roleStyle, "name") || asset.url.split("/").pop() || "style asset";
+  const instance = asset.scene.clone(true);
+  markAssetResourcesPreserved(instance);
+  wrapper.add(instance);
+
+  if (roleStyle.fitToBox !== false) {
+    fitAssetToBox(instance, size, getString(roleStyle, "fitMode") || "uniform");
+  }
+
+  const rotation = vectorFromStyle(roleStyle.rotationDegrees);
+  wrapper.rotation.set(
+    THREE.MathUtils.degToRad(rotation.x),
+    THREE.MathUtils.degToRad(rotation.y),
+    THREE.MathUtils.degToRad(rotation.z));
+
+  const offset = vectorFromStyle(roleStyle.offset);
+  wrapper.position.set(offset.x, offset.y, offset.z);
+
+  const scale = scaleFromStyle(roleStyle.scale);
+  wrapper.scale.set(scale.x, scale.y, scale.z);
+  return wrapper;
+}
+
+function fitAssetToBox(instance, size, fitMode) {
+  const bounds = new THREE.Box3().setFromObject(instance);
+  if (bounds.isEmpty()) {
+    return;
+  }
+
+  const modelSize = bounds.getSize(new THREE.Vector3());
+  if (modelSize.x <= 1e-9 || modelSize.y <= 1e-9 || modelSize.z <= 1e-9) {
+    return;
+  }
+
+  const targetSize = new THREE.Vector3(size.length, size.height, size.width);
+  if (fitMode === "stretch") {
+    instance.scale.multiply(new THREE.Vector3(
+      targetSize.x / modelSize.x,
+      targetSize.y / modelSize.y,
+      targetSize.z / modelSize.z));
+  } else {
+    const uniformScale = Math.min(
+      targetSize.x / modelSize.x,
+      targetSize.y / modelSize.y,
+      targetSize.z / modelSize.z);
+    instance.scale.multiplyScalar(uniformScale);
+  }
+
+  const fittedBounds = new THREE.Box3().setFromObject(instance);
+  const center = fittedBounds.getCenter(new THREE.Vector3());
+  instance.position.sub(center);
 }
 
 function createBoxGroup(size, role, label, isLead) {
@@ -1057,13 +1286,24 @@ function updateMetrics() {
   const trainBoxes = (Array.isArray(snapshot.boxes) ? snapshot.boxes : []).filter((box) => isTrainRole(box?.role));
   const trainRoles = summarizeTrainRoles(trainBoxes);
   const offsetRange = getDynamicOffsetRange();
+  const visualStats = state.trainVisualStats;
+  const loadingAssets = Math.max(
+    visualStats.assetRequested - visualStats.assetLoaded - visualStats.assetFailed,
+    0);
+  const fallbackVisuals = Math.max(visualStats.trainBoxes - visualStats.assetLoaded, 0);
   appendMetricRows(ui.trainMetrics, [
+    ["Train style", getSelectedTrainStyleName()],
     ["Pose cars", trainPoseCars > 0 ? String(trainPoseCars) : "none"],
     ["Lead distance", Number.isFinite(finiteNumber(snapshot.trainPose?.leadDistance, Number.NaN))
       ? formatDistance(finiteNumber(snapshot.trainPose.leadDistance))
       : "not exported"],
     ["Train boxes", String(trainBoxes.length)],
     ["Dynamic boxes", String(state.dynamicBoxes.length)],
+    ["Asset visuals", visualStats.assetRequested > 0
+      ? `${visualStats.assetLoaded}/${visualStats.assetRequested}`
+      : "none"],
+    ["Loading assets", loadingAssets > 0 ? String(loadingAssets) : "none"],
+    ["Debug fallbacks", String(fallbackVisuals)],
     ["Spacing span", offsetRange],
     ["Roles", trainRoles]
   ]);
@@ -1241,6 +1481,77 @@ function makeCaptureName(extension) {
   return `${stem}-${timestamp}.${extension}`;
 }
 
+function createEmptyTrainVisualStats() {
+  return {
+    trainBoxes: 0,
+    assetRequested: 0,
+    assetLoaded: 0,
+    assetFailed: 0
+  };
+}
+
+function getSelectedTrainStyle() {
+  return state.trainStyles.find((style) => getString(style, "id") === state.selectedTrainStyleId) ??
+    state.trainStyles[0] ??
+    null;
+}
+
+function getSelectedTrainStyleName() {
+  const style = getSelectedTrainStyle();
+  return getString(style, "name") || getString(style, "id") || "Debug boxes";
+}
+
+function getTrainRoleStyle(role) {
+  const style = getSelectedTrainStyle();
+  const roles = style?.roles;
+  if (!roles || typeof roles !== "object") {
+    return null;
+  }
+
+  if (roles[role]) {
+    return roles[role];
+  }
+
+  if (role === "train.body.banking-profile" && roles["train.body"]) {
+    return roles["train.body"];
+  }
+
+  if (roles["train.*"]) {
+    return roles["train.*"];
+  }
+
+  return null;
+}
+
+function vectorFromStyle(value) {
+  if (!value || typeof value !== "object") {
+    return new THREE.Vector3();
+  }
+
+  return new THREE.Vector3(
+    finiteNumber(value.x ?? value.X),
+    finiteNumber(value.y ?? value.Y),
+    finiteNumber(value.z ?? value.Z)
+  );
+}
+
+function scaleFromStyle(value) {
+  if (typeof value === "number") {
+    const uniformScale = Number.isFinite(value) && value > 0 ? value : 1;
+    return new THREE.Vector3(uniformScale, uniformScale, uniformScale);
+  }
+
+  if (!value || typeof value !== "object") {
+    return new THREE.Vector3(1, 1, 1);
+  }
+
+  return new THREE.Vector3(
+    positiveNumber(value.x ?? value.X, 1),
+    positiveNumber(value.y ?? value.Y, 1),
+    positiveNumber(value.z ?? value.Z, 1)
+  );
+}
+
 function colorForLineKind(kind) {
   switch (kind) {
     case "frame.axis.tangent":
@@ -1289,25 +1600,51 @@ function finiteNumber(value, fallback = 0) {
   return Number.isFinite(number) ? number : fallback;
 }
 
+function positiveNumber(value, fallback = 1) {
+  const number = Number(value);
+  return Number.isFinite(number) && number > 0 ? number : fallback;
+}
+
 function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max);
 }
 
+function disposeChildren(group) {
+  group.children.slice().forEach((child) => {
+    disposeObjectTree(child);
+    group.remove(child);
+  });
+}
+
+function disposeObjectTree(object) {
+  object.traverse((child) => {
+    disposeObjectResources(child);
+  });
+}
+
 function clearGroup(group) {
   group.traverse((object) => {
-    if (object.geometry) {
-      object.geometry.dispose();
-    }
-
-    if (object.material) {
-      if (Array.isArray(object.material)) {
-        object.material.forEach(disposeMaterial);
-      } else {
-        disposeMaterial(object.material);
-      }
-    }
+    disposeObjectResources(object);
   });
   group.clear();
+}
+
+function disposeObjectResources(object) {
+  if (object.userData?.preserveAssetResources) {
+    return;
+  }
+
+  if (object.geometry) {
+    object.geometry.dispose();
+  }
+
+  if (object.material) {
+    if (Array.isArray(object.material)) {
+      object.material.forEach(disposeMaterial);
+    } else {
+      disposeMaterial(object.material);
+    }
+  }
 }
 
 function disposeMaterial(material) {
@@ -1316,6 +1653,12 @@ function disposeMaterial(material) {
   }
 
   material.dispose();
+}
+
+function markAssetResourcesPreserved(object) {
+  object.traverse((child) => {
+    child.userData.preserveAssetResources = true;
+  });
 }
 
 function setBusy(busy) {
@@ -1328,6 +1671,7 @@ function updateControlAvailability() {
   const canMove = hasSnapshot && hasMotionSamples() && !state.busy;
 
   ui.snapshotSelect.disabled = state.busy || state.summaries.length === 0;
+  ui.styleSelect.disabled = state.busy || state.trainStyles.length === 0;
   ui.reloadButton.disabled = state.busy;
   ui.fileInput.disabled = state.busy;
   ui.fileButton.classList.toggle("disabled", state.busy);
@@ -1476,10 +1820,18 @@ function getSummaryPath(summary) {
 }
 
 function getString(object, propertyName) {
+  if (!object) {
+    return "";
+  }
+
   return object[propertyName] ?? object[toPascalCase(propertyName)] ?? "";
 }
 
 function getNumber(object, propertyName) {
+  if (!object) {
+    return 0;
+  }
+
   return Number(object[propertyName] ?? object[toPascalCase(propertyName)] ?? 0);
 }
 

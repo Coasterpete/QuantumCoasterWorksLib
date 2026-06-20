@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "defaultTrainStyle": "debug-boxes",
+  "trainStyles": [
+    {
+      "id": "debug-boxes",
+      "name": "Debug boxes",
+      "roles": {}
+    }
+  ],
+  "trackStyles": []
+}
