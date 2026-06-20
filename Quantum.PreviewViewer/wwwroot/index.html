@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Quantum Preview Viewer</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/styles.css">
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.166.1/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.166.1/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body>
+  <div class="app-shell">
+    <header class="toolbar">
+      <div class="brand">
+        <strong>Quantum Preview Viewer</strong>
+        <span>Spike</span>
+      </div>
+
+      <label class="control select-control">
+        <span>Snapshot</span>
+        <select id="snapshotSelect"></select>
+      </label>
+
+      <button id="reloadButton" type="button">Reload</button>
+      <label class="file-button">
+        <input id="fileInput" type="file" accept=".json,application/json">
+        Open JSON
+      </label>
+      <button id="playButton" type="button" aria-pressed="false">Play</button>
+
+      <label class="control scrubber-control">
+        <span>Distance</span>
+        <input id="distanceScrubber" type="range" min="0" max="1" step="0.01" value="0" disabled>
+      </label>
+      <output id="distanceValue" for="distanceScrubber">0.00 m</output>
+
+      <label class="control speed-control">
+        <span>Speed</span>
+        <input id="speedInput" type="range" min="1" max="40" step="1" value="8">
+      </label>
+
+      <label class="toggle">
+        <input id="followToggle" type="checkbox">
+        Follow
+      </label>
+
+      <button id="resetCameraButton" type="button">Reset Camera</button>
+      <button id="captureButton" type="button">PNG</button>
+      <button id="recordButton" type="button">WebM</button>
+    </header>
+
+    <main class="workspace">
+      <section class="viewport-panel" aria-label="Quantum preview viewport">
+        <div id="viewport"></div>
+        <div id="statusBar" class="status-bar">Loading</div>
+      </section>
+
+      <aside class="inspector" aria-label="Snapshot inspector">
+        <section class="inspector-section">
+          <h2>Snapshot</h2>
+          <dl id="snapshotMetrics" class="metrics"></dl>
+        </section>
+
+        <section class="inspector-section">
+          <h2>Layers</h2>
+          <label class="toggle">
+            <input id="centerlineLayer" type="checkbox" checked>
+            Centerline
+          </label>
+          <label class="toggle">
+            <input id="framesLayer" type="checkbox" checked>
+            Frames
+          </label>
+          <label class="toggle">
+            <input id="trainLayer" type="checkbox" checked>
+            Train
+          </label>
+          <label class="toggle">
+            <input id="diagnosticsLayer" type="checkbox" checked>
+            Diagnostics
+          </label>
+        </section>
+      </aside>
+    </main>
+  </div>
+
+  <script type="module" src="/app.js"></script>
+</body>
+</html>
