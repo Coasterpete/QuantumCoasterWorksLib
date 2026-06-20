@@ -17,48 +17,69 @@
 </head>
 <body>
   <div class="app-shell">
-    <header class="toolbar">
+    <header class="topbar">
       <div class="brand">
         <strong>Quantum Preview Viewer</strong>
-        <span>Spike</span>
+        <span>DebugViewportSnapshotV1</span>
+      </div>
+      <div id="appStatus" class="app-status" role="status" aria-live="polite">
+        <span class="status-dot" aria-hidden="true"></span>
+        <span id="appStatusText">Loading</span>
+      </div>
+    </header>
+
+    <section class="command-bar" aria-label="Viewer controls">
+      <div class="control-group snapshot-group">
+        <label class="control select-control">
+          <span>Snapshot</span>
+          <select id="snapshotSelect"></select>
+        </label>
+
+        <button id="reloadButton" type="button">Reload</button>
+        <label class="file-button" id="fileButton">
+          <input id="fileInput" type="file" accept=".json,application/json">
+          Open JSON
+        </label>
       </div>
 
-      <label class="control select-control">
-        <span>Snapshot</span>
-        <select id="snapshotSelect"></select>
-      </label>
+      <div class="control-group playback-group">
+        <button id="playButton" type="button" aria-pressed="false">Play</button>
+        <label class="control scrubber-control">
+          <span>Lead distance</span>
+          <input id="distanceScrubber" type="range" min="0" max="1" step="0.01" value="0" disabled>
+        </label>
+        <output id="distanceValue" for="distanceScrubber">0.00 m</output>
 
-      <button id="reloadButton" type="button">Reload</button>
-      <label class="file-button">
-        <input id="fileInput" type="file" accept=".json,application/json">
-        Open JSON
-      </label>
-      <button id="playButton" type="button" aria-pressed="false">Play</button>
+        <label class="control speed-control">
+          <span>Speed</span>
+          <input id="speedInput" type="range" min="1" max="40" step="1" value="8">
+        </label>
+      </div>
 
-      <label class="control scrubber-control">
-        <span>Distance</span>
-        <input id="distanceScrubber" type="range" min="0" max="1" step="0.01" value="0" disabled>
-      </label>
-      <output id="distanceValue" for="distanceScrubber">0.00 m</output>
+      <div class="control-group camera-group">
+        <label class="toggle">
+          <input id="followToggle" type="checkbox">
+          Follow train
+        </label>
 
-      <label class="control speed-control">
-        <span>Speed</span>
-        <input id="speedInput" type="range" min="1" max="40" step="1" value="8">
-      </label>
+        <button id="resetCameraButton" type="button">Reset Camera</button>
+      </div>
 
-      <label class="toggle">
-        <input id="followToggle" type="checkbox">
-        Follow
-      </label>
-
-      <button id="resetCameraButton" type="button">Reset Camera</button>
-      <button id="captureButton" type="button">PNG</button>
-      <button id="recordButton" type="button">WebM</button>
-    </header>
+      <div class="control-group capture-group">
+        <button id="captureButton" type="button">PNG</button>
+        <button id="recordButton" type="button">WebM</button>
+      </div>
+    </section>
 
     <main class="workspace">
       <section class="viewport-panel" aria-label="Quantum preview viewport">
         <div id="viewport"></div>
+        <div id="viewportOverlay" class="viewport-overlay" hidden>
+          <div class="overlay-panel">
+            <strong id="overlayTitle">Loading</strong>
+            <p id="overlayMessage">Opening generated snapshots.</p>
+          </div>
+        </div>
         <div id="statusBar" class="status-bar">Loading</div>
       </section>
 
@@ -69,23 +90,46 @@
         </section>
 
         <section class="inspector-section">
+          <h2>Scene</h2>
+          <div id="sceneStats" class="stat-grid"></div>
+        </section>
+
+        <section class="inspector-section">
           <h2>Layers</h2>
-          <label class="toggle">
+          <label class="layer-toggle">
+            <input id="gridLayer" type="checkbox" checked>
+            <span>Grid</span>
+            <span id="gridLayerState" class="layer-state">On</span>
+          </label>
+          <label class="layer-toggle">
             <input id="centerlineLayer" type="checkbox" checked>
-            Centerline
+            <span>Centerline</span>
+            <span id="centerlineLayerCount" class="layer-count">0</span>
+            <span id="centerlineLayerState" class="layer-state">On</span>
           </label>
-          <label class="toggle">
+          <label class="layer-toggle">
             <input id="framesLayer" type="checkbox" checked>
-            Frames
+            <span>Frames</span>
+            <span id="framesLayerCount" class="layer-count">0</span>
+            <span id="framesLayerState" class="layer-state">On</span>
           </label>
-          <label class="toggle">
+          <label class="layer-toggle">
             <input id="trainLayer" type="checkbox" checked>
-            Train
+            <span>Train</span>
+            <span id="trainLayerCount" class="layer-count">0</span>
+            <span id="trainLayerState" class="layer-state">On</span>
           </label>
-          <label class="toggle">
+          <label class="layer-toggle">
             <input id="diagnosticsLayer" type="checkbox" checked>
-            Diagnostics
+            <span>Diagnostics</span>
+            <span id="diagnosticsLayerCount" class="layer-count">0</span>
+            <span id="diagnosticsLayerState" class="layer-state">On</span>
           </label>
+        </section>
+
+        <section class="inspector-section">
+          <h2>Train</h2>
+          <dl id="trainMetrics" class="metrics"></dl>
         </section>
       </aside>
     </main>

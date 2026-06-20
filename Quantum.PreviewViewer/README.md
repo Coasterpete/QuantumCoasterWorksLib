@@ -1,4 +1,4 @@
-# Quantum Preview Viewer Spike
+# Quantum Preview Viewer
 
 `Quantum.PreviewViewer` is a separate prototype app for quick visual inspection of `DebugViewportSnapshotV1` JSON.
 
@@ -18,14 +18,16 @@ Then open the printed localhost URL. The viewer lists valid generated snapshots 
 
 Current capabilities:
 
+- Shows catalog/file load status, empty/error states, snapshot metadata, scene counts, train metrics, and layer visibility state.
 - Renders centerline polylines from `centerlinePoints`.
 - Renders frame axes from `frames`.
 - Renders `lines` as colored diagnostics.
 - Renders oriented train/debug boxes from `boxes`.
-- Scrubs and plays a visual lead distance through the exported sampled frames.
+- Scrubs and plays a visual lead distance through the exported sampled frames with orbit and follow-train camera modes.
 - Repositions train placeholder boxes by preserving their exported spacing offsets.
 - Supports orbit, pan, zoom, camera reset, and optional follow camera.
 - Captures PNG screenshots and WebM recordings through browser canvas APIs.
+- Caps selected helper visuals such as sample markers, frame axes, and labels for responsiveness on larger snapshots.
 
 Limitations:
 
