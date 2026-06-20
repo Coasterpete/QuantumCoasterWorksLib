@@ -233,6 +233,8 @@ namespace Quantum.IO.DebugViewport.V1
                     return DebugViewportSnapshotV1Vocabulary.FrameAxisNormalKind;
                 case TrackFrameAxisType.Binormal:
                     return DebugViewportSnapshotV1Vocabulary.FrameAxisBinormalKind;
+                case TrackFrameAxisType.Diagnostic:
+                    return DebugViewportSnapshotV1Vocabulary.DiagnosticLineKind;
                 default:
                     return DebugViewportSnapshotV1Vocabulary.DiagnosticLineKind;
             }

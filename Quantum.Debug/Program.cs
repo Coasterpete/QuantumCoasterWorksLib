@@ -86,6 +86,24 @@ namespace Quantum.Debug
                 return DebugViewportSnapshotV1FromCsvCommand.Run(inputCsvPath, outputJsonPath);
             }
 
+            if (command == DebugCommandKind.DebugViewportSnapshotV1FromTrackLayoutPackageV2)
+            {
+                if (args.Length < 2 || args.Length > 3)
+                {
+                    Console.WriteLine(
+                        "Usage: " +
+                        DebugViewportSnapshotV1FromTrackLayoutPackageV2Command.CommandName +
+                        " <inputJsonPath> [outputJsonPath]");
+                    return 1;
+                }
+
+                string inputJsonPath = args[1];
+                string? outputJsonPath = args.Length == 3 ? args[2] : null;
+                return DebugViewportSnapshotV1FromTrackLayoutPackageV2Command.Run(
+                    inputJsonPath,
+                    outputJsonPath);
+            }
+
             if (command == DebugCommandKind.DebugViewportSnapshotV1Validate)
             {
                 if (args.Length != 2)
