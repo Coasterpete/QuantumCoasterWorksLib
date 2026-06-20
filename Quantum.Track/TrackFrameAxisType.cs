@@ -4,6 +4,7 @@ namespace Quantum.Track
     {
         Tangent = 0,
         Normal = 1,
-        Binormal = 2
+        Binormal = 2,
+        Diagnostic = 3
     }
 }

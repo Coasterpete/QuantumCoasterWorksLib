@@ -24,6 +24,7 @@ public sealed class DebugCommandHelpTests
         Assert.Contains("Commands:", output);
         Assert.Contains("mesh-export-v1-sample [outputPath]", output);
         Assert.Contains("debug-viewport-snapshot-v1-from-csv <inputCsvPath> [outputJsonPath]", output);
+        Assert.Contains("debug-viewport-snapshot-v1-from-track-layout-package-v2 <inputJsonPath> [outputJsonPath]", output);
         Assert.Contains("debug-viewport-snapshot-v1-gallery [artifactDirectory] [outputHtmlPath]", output);
         Assert.Contains("debug-viewport-snapshot-v1-browser [artifactDirectory] [outputHtmlPath]", output);
         Assert.Contains("debug-viewport-snapshot-v1-transition-authoring [outputPath]", output);
@@ -126,6 +127,27 @@ public sealed class DebugCommandHelpTests
         Assert.Contains("sample measurement readout", output);
         Assert.Contains("backend-only debug aid", output);
         Assert.Contains("not a final editor, frontend, renderer, or JSON contract change", output);
+    }
+
+    [Fact]
+    public void TryWriteRequestedHelp_DebugViewportFromTrackLayoutPackageV2_PrintsImportExportDetails()
+    {
+        var writer = new StringWriter(CultureInfo.InvariantCulture);
+
+        bool handled = DebugCommandHelp.TryWriteRequestedHelp(
+            new[] { "help", "debug-viewport-snapshot-v1-from-track-layout-package-v2" },
+            writer,
+            out int exitCode);
+
+        Assert.True(handled);
+        Assert.Equal(0, exitCode);
+
+        string output = writer.ToString();
+        Assert.Contains("debug-viewport-snapshot-v1-from-track-layout-package-v2 <inputJsonPath> [outputJsonPath]", output);
+        Assert.Contains("TrackLayoutPackageV2 importer", output);
+        Assert.Contains("simple train boxes", output);
+        Assert.Contains("BankingProfile sampling path", output);
+        Assert.Contains("diagnostic connector lines", output);
     }
 
     [Fact]
@@ -449,6 +471,7 @@ public sealed class DebugCommandHelpTests
         Assert.Contains("Supported commands:", output);
         Assert.Contains("mesh-export-v1-sample [outputPath]", output);
         Assert.Contains("debug-viewport-snapshot-v1 [outputPath]", output);
+        Assert.Contains("debug-viewport-snapshot-v1-from-track-layout-package-v2 <inputJsonPath> [outputJsonPath]", output);
         Assert.Contains("debug-viewport-snapshot-v1-gallery [artifactDirectory] [outputHtmlPath]", output);
         Assert.Contains("debug-viewport-snapshot-v1-browser [artifactDirectory] [outputHtmlPath]", output);
         Assert.Contains("debug-viewport-snapshot-v1-spatial-layout [outputPath]", output);

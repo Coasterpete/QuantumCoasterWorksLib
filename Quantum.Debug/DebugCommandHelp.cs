@@ -96,6 +96,24 @@ namespace Quantum.Debug
                     "dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1-from-csv Quantum.Tests/IO/Fixtures/Milestone7.synthetic.straight_line.centerline_frames.csv artifacts/debug-viewport/Milestone7.synthetic.straight_line.snapshot.json"
                 }),
             new DebugCommandHelpEntry(
+                name: DebugViewportSnapshotV1FromTrackLayoutPackageV2Command.CommandName,
+                usage: "debug-viewport-snapshot-v1-from-track-layout-package-v2 <inputJsonPath> [outputJsonPath]",
+                summary: "Import a TrackLayoutPackageV2 JSON layout and export DebugViewportSnapshotV1 JSON.",
+                arguments: new[]
+                {
+                    "inputJsonPath: Required TrackLayoutPackageV2 JSON path.",
+                    "outputJsonPath: Optional JSON output path. Defaults next to the input JSON with " +
+                    DebugViewportSnapshotV1FromTrackLayoutPackageV2Command.DefaultOutputExtension + " appended.",
+                    "The command validates and maps through the TrackLayoutPackageV2 importer, compiles the authored layout, samples backend TrackFrame data, evaluates simple train boxes when the track is long enough, and validates the resulting DebugViewportSnapshotV1 payload.",
+                    "Authored banking uses the existing opt-in BankingProfile sampling path. Authored heartline offsets are represented as diagnostic connector lines because DebugViewportSnapshotV1 has no dedicated heartline layer.",
+                    DebugViewportPreviewIndexNote
+                },
+                examples: new[]
+                {
+                    "dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1-from-track-layout-package-v2 artifacts/layouts/minimal-v2.json",
+                    "dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1-from-track-layout-package-v2 artifacts/layouts/minimal-v2.json artifacts/debug-viewport/minimal-v2.snapshot.json"
+                }),
+            new DebugCommandHelpEntry(
                 name: "debug-viewport-snapshot-v1-validate",
                 usage: "debug-viewport-snapshot-v1-validate <snapshotJsonPath>",
                 summary: "Validate and summarize a DebugViewportSnapshotV1 JSON file.",

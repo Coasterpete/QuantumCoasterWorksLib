@@ -121,6 +121,12 @@ Generate a snapshot from a self-authored sampled-frame CSV fixture:
 dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1-from-csv Quantum.Tests/IO/Fixtures/Milestone7.synthetic.straight_line.centerline_frames.csv artifacts/debug-viewport/Milestone7.synthetic.straight_line.snapshot.json
 ```
 
+Generate a snapshot from a `TrackLayoutPackageV2` JSON layout:
+
+```powershell
+dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1-from-track-layout-package-v2 artifacts/layouts/minimal-v2.json artifacts/debug-viewport/minimal-v2.snapshot.json
+```
+
 Validate and inspect a snapshot JSON file:
 
 ```powershell
@@ -198,6 +204,7 @@ Generated JSON, SVG, Markdown, and HTML under `artifacts/` are local output by d
 - `dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1-transition-authoring [outputPath]`: write the deterministic transition-authoring `DebugViewportSnapshotV1` sample JSON.
 - `dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1-spatial-layout [outputPath]`: write the deterministic three-dimensional spatial-layout `DebugViewportSnapshotV1` sample JSON.
 - `dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1-from-csv <inputCsvPath> [outputJsonPath]`: bridge a sampled-frame CSV fixture to `DebugViewportSnapshotV1` JSON.
+- `dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1-from-track-layout-package-v2 <inputJsonPath> [outputJsonPath]`: import `TrackLayoutPackageV2`, compile/evaluate it through backend authoring/runtime systems, and export validated `DebugViewportSnapshotV1` JSON.
 - `dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1-validate <snapshotJsonPath>`: validate and summarize a snapshot JSON file.
 - `dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1-svg <snapshotJsonPath> [outputSvgPath]`: write a multi-panel backend-only SVG preview from snapshot JSON.
 - `dotnet run --project Quantum.Debug -- debug-viewport-snapshot-v1-gallery [artifactDirectory] [outputHtmlPath]`: write a static HTML gallery for generated DebugViewportSnapshotV1 JSON and SVG artifacts.
