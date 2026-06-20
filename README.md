@@ -103,6 +103,19 @@ artifacts uncommitted by default.
 
 For optional Blender workflows, see `docs/visualization/blender-visualization-index.md`.
 
+For the Milestone 149 preview viewer spike, generate snapshots first and run:
+
+```powershell
+dotnet run --project Quantum.PreviewViewer
+```
+
+`Quantum.PreviewViewer` is a separate local ASP.NET Core + Three.js prototype
+for opening generated `DebugViewportSnapshotV1` JSON, orbiting/panning/zooming a
+3D scene, scrubbing or playing train placeholder boxes through exported samples,
+and capturing PNG/WebM progress output. It is not a production editor and does
+not add authoring tools, supports, track styles, or backend renderer
+dependencies.
+
 Generate the built-in debug viewport snapshot:
 
 ```powershell
