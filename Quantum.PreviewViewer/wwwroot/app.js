@@ -3,9 +3,15 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 
 const ui = {
   viewport: document.getElementById("viewport"),
+  appStatus: document.getElementById("appStatus"),
+  appStatusText: document.getElementById("appStatusText"),
   statusBar: document.getElementById("statusBar"),
+  viewportOverlay: document.getElementById("viewportOverlay"),
+  overlayTitle: document.getElementById("overlayTitle"),
+  overlayMessage: document.getElementById("overlayMessage"),
   snapshotSelect: document.getElementById("snapshotSelect"),
   reloadButton: document.getElementById("reloadButton"),
+  fileButton: document.getElementById("fileButton"),
   fileInput: document.getElementById("fileInput"),
   playButton: document.getElementById("playButton"),
   distanceScrubber: document.getElementById("distanceScrubber"),
@@ -16,14 +22,28 @@ const ui = {
   captureButton: document.getElementById("captureButton"),
   recordButton: document.getElementById("recordButton"),
   snapshotMetrics: document.getElementById("snapshotMetrics"),
+  sceneStats: document.getElementById("sceneStats"),
+  trainMetrics: document.getElementById("trainMetrics"),
+  gridLayer: document.getElementById("gridLayer"),
+  gridLayerState: document.getElementById("gridLayerState"),
   centerlineLayer: document.getElementById("centerlineLayer"),
+  centerlineLayerCount: document.getElementById("centerlineLayerCount"),
+  centerlineLayerState: document.getElementById("centerlineLayerState"),
   framesLayer: document.getElementById("framesLayer"),
+  framesLayerCount: document.getElementById("framesLayerCount"),
+  framesLayerState: document.getElementById("framesLayerState"),
   trainLayer: document.getElementById("trainLayer"),
-  diagnosticsLayer: document.getElementById("diagnosticsLayer")
+  trainLayerCount: document.getElementById("trainLayerCount"),
+  trainLayerState: document.getElementById("trainLayerState"),
+  diagnosticsLayer: document.getElementById("diagnosticsLayer"),
+  diagnosticsLayerCount: document.getElementById("diagnosticsLayerCount"),
+  diagnosticsLayerState: document.getElementById("diagnosticsLayerState")
 };
 
 const colors = {
   background: 0x0b0c0e,
+  accent: 0x2dd4bf,
+  accentStrong: 0xf5b84b,
   centerline: 0x2dd4bf,
   samplePoint: 0xf5b84b,
   tangent: 0xf4b942,
@@ -31,17 +51,29 @@ const colors = {
   binormal: 0x60a5fa,
   diagnostic: 0xf05d5e,
   trainBody: 0xf5b84b,
+  trainLead: 0xffffff,
+  trainStripe: 0x111827,
   trainBogie: 0x66d9c6,
   trainWheel: 0xe879f9,
   trainOther: 0xd6d3d1,
   grid: 0x363b45
 };
 
+const renderLimits = {
+  maxCenterlineMarkers: 1500,
+  maxFrameAxes: 240,
+  maxTrainLabels: 48
+};
+
 const state = {
   summaries: [],
+  summaryByPath: new Map(),
   snapshot: null,
+  snapshotSummary: null,
   snapshotLabel: "",
+  busy: false,
   points: [],
+  pointDistances: [],
   frames: [],
   frameDistances: [],
   currentDistance: 0,
@@ -53,6 +85,8 @@ const state = {
   bounds: new THREE.Box3(),
   boundsCenter: new THREE.Vector3(),
   boundsRadius: 12,
+  centerlineMarkerStride: 1,
+  frameAxisStride: 1,
   recording: false,
   recorder: null,
   recordedChunks: [],
@@ -95,7 +129,7 @@ resizeObserver.observe(ui.viewport);
 
 ui.snapshotSelect.addEventListener("change", () => {
   if (ui.snapshotSelect.value) {
-    loadSnapshotByPath(ui.snapshotSelect.value);
+    openSnapshotByPath(ui.snapshotSelect.value);
   }
 });
 
@@ -109,13 +143,15 @@ ui.speedInput.addEventListener("input", () => {
 ui.followToggle.addEventListener("change", () => {
   if (!ui.followToggle.checked) {
     controls.enabled = true;
+  } else if (state.snapshot) {
+    updateDynamicObjects({ snapFollow: true });
   }
 });
 ui.resetCameraButton.addEventListener("click", frameCamera);
 ui.captureButton.addEventListener("click", capturePng);
 ui.recordButton.addEventListener("click", toggleRecording);
 
-[ui.centerlineLayer, ui.framesLayer, ui.trainLayer, ui.diagnosticsLayer].forEach((input) => {
+[ui.gridLayer, ui.centerlineLayer, ui.framesLayer, ui.trainLayer, ui.diagnosticsLayer].forEach((input) => {
   input.addEventListener("change", updateLayerVisibility);
 });
 
@@ -124,7 +160,14 @@ loadCatalog();
 requestAnimationFrame(tick);
 
 async function loadCatalog(options = {}) {
-  setStatus("Loading generated snapshots");
+  const requestedPath = options.reloadCurrent
+    ? ui.snapshotSelect.value || (state.snapshotSummary ? getSummaryPath(state.snapshotSummary) : "")
+    : "";
+
+  setBusy(true);
+  showOverlay("Loading snapshots", "Scanning artifacts/debug-viewport for DebugViewportSnapshotV1 JSON.", "loading");
+  setStatus("Loading generated snapshots", "loading");
+
   try {
     const response = await fetch("/api/snapshots");
     if (!response.ok) {
@@ -133,24 +176,29 @@ async function loadCatalog(options = {}) {
 
     const catalog = await response.json();
     state.summaries = Array.isArray(catalog.snapshots) ? catalog.snapshots : [];
+    state.summaryByPath = new Map(state.summaries.map((summary) => [getSummaryPath(summary), summary]));
     populateSnapshotSelect();
 
     if (state.summaries.length === 0) {
       clearSnapshot();
-      setStatus("No generated DebugViewportSnapshotV1 JSON found under artifacts/debug-viewport");
+      showOverlay(
+        "No generated snapshots",
+        "No DebugViewportSnapshotV1 JSON was found under artifacts/debug-viewport. Open a snapshot JSON file to inspect one directly.",
+        "warning");
+      setStatus("No generated DebugViewportSnapshotV1 JSON found under artifacts/debug-viewport", "warning");
       return;
     }
 
-    const currentPath = ui.snapshotSelect.value;
-    if (options.reloadCurrent && currentPath) {
-      await loadSnapshotByPath(currentPath);
+    if (options.reloadCurrent && requestedPath && state.summaryByPath.has(requestedPath)) {
+      await loadSnapshotByPath(requestedPath);
       return;
     }
 
     await loadSnapshotByPath(getSummaryPath(state.summaries[0]));
   } catch (error) {
-    clearSnapshot();
-    setStatus(error.message, true);
+    handleLoadError(error);
+  } finally {
+    setBusy(false);
   }
 }
 
@@ -183,7 +231,8 @@ async function loadSnapshotByPath(repositoryRelativePath) {
     return;
   }
 
-  setStatus(`Opening ${repositoryRelativePath}`);
+  showOverlay("Opening snapshot", repositoryRelativePath, "loading");
+  setStatus(`Opening ${repositoryRelativePath}`, "loading");
   const response = await fetch(`/api/snapshot?path=${encodeURIComponent(repositoryRelativePath)}`);
   if (!response.ok) {
     const payload = await safeReadJson(response);
@@ -195,20 +244,34 @@ async function loadSnapshotByPath(repositoryRelativePath) {
   ui.snapshotSelect.value = repositoryRelativePath;
 }
 
+async function openSnapshotByPath(repositoryRelativePath) {
+  setBusy(true);
+  try {
+    await loadSnapshotByPath(repositoryRelativePath);
+  } catch (error) {
+    handleLoadError(error);
+  } finally {
+    setBusy(false);
+  }
+}
+
 async function loadFileSnapshot(event) {
   const file = event.target.files && event.target.files[0];
   if (!file) {
     return;
   }
 
+  setBusy(true);
+  showOverlay("Opening local JSON", file.name, "loading");
   try {
     const text = await file.text();
     loadSnapshotFromText(text, file.name);
     ui.snapshotSelect.value = "";
   } catch (error) {
-    setStatus(error.message, true);
+    handleLoadError(error);
   } finally {
     ui.fileInput.value = "";
+    setBusy(false);
   }
 }
 
@@ -218,12 +281,17 @@ function loadSnapshotFromText(json, label) {
     throw new Error("Expected DebugViewportSnapshotV1 JSON.");
   }
 
+  setPlaying(false);
   state.snapshot = snapshot;
+  state.snapshotSummary = state.summaryByPath.get(label) ?? null;
   state.snapshotLabel = label;
   state.points = getCenterlinePoints(snapshot);
+  state.pointDistances = state.points.map((point) => point.distance);
   state.frames = getFrames(snapshot);
   state.frameDistances = state.frames.map((frame) => frame.distance);
   state.dynamicBoxes = [];
+  state.centerlineMarkerStride = 1;
+  state.frameAxisStride = 1;
 
   clearGroup(groups.centerline);
   clearGroup(groups.frames);
@@ -253,13 +321,31 @@ function loadSnapshotFromText(json, label) {
   updateLayerVisibility();
   updateMetrics();
   frameCamera();
-  setStatus(`Loaded ${label}`);
+
+  const hasRenderableContent =
+    state.points.length > 0 ||
+    state.frames.length > 0 ||
+    (Array.isArray(snapshot.lines) && snapshot.lines.length > 0) ||
+    (Array.isArray(snapshot.boxes) && snapshot.boxes.length > 0);
+
+  if (hasRenderableContent) {
+    hideOverlay();
+    setStatus(`Loaded ${label}`, "ready");
+  } else {
+    showOverlay(
+      "Snapshot has no visible layers",
+      "The file is valid, but it contains no centerline points, frames, diagnostics, or boxes to draw.",
+      "warning");
+    setStatus(`Loaded empty snapshot ${label}`, "warning");
+  }
 }
 
 function clearSnapshot() {
   state.snapshot = null;
+  state.snapshotSummary = null;
   state.snapshotLabel = "";
   state.points = [];
+  state.pointDistances = [];
   state.frames = [];
   state.frameDistances = [];
   state.dynamicBoxes = [];
@@ -269,6 +355,10 @@ function clearSnapshot() {
   ui.distanceScrubber.disabled = true;
   ui.distanceValue.value = "0.00 m";
   ui.snapshotMetrics.replaceChildren();
+  ui.sceneStats.replaceChildren();
+  ui.trainMetrics.replaceChildren();
+  updateLayerVisibility();
+  updateControlAvailability();
 }
 
 function buildGrid() {
@@ -294,7 +384,11 @@ function buildCenterline() {
   );
   groups.centerline.add(line);
 
-  const markerGeometry = new THREE.BufferGeometry().setFromPoints(state.points.map((sample) => sample.position));
+  state.centerlineMarkerStride = Math.max(1, Math.ceil(state.points.length / renderLimits.maxCenterlineMarkers));
+  const markerPoints = state.points
+    .filter((_, index) => index % state.centerlineMarkerStride === 0)
+    .map((sample) => sample.position);
+  const markerGeometry = new THREE.BufferGeometry().setFromPoints(markerPoints);
   const markers = new THREE.Points(
     markerGeometry,
     new THREE.PointsMaterial({
@@ -311,11 +405,10 @@ function buildFrames() {
     return;
   }
 
-  const maxAxes = 180;
-  const stride = Math.max(1, Math.ceil(state.frames.length / maxAxes));
-  addFrameAxisLines("tangent", colors.tangent, stride);
-  addFrameAxisLines("normal", colors.normal, stride);
-  addFrameAxisLines("binormal", colors.binormal, stride);
+  state.frameAxisStride = Math.max(1, Math.ceil(state.frames.length / renderLimits.maxFrameAxes));
+  addFrameAxisLines("tangent", colors.tangent, state.frameAxisStride);
+  addFrameAxisLines("normal", colors.normal, state.frameAxisStride);
+  addFrameAxisLines("binormal", colors.binormal, state.frameAxisStride);
 }
 
 function addFrameAxisLines(axisName, color, stride) {
@@ -377,6 +470,7 @@ function buildTrainBoxes(snapshot) {
     ? 0
     : Math.max(...trainBoxes.map((box) => finiteNumber(box.frame.distance)));
 
+  let labelCount = 0;
   boxes.forEach((box) => {
     if (!box || !box.size || !hasFrame(box.frame)) {
       return;
@@ -388,10 +482,18 @@ function buildTrainBoxes(snapshot) {
       height: Math.max(finiteNumber(box.size.height), 0.01)
     };
 
-    const group = createBoxGroup(size, box.role, box.label);
+    const isLead = isTrainRole(box.role) && Math.abs(finiteNumber(box.frame.distance) - leadReference) <= 1e-6;
+    const shouldLabel = Boolean(box.label) &&
+      isTrainRole(box.role) &&
+      labelCount < renderLimits.maxTrainLabels;
+    const group = createBoxGroup(size, box.role, shouldLabel ? box.label : "", isLead);
+    if (shouldLabel) {
+      labelCount += 1;
+    }
+
     groups.train.add(group);
 
-    const dynamic = isTrainRole(box.role) && state.points.length > 1;
+    const dynamic = isTrainRole(box.role) && hasMotionSamples();
     if (dynamic) {
       state.dynamicBoxes.push({
         group,
@@ -405,18 +507,19 @@ function buildTrainBoxes(snapshot) {
   });
 }
 
-function createBoxGroup(size, role, label) {
+function createBoxGroup(size, role, label, isLead) {
   const group = new THREE.Group();
   group.name = label || role || "box";
+  const isBody = role === "train.body" || role === "train.body.banking-profile";
 
   const geometry = new THREE.BoxGeometry(size.length, size.height, size.width);
   const material = new THREE.MeshStandardMaterial({
-    color: colorForBoxRole(role),
+    color: isLead ? colors.trainLead : colorForBoxRole(role),
     roughness: 0.72,
     metalness: 0.05,
     side: THREE.DoubleSide,
     transparent: true,
-    opacity: role === "train.wheel" ? 0.72 : 0.86
+    opacity: role === "train.wheel" ? 0.72 : 0.9
   });
   const mesh = new THREE.Mesh(geometry, material);
   group.add(mesh);
@@ -427,7 +530,103 @@ function createBoxGroup(size, role, label) {
   );
   group.add(edges);
 
+  if (isBody) {
+    const stripeHeight = Math.max(size.height * 0.035, 0.035);
+    const stripeWidth = Math.max(size.width * 0.12, 0.06);
+    const stripe = new THREE.Mesh(
+      new THREE.BoxGeometry(size.length * 0.82, stripeHeight, stripeWidth),
+      new THREE.MeshStandardMaterial({
+        color: isLead ? colors.accent : colors.trainStripe,
+        emissive: isLead ? colors.accent : 0x000000,
+        emissiveIntensity: isLead ? 0.18 : 0,
+        roughness: 0.64
+      })
+    );
+    stripe.position.set(0, size.height * 0.52 + stripeHeight * 0.5, 0);
+    group.add(stripe);
+
+    const nose = new THREE.Mesh(
+      new THREE.BoxGeometry(Math.max(size.length * 0.035, 0.05), size.height * 0.72, size.width * 0.9),
+      new THREE.MeshStandardMaterial({
+        color: isLead ? colors.accentStrong : 0xffffff,
+        roughness: 0.6,
+        transparent: true,
+        opacity: isLead ? 0.95 : 0.6
+      })
+    );
+    nose.position.set(size.length * 0.5, 0, 0);
+    group.add(nose);
+
+    const arrowLength = clamp(size.length * 0.56, 0.9, 3.2);
+    const arrow = new THREE.ArrowHelper(
+      new THREE.Vector3(1, 0, 0),
+      new THREE.Vector3(-arrowLength * 0.48, size.height * 0.68, 0),
+      arrowLength,
+      isLead ? colors.accent : 0xffffff,
+      Math.max(arrowLength * 0.22, 0.18),
+      Math.max(size.width * 0.08, 0.08)
+    );
+    group.add(arrow);
+  }
+
+  if (label) {
+    const labelSprite = createLabelSprite(label, isLead);
+    labelSprite.position.set(0, size.height * 0.9, 0);
+    group.add(labelSprite);
+  }
+
   return group;
+}
+
+function createLabelSprite(label, isLead) {
+  const canvas = document.createElement("canvas");
+  const context = canvas.getContext("2d");
+  const text = String(label).slice(0, 42);
+  const fontSize = 28;
+  context.font = `600 ${fontSize}px Segoe UI, Arial, sans-serif`;
+  const textWidth = Math.ceil(context.measureText(text).width);
+  const paddingX = 18;
+  const paddingY = 10;
+  canvas.width = textWidth + paddingX * 2;
+  canvas.height = fontSize + paddingY * 2;
+
+  context.font = `600 ${fontSize}px Segoe UI, Arial, sans-serif`;
+  context.textBaseline = "middle";
+  context.fillStyle = isLead ? "rgba(245, 184, 75, 0.92)" : "rgba(17, 19, 24, 0.86)";
+  context.strokeStyle = isLead ? "rgba(255, 255, 255, 0.75)" : "rgba(244, 240, 232, 0.24)";
+  context.lineWidth = 2;
+  roundedRect(context, 1, 1, canvas.width - 2, canvas.height - 2, 8);
+  context.fill();
+  context.stroke();
+  context.fillStyle = isLead ? "#111318" : "#f4f0e8";
+  context.fillText(text, paddingX, canvas.height * 0.5);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  const material = new THREE.SpriteMaterial({
+    map: texture,
+    transparent: true,
+    depthWrite: false
+  });
+  const sprite = new THREE.Sprite(material);
+  const worldWidth = clamp(canvas.width / 90, 1.35, 5.2);
+  sprite.scale.set(worldWidth, worldWidth * (canvas.height / canvas.width), 1);
+  return sprite;
+}
+
+function roundedRect(context, x, y, width, height, radius) {
+  const r = Math.min(radius, width * 0.5, height * 0.5);
+  context.beginPath();
+  context.moveTo(x + r, y);
+  context.lineTo(x + width - r, y);
+  context.quadraticCurveTo(x + width, y, x + width, y + r);
+  context.lineTo(x + width, y + height - r);
+  context.quadraticCurveTo(x + width, y + height, x + width - r, y + height);
+  context.lineTo(x + r, y + height);
+  context.quadraticCurveTo(x, y + height, x, y + height - r);
+  context.lineTo(x, y + r);
+  context.quadraticCurveTo(x, y, x + r, y);
+  context.closePath();
 }
 
 function buildCursor() {
@@ -454,8 +653,20 @@ function addLocalCursorAxis(end, color) {
 }
 
 function configureScrubber(snapshot) {
-  const minDistance = state.points.length > 0 ? state.points[0].distance : 0;
-  const maxDistance = state.points.length > 0 ? state.points[state.points.length - 1].distance : 1;
+  const sampleDistances = state.pointDistances.length > 0 ? state.pointDistances : state.frameDistances;
+  if (sampleDistances.length === 0) {
+    state.playRange = { min: 0, max: 1 };
+    state.currentDistance = 0;
+    ui.distanceScrubber.min = "0";
+    ui.distanceScrubber.max = "1";
+    ui.distanceScrubber.value = "0";
+    ui.distanceScrubber.disabled = true;
+    ui.distanceValue.value = "0.00 m";
+    return;
+  }
+
+  const minDistance = sampleDistances[0];
+  const maxDistance = sampleDistances[sampleDistances.length - 1];
   let minLead = minDistance;
   let maxLead = maxDistance;
   let defaultDistance = minDistance;
@@ -501,8 +712,8 @@ function setDistance(distance) {
   updateDynamicObjects();
 }
 
-function updateDynamicObjects() {
-  if (!state.snapshot || state.points.length === 0) {
+function updateDynamicObjects(options = {}) {
+  if (!state.snapshot || !hasMotionSamples()) {
     return;
   }
 
@@ -515,23 +726,26 @@ function updateDynamicObjects() {
   });
 
   if (ui.followToggle.checked) {
-    updateFollowCamera(leadFrame);
+    updateFollowCamera(leadFrame, options.snapFollow === true);
   }
 }
 
-function updateFollowCamera(frame) {
-  const target = frame.position.clone().addScaledVector(frame.normal, state.axisScale * 0.55);
-  const backDistance = Math.max(state.axisScale * 8.0, 16);
-  const upDistance = Math.max(state.axisScale * 3.0, 5);
-  const sideDistance = Math.max(state.axisScale * 3.0, 5);
+function updateFollowCamera(frame, snap = false) {
+  const lookAheadDistance = clamp(state.boundsRadius * 0.08, 1.5, 12);
+  const lookAheadFrame = sampleFrame(frame.distance + lookAheadDistance);
+  const target = lookAheadFrame.position.clone().addScaledVector(lookAheadFrame.normal, state.axisScale * 0.65);
+  const backDistance = clamp(state.boundsRadius * 0.46, 8, 48);
+  const upDistance = clamp(state.boundsRadius * 0.22, 3.5, 18);
+  const sideDistance = clamp(state.boundsRadius * 0.2, 2.5, 16);
   const cameraPosition = frame.position.clone()
     .addScaledVector(frame.tangent, -backDistance)
     .addScaledVector(frame.normal, upDistance)
     .addScaledVector(frame.binormal, sideDistance);
+  const alpha = snap ? 1 : state.playing ? 0.18 : 0.28;
 
   controls.enabled = false;
-  controls.target.lerp(target, 0.18);
-  camera.position.lerp(cameraPosition, 0.18);
+  controls.target.lerp(target, alpha);
+  camera.position.lerp(cameraPosition, alpha);
 }
 
 function applyFrameToGroup(group, frame) {
@@ -546,6 +760,10 @@ function sampleFrame(distance) {
   }
 
   return frameFromCenterline(distance);
+}
+
+function hasMotionSamples() {
+  return state.frames.length > 0 || state.points.length > 0;
 }
 
 function interpolateFrame(frames, distances, distance) {
@@ -583,7 +801,7 @@ function frameFromCenterline(distance) {
     });
   }
 
-  const distances = state.points.map((point) => point.distance);
+  const distances = state.pointDistances;
   const clampedDistance = clamp(distance, distances[0], distances[distances.length - 1]);
   const index = findSegmentIndex(distances, clampedDistance);
   const left = state.points[index];
@@ -737,58 +955,180 @@ function frameCamera() {
   camera.near = Math.max(radius / 1000, 0.01);
   camera.far = Math.max(radius * 80, 1000);
   camera.updateProjectionMatrix();
-  camera.position.set(
-    center.x + radius * 1.25,
-    center.y + radius * 0.72,
-    center.z + radius * 1.35
-  );
+
+  const overviewFrame = getOverviewFrame();
+  const cameraPosition = center.clone()
+    .addScaledVector(overviewFrame.tangent, -radius * 1.18)
+    .addScaledVector(overviewFrame.normal, radius * 0.72)
+    .addScaledVector(overviewFrame.binormal, radius * 1.18);
+  camera.position.copy(cameraPosition);
   controls.target.copy(center);
   controls.maxDistance = Math.max(radius * 24, 100);
+  controls.minDistance = Math.max(radius * 0.012, 0.35);
   controls.enabled = !ui.followToggle.checked;
   controls.update();
+
+  if (ui.followToggle.checked && state.snapshot && hasMotionSamples()) {
+    updateDynamicObjects({ snapFollow: true });
+  }
+}
+
+function getOverviewFrame() {
+  if (state.frames.length > 0) {
+    return cloneFrame(state.frames[0]);
+  }
+
+  if (state.points.length > 1) {
+    const first = state.points[0].position;
+    const last = state.points[state.points.length - 1].position;
+    const tangent = last.clone().sub(first);
+    if (tangent.lengthSq() <= 1e-12) {
+      tangent.set(1, 0, 0);
+    }
+
+    return orthonormalFrame({
+      distance: state.points[0].distance,
+      position: first.clone(),
+      tangent,
+      normal: new THREE.Vector3(0, 1, 0),
+      binormal: new THREE.Vector3(0, 0, 1)
+    });
+  }
+
+  return orthonormalFrame({
+    distance: 0,
+    position: new THREE.Vector3(),
+    tangent: new THREE.Vector3(1, 0, 0),
+    normal: new THREE.Vector3(0, 1, 0),
+    binormal: new THREE.Vector3(0, 0, 1)
+  });
 }
 
 function updateLayerVisibility() {
+  groups.grid.visible = ui.gridLayer.checked;
   groups.centerline.visible = ui.centerlineLayer.checked;
   groups.frames.visible = ui.framesLayer.checked;
   groups.train.visible = ui.trainLayer.checked;
   groups.diagnostics.visible = ui.diagnosticsLayer.checked;
+  updateLayerControl(ui.gridLayer, ui.gridLayerState);
+  updateLayerControl(ui.centerlineLayer, ui.centerlineLayerState);
+  updateLayerControl(ui.framesLayer, ui.framesLayerState);
+  updateLayerControl(ui.trainLayer, ui.trainLayerState);
+  updateLayerControl(ui.diagnosticsLayer, ui.diagnosticsLayerState);
+  updateLayerCounts();
 }
 
 function updateMetrics() {
   const snapshot = state.snapshot;
   ui.snapshotMetrics.replaceChildren();
+  ui.sceneStats.replaceChildren();
+  ui.trainMetrics.replaceChildren();
   if (!snapshot) {
+    updateLayerCounts();
     return;
   }
 
+  const summary = state.snapshotSummary;
+  const metadata = snapshot.metadata ?? {};
   const trainPoseCars = Array.isArray(snapshot.trainPose?.cars) ? snapshot.trainPose.cars.length : 0;
-  const rows = [
-    ["File", state.snapshotLabel],
-    ["Source", snapshot.metadata?.sourceFixtureName || "local"],
-    ["Units", snapshot.metadata?.units || "meters"],
-    ["Centerline", String(Array.isArray(snapshot.centerlinePoints) ? snapshot.centerlinePoints.length : 0)],
-    ["Frames", String(Array.isArray(snapshot.frames) ? snapshot.frames.length : 0)],
-    ["Lines", String(Array.isArray(snapshot.lines) ? snapshot.lines.length : 0)],
-    ["Boxes", String(Array.isArray(snapshot.boxes) ? snapshot.boxes.length : 0)],
-    ["Train pose", trainPoseCars > 0 ? `${trainPoseCars} cars` : "none"],
-    ["Dynamic boxes", String(state.dynamicBoxes.length)],
-    ["Distance span", `${state.playRange.min.toFixed(2)} to ${state.playRange.max.toFixed(2)} m`]
-  ];
+  const size = state.bounds.getSize(new THREE.Vector3());
+  const summaryPath = summary ? getSummaryPath(summary) : "";
 
+  appendMetricRows(ui.snapshotMetrics, [
+    ["File", state.snapshotLabel.split(/[\\/]/).pop() || state.snapshotLabel],
+    ["Path", summaryPath || state.snapshotLabel],
+    ["Contract", `${snapshot.contract} v${snapshot.version}`],
+    ["Fixture", metadata.sourceFixtureName || "local"],
+    ["Units", metadata.units || "meters"],
+    ["Sample count", formatOptionalNumber(metadata.sampleCount)],
+    ["Modified", summary ? formatDate(getString(summary, "modifiedUtc")) : "local file"],
+    ["Size", summary ? formatBytes(getNumber(summary, "sizeBytes")) : formatBytes(snapshotJsonSize(snapshot))],
+    ["Bounds", `${formatDistance(size.x)} x ${formatDistance(size.y)} x ${formatDistance(size.z)}`],
+    ["Distance span", `${formatDistance(state.playRange.min)} to ${formatDistance(state.playRange.max)}`]
+  ]);
+
+  appendSceneStats([
+    ["Centerline", state.points.length],
+    ["Frames", state.frames.length],
+    ["Diagnostics", Array.isArray(snapshot.lines) ? snapshot.lines.length : 0],
+    ["Boxes", Array.isArray(snapshot.boxes) ? snapshot.boxes.length : 0]
+  ]);
+
+  const trainBoxes = (Array.isArray(snapshot.boxes) ? snapshot.boxes : []).filter((box) => isTrainRole(box?.role));
+  const trainRoles = summarizeTrainRoles(trainBoxes);
+  const offsetRange = getDynamicOffsetRange();
+  appendMetricRows(ui.trainMetrics, [
+    ["Pose cars", trainPoseCars > 0 ? String(trainPoseCars) : "none"],
+    ["Lead distance", Number.isFinite(finiteNumber(snapshot.trainPose?.leadDistance, Number.NaN))
+      ? formatDistance(finiteNumber(snapshot.trainPose.leadDistance))
+      : "not exported"],
+    ["Train boxes", String(trainBoxes.length)],
+    ["Dynamic boxes", String(state.dynamicBoxes.length)],
+    ["Spacing span", offsetRange],
+    ["Roles", trainRoles]
+  ]);
+
+  updateLayerCounts();
+}
+
+function updateLayerControl(input, stateElement) {
+  const label = input.closest(".layer-toggle");
+  if (label) {
+    label.classList.toggle("is-off", !input.checked);
+  }
+
+  stateElement.textContent = input.checked ? "On" : "Off";
+}
+
+function updateLayerCounts() {
+  if (ui.centerlineLayerCount) {
+    ui.centerlineLayerCount.textContent = formatCount(state.points.length);
+  }
+  if (ui.framesLayerCount) {
+    const renderedFrameAxes = state.frames.length === 0
+      ? 0
+      : Math.ceil(state.frames.length / Math.max(state.frameAxisStride, 1));
+    ui.framesLayerCount.textContent = state.frameAxisStride > 1
+      ? `${formatCount(renderedFrameAxes)}/${formatCount(state.frames.length)}`
+      : formatCount(state.frames.length);
+  }
+  if (ui.trainLayerCount) {
+    const boxCount = Array.isArray(state.snapshot?.boxes) ? state.snapshot.boxes.length : 0;
+    ui.trainLayerCount.textContent = formatCount(boxCount);
+  }
+  if (ui.diagnosticsLayerCount) {
+    const lineCount = Array.isArray(state.snapshot?.lines) ? state.snapshot.lines.length : 0;
+    ui.diagnosticsLayerCount.textContent = formatCount(lineCount);
+  }
+}
+
+function appendMetricRows(element, rows) {
   rows.forEach(([term, description]) => {
     const dt = document.createElement("dt");
     dt.textContent = term;
     const dd = document.createElement("dd");
     dd.textContent = description;
-    ui.snapshotMetrics.append(dt, dd);
+    element.append(dt, dd);
+  });
+}
+
+function appendSceneStats(stats) {
+  stats.forEach(([label, value]) => {
+    const item = document.createElement("div");
+    item.className = "stat-item";
+    const strong = document.createElement("strong");
+    strong.textContent = formatCount(value);
+    const span = document.createElement("span");
+    span.textContent = label;
+    item.append(strong, span);
+    ui.sceneStats.appendChild(item);
   });
 }
 
 function setPlaying(playing) {
-  state.playing = playing;
-  ui.playButton.textContent = playing ? "Pause" : "Play";
-  ui.playButton.setAttribute("aria-pressed", String(playing));
+  state.playing = playing && Boolean(state.snapshot) && hasMotionSamples();
+  ui.playButton.textContent = state.playing ? "Pause" : "Play";
+  ui.playButton.setAttribute("aria-pressed", String(state.playing));
 }
 
 function tick(timestamp) {
@@ -820,6 +1160,11 @@ function resizeRenderer() {
 }
 
 function capturePng() {
+  if (!state.snapshot) {
+    setStatus("Open a snapshot before capturing PNG", "warning");
+    return;
+  }
+
   renderer.render(scene, camera);
   renderer.domElement.toBlob((blob) => {
     if (!blob) {
@@ -835,6 +1180,11 @@ function capturePng() {
 function toggleRecording() {
   if (state.recording && state.recorder) {
     state.recorder.stop();
+    return;
+  }
+
+  if (!state.snapshot) {
+    setStatus("Open a snapshot before recording WebM", "warning");
     return;
   }
 
@@ -951,18 +1301,166 @@ function clearGroup(group) {
 
     if (object.material) {
       if (Array.isArray(object.material)) {
-        object.material.forEach((material) => material.dispose());
+        object.material.forEach(disposeMaterial);
       } else {
-        object.material.dispose();
+        disposeMaterial(object.material);
       }
     }
   });
   group.clear();
 }
 
-function setStatus(message, isError = false) {
+function disposeMaterial(material) {
+  if (material.map) {
+    material.map.dispose();
+  }
+
+  material.dispose();
+}
+
+function setBusy(busy) {
+  state.busy = busy;
+  updateControlAvailability();
+}
+
+function updateControlAvailability() {
+  const hasSnapshot = Boolean(state.snapshot);
+  const canMove = hasSnapshot && hasMotionSamples() && !state.busy;
+
+  ui.snapshotSelect.disabled = state.busy || state.summaries.length === 0;
+  ui.reloadButton.disabled = state.busy;
+  ui.fileInput.disabled = state.busy;
+  ui.fileButton.classList.toggle("disabled", state.busy);
+  ui.playButton.disabled = !canMove;
+  ui.distanceScrubber.disabled = !canMove;
+  ui.speedInput.disabled = state.busy;
+  ui.followToggle.disabled = !hasSnapshot || !hasMotionSamples() || state.busy;
+  ui.resetCameraButton.disabled = !hasSnapshot || state.busy;
+  ui.captureButton.disabled = !hasSnapshot || state.busy;
+  ui.recordButton.disabled = (!hasSnapshot || state.busy) && !state.recording;
+
+  [ui.gridLayer, ui.centerlineLayer, ui.framesLayer, ui.trainLayer, ui.diagnosticsLayer].forEach((input) => {
+    input.disabled = !hasSnapshot || state.busy;
+  });
+}
+
+function showOverlay(title, message, status = "ready") {
+  ui.overlayTitle.textContent = title;
+  ui.overlayMessage.textContent = message;
+  ui.viewportOverlay.style.display = "";
+  ui.viewportOverlay.hidden = false;
+  ui.viewportOverlay.dataset.status = status;
+}
+
+function hideOverlay() {
+  ui.viewportOverlay.hidden = true;
+  ui.viewportOverlay.style.display = "none";
+}
+
+function handleLoadError(error) {
+  clearSnapshot();
+  const message = error instanceof Error ? error.message : String(error);
+  showOverlay("Could not open snapshot", message, "error");
+  setStatus(message, "error");
+}
+
+function setStatus(message, status = "ready") {
+  const resolvedStatus = typeof status === "boolean"
+    ? status ? "error" : "ready"
+    : status;
+
   ui.statusBar.textContent = message;
-  ui.statusBar.classList.toggle("error", isError);
+  ui.statusBar.classList.remove("ready", "loading", "warning", "error");
+  ui.statusBar.classList.add(resolvedStatus);
+  ui.appStatusText.textContent = message;
+  ui.appStatus.dataset.status = resolvedStatus;
+}
+
+function formatDistance(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) {
+    return "n/a";
+  }
+
+  return `${number.toFixed(Math.abs(number) >= 100 ? 1 : 2)} m`;
+}
+
+function formatOptionalNumber(value) {
+  const number = Number(value);
+  return Number.isFinite(number) ? formatCount(number) : "not exported";
+}
+
+function formatCount(value) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number.toLocaleString("en-US") : "0";
+}
+
+function formatBytes(value) {
+  const bytes = Number(value);
+  if (!Number.isFinite(bytes) || bytes <= 0) {
+    return "n/a";
+  }
+
+  const units = ["B", "KB", "MB", "GB"];
+  let scaled = bytes;
+  let unitIndex = 0;
+  while (scaled >= 1024 && unitIndex < units.length - 1) {
+    scaled /= 1024;
+    unitIndex += 1;
+  }
+
+  const precision = scaled >= 10 || unitIndex === 0 ? 0 : 1;
+  return `${scaled.toFixed(precision)} ${units[unitIndex]}`;
+}
+
+function formatDate(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "unknown";
+  }
+
+  return date.toLocaleString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
+}
+
+function snapshotJsonSize(snapshot) {
+  return new Blob([JSON.stringify(snapshot)]).size;
+}
+
+function summarizeTrainRoles(trainBoxes) {
+  if (trainBoxes.length === 0) {
+    return "none";
+  }
+
+  const roleCounts = new Map();
+  trainBoxes.forEach((box) => {
+    const role = box.role || "unknown";
+    roleCounts.set(role, (roleCounts.get(role) ?? 0) + 1);
+  });
+
+  return Array.from(roleCounts.entries())
+    .map(([role, count]) => `${role.replace(/^train\./, "")}: ${count}`)
+    .join(", ");
+}
+
+function getDynamicOffsetRange() {
+  if (state.dynamicBoxes.length === 0) {
+    return "none";
+  }
+
+  const offsets = state.dynamicBoxes.map((box) => box.offset);
+  const minOffset = Math.min(...offsets);
+  const maxOffset = Math.max(...offsets);
+  if (Math.abs(minOffset - maxOffset) <= 1e-6) {
+    return formatDistance(minOffset);
+  }
+
+  return `${formatDistance(minOffset)} to ${formatDistance(maxOffset)}`;
 }
 
 async function safeReadJson(response) {
