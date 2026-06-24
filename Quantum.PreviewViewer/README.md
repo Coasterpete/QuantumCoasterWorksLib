@@ -26,7 +26,7 @@ Current capabilities:
 - Renders frame axes from `frames`.
 - Renders `lines` as colored diagnostics.
 - Renders oriented train/debug boxes from `boxes`.
-- Can replace configured train box roles with GLTF/GLB assets while preserving debug boxes as the fallback.
+- Can replace configured train box roles with GLTF/GLB assets while preserving debug boxes as the fallback and optional overlay.
 - Scrubs and plays a visual lead distance through the exported sampled frames with orbit and follow-train camera modes.
 - Repositions train placeholder boxes by preserving their exported spacing offsets.
 - Supports orbit, pan, zoom, camera reset, and optional follow camera.
@@ -43,9 +43,28 @@ Style manifest shape:
     {
       "id": "custom-train",
       "name": "Custom train",
+      "debugBoxOverlay": false,
       "roles": {
+        "train.lead": {
+          "asset": "assets/trains/custom-lead.glb",
+          "fitToBox": true,
+          "fitMode": "uniform",
+          "scale": 1.0,
+          "offset": { "x": 0.0, "y": 0.0, "z": 0.0 },
+          "rotationDegrees": { "x": 0.0, "y": 90.0, "z": 0.0 }
+        },
+        "train.middle": {
+          "asset": "assets/trains/custom-middle.glb",
+          "fitToBox": true,
+          "fitMode": "uniform"
+        },
+        "train.rear": {
+          "asset": "assets/trains/custom-rear.glb",
+          "fitToBox": true,
+          "fitMode": "uniform"
+        },
         "train.body": {
-          "asset": "assets/trains/custom-car.glb",
+          "asset": "assets/trains/custom-fallback-car.glb",
           "fitToBox": true,
           "fitMode": "uniform",
           "scale": 1.0,
@@ -58,6 +77,8 @@ Style manifest shape:
   "trackStyles": []
 }
 ```
+
+Train body boxes are still exported as `train.body` by `DebugViewportSnapshotV1`. The viewer resolves the visual asset role per car: first car uses `train.lead`, last car uses `train.rear`, interior cars use `train.middle`, and any missing variant falls back to `train.body`. A one-car train uses `train.lead`. See [preview-viewer-train-styles.md](../docs/visualization/preview-viewer-train-styles.md) for configuration examples.
 
 Asset paths are resolved under the configured preview asset root, which defaults to the manifest directory. `PreviewStyleManifest` and `PreviewStyleAssetRoot` can be set through app configuration if the manifest or assets need to live elsewhere in the repository.
 

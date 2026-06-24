@@ -449,6 +449,97 @@ public static class PreviewStyleAssetFiles
     }
 }
 
+public static class PreviewTrainStyleRoles
+{
+    public const string TrainLeadRole = "train.lead";
+    public const string TrainMiddleRole = "train.middle";
+    public const string TrainRearRole = "train.rear";
+    public const string TrainBodyRole = "train.body";
+    public const string TrainBodyBankingProfileRole = "train.body.banking-profile";
+    public const string TrainWildcardRole = "train.*";
+
+    public static bool IsTrainBodyRole(string? snapshotRole)
+    {
+        return string.Equals(snapshotRole, TrainBodyRole, StringComparison.Ordinal) ||
+            string.Equals(snapshotRole, TrainBodyBankingProfileRole, StringComparison.Ordinal);
+    }
+
+    public static string ResolveTrainBodyStyleRole(int carIndex, int carCount)
+    {
+        if (carCount <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(carCount), "Train car count must be positive.");
+        }
+
+        if (carIndex < 0 || carIndex >= carCount)
+        {
+            throw new ArgumentOutOfRangeException(nameof(carIndex), "Train car index must be inside the train.");
+        }
+
+        if (carIndex == 0)
+        {
+            return TrainLeadRole;
+        }
+
+        return carIndex == carCount - 1
+            ? TrainRearRole
+            : TrainMiddleRole;
+    }
+
+    public static string? ResolveConfiguredStyleRole(
+        string? snapshotRole,
+        int carIndex,
+        int carCount,
+        IReadOnlyCollection<string> configuredRoles)
+    {
+        if (string.IsNullOrWhiteSpace(snapshotRole))
+        {
+            return null;
+        }
+
+        if (IsTrainBodyRole(snapshotRole))
+        {
+            string variantRole = ResolveTrainBodyStyleRole(carIndex, carCount);
+            if (ContainsRole(configuredRoles, variantRole))
+            {
+                return variantRole;
+            }
+
+            if (ContainsRole(configuredRoles, TrainBodyRole))
+            {
+                return TrainBodyRole;
+            }
+
+            if (ContainsRole(configuredRoles, snapshotRole))
+            {
+                return snapshotRole;
+            }
+        }
+        else if (ContainsRole(configuredRoles, snapshotRole))
+        {
+            return snapshotRole;
+        }
+
+        return snapshotRole.StartsWith("train.", StringComparison.Ordinal) &&
+            ContainsRole(configuredRoles, TrainWildcardRole)
+                ? TrainWildcardRole
+                : null;
+    }
+
+    private static bool ContainsRole(IReadOnlyCollection<string> configuredRoles, string role)
+    {
+        foreach (string configuredRole in configuredRoles)
+        {
+            if (string.Equals(configuredRole, role, StringComparison.Ordinal))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+}
+
 public static class SnapshotCatalog
 {
     public const string ContractName = "quantum.debug_viewport_snapshot";

@@ -92,6 +92,111 @@ public sealed class StyleManifestCatalogTests
     }
 
     [Fact]
+    public void LoadManifest_AddsAssetUrlsForTrainRoleVariantAssets()
+    {
+        string tempDirectory = CreateTempDirectoryPath();
+        string repositoryRoot = Path.Combine(tempDirectory, "repo");
+        string viewerRoot = Path.Combine(repositoryRoot, "Quantum.PreviewViewer");
+        string manifestPath = Path.Combine(viewerRoot, "preview-styles.json");
+
+        try
+        {
+            Directory.CreateDirectory(Path.Combine(viewerRoot, "assets", "trains"));
+            File.WriteAllText(Path.Combine(repositoryRoot, "QuantumCoasterWorks.sln"), string.Empty);
+            File.WriteAllText(Path.Combine(viewerRoot, "assets", "trains", "lead.glb"), "lead");
+            File.WriteAllText(Path.Combine(viewerRoot, "assets", "trains", "middle.glb"), "middle");
+            File.WriteAllText(Path.Combine(viewerRoot, "assets", "trains", "rear.glb"), "rear");
+            File.WriteAllText(Path.Combine(viewerRoot, "assets", "trains", "body.glb"), "body");
+            File.WriteAllText(
+                manifestPath,
+                """
+                {
+                  "version": 1,
+                  "defaultTrainStyle": "variants",
+                  "trainStyles": [
+                    {
+                      "id": "variants",
+                      "name": "Variants",
+                      "roles": {
+                        "train.lead": { "asset": "assets/trains/lead.glb" },
+                        "train.middle": { "asset": "assets/trains/middle.glb" },
+                        "train.rear": { "asset": "assets/trains/rear.glb" },
+                        "train.body": { "asset": "assets/trains/body.glb" }
+                      }
+                    }
+                  ],
+                  "trackStyles": []
+                }
+                """);
+
+            JsonObject manifest = PreviewStyleManifestCatalog.LoadManifest(
+                repositoryRoot,
+                manifestPath,
+                viewerRoot,
+                "/style-assets");
+
+            Assert.Equal("/style-assets/assets/trains/lead.glb", GetRole(manifest, "train.lead")["assetUrl"]!.GetValue<string>());
+            Assert.Equal("/style-assets/assets/trains/middle.glb", GetRole(manifest, "train.middle")["assetUrl"]!.GetValue<string>());
+            Assert.Equal("/style-assets/assets/trains/rear.glb", GetRole(manifest, "train.rear")["assetUrl"]!.GetValue<string>());
+            Assert.Equal("/style-assets/assets/trains/body.glb", GetRole(manifest, "train.body")["assetUrl"]!.GetValue<string>());
+        }
+        finally
+        {
+            DeleteDirectoryIfPresent(tempDirectory);
+        }
+    }
+
+    [Fact]
+    public void ResolveConfiguredStyleRole_UsesTrainPositionVariantsThenBodyFallback()
+    {
+        string[] variantRoles =
+        {
+            PreviewTrainStyleRoles.TrainLeadRole,
+            PreviewTrainStyleRoles.TrainMiddleRole,
+            PreviewTrainStyleRoles.TrainRearRole,
+            PreviewTrainStyleRoles.TrainBodyRole
+        };
+
+        Assert.Equal(
+            PreviewTrainStyleRoles.TrainLeadRole,
+            PreviewTrainStyleRoles.ResolveConfiguredStyleRole(
+                PreviewTrainStyleRoles.TrainBodyRole,
+                carIndex: 0,
+                carCount: 4,
+                variantRoles));
+        Assert.Equal(
+            PreviewTrainStyleRoles.TrainMiddleRole,
+            PreviewTrainStyleRoles.ResolveConfiguredStyleRole(
+                PreviewTrainStyleRoles.TrainBodyRole,
+                carIndex: 1,
+                carCount: 4,
+                variantRoles));
+        Assert.Equal(
+            PreviewTrainStyleRoles.TrainRearRole,
+            PreviewTrainStyleRoles.ResolveConfiguredStyleRole(
+                PreviewTrainStyleRoles.TrainBodyRole,
+                carIndex: 3,
+                carCount: 4,
+                variantRoles));
+        Assert.Equal(
+            PreviewTrainStyleRoles.TrainLeadRole,
+            PreviewTrainStyleRoles.ResolveConfiguredStyleRole(
+                PreviewTrainStyleRoles.TrainBodyRole,
+                carIndex: 0,
+                carCount: 1,
+                variantRoles));
+
+        string[] fallbackRoles = { PreviewTrainStyleRoles.TrainBodyRole };
+        Assert.Equal(
+            PreviewTrainStyleRoles.TrainBodyRole,
+            PreviewTrainStyleRoles.ResolveConfiguredStyleRole(
+                PreviewTrainStyleRoles.TrainBodyBankingProfileRole,
+                carIndex: 1,
+                carCount: 3,
+                fallbackRoles));
+    }
+
+    [Fact]
     public void TryResolveStyleAssetFile_AllowsGltfSidecarBinFiles()
     {
         string tempDirectory = CreateTempDirectoryPath();
@@ -113,6 +218,59 @@ public sealed class StyleManifestCatalogTests
             Assert.True(resolved, error);
             Assert.Equal(sidecarPath, resolvedPath);
             Assert.Equal("application/octet-stream", contentType);
+        }
+        finally
+        {
+            DeleteDirectoryIfPresent(tempDirectory);
+        }
+    }
+
+    [Fact]
+    public void LoadManifest_DoesNotAddAssetUrlForAssetsOutsideAssetRoot()
+    {
+        string tempDirectory = CreateTempDirectoryPath();
+        string repositoryRoot = Path.Combine(tempDirectory, "repo");
+        string viewerRoot = Path.Combine(repositoryRoot, "Quantum.PreviewViewer");
+        string manifestPath = Path.Combine(viewerRoot, "preview-styles.json");
+
+        try
+        {
+            Directory.CreateDirectory(viewerRoot);
+            File.WriteAllText(Path.Combine(repositoryRoot, "QuantumCoasterWorks.sln"), string.Empty);
+            File.WriteAllText(
+                manifestPath,
+                """
+                {
+                  "version": 1,
+                  "defaultTrainStyle": "unsafe",
+                  "trainStyles": [
+                    {
+                      "id": "unsafe",
+                      "name": "Unsafe",
+                      "roles": {
+                        "train.body": {
+                          "asset": "../outside.glb"
+                        }
+                      }
+                    }
+                  ],
+                  "trackStyles": []
+                }
+                """);
+
+            JsonObject manifest = PreviewStyleManifestCatalog.LoadManifest(
+                repositoryRoot,
+                manifestPath,
+                viewerRoot,
+                "/style-assets");
+
+            JsonObject role = GetTrainBodyRole(manifest);
+            Assert.Null(role["assetUrl"]);
+            JsonArray diagnostics = Assert.IsType<JsonArray>(manifest["diagnostics"]);
+            Assert.Contains(
+                diagnostics,
+                diagnostic => ((JsonObject)diagnostic!)["message"]!.GetValue<string>()
+                    .Contains("inside the configured preview asset root", StringComparison.Ordinal));
         }
         finally
         {
@@ -148,10 +306,15 @@ public sealed class StyleManifestCatalogTests
 
     private static JsonObject GetTrainBodyRole(JsonObject manifest)
     {
+        return GetRole(manifest, "train.body");
+    }
+
+    private static JsonObject GetRole(JsonObject manifest, string roleName)
+    {
         JsonArray trainStyles = Assert.IsType<JsonArray>(manifest["trainStyles"]);
         JsonObject style = Assert.IsType<JsonObject>(trainStyles[0]);
         JsonObject roles = Assert.IsType<JsonObject>(style["roles"]);
-        return Assert.IsType<JsonObject>(roles["train.body"]);
+        return Assert.IsType<JsonObject>(roles[roleName]);
     }
 
     private static string CreateTempDirectoryPath()
