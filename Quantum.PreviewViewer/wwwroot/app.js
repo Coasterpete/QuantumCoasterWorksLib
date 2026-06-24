@@ -547,6 +547,7 @@ function buildTrainBoxes(snapshot) {
   }
 
   const trainBoxes = boxes.filter((box) => isTrainRole(box.role) && hasFrame(box.frame));
+  const trainBodyStyleRoles = resolveTrainBodyStyleRoles(trainBoxes);
   const leadReference = trainBoxes.length === 0
     ? 0
     : Math.max(...trainBoxes.map((box) => finiteNumber(box.frame.distance)));
@@ -563,11 +564,15 @@ function buildTrainBoxes(snapshot) {
       height: Math.max(finiteNumber(box.size.height), 0.01)
     };
 
-    const isLead = isTrainRole(box.role) && Math.abs(finiteNumber(box.frame.distance) - leadReference) <= 1e-6;
+    const styleRole = trainBodyStyleRoles.get(box) || box.role;
+    const isLead = styleRole === "train.lead" ||
+      (isTrainRole(box.role) &&
+        !isTrainBodyRole(box.role) &&
+        Math.abs(finiteNumber(box.frame.distance) - leadReference) <= 1e-6);
     const shouldLabel = Boolean(box.label) &&
       isTrainRole(box.role) &&
       labelCount < renderLimits.maxTrainLabels;
-    const group = createTrainVisualGroup(size, box.role, shouldLabel ? box.label : "", isLead);
+    const group = createTrainVisualGroup(size, box.role, styleRole, shouldLabel ? box.label : "", isLead);
     if (shouldLabel) {
       labelCount += 1;
     }
@@ -609,13 +614,63 @@ function rebuildTrainVisuals() {
   setStatus(`Train style: ${getSelectedTrainStyleName()}`, "ready");
 }
 
-function createTrainVisualGroup(size, role, label, isLead) {
+function resolveTrainBodyStyleRoles(trainBoxes) {
+  const bodyEntries = trainBoxes
+    .map((box, index) => ({
+      box,
+      index,
+      carIndex: parseCarIndex(box.label),
+      distance: finiteNumber(box.frame?.distance, Number.NaN)
+    }))
+    .filter((entry) => isTrainBodyRole(entry.box.role));
+
+  if (bodyEntries.length === 0) {
+    return new Map();
+  }
+
+  if (bodyEntries.some((entry) => entry.carIndex !== null)) {
+    bodyEntries.sort((left, right) => {
+      const leftIndex = left.carIndex ?? Number.MAX_SAFE_INTEGER;
+      const rightIndex = right.carIndex ?? Number.MAX_SAFE_INTEGER;
+      return leftIndex === rightIndex
+        ? left.index - right.index
+        : leftIndex - rightIndex;
+    });
+  } else if (bodyEntries.every((entry) => Number.isFinite(entry.distance))) {
+    bodyEntries.sort((left, right) => right.distance === left.distance
+      ? left.index - right.index
+      : right.distance - left.distance);
+  }
+
+  const roles = new Map();
+  bodyEntries.forEach((entry, carIndex) => {
+    roles.set(entry.box, resolveTrainBodyStyleRole(carIndex, bodyEntries.length));
+  });
+
+  return roles;
+}
+
+function resolveTrainBodyStyleRole(carIndex, carCount) {
+  if (carIndex === 0) {
+    return "train.lead";
+  }
+
+  return carIndex === carCount - 1 ? "train.rear" : "train.middle";
+}
+
+function parseCarIndex(label) {
+  const match = String(label ?? "").match(/(?:^|-)car-(\d+)$/i);
+  return match ? Number(match[1]) : null;
+}
+
+function createTrainVisualGroup(size, role, styleRole, label, isLead) {
   if (!isTrainRole(role)) {
     return createBoxGroup(size, role, label, isLead);
   }
 
   state.trainVisualStats.trainBoxes += 1;
-  const roleStyle = getTrainRoleStyle(role);
+  incrementRoleCount(state.trainVisualStats.styleRoles, styleRole);
+  const roleStyle = getTrainRoleStyle(styleRole, role);
   const assetUrl = getString(roleStyle, "assetUrl");
   if (!assetUrl) {
     return createBoxGroup(size, role, label, isLead);
@@ -627,6 +682,8 @@ function createTrainVisualGroup(size, role, label, isLead) {
   group.name = label || role || "train asset";
   group.userData.assetStatus = "loading";
   group.userData.assetUrl = assetUrl;
+  group.userData.snapshotRole = role;
+  group.userData.styleRole = styleRole;
   group.add(createBoxGroup(size, role, label, isLead));
 
   loadStyleAsset(assetUrl)
@@ -635,7 +692,7 @@ function createTrainVisualGroup(size, role, label, isLead) {
         return;
       }
 
-      replaceFallbackWithAsset(group, asset, roleStyle, size, label, isLead);
+      replaceFallbackWithAsset(group, asset, roleStyle, size, role, label, isLead);
       state.trainVisualStats.assetLoaded += 1;
       updateMetrics();
     })
@@ -654,10 +711,15 @@ function createTrainVisualGroup(size, role, label, isLead) {
   return group;
 }
 
-function replaceFallbackWithAsset(group, asset, roleStyle, size, label, isLead) {
+function replaceFallbackWithAsset(group, asset, roleStyle, size, role, label, isLead) {
   disposeChildren(group);
   const assetGroup = createAssetVisualGroup(asset, roleStyle, size);
   group.add(assetGroup);
+  if (shouldShowDebugBoxOverlay(roleStyle)) {
+    group.add(createDebugBoxOverlayGroup(size, role, isLead));
+    state.trainVisualStats.debugOverlays += 1;
+  }
+
   if (label) {
     const labelSprite = createLabelSprite(label, isLead);
     labelSprite.position.set(0, size.height * 0.9, 0);
@@ -684,19 +746,24 @@ async function loadStyleAsset(assetUrl) {
 function createAssetVisualGroup(asset, roleStyle, size) {
   const wrapper = new THREE.Group();
   wrapper.name = getString(roleStyle, "name") || asset.url.split("/").pop() || "style asset";
+  const modelRoot = new THREE.Group();
   const instance = asset.scene.clone(true);
   markAssetResourcesPreserved(instance);
-  wrapper.add(instance);
-
-  if (roleStyle.fitToBox !== false) {
-    fitAssetToBox(instance, size, getString(roleStyle, "fitMode") || "uniform");
-  }
+  modelRoot.add(instance);
+  wrapper.add(modelRoot);
 
   const rotation = vectorFromStyle(roleStyle.rotationDegrees);
-  wrapper.rotation.set(
+  modelRoot.rotation.set(
     THREE.MathUtils.degToRad(rotation.x),
     THREE.MathUtils.degToRad(rotation.y),
     THREE.MathUtils.degToRad(rotation.z));
+
+  const fitMode = normalizeFitMode(getString(roleStyle, "fitMode") || "uniform");
+  if (roleStyle.fitToBox !== false && fitMode !== "none") {
+    fitAssetToBox(modelRoot, size, fitMode);
+  } else if (roleStyle.center !== false) {
+    centerAssetAtOrigin(modelRoot);
+  }
 
   const offset = vectorFromStyle(roleStyle.offset);
   wrapper.position.set(offset.x, offset.y, offset.z);
@@ -706,8 +773,8 @@ function createAssetVisualGroup(asset, roleStyle, size) {
   return wrapper;
 }
 
-function fitAssetToBox(instance, size, fitMode) {
-  const bounds = new THREE.Box3().setFromObject(instance);
+function fitAssetToBox(object, size, fitMode) {
+  const bounds = new THREE.Box3().setFromObject(object);
   if (bounds.isEmpty()) {
     return;
   }
@@ -719,21 +786,64 @@ function fitAssetToBox(instance, size, fitMode) {
 
   const targetSize = new THREE.Vector3(size.length, size.height, size.width);
   if (fitMode === "stretch") {
-    instance.scale.multiply(new THREE.Vector3(
+    object.scale.multiply(new THREE.Vector3(
       targetSize.x / modelSize.x,
       targetSize.y / modelSize.y,
       targetSize.z / modelSize.z));
   } else {
-    const uniformScale = Math.min(
+    const scales = [
       targetSize.x / modelSize.x,
       targetSize.y / modelSize.y,
-      targetSize.z / modelSize.z);
-    instance.scale.multiplyScalar(uniformScale);
+      targetSize.z / modelSize.z
+    ];
+    const uniformScale = fitMode === "cover"
+      ? Math.max(...scales)
+      : Math.min(...scales);
+    object.scale.multiplyScalar(uniformScale);
   }
 
-  const fittedBounds = new THREE.Box3().setFromObject(instance);
+  centerAssetAtOrigin(object);
+}
+
+function centerAssetAtOrigin(object) {
+  const fittedBounds = new THREE.Box3().setFromObject(object);
+  if (fittedBounds.isEmpty()) {
+    return;
+  }
+
   const center = fittedBounds.getCenter(new THREE.Vector3());
-  instance.position.sub(center);
+  object.position.sub(center);
+}
+
+function normalizeFitMode(value) {
+  const mode = String(value || "").toLowerCase();
+  return mode === "stretch" || mode === "cover" || mode === "none"
+    ? mode
+    : "uniform";
+}
+
+function createDebugBoxOverlayGroup(size, role, isLead) {
+  const group = new THREE.Group();
+  group.name = `${role || "box"} debug overlay`;
+  const geometry = new THREE.BoxGeometry(size.length, size.height, size.width);
+  const material = new THREE.MeshStandardMaterial({
+    color: isLead ? colors.accent : colorForBoxRole(role),
+    roughness: 0.8,
+    metalness: 0,
+    transparent: true,
+    opacity: 0.12,
+    depthWrite: false
+  });
+  group.add(new THREE.Mesh(geometry, material));
+  group.add(new THREE.LineSegments(
+    new THREE.EdgesGeometry(geometry),
+    new THREE.LineBasicMaterial({
+      color: isLead ? colors.accentStrong : 0xffffff,
+      transparent: true,
+      opacity: 0.72
+    })
+  ));
+  return group;
 }
 
 function createBoxGroup(size, role, label, isLead) {
@@ -1304,7 +1414,9 @@ function updateMetrics() {
       : "none"],
     ["Loading assets", loadingAssets > 0 ? String(loadingAssets) : "none"],
     ["Debug fallbacks", String(fallbackVisuals)],
+    ["Debug overlays", visualStats.debugOverlays > 0 ? String(visualStats.debugOverlays) : "off"],
     ["Spacing span", offsetRange],
+    ["Style roles", summarizeRoleCounts(visualStats.styleRoles)],
     ["Roles", trainRoles]
   ]);
 
@@ -1486,7 +1598,9 @@ function createEmptyTrainVisualStats() {
     trainBoxes: 0,
     assetRequested: 0,
     assetLoaded: 0,
-    assetFailed: 0
+    assetFailed: 0,
+    debugOverlays: 0,
+    styleRoles: {}
   };
 }
 
@@ -1501,26 +1615,47 @@ function getSelectedTrainStyleName() {
   return getString(style, "name") || getString(style, "id") || "Debug boxes";
 }
 
-function getTrainRoleStyle(role) {
+function getTrainRoleStyle(styleRole, snapshotRole = styleRole) {
   const style = getSelectedTrainStyle();
   const roles = style?.roles;
   if (!roles || typeof roles !== "object") {
     return null;
   }
 
-  if (roles[role]) {
-    return roles[role];
+  if (roles[styleRole]) {
+    return roles[styleRole];
   }
 
-  if (role === "train.body.banking-profile" && roles["train.body"]) {
+  if (isTrainBodyVariantRole(styleRole) && roles["train.body"]) {
     return roles["train.body"];
   }
 
-  if (roles["train.*"]) {
+  if (roles[snapshotRole]) {
+    return roles[snapshotRole];
+  }
+
+  if (snapshotRole === "train.body.banking-profile" && roles["train.body"]) {
+    return roles["train.body"];
+  }
+
+  if (isTrainRole(snapshotRole) && roles["train.*"]) {
     return roles["train.*"];
   }
 
   return null;
+}
+
+function shouldShowDebugBoxOverlay(roleStyle) {
+  const style = getSelectedTrainStyle();
+  return roleStyle?.debugBoxOverlay === true || style?.debugBoxOverlay === true;
+}
+
+function incrementRoleCount(target, role) {
+  if (!role) {
+    return;
+  }
+
+  target[role] = (target[role] ?? 0) + 1;
 }
 
 function vectorFromStyle(value) {
@@ -1581,6 +1716,14 @@ function colorForBoxRole(role) {
 
 function isTrainRole(role) {
   return typeof role === "string" && role.startsWith("train.");
+}
+
+function isTrainBodyRole(role) {
+  return role === "train.body" || role === "train.body.banking-profile";
+}
+
+function isTrainBodyVariantRole(role) {
+  return role === "train.lead" || role === "train.middle" || role === "train.rear";
 }
 
 function hasFrame(frame) {
@@ -1788,6 +1931,18 @@ function summarizeTrainRoles(trainBoxes) {
   });
 
   return Array.from(roleCounts.entries())
+    .map(([role, count]) => `${role.replace(/^train\./, "")}: ${count}`)
+    .join(", ");
+}
+
+function summarizeRoleCounts(roleCounts) {
+  const entries = Object.entries(roleCounts ?? {});
+  if (entries.length === 0) {
+    return "none";
+  }
+
+  return entries
+    .sort(([left], [right]) => left.localeCompare(right))
     .map(([role, count]) => `${role.replace(/^train\./, "")}: ${count}`)
     .join(", ");
 }
