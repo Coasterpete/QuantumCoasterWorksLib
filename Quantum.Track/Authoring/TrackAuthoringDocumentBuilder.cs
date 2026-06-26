@@ -29,6 +29,7 @@ namespace Quantum.Track.Authoring
                 throw new ArgumentNullException(nameof(definition));
             }
 
+            TrackSamplingOptions samplingOptions = TrackSamplingOptions.Default;
             IReadOnlyList<GeometricSectionDefinition> definitions = definition.Sections;
             var sectionLengths = new List<(GeometricSectionDefinition Section, double Length)>(
                 definitions.Count);
@@ -51,7 +52,8 @@ namespace Quantum.Track.Authoring
             List<TrackSegment> segments = CreatePlacedSegments(
                 definitions,
                 geometricSections,
-                definition.StartPose);
+                definition.StartPose,
+                samplingOptions);
 
             var document = new TrackDocument(
                 segments,
@@ -64,7 +66,7 @@ namespace Quantum.Track.Authoring
                 totalLength);
             TrackRuntimeCompileResult runtimeCompilation = TrackRuntimeCompiler.Compile(
                 document,
-                TrackSamplingOptions.Default);
+                samplingOptions);
 
             if (!runtimeCompilation.Success || runtimeCompilation.Runtime is null)
             {
@@ -227,7 +229,8 @@ namespace Quantum.Track.Authoring
         private static List<TrackSegment> CreatePlacedSegments(
             IReadOnlyList<GeometricSectionDefinition> definitions,
             IReadOnlyList<GeometricSection> geometricSections,
-            TrackStartPose startPose)
+            TrackStartPose startPose,
+            TrackSamplingOptions samplingOptions)
         {
             var segments = new List<TrackSegment>(definitions.Count);
             Vector3d currentPosition = startPose.Position;
@@ -237,7 +240,10 @@ namespace Quantum.Track.Authoring
 
             for (int i = 0; i < definitions.Count; i++)
             {
-                IArcLengthCurve localCurve = CreateLocalCurve(definitions[i], geometricSections[i]);
+                IArcLengthCurve localCurve = CreateLocalCurve(
+                    definitions[i],
+                    geometricSections[i],
+                    samplingOptions);
                 var placedCurve = new PlacedAuthoringSectionCurve(
                     localCurve,
                     currentPosition,
@@ -254,7 +260,8 @@ namespace Quantum.Track.Authoring
                         placedCurve,
                         ref currentTangent,
                         ref currentNormal,
-                        ref currentBinormal);
+                        ref currentBinormal,
+                        samplingOptions);
                 }
                 else
                 {
@@ -273,7 +280,8 @@ namespace Quantum.Track.Authoring
 
         private static IArcLengthCurve CreateLocalCurve(
             GeometricSectionDefinition definition,
-            GeometricSection geometricSection)
+            GeometricSection geometricSection,
+            TrackSamplingOptions samplingOptions)
         {
             if (definition is CurvatureTransitionSectionDefinition transition)
             {
@@ -292,8 +300,8 @@ namespace Quantum.Track.Authoring
                     spatial.Degree);
                 return new ArcLengthCurveAdapter(
                     curve,
-                    TrackSamplingOptions.DefaultArcLengthSamples,
-                    TrackSamplingOptions.DefaultArcLengthTolerance);
+                    samplingOptions.ArcLengthSamples,
+                    samplingOptions.ArcLengthTolerance);
             }
 
             IParamCurve generatedCurve = geometricSection.GenerateCurve();
@@ -338,16 +346,17 @@ namespace Quantum.Track.Authoring
             IArcLengthCurve curve,
             ref Vector3d tangent,
             ref Vector3d normal,
-            ref Vector3d binormal)
+            ref Vector3d binormal,
+            TrackSamplingOptions samplingOptions)
         {
             Vector3d previousTangent = curve.TangentByLength(0.0);
             Vector3d transportedNormal = normal;
             double curveLength = curve.Length;
 
-            for (int i = 1; i <= TrackSamplingOptions.DefaultTransportSamplesPerSegment; i++)
+            for (int i = 1; i <= samplingOptions.TransportSamplesPerSegment; i++)
             {
                 double fraction =
-                    (double)i / TrackSamplingOptions.DefaultTransportSamplesPerSegment;
+                    (double)i / samplingOptions.TransportSamplesPerSegment;
                 Vector3d currentTangent = curve.TangentByLength(curveLength * fraction);
                 transportedNormal = RotationMinimizingFrameTransport.TransportNormal(
                     transportedNormal,

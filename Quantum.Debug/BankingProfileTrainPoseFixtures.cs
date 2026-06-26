@@ -12,6 +12,9 @@ namespace Quantum.Debug
 {
     public sealed class BankingProfileTrainPoseFixture
     {
+        private readonly TrackEvaluator _runtimeEvaluator;
+        private readonly TrainCarTransformProvider _runtimeProvider;
+
         public BankingProfileTrainPoseFixture(
             string name,
             TrackDocument document,
@@ -42,6 +45,8 @@ namespace Quantum.Debug
             Definition = definition ?? throw new ArgumentNullException(nameof(definition));
             LeadDistance = leadDistance;
             CenterlineSampleDistances = Array.AsReadOnly(sampleDistances);
+            _runtimeEvaluator = new TrackEvaluator(new CompiledTrackRuntime(Document));
+            _runtimeProvider = new TrainCarTransformProvider(_runtimeEvaluator);
         }
 
         public string Name { get; }
@@ -58,9 +63,7 @@ namespace Quantum.Debug
 
         public TrainPoseResult EvaluateTrainPose()
         {
-            var evaluator = new TrackEvaluator(Document);
-            var provider = new TrainCarTransformProvider(evaluator);
-            return provider.EvaluateTrainPose(
+            return _runtimeProvider.EvaluateTrainPose(
                 LeadDistance,
                 Definition,
                 BankingProfile);
@@ -74,7 +77,7 @@ namespace Quantum.Debug
         public DebugViewportSnapshotV1Dto BuildDebugViewportSnapshot()
         {
             ExportTrackFrame[] sampledFrames = BankingProfileSampler.SampleFramesAtDistances(
-                Document,
+                _runtimeEvaluator,
                 BankingProfile,
                 CenterlineSampleDistances);
             TrainPoseResult trainPose = EvaluateTrainPose();

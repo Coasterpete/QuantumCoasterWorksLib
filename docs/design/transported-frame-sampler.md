@@ -10,25 +10,37 @@ extents, and stored in `Quantum.Track.TrackFrame.Distance`. Roll is applied afte
 base-frame transport. `TransportedTrackFrameSampler` remains only as an obsolete
 compatibility facade.
 
-## Context
+Milestone 151 refresh: `TrackSamplingOptions` is the source of truth for
+compiled arc-length and transported-frame sample density. The default
+`CompiledTrackRuntime` constructor uses `TrackSamplingOptions.Default`; custom
+runtime options may change transported-frame node density while preserving
+centerline position, tangent, and station-distance semantics. Query-list density
+and ordering do not define frame history for `TrackEvaluator`; the compiled
+runtime transport history does.
 
-Quantum's current public coaster-domain sampling lane is:
+The rest of this note is retained as historical rationale. Statements below
+about "future" transported behavior or "current" stateless evaluator behavior
+describe the pre-Milestone 138 state, not the current runtime contract. See
+`docs/public-coaster-api-boundary.md` for the current public behavior summary.
+
+## Historical Context
+
+Quantum's public coaster-domain sampling lane was, and remains:
 
 ```text
 TrackDocument -> TrackEvaluator -> TrackFrame
 ```
 
-`TrackEvaluator.EvaluateFrameAtDistance` and
-`TrackEvaluator.EvaluateFramesAtDistances` already return finite,
-orthonormalized `TrackFrame` values for station-distance sampling. The current
-frame construction is intentionally simple and deterministic: evaluate the
-centerline position and tangent, choose a reference-up axis, build normal and
-binormal from cross products, then apply the segment roll around the tangent.
+Before canonical runtime transport, `TrackEvaluator.EvaluateFrameAtDistance`
+and `TrackEvaluator.EvaluateFramesAtDistances` returned finite,
+orthonormalized `TrackFrame` values by evaluating the centerline position and
+tangent, choosing a reference-up axis, building normal/binormal from cross
+products, then applying segment roll around the tangent.
 
-That behavior is good enough for the current prototype, but it is stateless.
-Each frame is built independently from the sampled tangent. A future transported
-frame sampler should make the unrolled base frame continuous along the
-centerline before any banking or roll profile is applied.
+That older behavior was deterministic but stateless: each frame was built
+independently from the sampled tangent. The implemented runtime now compiles a
+transported unrolled base-frame history and samples scalar and batch frames from
+that same history before applying segment roll or an explicit `BankingProfile`.
 
 ## Problem With Stateless Reference-Up Frames
 
@@ -52,20 +64,25 @@ fallback reference axis and orthonormalizing the result. That protects frame
 validity, but it does not guarantee visual or diagnostic continuity through
 vertical tangent regions.
 
-## Proposed Transported Sampling Concept
+## Implemented Transported Sampling Shape
 
-A future transported sampler should operate over an ordered station-distance
-sequence. The basic shape is:
+The implemented canonical sampler operates over a compiled station-distance
+node sequence, not over the caller's requested query sequence. The basic shape
+is:
 
 1. Validate finite input distances and resolve the document length policy.
-2. Evaluate centerline positions and tangents at each requested distance.
-3. Seed the first unrolled normal from a deterministic source.
-4. Move from sample to sample, carrying the previous unrolled normal forward.
-5. Project or minimally rotate that previous normal onto the current tangent's
-   perpendicular plane.
-6. Rebuild `Binormal = Tangent x Normal` and re-orthonormalize.
-7. Align signs against the previous frame to avoid accidental 180 degree flips.
-8. Apply roll/banking around the current tangent after base-frame transport.
+2. Compile transport nodes from the measured segment lengths using
+   `TrackSamplingOptions.TransportSamplesPerSegment`.
+3. Seed the first unrolled normal from authored start-pose data when present,
+   otherwise from a deterministic fallback.
+4. Move across compiled nodes, carrying the previous unrolled normal forward.
+5. Transport that previous normal onto the current tangent's perpendicular
+   plane with the shared rotation-minimizing transport helper.
+6. For a requested station distance, use the preceding compiled node and
+   transport from that node to the exact sampled tangent.
+7. Rebuild `Binormal = Tangent x Normal` and re-orthonormalize.
+8. Apply segment roll or profile banking around the current tangent after
+   base-frame transport.
 9. Return the existing `TrackFrame` contract.
 
 This is parallel-transport-style sampling: the frame changes as little as
@@ -82,58 +99,33 @@ or geometry libraries before growing broad custom math code.
 
 The first frame needs a deterministic unrolled normal. Candidate policies:
 
-- Use the current stateless `TrackEvaluator` normal at the first distance, then
-  project it onto the first tangent plane.
+- Historical candidate: seed from the then-current stateless evaluator normal
+  at the first distance, then project it onto the first tangent plane.
 - Use an explicitly supplied seed normal from a caller or document-level
   authoring setting.
 - Use a deterministic fallback axis least aligned with the first tangent.
 
-For early runtime work, the safest default is probably to seed from the current
-evaluator so existing unbanked starting orientation remains familiar. The
-sampler should still have a fallback for degenerate or non-finite seed data.
+Historical candidate policies included seeding from the then-current stateless
+evaluator. The implemented runtime seeds from authored start-pose normal data
+when present and otherwise uses deterministic fallback-axis projection rules.
+The sampler still has fallback behavior for degenerate or non-finite seed data.
 
 ## Relationship To `TrackEvaluator.EvaluateFrameAtDistance`
 
-`EvaluateFrameAtDistance(double)` is scalar. It has no previous sample, no next
-sample, and no caller-provided traversal direction. That makes true transported
-frame behavior ambiguous.
-
-Recommended policy:
-
-- Keep scalar evaluation unchanged until a deliberate behavior-changing
-  milestone.
-- Treat scalar evaluation as the stable compatibility path for consumers that
-  need one independent frame.
-- If a transported result is needed for a single visual marker, sample it
-  through an explicit transported sampler using a deterministic sequence and
-  then select the desired frame.
-- Do not make scalar evaluation secretly depend on hidden cached history,
-  because that would make results order-dependent and difficult to test.
-
-Longer term, `TrackEvaluator` may expose an explicit transported-frame entry
-point, but the scalar method should remain deterministic and context-free unless
-its contract is intentionally revised.
+Superseded guidance: the original note recommended keeping scalar evaluation
+stateless until a deliberate migration. That migration has happened. Scalar
+evaluation is still deterministic and context-free from the caller's point of
+view, but it samples the compiled canonical transported-frame history rather
+than rebuilding an independent reference-up frame.
 
 ## Relationship To `TrackEvaluator.EvaluateFramesAtDistances`
 
-Batch frame sampling is the natural home for transported behavior because the
-ordered distance list provides traversal context. However, the current batch API
-is tested as scalar-equivalent: each returned frame should match evaluating that
-same distance independently.
-
-Recommended migration path:
-
-- Add a future explicit API or helper for transported batch sampling rather than
-  changing `EvaluateFramesAtDistances` silently.
-- Require distances to be non-decreasing, or define an internal sort/restore
-  policy, before transport is enabled.
-- Preserve current `EvaluateFramesAtDistances` semantics until tests and
-  downstream consumers are intentionally migrated.
-- If transported behavior eventually becomes the default batch policy, update
-  scalar parity tests and document the ordering requirement clearly.
-
-An explicit name such as `EvaluateTransportedFramesAtDistances` or a
-`TransportedTrackFrameSampler` would make the behavior visible and reviewable.
+Superseded guidance: the original note described batch sampling as a possible
+future home for transported behavior. Current batch evaluation samples the same
+compiled transported history as scalar evaluation, preserves caller order,
+allows duplicate and unordered finite distances, and remains scalar-equivalent
+at each station. `TransportedTrackFrameSampler` now forwards to canonical
+evaluation and remains only for obsolete compatibility coverage.
 
 ## Relationship To Frame Diagnostics
 
@@ -210,15 +202,17 @@ wrap boundary.
 
 ## Deterministic Tests Needed Later
 
-When runtime behavior is added, tests should cover:
+The runtime behavior now exists. Tests should continue to cover:
 
-- stateless scalar evaluation remains deterministic and context-free
-- transported batch sampling rejects or clearly handles unsorted distances
+- scalar and batch evaluation remain deterministic and station-equivalent
+- batch sampling clearly handles unsorted and duplicate distances
 - all transported frames are finite and orthonormal
 - tangent output matches the underlying centerline tangent samples
 - straight horizontal track preserves the expected starting frame
 - vertical or near-vertical tangent sequences avoid reference-axis flip spikes
 - repeated sampling of the same document and distances returns identical frames
+- custom transport sample densities preserve centerline samples and converge
+  orientation toward denser transported-frame histories
 - open-track endpoint behavior is stable
 - closed-loop residual twist policy is deterministic once loop semantics exist
 - zero banking leaves transported base frames unrolled

@@ -177,10 +177,11 @@ namespace Quantum.Debug
             var points = controlPoints.ToList();
             var weights = Enumerable.Repeat(1.0, points.Count).ToList();
             var curve = new GSharkNurbsCurveAdapter(points, weights, SpatialDegree);
+            TrackSamplingOptions samplingOptions = TrackSamplingOptions.Default;
             return new ArcLengthLUT(
                 curve,
-                TrackSamplingOptions.DefaultArcLengthSamples,
-                TrackSamplingOptions.DefaultArcLengthTolerance).TotalLength;
+                samplingOptions.ArcLengthSamples,
+                samplingOptions.ArcLengthTolerance).TotalLength;
         }
 
         private static double[] BuildFrameDistances()

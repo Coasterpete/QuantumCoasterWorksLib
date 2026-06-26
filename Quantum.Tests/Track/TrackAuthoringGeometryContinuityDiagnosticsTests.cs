@@ -470,10 +470,11 @@ public sealed class TrackAuthoringGeometryContinuityDiagnosticsTests
         var points = controlPoints.ToList();
         var weights = Enumerable.Repeat(1.0, points.Count).ToList();
         var curve = new GSharkNurbsCurveAdapter(points, weights, degree);
+        TrackSamplingOptions samplingOptions = TrackSamplingOptions.Default;
         double length = new ArcLengthLUT(
             curve,
-            TrackSamplingOptions.DefaultArcLengthSamples,
-            TrackSamplingOptions.DefaultArcLengthTolerance).TotalLength;
+            samplingOptions.ArcLengthSamples,
+            samplingOptions.ArcLengthTolerance).TotalLength;
         return new SpatialSectionDefinition(id, length, points, degree, weights);
     }
 

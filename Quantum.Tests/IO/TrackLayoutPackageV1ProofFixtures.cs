@@ -262,8 +262,8 @@ public static class TrackLayoutPackageV1ProofFixtures
                 new List<Vector3d>(controlPoints),
                 new List<double>(weights),
                 degree),
-            TrackSamplingOptions.DefaultArcLengthSamples,
-            TrackSamplingOptions.DefaultArcLengthTolerance);
+            TrackSamplingOptions.Default.ArcLengthSamples,
+            TrackSamplingOptions.Default.ArcLengthTolerance);
         return curve.Length;
     }
 
