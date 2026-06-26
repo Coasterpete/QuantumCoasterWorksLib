@@ -107,3 +107,29 @@ a different forward or up axis.
 
 If an asset cannot be loaded, the viewer keeps the generated debug box for that
 car. This fallback is intentional and does not mark the snapshot invalid.
+
+## Playback Smoothing
+
+Train styles do not change playback placement. The viewer moves every dynamic
+train visual by preserving its exported spacing offset from the lead car and
+sampling the preview path at the current lead distance plus that offset.
+
+For sparse snapshots, the viewer builds a denser evaluated centerline before
+applying the selected train style:
+
+- With three or more strictly increasing `frames`, train positions use cubic
+  Hermite interpolation over frame distance, using exported tangents as endpoint
+  derivatives. The active tangent comes from the smoothed position curve, while
+  exported normal/binormal axes are interpolated and re-orthonormalized for
+  stable placeholder orientation.
+- If no usable frames are exported, the same smooth position interpolation is
+  applied to `centerlinePoints` and a simple Y-up frame is rebuilt.
+- With fewer samples or repeated distances, playback falls back to the older
+  linear interpolation.
+
+The Centerline layer defaults to the smoothed evaluated path. The Layers panel
+can switch it back to Raw to inspect the original `centerlinePoints` polyline and
+sample markers, and the inspector reports raw versus smoothed sample counts.
+Style role metadata and debug-box fallback behavior are unchanged. This is a
+preview aid only; it does not rewrite `DebugViewportSnapshotV1` JSON or change
+backend train pose evaluation.

@@ -31,6 +31,7 @@ const ui = {
   centerlineLayer: document.getElementById("centerlineLayer"),
   centerlineLayerCount: document.getElementById("centerlineLayerCount"),
   centerlineLayerState: document.getElementById("centerlineLayerState"),
+  centerlineModeInputs: Array.from(document.querySelectorAll("input[name=\"centerlineMode\"]")),
   framesLayer: document.getElementById("framesLayer"),
   framesLayerCount: document.getElementById("framesLayerCount"),
   framesLayerState: document.getElementById("framesLayerState"),
@@ -67,6 +68,14 @@ const renderLimits = {
   maxTrainLabels: 48
 };
 
+const playbackSmoothing = {
+  minSmoothSampleCount: 3,
+  evaluatedSamplesPerSegment: 24,
+  maxEvaluatedSampleCount: 4096,
+  distanceEpsilon: 1e-9,
+  zeroLengthEpsilon: 1e-12
+};
+
 const state = {
   summaries: [],
   summaryByPath: new Map(),
@@ -78,6 +87,9 @@ const state = {
   pointDistances: [],
   frames: [],
   frameDistances: [],
+  evaluatedCenterlineFrames: [],
+  evaluatedCenterlineDistances: [],
+  centerlineMode: "smooth",
   currentDistance: 0,
   playRange: { min: 0, max: 1 },
   playing: false,
@@ -152,7 +164,7 @@ ui.fileInput.addEventListener("change", loadFileSnapshot);
 ui.playButton.addEventListener("click", () => setPlaying(!state.playing));
 ui.distanceScrubber.addEventListener("input", () => setDistance(Number(ui.distanceScrubber.value)));
 ui.speedInput.addEventListener("input", () => {
-  state.playSpeed = Number(ui.speedInput.value);
+  state.playSpeed = finiteNumber(ui.speedInput.value, state.playSpeed);
 });
 ui.followToggle.addEventListener("change", () => {
   if (!ui.followToggle.checked) {
@@ -167,6 +179,18 @@ ui.recordButton.addEventListener("click", toggleRecording);
 
 [ui.gridLayer, ui.centerlineLayer, ui.framesLayer, ui.trainLayer, ui.diagnosticsLayer].forEach((input) => {
   input.addEventListener("change", updateLayerVisibility);
+});
+
+ui.centerlineModeInputs.forEach((input) => {
+  input.addEventListener("change", () => {
+    if (!input.checked) {
+      return;
+    }
+
+    state.centerlineMode = input.value === "raw" ? "raw" : "smooth";
+    updateCenterlineModeVisibility();
+    updateMetrics();
+  });
 });
 
 resizeRenderer();
@@ -366,6 +390,7 @@ function loadSnapshotFromText(json, label) {
   state.pointDistances = state.points.map((point) => point.distance);
   state.frames = getFrames(snapshot);
   state.frameDistances = state.frames.map((frame) => frame.distance);
+  rebuildEvaluatedCenterline();
   state.dynamicBoxes = [];
   state.trainVisualGeneration += 1;
   state.trainVisualStats = createEmptyTrainVisualStats();
@@ -379,7 +404,7 @@ function loadSnapshotFromText(json, label) {
   clearGroup(groups.cursor);
   clearGroup(groups.grid);
 
-  state.bounds = collectBounds(snapshot, state.points);
+  state.bounds = collectBounds(snapshot, state.points.concat(state.evaluatedCenterlineFrames));
   if (state.bounds.isEmpty()) {
     state.bounds.expandByPoint(new THREE.Vector3(0, 0, 0));
     state.bounds.expandByPoint(new THREE.Vector3(1, 1, 1));
@@ -427,6 +452,8 @@ function clearSnapshot() {
   state.pointDistances = [];
   state.frames = [];
   state.frameDistances = [];
+  state.evaluatedCenterlineFrames = [];
+  state.evaluatedCenterlineDistances = [];
   state.dynamicBoxes = [];
   state.trainVisualGeneration += 1;
   state.trainVisualStats = createEmptyTrainVisualStats();
@@ -454,16 +481,32 @@ function buildGrid() {
 }
 
 function buildCenterline() {
-  if (state.points.length < 2) {
+  const hasRawCenterline = state.points.length >= 2;
+  const hasSmoothCenterline = state.evaluatedCenterlineFrames.length >= 2;
+  if (!hasRawCenterline && !hasSmoothCenterline) {
     return;
   }
 
-  const geometry = new THREE.BufferGeometry().setFromPoints(state.points.map((sample) => sample.position));
-  const line = new THREE.Line(
-    geometry,
-    new THREE.LineBasicMaterial({ color: colors.centerline })
-  );
-  groups.centerline.add(line);
+  if (hasSmoothCenterline) {
+    const smoothGeometry = new THREE.BufferGeometry().setFromPoints(
+      state.evaluatedCenterlineFrames.map((sample) => sample.position));
+    const smoothLine = new THREE.Line(
+      smoothGeometry,
+      new THREE.LineBasicMaterial({ color: colors.centerline })
+    );
+    smoothLine.userData.centerlineDisplay = "smooth";
+    groups.centerline.add(smoothLine);
+  }
+
+  if (hasRawCenterline) {
+    const rawGeometry = new THREE.BufferGeometry().setFromPoints(state.points.map((sample) => sample.position));
+    const rawLine = new THREE.Line(
+      rawGeometry,
+      new THREE.LineBasicMaterial({ color: colors.centerline })
+    );
+    rawLine.userData.centerlineDisplay = "raw";
+    groups.centerline.add(rawLine);
+  }
 
   state.centerlineMarkerStride = Math.max(1, Math.ceil(state.points.length / renderLimits.maxCenterlineMarkers));
   const markerPoints = state.points
@@ -478,7 +521,27 @@ function buildCenterline() {
       sizeAttenuation: true
     })
   );
+  markers.userData.centerlineDisplay = "raw-marker";
   groups.centerline.add(markers);
+  updateCenterlineModeVisibility();
+}
+
+function updateCenterlineModeVisibility() {
+  const hasRawCenterline = state.points.length >= 2;
+  const hasSmoothCenterline = state.evaluatedCenterlineFrames.length >= 2;
+  groups.centerline.children.forEach((child) => {
+    switch (child.userData?.centerlineDisplay) {
+      case "smooth":
+        child.visible = hasSmoothCenterline && (state.centerlineMode === "smooth" || !hasRawCenterline);
+        break;
+      case "raw":
+        child.visible = hasRawCenterline && (state.centerlineMode === "raw" || !hasSmoothCenterline);
+        break;
+      case "raw-marker":
+        child.visible = hasRawCenterline;
+        break;
+    }
+  });
 }
 
 function buildFrames() {
@@ -992,7 +1055,7 @@ function addLocalCursorAxis(end, color) {
 }
 
 function configureScrubber(snapshot) {
-  const sampleDistances = state.pointDistances.length > 0 ? state.pointDistances : state.frameDistances;
+  const sampleDistances = getMotionDistances();
   if (sampleDistances.length === 0) {
     state.playRange = { min: 0, max: 1 };
     state.currentDistance = 0;
@@ -1034,7 +1097,7 @@ function configureScrubber(snapshot) {
 
   ui.distanceScrubber.min = String(state.playRange.min);
   ui.distanceScrubber.max = String(state.playRange.max);
-  ui.distanceScrubber.step = String(Math.max((state.playRange.max - state.playRange.min) / 1000, 0.01));
+  ui.distanceScrubber.step = "any";
   ui.distanceScrubber.disabled = false;
 
   setDistance(clamp(defaultDistance, state.playRange.min, state.playRange.max));
@@ -1046,9 +1109,13 @@ function setDistance(distance) {
   }
 
   state.currentDistance = clamp(distance, state.playRange.min, state.playRange.max);
+  updateDistanceReadout();
+  updateDynamicObjects();
+}
+
+function updateDistanceReadout() {
   ui.distanceScrubber.value = String(state.currentDistance);
   ui.distanceValue.value = `${state.currentDistance.toFixed(2)} m`;
-  updateDynamicObjects();
 }
 
 function updateDynamicObjects(options = {}) {
@@ -1094,15 +1161,89 @@ function applyFrameToGroup(group, frame) {
 }
 
 function sampleFrame(distance) {
+  if (state.evaluatedCenterlineFrames.length > 0) {
+    return frameFromEvaluatedCenterline(distance);
+  }
+
+  return sampleSparseFrame(distance);
+}
+
+function sampleSparseFrame(distance) {
   if (state.frames.length > 0) {
     return interpolateFrame(state.frames, state.frameDistances, distance);
   }
 
-  return frameFromCenterline(distance);
+  return frameFromRawCenterline(distance);
 }
 
 function hasMotionSamples() {
-  return state.frames.length > 0 || state.points.length > 0;
+  return state.evaluatedCenterlineFrames.length > 0 || state.frames.length > 0 || state.points.length > 0;
+}
+
+function getMotionDistances() {
+  if (state.evaluatedCenterlineDistances.length > 0) {
+    return state.evaluatedCenterlineDistances;
+  }
+
+  return getSparseMotionDistances();
+}
+
+function getSparseMotionDistances() {
+  return state.frames.length > 0 ? state.frameDistances : state.pointDistances;
+}
+
+function rebuildEvaluatedCenterline() {
+  state.evaluatedCenterlineFrames = [];
+  state.evaluatedCenterlineDistances = [];
+
+  const sourceDistances = getSparseMotionDistances();
+  if (sourceDistances.length < 2 || !hasStrictlyIncreasingDistances(sourceDistances)) {
+    return;
+  }
+
+  const firstDistance = sourceDistances[0];
+  const lastDistance = sourceDistances[sourceDistances.length - 1];
+  const span = lastDistance - firstDistance;
+  if (span <= playbackSmoothing.distanceEpsilon) {
+    return;
+  }
+
+  const sampleCount = getEvaluatedCenterlineSampleCount(sourceDistances.length);
+  for (let index = 0; index < sampleCount; index += 1) {
+    const t = sampleCount <= 1 ? 0 : index / (sampleCount - 1);
+    const distance = index === sampleCount - 1
+      ? lastDistance
+      : firstDistance + span * t;
+    const frame = sampleSparseFrame(distance);
+    state.evaluatedCenterlineFrames.push(frame);
+    state.evaluatedCenterlineDistances.push(frame.distance);
+  }
+}
+
+function getEvaluatedCenterlineSampleCount(sourceSampleCount) {
+  if (sourceSampleCount < 2) {
+    return sourceSampleCount;
+  }
+
+  if (sourceSampleCount >= playbackSmoothing.maxEvaluatedSampleCount) {
+    return sourceSampleCount;
+  }
+
+  const targetCount = ((sourceSampleCount - 1) * playbackSmoothing.evaluatedSamplesPerSegment) + 1;
+  return Math.floor(clamp(targetCount, sourceSampleCount, playbackSmoothing.maxEvaluatedSampleCount));
+}
+
+function frameFromEvaluatedCenterline(distance) {
+  if (state.evaluatedCenterlineFrames.length === 1) {
+    return cloneFrame(state.evaluatedCenterlineFrames[0]);
+  }
+
+  const distances = state.evaluatedCenterlineDistances;
+  const clampedDistance = clamp(distance, distances[0], distances[distances.length - 1]);
+  const index = findSegmentIndex(distances, clampedDistance);
+  const left = state.evaluatedCenterlineFrames[index];
+  const right = state.evaluatedCenterlineFrames[Math.min(index + 1, state.evaluatedCenterlineFrames.length - 1)];
+  return interpolateLinearFrame(left, right, clampedDistance);
 }
 
 function interpolateFrame(frames, distances, distance) {
@@ -1118,6 +1259,14 @@ function interpolateFrame(frames, distances, distance) {
   const index = findSegmentIndex(distances, distance);
   const left = frames[index];
   const right = frames[index + 1];
+  if (canUseSmoothPositionInterpolation(frames, distances)) {
+    return interpolateSmoothFrame(frames, distances, index, distance);
+  }
+
+  return interpolateLinearFrame(left, right, distance);
+}
+
+function interpolateLinearFrame(left, right, distance) {
   const span = right.distance - left.distance;
   const t = span <= 0 ? 0 : (distance - left.distance) / span;
   return orthonormalFrame({
@@ -1129,7 +1278,37 @@ function interpolateFrame(frames, distances, distance) {
   });
 }
 
-function frameFromCenterline(distance) {
+function interpolateSmoothFrame(frames, distances, index, distance) {
+  const left = frames[index];
+  const right = frames[index + 1];
+  const span = right.distance - left.distance;
+  const t = span <= playbackSmoothing.distanceEpsilon
+    ? 0
+    : (distance - left.distance) / span;
+  const leftDerivative = framePositionDerivative(frames, distances, index);
+  const rightDerivative = framePositionDerivative(frames, distances, index + 1);
+  let tangent = cubicHermiteDerivative(
+    left.position,
+    right.position,
+    leftDerivative,
+    rightDerivative,
+    span,
+    t);
+
+  if (tangent.lengthSq() <= playbackSmoothing.zeroLengthEpsilon) {
+    tangent = left.tangent.clone().lerp(right.tangent, t);
+  }
+
+  return orthonormalFrame({
+    distance,
+    position: cubicHermitePosition(left.position, right.position, leftDerivative, rightDerivative, span, t),
+    tangent,
+    normal: left.normal.clone().lerp(right.normal, t),
+    binormal: left.binormal.clone().lerp(right.binormal, t)
+  });
+}
+
+function frameFromRawCenterline(distance) {
   if (state.points.length === 1) {
     return orthonormalFrame({
       distance,
@@ -1145,23 +1324,127 @@ function frameFromCenterline(distance) {
   const index = findSegmentIndex(distances, clampedDistance);
   const left = state.points[index];
   const right = state.points[Math.min(index + 1, state.points.length - 1)];
+  if (canUseSmoothPositionInterpolation(state.points, distances)) {
+    return interpolateSmoothCenterlineFrame(state.points, distances, index, clampedDistance);
+  }
+
+  return interpolateLinearCenterlineFrame(left, right, clampedDistance);
+}
+
+function interpolateLinearCenterlineFrame(left, right, distance) {
   const span = right.distance - left.distance;
-  const t = span <= 0 ? 0 : (clampedDistance - left.distance) / span;
+  const t = span <= 0 ? 0 : (distance - left.distance) / span;
   const position = left.position.clone().lerp(right.position, t);
   const tangent = right.position.clone().sub(left.position);
   if (tangent.lengthSq() <= 1e-12) {
     tangent.set(1, 0, 0);
   }
 
+  return centerlineFrameFromPositionAndTangent(distance, position, tangent);
+}
+
+function interpolateSmoothCenterlineFrame(points, distances, index, distance) {
+  const left = points[index];
+  const right = points[index + 1];
+  const span = right.distance - left.distance;
+  const t = span <= playbackSmoothing.distanceEpsilon
+    ? 0
+    : (distance - left.distance) / span;
+  const leftDerivative = samplePositionDerivative(points, distances, index);
+  const rightDerivative = samplePositionDerivative(points, distances, index + 1);
+  const position = cubicHermitePosition(left.position, right.position, leftDerivative, rightDerivative, span, t);
+  let tangent = cubicHermiteDerivative(left.position, right.position, leftDerivative, rightDerivative, span, t);
+  if (tangent.lengthSq() <= playbackSmoothing.zeroLengthEpsilon) {
+    tangent = right.position.clone().sub(left.position);
+  }
+
+  return centerlineFrameFromPositionAndTangent(distance, position, tangent);
+}
+
+function centerlineFrameFromPositionAndTangent(distance, position, tangent) {
+  const normalizedTangent = tangent.clone();
+  if (normalizedTangent.lengthSq() <= playbackSmoothing.zeroLengthEpsilon) {
+    normalizedTangent.set(1, 0, 0);
+  }
+
+  normalizedTangent.normalize();
   return orthonormalFrame({
-    distance: clampedDistance,
+    distance,
     position,
-    tangent,
-    normal: Math.abs(tangent.clone().normalize().dot(new THREE.Vector3(0, 1, 0))) > 0.94
+    tangent: normalizedTangent,
+    normal: Math.abs(normalizedTangent.dot(new THREE.Vector3(0, 1, 0))) > 0.94
       ? new THREE.Vector3(1, 0, 0)
       : new THREE.Vector3(0, 1, 0),
     binormal: new THREE.Vector3(0, 0, 1)
   });
+}
+
+function canUseSmoothPositionInterpolation(samples, distances) {
+  return samples.length >= playbackSmoothing.minSmoothSampleCount &&
+    hasStrictlyIncreasingDistances(distances);
+}
+
+function hasStrictlyIncreasingDistances(distances) {
+  for (let index = 1; index < distances.length; index += 1) {
+    if (distances[index] - distances[index - 1] <= playbackSmoothing.distanceEpsilon) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function samplePositionDerivative(samples, distances, index) {
+  if (samples.length < 2) {
+    return new THREE.Vector3();
+  }
+
+  const previousIndex = Math.max(0, index - 1);
+  const nextIndex = Math.min(samples.length - 1, index + 1);
+  const distanceSpan = distances[nextIndex] - distances[previousIndex];
+  if (distanceSpan <= playbackSmoothing.distanceEpsilon) {
+    return new THREE.Vector3();
+  }
+
+  return samples[nextIndex].position.clone()
+    .sub(samples[previousIndex].position)
+    .multiplyScalar(1 / distanceSpan);
+}
+
+function framePositionDerivative(frames, distances, index) {
+  const tangent = frames[index].tangent.clone();
+  if (tangent.lengthSq() > playbackSmoothing.zeroLengthEpsilon) {
+    return tangent.normalize();
+  }
+
+  return samplePositionDerivative(frames, distances, index);
+}
+
+function cubicHermitePosition(left, right, leftDerivative, rightDerivative, span, t) {
+  const t2 = t * t;
+  const t3 = t2 * t;
+  const h00 = 2 * t3 - 3 * t2 + 1;
+  const h10 = t3 - 2 * t2 + t;
+  const h01 = -2 * t3 + 3 * t2;
+  const h11 = t3 - t2;
+
+  return left.clone().multiplyScalar(h00)
+    .add(leftDerivative.clone().multiplyScalar(h10 * span))
+    .add(right.clone().multiplyScalar(h01))
+    .add(rightDerivative.clone().multiplyScalar(h11 * span));
+}
+
+function cubicHermiteDerivative(left, right, leftDerivative, rightDerivative, span, t) {
+  const t2 = t * t;
+  const h00 = 6 * t2 - 6 * t;
+  const h10 = 3 * t2 - 4 * t + 1;
+  const h01 = -6 * t2 + 6 * t;
+  const h11 = 3 * t2 - 2 * t;
+
+  return left.clone().multiplyScalar(h00)
+    .add(leftDerivative.clone().multiplyScalar(h10 * span))
+    .add(right.clone().multiplyScalar(h01))
+    .add(rightDerivative.clone().multiplyScalar(h11 * span));
 }
 
 function orthonormalFrame(frame) {
@@ -1349,6 +1632,7 @@ function updateLayerVisibility() {
   groups.frames.visible = ui.framesLayer.checked;
   groups.train.visible = ui.trainLayer.checked;
   groups.diagnostics.visible = ui.diagnosticsLayer.checked;
+  updateCenterlineModeVisibility();
   updateLayerControl(ui.gridLayer, ui.gridLayerState);
   updateLayerControl(ui.centerlineLayer, ui.centerlineLayerState);
   updateLayerControl(ui.framesLayer, ui.framesLayerState);
@@ -1383,11 +1667,16 @@ function updateMetrics() {
     ["Modified", summary ? formatDate(getString(summary, "modifiedUtc")) : "local file"],
     ["Size", summary ? formatBytes(getNumber(summary, "sizeBytes")) : formatBytes(snapshotJsonSize(snapshot))],
     ["Bounds", `${formatDistance(size.x)} x ${formatDistance(size.y)} x ${formatDistance(size.z)}`],
-    ["Distance span", `${formatDistance(state.playRange.min)} to ${formatDistance(state.playRange.max)}`]
+    ["Distance span", `${formatDistance(state.playRange.min)} to ${formatDistance(state.playRange.max)}`],
+    ["Raw centerline samples", formatCount(state.points.length)],
+    ["Smoothed centerline samples", formatCount(state.evaluatedCenterlineFrames.length)],
+    ["Centerline mode", describeCenterlineMode()],
+    ["Playback sampling", describePlaybackSampling()]
   ]);
 
   appendSceneStats([
-    ["Centerline", state.points.length],
+    ["Raw path", state.points.length],
+    ["Smooth path", state.evaluatedCenterlineFrames.length],
     ["Frames", state.frames.length],
     ["Diagnostics", Array.isArray(snapshot.lines) ? snapshot.lines.length : 0],
     ["Boxes", Array.isArray(snapshot.boxes) ? snapshot.boxes.length : 0]
@@ -1434,7 +1723,11 @@ function updateLayerControl(input, stateElement) {
 
 function updateLayerCounts() {
   if (ui.centerlineLayerCount) {
-    ui.centerlineLayerCount.textContent = formatCount(state.points.length);
+    const visibleCount = getVisibleCenterlineSampleCount();
+    ui.centerlineLayerCount.textContent = state.centerlineMode === "smooth" &&
+      state.evaluatedCenterlineFrames.length > 0
+      ? `${formatCount(visibleCount)}/${formatCount(state.points.length)}`
+      : formatCount(visibleCount);
   }
   if (ui.framesLayerCount) {
     const renderedFrameAxes = state.frames.length === 0
@@ -1488,11 +1781,7 @@ function tick(timestamp) {
   state.lastFrameTime = timestamp;
 
   if (state.playing && state.snapshot) {
-    let nextDistance = state.currentDistance + state.playSpeed * deltaSeconds;
-    if (nextDistance >= state.playRange.max) {
-      nextDistance = state.playRange.min + (nextDistance - state.playRange.max);
-    }
-    setDistance(nextDistance);
+    advancePlayback(deltaSeconds);
   } else if (ui.followToggle.checked && state.snapshot) {
     updateDynamicObjects();
   }
@@ -1500,6 +1789,31 @@ function tick(timestamp) {
   controls.update();
   renderer.render(scene, camera);
   requestAnimationFrame(tick);
+}
+
+function advancePlayback(deltaSeconds) {
+  const speed = finiteNumber(state.playSpeed);
+  if (!Number.isFinite(deltaSeconds) || deltaSeconds <= 0 || speed === 0) {
+    updateDynamicObjects();
+    return;
+  }
+
+  const nextDistance = wrapDistance(
+    state.currentDistance + speed * deltaSeconds,
+    state.playRange.min,
+    state.playRange.max);
+  state.currentDistance = nextDistance;
+  updateDistanceReadout();
+  updateDynamicObjects();
+}
+
+function wrapDistance(distance, minDistance, maxDistance) {
+  const span = maxDistance - minDistance;
+  if (!Number.isFinite(distance) || !Number.isFinite(span) || span <= 0) {
+    return minDistance;
+  }
+
+  return ((((distance - minDistance) % span) + span) % span) + minDistance;
 }
 
 function resizeRenderer() {
@@ -1829,6 +2143,9 @@ function updateControlAvailability() {
   [ui.gridLayer, ui.centerlineLayer, ui.framesLayer, ui.trainLayer, ui.diagnosticsLayer].forEach((input) => {
     input.disabled = !hasSnapshot || state.busy;
   });
+  ui.centerlineModeInputs.forEach((input) => {
+    input.disabled = !hasSnapshot || state.busy;
+  });
 }
 
 function showOverlay(title, message, status = "ready") {
@@ -1960,6 +2277,53 @@ function getDynamicOffsetRange() {
   }
 
   return `${formatDistance(minOffset)} to ${formatDistance(maxOffset)}`;
+}
+
+function getVisibleCenterlineSampleCount() {
+  if (state.centerlineMode === "smooth" && state.evaluatedCenterlineFrames.length > 0) {
+    return state.evaluatedCenterlineFrames.length;
+  }
+
+  if (state.points.length > 0) {
+    return state.points.length;
+  }
+
+  return state.evaluatedCenterlineFrames.length;
+}
+
+function describeCenterlineMode() {
+  if (state.centerlineMode === "raw") {
+    return state.points.length > 0 ? "raw debug" : "smooth fallback";
+  }
+
+  return state.evaluatedCenterlineFrames.length > 0 ? "smooth evaluated" : "raw fallback";
+}
+
+function describePlaybackSampling() {
+  if (state.evaluatedCenterlineFrames.length > 0) {
+    const source = state.frames.length > 0 ? "frames" : "centerline";
+    return `smooth evaluated ${source}`;
+  }
+
+  if (state.frames.length >= playbackSmoothing.minSmoothSampleCount &&
+    hasStrictlyIncreasingDistances(state.frameDistances)) {
+    return "smooth frame interpolation";
+  }
+
+  if (state.frames.length > 0) {
+    return "linear frame interpolation";
+  }
+
+  if (state.points.length >= playbackSmoothing.minSmoothSampleCount &&
+    hasStrictlyIncreasingDistances(state.pointDistances)) {
+    return "smooth centerline interpolation";
+  }
+
+  if (state.points.length > 0) {
+    return "linear centerline interpolation";
+  }
+
+  return "none";
 }
 
 async function safeReadJson(response) {
