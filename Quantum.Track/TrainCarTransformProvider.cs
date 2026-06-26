@@ -17,7 +17,6 @@ namespace Quantum.Track
     public sealed class TrainCarTransformProvider
     {
         private readonly TrackEvaluator _evaluator;
-        private readonly TrainCarBodySampler _bodySampler;
         private readonly TrainArticulationFrameSolver _articulationSolver;
         private readonly TrainWheelTransformLayoutSolver _wheelLayoutSolver;
         private readonly TrainPoseAssembler _poseAssembler;
@@ -25,7 +24,6 @@ namespace Quantum.Track
         public TrainCarTransformProvider(TrackEvaluator evaluator)
         {
             _evaluator = evaluator ?? throw new ArgumentNullException(nameof(evaluator));
-            _bodySampler = new TrainCarBodySampler(_evaluator);
             _articulationSolver = new TrainArticulationFrameSolver();
             _wheelLayoutSolver = new TrainWheelTransformLayoutSolver();
             _poseAssembler = new TrainPoseAssembler();
@@ -84,7 +82,8 @@ namespace Quantum.Track
             double carSpacing,
             int carCount)
         {
-            return _bodySampler.SampleBodies(leadDistance, carSpacing, carCount);
+            return new TrainCarBodySampler(CreateRuntimeSnapshotEvaluator())
+                .SampleBodies(leadDistance, carSpacing, carCount);
         }
 
         /// <summary>
@@ -291,7 +290,9 @@ namespace Quantum.Track
                     "Bogie spacing must be finite and non-negative.");
             }
 
+            TrackEvaluator evaluator = CreateRuntimeSnapshotEvaluator();
             double totalLength = ResolveTotalLengthAndValidateBodyInputs(
+                evaluator,
                 leadDistance,
                 carSpacing,
                 carCount);
@@ -305,7 +306,7 @@ namespace Quantum.Track
                 bodyDistances,
                 bogieSpacing,
                 totalLength,
-                distances => _evaluator.EvaluateFramesAtDistances(distances));
+                distances => evaluator.EvaluateFramesAtDistances(distances));
         }
 
         private IReadOnlyList<TrainCarTransform> SampleProfileBackedBodies(
@@ -314,7 +315,9 @@ namespace Quantum.Track
             int carCount,
             BankingProfile bankingProfile)
         {
+            TrackEvaluator evaluator = CreateRuntimeSnapshotEvaluator();
             double totalLength = ResolveTotalLengthAndValidateBodyInputs(
+                evaluator,
                 leadDistance,
                 carSpacing,
                 carCount);
@@ -324,7 +327,7 @@ namespace Quantum.Track
                 carCount,
                 totalLength);
             TrackFrame[] frames = BankingProfileSampler.SampleFramesAtDistances(
-                _evaluator,
+                evaluator,
                 bankingProfile,
                 distances);
             var transforms = new List<TrainCarTransform>(carCount);
@@ -348,7 +351,9 @@ namespace Quantum.Track
             TrainWheelLayout wheelLayout,
             BankingProfile bankingProfile)
         {
+            TrackEvaluator evaluator = CreateRuntimeSnapshotEvaluator();
             double totalLength = ResolveTotalLengthAndValidateBodyInputs(
+                evaluator,
                 leadDistance,
                 definition.CarSpacing,
                 definition.CarCount);
@@ -362,7 +367,7 @@ namespace Quantum.Track
                 definition.BogieSpacing,
                 totalLength,
                 distances => BankingProfileSampler.SampleFramesAtDistances(
-                    _evaluator,
+                    evaluator,
                     bankingProfile,
                     distances));
 
@@ -443,6 +448,7 @@ namespace Quantum.Track
         }
 
         private double ResolveTotalLengthAndValidateBodyInputs(
+            TrackEvaluator evaluator,
             double leadDistance,
             double carSpacing,
             int carCount)
@@ -471,12 +477,17 @@ namespace Quantum.Track
                     "Car count must be non-negative.");
             }
 
-            double totalLength = _evaluator.GetBoundTrackTotalLength();
+            double totalLength = evaluator.GetBoundTrackTotalLength();
             ValidateDistanceInRange(
                 leadDistance,
                 totalLength,
                 "Lead car distance is out of range.");
             return totalLength;
+        }
+
+        private TrackEvaluator CreateRuntimeSnapshotEvaluator()
+        {
+            return _evaluator.CreateCurrentRuntimeSnapshotEvaluator();
         }
 
         private static double[] BuildBodyDistances(

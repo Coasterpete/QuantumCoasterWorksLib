@@ -7,8 +7,6 @@ namespace Quantum.Track.Internal
 {
     internal sealed class CompiledTrackSamplingContext
     {
-        private const int ArcLengthSamples = 100;
-        private const int TransportSamplesPerSegment = 100;
         private const double DeclaredLengthAbsoluteTolerance = 1e-3;
         private const double DeclaredLengthRelativeTolerance = 1e-6;
 
@@ -40,68 +38,7 @@ namespace Quantum.Track.Internal
 
         public static CompiledTrackSamplingContext Compile(TrackDocument document)
         {
-            if (document is null)
-            {
-                throw new ArgumentNullException(nameof(document));
-            }
-
-            int segmentCount = document.Segments.Count;
-            var segments = new CompiledTrackSegment[segmentCount];
-            double totalLength = 0.0;
-
-            for (int i = 0; i < segmentCount; i++)
-            {
-                TrackSegment segment = document.Segments[i];
-
-                if (segment is null)
-                {
-                    throw new InvalidOperationException("TrackDocument contains a null segment entry.");
-                }
-
-                ValidateFinitePositiveLength(segment, i);
-                ValidateFiniteRoll(segment, i);
-
-                ArcLengthLUT? arcLengthLookup = null;
-                double geometricLength = segment.Length;
-
-                if (segment.Spline is IParamCurve spline)
-                {
-                    arcLengthLookup = BuildArcLengthLookup(spline, i);
-                    ValidateMeasuredLength(arcLengthLookup.TotalLength, i);
-                    if (segment.Spline is IArcLengthCurve arcLengthCurve)
-                    {
-                        geometricLength = arcLengthCurve.Length;
-                        ValidateMeasuredLength(geometricLength, i);
-                        ValidateLengthsMatch(
-                            geometricLength,
-                            arcLengthLookup.TotalLength,
-                            i,
-                            "reported arc length");
-                    }
-                    else
-                    {
-                        geometricLength = arcLengthLookup.TotalLength;
-                    }
-
-                    ValidateMeasuredLength(geometricLength, i);
-                    ValidateDeclaredLengthMatchesMeasured(segment.Length, geometricLength, i);
-                    ValidateSplineTangents(spline, i);
-                }
-
-                segments[i] = new CompiledTrackSegment(
-                    segment,
-                    totalLength,
-                    geometricLength,
-                    arcLengthLookup,
-                    arcLengthLookup?.TotalLength ?? geometricLength);
-                totalLength += geometricLength;
-            }
-
-            return new CompiledTrackSamplingContext(
-                segments,
-                totalLength,
-                BuildTransportNodeDistances(segments, totalLength),
-                document.StartPose?.Normal);
+            return Compile(document, TrackSamplingOptions.Default);
         }
 
         public static CompiledTrackSamplingContext Compile(
@@ -468,16 +405,6 @@ namespace Quantum.Track.Internal
 
         private static double[] BuildTransportNodeDistances(
             IReadOnlyList<CompiledTrackSegment> segments,
-            double totalLength)
-        {
-            return BuildTransportNodeDistances(
-                segments,
-                totalLength,
-                TransportSamplesPerSegment);
-        }
-
-        private static double[] BuildTransportNodeDistances(
-            IReadOnlyList<CompiledTrackSegment> segments,
             double totalLength,
             int samplesPerSegment)
         {
@@ -520,14 +447,6 @@ namespace Quantum.Track.Internal
                 throw new InvalidOperationException(
                     $"Track segment at index {segmentIndex} must have a finite roll angle.");
             }
-        }
-
-        private static ArcLengthLUT BuildArcLengthLookup(IParamCurve spline, int segmentIndex)
-        {
-            return BuildArcLengthLookup(
-                spline,
-                segmentIndex,
-                TrackSamplingOptions.Default);
         }
 
         private static ArcLengthLUT BuildArcLengthLookup(
@@ -583,11 +502,6 @@ namespace Quantum.Track.Internal
                     segmentIndex,
                     statedLengthLabel));
             }
-        }
-
-        private static void ValidateSplineTangents(IParamCurve spline, int segmentIndex)
-        {
-            ValidateSplineTangents(spline, segmentIndex, ArcLengthSamples);
         }
 
         private static void ValidateSplineTangents(

@@ -197,6 +197,16 @@ namespace Quantum.Track
             return ResolveBoundDocument();
         }
 
+        internal TrackEvaluator CreateCurrentRuntimeSnapshotEvaluator()
+        {
+            if (_boundSamplingContext != null)
+            {
+                return this;
+            }
+
+            return new TrackEvaluator(new CompiledTrackRuntime(ResolveBoundDocument()));
+        }
+
         /// <summary>
         /// Explicit support-layer compatibility API for callers that still need
         /// the spline frame contract.

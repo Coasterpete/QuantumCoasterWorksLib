@@ -296,10 +296,11 @@ public sealed class SpatialSectionTrackAuthoringTests
     {
         weights ??= Enumerable.Repeat(1.0, controlPoints.Count).ToList();
         var curve = new GSharkNurbsCurveAdapter(controlPoints, weights, degree);
+        TrackSamplingOptions samplingOptions = TrackSamplingOptions.Default;
         return new ArcLengthLUT(
             curve,
-            TrackSamplingOptions.DefaultArcLengthSamples,
-            TrackSamplingOptions.DefaultArcLengthTolerance).TotalLength;
+            samplingOptions.ArcLengthSamples,
+            samplingOptions.ArcLengthTolerance).TotalLength;
     }
 
     private static TrackStartPose CreateArbitraryStartPose()

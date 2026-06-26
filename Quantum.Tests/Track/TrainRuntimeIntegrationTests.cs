@@ -158,6 +158,25 @@ public sealed class TrainRuntimeIntegrationTests
     }
 
     [Fact]
+    public void DocumentProviderPoseEvaluation_CompilesOneRuntimeSnapshotPerCall()
+    {
+        var curve = new CountingArcLengthLineCurve(30.0);
+        var document = new TrackDocument(new[]
+        {
+            new StraightSegment(curve.Length, "counting", spline: curve)
+        });
+        var provider = new TrainCarTransformProvider(new TrackEvaluator(document));
+        TrainConsistDefinition definition = CreateConsistDefinition();
+        int readsBeforePoseEvaluation = curve.LengthReadCount;
+
+        provider.EvaluateTrainPose(24.0, definition);
+        Assert.Equal(readsBeforePoseEvaluation + 1, curve.LengthReadCount);
+
+        provider.EvaluateTrainPose(24.0, definition);
+        Assert.Equal(readsBeforePoseEvaluation + 2, curve.LengthReadCount);
+    }
+
+    [Fact]
     public void InvalidTrainDistances_DocumentAndRuntimeProvidersThrowEquivalentExceptions()
     {
         ProviderPair pair = CreateProviderPair();

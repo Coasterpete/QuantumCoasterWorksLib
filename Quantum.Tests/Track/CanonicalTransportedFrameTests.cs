@@ -218,6 +218,59 @@ public sealed class CanonicalTransportedFrameTests
         }
     }
 
+    [Fact]
+    public void DefaultTransportDensity_ImplicitAndExplicitRuntimeOptionsMatch()
+    {
+        TrackDocument document = CreateThreeDimensionalDensityDocument();
+        double[] distances = BuildUniformDistances(document.TotalLength, sampleCount: 21);
+
+        ExportTrackFrame[] implicitDefault = new TrackEvaluator(
+                new CompiledTrackRuntime(document))
+            .EvaluateFramesAtDistances(distances);
+        ExportTrackFrame[] explicitDefault = new TrackEvaluator(
+                new CompiledTrackRuntime(document, TrackSamplingOptions.Default))
+            .EvaluateFramesAtDistances(distances);
+
+        for (int i = 0; i < distances.Length; i++)
+        {
+            AssertFrameNear(implicitDefault[i], explicitDefault[i]);
+        }
+    }
+
+    [Fact]
+    public void TransportSampleDensity_PreservesCenterlineAndConvergesOrientation()
+    {
+        TrackDocument document = CreateThreeDimensionalDensityDocument();
+        double[] distances = BuildUniformDistances(document.TotalLength, sampleCount: 31);
+
+        ExportTrackFrame[] sparse = SampleWithTransportSamples(
+            document,
+            transportSamplesPerSegment: 2,
+            distances);
+        ExportTrackFrame[] medium = SampleWithTransportSamples(
+            document,
+            transportSamplesPerSegment: 16,
+            distances);
+        ExportTrackFrame[] dense = SampleWithTransportSamples(
+            document,
+            transportSamplesPerSegment: 128,
+            distances);
+
+        AssertCenterlineSamplesNear(sparse, dense);
+        AssertCenterlineSamplesNear(medium, dense);
+
+        double sparseToDense = MaxNormalOrBinormalAngleDeltaRadians(sparse, dense);
+        double mediumToDense = MaxNormalOrBinormalAngleDeltaRadians(medium, dense);
+
+        Assert.True(
+            sparseToDense > 1e-4,
+            $"Expected sparse transport density to produce a measurable orientation delta, got {sparseToDense:R} radians.");
+        Assert.True(
+            mediumToDense < sparseToDense,
+            $"Expected denser transport sampling to converge: sparse={sparseToDense:R}, medium={mediumToDense:R}.");
+        Assert.InRange(mediumToDense, 0.0, 0.05);
+    }
+
     private static TrackDocument CreateSmoothTwoSegmentDocument()
     {
         var first = new CubicBezierCurve(
@@ -236,6 +289,98 @@ public sealed class CanonicalTransportedFrameTests
             new CurvedSegment(new ArcLengthLUT(first).TotalLength, spline: first),
             new CurvedSegment(new ArcLengthLUT(second).TotalLength, spline: second)
         });
+    }
+
+    private static TrackDocument CreateThreeDimensionalDensityDocument()
+    {
+        var curve = new CubicBezierCurve(
+            new Vector3d(0.0, 0.0, 0.0),
+            new Vector3d(12.0, -4.0, 18.0),
+            new Vector3d(-6.0, 22.0, 30.0),
+            new Vector3d(28.0, 16.0, 44.0));
+
+        return new TrackDocument(new TrackSegment[]
+        {
+            new CurvedSegment(
+                new ArcLengthLUT(curve).TotalLength,
+                id: "transport-density-3d",
+                spline: curve)
+        });
+    }
+
+    private static double[] BuildUniformDistances(double totalLength, int sampleCount)
+    {
+        var distances = new double[sampleCount];
+        for (int i = 0; i < distances.Length; i++)
+        {
+            distances[i] = totalLength * i / (sampleCount - 1.0);
+        }
+
+        distances[distances.Length - 1] = totalLength;
+        return distances;
+    }
+
+    private static ExportTrackFrame[] SampleWithTransportSamples(
+        TrackDocument document,
+        int transportSamplesPerSegment,
+        IReadOnlyList<double> distances)
+    {
+        var options = new TrackSamplingOptions(
+            TrackSamplingOptions.Default.ArcLengthSamples,
+            TrackSamplingOptions.Default.ArcLengthTolerance,
+            transportSamplesPerSegment);
+        var evaluator = new TrackEvaluator(new CompiledTrackRuntime(document, options));
+        return evaluator.EvaluateFramesAtDistances(distances);
+    }
+
+    private static void AssertCenterlineSamplesNear(
+        IReadOnlyList<ExportTrackFrame> expected,
+        IReadOnlyList<ExportTrackFrame> actual)
+    {
+        Assert.Equal(expected.Count, actual.Count);
+        for (int i = 0; i < expected.Count; i++)
+        {
+            AssertNear(expected[i].Distance, actual[i].Distance);
+            AssertVectorNear(expected[i].Position, actual[i].Position);
+            AssertVectorNear(expected[i].Tangent, actual[i].Tangent);
+        }
+    }
+
+    private static double MaxNormalOrBinormalAngleDeltaRadians(
+        IReadOnlyList<ExportTrackFrame> expected,
+        IReadOnlyList<ExportTrackFrame> actual)
+    {
+        Assert.Equal(expected.Count, actual.Count);
+        double max = 0.0;
+
+        for (int i = 0; i < expected.Count; i++)
+        {
+            max = System.Math.Max(max, AngleDeltaRadians(expected[i].Normal, actual[i].Normal));
+            max = System.Math.Max(max, AngleDeltaRadians(expected[i].Binormal, actual[i].Binormal));
+        }
+
+        return max;
+    }
+
+    private static double AngleDeltaRadians(Vector3d expected, Vector3d actual)
+    {
+        double dot = Vector3d.Dot(expected.Normalized(), actual.Normalized());
+        return System.Math.Acos(Clamp(dot, -1.0, 1.0));
+    }
+
+    private static double Clamp(double value, double min, double max)
+    {
+        if (value < min)
+        {
+            return min;
+        }
+
+        if (value > max)
+        {
+            return max;
+        }
+
+        return value;
     }
 
     private static void AssertValidFrame(ExportTrackFrame frame)

@@ -305,10 +305,11 @@ public sealed class DebugViewportSnapshotV1FromTrackLayoutPackageV2CommandTests
             points.ToList(),
             Enumerable.Repeat(1.0, points.Length).ToList(),
             degree: 3);
+        TrackSamplingOptions samplingOptions = TrackSamplingOptions.Default;
         return new ArcLengthLUT(
             curve,
-            TrackSamplingOptions.DefaultArcLengthSamples,
-            TrackSamplingOptions.DefaultArcLengthTolerance).TotalLength;
+            samplingOptions.ArcLengthSamples,
+            samplingOptions.ArcLengthTolerance).TotalLength;
     }
 
     private static TrackLayoutVector3dV2Dto Vector(double x, double y, double z)

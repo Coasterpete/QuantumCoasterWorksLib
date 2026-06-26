@@ -7,6 +7,14 @@ diagnostics foundation established across Milestones 39-46 before starting
 This checkpoint does not implement runtime behavior, change production
 contracts, add dependencies, or add Unity/browser/frontend code.
 
+Milestone 151 note: this is a historical checkpoint. Several "current" runtime
+statements below describe the Milestone 47 state and are superseded by later
+work: `TrackEvaluator` now uses canonical transported-frame history for scalar
+and batch coaster frames, `TransportedTrackFrameSampler` is an obsolete
+compatibility facade, and `BankingProfile` runtime sampling exists as an
+explicit opt-in path. The diagnostic/export rationale remains useful, but use
+`docs/public-coaster-api-boundary.md` for current runtime behavior.
+
 ## Context
 
 Milestone 39 established the external coaster simulation reference audit. The
@@ -54,8 +62,8 @@ behavior or banking behavior.
 
 ### Transported frame sampler
 
-`TransportedTrackFrameSampler` now exists as an explicit station-distance
-sampler. It:
+Historical Milestone 47 state: `TransportedTrackFrameSampler` existed as an
+explicit station-distance sampler. It:
 
 - requires finite distances in non-decreasing station order
 - preserves duplicate sample distances and output order
@@ -65,14 +73,15 @@ sampler. It:
 - applies existing segment `RollRadians` only after base-frame transport
 - returns the existing `Quantum.Track.TrackFrame` contract
 
-The sampler is not hidden inside `TrackEvaluator`. It is opt-in and sequence
-based, which keeps transported behavior reviewable and prevents scalar frame
-evaluation from becoming history-dependent.
+Current runtime state: canonical transported-frame sampling now lives inside
+compiled `TrackEvaluator` sampling state. `TransportedTrackFrameSampler` remains
+only as an obsolete facade over the canonical evaluator path.
 
 ### Stateless-vs-transported comparison diagnostics
 
-`TransportedFrameComparisonDiagnostics` compares the current stateless evaluator
-frame sequence with the transported sampler over the same distances. The report
+`TransportedFrameComparisonDiagnostics` compares a diagnostic stateless
+reference-up baseline with the canonical transported frames over the same
+distances. The report
 captures:
 
 - per-sample tangent, normal, binormal, frame, roll/twist, and matrix orientation
@@ -124,13 +133,15 @@ dependencies, Unity code, or a production visualization contract.
 
 ### `TrackEvaluator` scalar behavior
 
-`TrackEvaluator.EvaluateFrameAtDistance` remains deterministic and
-context-free. A scalar call still evaluates one station distance independently,
-without hidden frame history or cached traversal state.
+Historical Milestone 47 state: `TrackEvaluator.EvaluateFrameAtDistance` used
+stateless reference-up behavior, and `EvaluateFramesAtDistances` was
+scalar-equivalent to that stateless path.
 
-`TrackEvaluator.EvaluateFramesAtDistances` also remains scalar-equivalent. The
-current batch parity tests continue to verify that batch outputs match repeated
-scalar evaluation for the same distances.
+Current runtime state: scalar and batch frame APIs remain deterministic and
+station-equivalent, but both sample the same compiled canonical
+transported-frame history. Query order and query density do not define runtime
+history; `TrackSamplingOptions.TransportSamplesPerSegment` controls compiled
+transport node density.
 
 ### `TrackFrame` contract
 
@@ -162,9 +173,12 @@ does not change train pose DTOs, validation, or regression snapshots.
 
 ### `BankingProfile` runtime behavior
 
-No `BankingProfile` runtime behavior exists yet. The current runtime roll source
-is still `TrackSegment.RollRadians`, and that value still represents constant
-segment roll in the existing evaluator path.
+Historical Milestone 47 state: no `BankingProfile` runtime behavior existed yet.
+
+Current runtime state: `BankingProfile` is supported through explicit opt-in
+sampling paths such as `BankingProfileSampler.SampleFramesAtDistances(...)` and
+`TrainCarTransformProvider.EvaluateTrainPose(..., BankingProfile)`. The default
+train-pose path still uses segment/evaluator roll behavior.
 
 ## Why This Is A Safe Foundation For `BankingProfile`
 
@@ -174,10 +188,10 @@ otherwise blur:
 1. Base-frame stability along the centerline.
 2. Authored roll angle around the sampled tangent.
 
-The transported sampler proves that Quantum can evaluate a smoother unrolled
-base frame over an ordered distance sequence without changing scalar
-`TrackEvaluator` behavior. The comparison diagnostics prove that stateless and
-transported frames can be measured side by side over the same fixtures.
+The transported sampler proved that Quantum could evaluate a smoother unrolled
+base frame before it became the canonical runtime path. The comparison
+diagnostics still prove that stateless baseline and transported frames can be
+measured side by side over the same fixtures.
 
 That gives the next milestone a clear place to start: implement
 `BankingProfile` as a roll-angle scalar sampled by distance, then apply that
