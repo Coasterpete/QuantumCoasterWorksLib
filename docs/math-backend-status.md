@@ -1,9 +1,23 @@
 # Math Backend Status
 
-As of 2026-06-10, Quantum's math backend is stable for the current milestone (simple train boxes moving along centerline with stable frame sampling and distance-based placement), but it is intentionally mixed:
+As of Milestone 154, Quantum's math backend is stable for the current milestone (simple train boxes moving along centerline with stable frame sampling and distance-based placement), but it is intentionally mixed:
 - core math primitives are custom and lightweight
 - frame/placement logic is coaster-domain-specific and should stay custom
 - some general numerical functionality is duplicated and can be migrated incrementally to mature libraries later
+
+## Milestone 154 Public Surface Characterization
+
+`Quantum.Math` remains a small support-layer package, not a general-purpose math
+library. Its intended long-term public surface is:
+
+- stable public: `Vector3d`, `MathUtil`
+- transitional public: `Matrix4x4d`, `Matrix3x3`, `Transform3d`,
+  `ITrackFrameBasis`
+
+The transitional types remain public today to support existing backend
+integration points and compatibility tests. New coaster-facing APIs should
+prefer `Quantum.Track` or versioned `Quantum.IO` contracts rather than exposing
+new generic math entrypoints.
 
 ## Current Custom Math Types
 
