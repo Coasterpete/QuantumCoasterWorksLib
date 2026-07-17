@@ -8,12 +8,13 @@ Quantum CoasterWorks is an early-stage coaster design and simulation backend. Th
 - Backend-first architecture: the `Quantum.*` projects should stay engine-agnostic C# libraries.
 - Unity visualization is experimental and should be treated as an optional debug/prototype viewer, not the owner of backend architecture.
 - Future Unity or Unreal adapters may remain valid for PBR previews, ride-through views, and presentation rendering, but those are not part of the current backend preview.
-- No final frontend is selected. Avalonia remains a standalone editor shell candidate, with Silk.NET or OpenTK as possible technical viewport layers.
+- No final frontend workflow is selected. `Quantum.Editor.Avalonia` is the initial standalone editor shell scaffolding, with Silk.NET or OpenTK still possible as future technical viewport layers.
 
 ## Project Shape
 
 - `Quantum.Core`, `Quantum.Math`, `Quantum.Splines`, `Quantum.Track`, `Quantum.FVD`, `Quantum.Physics`, and `Quantum.IO` contain backend/domain logic.
 - `Quantum.Debug` contains backend diagnostics and command-line tooling.
+- `Quantum.Editor.Avalonia` contains standalone editor shell scaffolding only; it does not implement authoring workflows or viewport rendering yet.
 - `Quantum.Tests` contains automated tests and contract fixtures.
 - `Assets` contains the current Unity debug visualizer/prototype assets.
 

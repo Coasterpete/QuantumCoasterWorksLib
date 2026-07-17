@@ -1,0 +1,58 @@
+<Window
+    x:Class="Quantum.Editor.Avalonia.MainWindow"
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="Quantum CoasterWorks Editor">
+    <Grid
+        ColumnDefinitions="Auto,*,Auto"
+        RowDefinitions="Auto,Auto,*,Auto,Auto">
+        <Grid
+            x:Name="MenuBarRegion"
+            Grid.Row="0"
+            Grid.ColumnSpan="3">
+            <TextBlock Text="Menu bar" />
+        </Grid>
+
+        <Grid
+            x:Name="ToolbarRegion"
+            Grid.Row="1"
+            Grid.ColumnSpan="3">
+            <TextBlock Text="Toolbar" />
+        </Grid>
+
+        <Grid
+            x:Name="LeftToolboxRegion"
+            Grid.Row="2"
+            Grid.Column="0">
+            <TextBlock Text="Left toolbox" />
+        </Grid>
+
+        <Grid
+            x:Name="ViewportRegion"
+            Grid.Row="2"
+            Grid.Column="1">
+            <TextBlock Text="Center viewport" />
+        </Grid>
+
+        <Grid
+            x:Name="RightInspectorRegion"
+            Grid.Row="2"
+            Grid.Column="2">
+            <TextBlock Text="Right inspector" />
+        </Grid>
+
+        <Grid
+            x:Name="BottomPanelRegion"
+            Grid.Row="3"
+            Grid.ColumnSpan="3">
+            <TextBlock Text="Bottom panel" />
+        </Grid>
+
+        <Grid
+            x:Name="StatusBarRegion"
+            Grid.Row="4"
+            Grid.ColumnSpan="3">
+            <TextBlock Text="Status bar" />
+        </Grid>
+    </Grid>
+</Window>
