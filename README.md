@@ -36,7 +36,21 @@ Required local tools:
 
 Unity, Blender, Visual Studio, and other renderer/editor tools are optional for the current backend preview. They are not required to restore, build, or test the solution.
 
-## Avalonia Editor Vertical Slice
+## Avalonia Editor — M156
+
+Milestone 156 delivers a functional technical-editor vertical slice built on Avalonia and the existing engine-agnostic Quantum backend. It is an active development tool, not a production-ready coaster editor.
+
+![Quantum CoasterWorks Avalonia editor main workspace](docs/images/editor/editor-main-workspace.png)
+
+The current editor includes:
+
+- a Track Layout Package V2 document workspace with New, Open, Save, and dirty-state handling;
+- an interactive track viewport with pan, zoom, fit-to-track, sample picking, and section highlighting;
+- a synchronized track/section/banking outliner and property inspector;
+- a sampling and transported-frame diagnostics panel;
+- an undo/redo foundation for validated document edits;
+- transported normal/binormal frame visualization; and
+- isometric, top X/Z, and side X/Y camera-orientation presets.
 
 Run the standalone editor with:
 
@@ -44,7 +58,34 @@ Run the standalone editor with:
 dotnet run --project Quantum.Editor.Avalonia/Quantum.Editor.Avalonia.csproj
 ```
 
-The editor starts with a self-authored seven-section Track Layout Package V2 document so the workspace and technical viewport are immediately useful. It can create, open, validate, compile, edit, undo/redo, and save V2 layout JSON. The outliner, inspector, selected viewport sample, and diagnostics panel remain synchronized. The central viewport renders the sampled centerline and transported normal/binormal axes through the existing `Quantum.Track` runtime; mouse-wheel zoom, middle/right-button pan, track sample selection, fit, frame visibility, and isometric/top/side projections are available.
+### Viewport
+
+The central technical viewport draws the sampled centerline and transported frames produced by `Quantum.Track`. It supports fit-to-track, mouse-wheel zoom, middle/right-button panning, selectable frame samples, section colors, and synchronized selection details.
+
+![Avalonia editor sampled-track viewport with transported frames](docs/images/editor/editor-viewport.png)
+
+### Outliner and inspector
+
+The outliner exposes the active layout's ordered sections, banking keys, and heartline summary. Selecting an item updates the inspector, while viewport sample selection identifies and highlights the owning section.
+
+| Outliner | Inspector |
+| --- | --- |
+| ![Avalonia editor track outliner](docs/images/editor/editor-outliner.png) | ![Avalonia editor property inspector](docs/images/editor/editor-inspector.png) |
+
+### Toolbar and document workflow
+
+The toolbar provides New, Open, Save, Undo, Redo, fit-to-track, and transported-frame visibility controls. New/Open/Save operate on the versioned Track Layout Package V2 contract, and validated inspector edits participate in the undo/redo history.
+
+![Avalonia editor toolbar and document controls](docs/images/editor/editor-toolbar.png)
+
+### Camera views
+
+The viewport currently provides three technical camera-orientation presets:
+
+| Isometric | Top X/Z | Side X/Y |
+| --- | --- | --- |
+| ![Isometric camera preset selector](docs/images/editor/editor-camera-isometric-preset.png) | ![Top X/Z camera preset selector](docs/images/editor/editor-camera-top-preset.png) | ![Side X/Y camera preset selector](docs/images/editor/editor-camera-side-preset.png) |
+| ![Avalonia editor isometric track view](docs/images/editor/editor-isometric-view.png) | ![Avalonia editor top X/Z track view](docs/images/editor/editor-top-view.png) | ![Avalonia editor side X/Y track view](docs/images/editor/editor-side-view.png) |
 
 See [`docs/editor/m156-avalonia-editor.md`](docs/editor/m156-avalonia-editor.md) for supported edits, keyboard shortcuts, architecture boundaries, and current limitations.
 
