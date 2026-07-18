@@ -36,6 +36,35 @@ Required local tools:
 
 Unity, Blender, Visual Studio, and other renderer/editor tools are optional for the current backend preview. They are not required to restore, build, or test the solution.
 
+## Quick Start
+
+Quantum CoasterWorks currently targets developers and contributors. Clone the repository and run the editor directly from source.
+
+### Clone the repository
+
+```bash
+git clone https://github.com/Coasterpete/QuantumCoasterWorksLib.git
+cd QuantumCoasterWorksLib
+```
+
+### Run the Avalonia editor
+
+```bash
+dotnet run --project Quantum.Editor.Avalonia/Quantum.Editor.Avalonia.csproj -c Release
+```
+
+### Build the solution
+
+```bash
+dotnet build QuantumCoasterWorks.sln -c Release
+```
+
+### Run the test suite
+
+```bash
+dotnet test QuantumCoasterWorks.sln -c Release
+```
+
 ## Avalonia Editor — M156
 
 Milestone 156 delivers a functional technical-editor vertical slice built on Avalonia and the existing engine-agnostic Quantum backend. It is an active development tool, not a production-ready coaster editor.
