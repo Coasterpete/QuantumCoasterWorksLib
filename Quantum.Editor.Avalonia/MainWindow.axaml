@@ -1,0 +1,202 @@
+<Window
+    x:Class="Quantum.Editor.Avalonia.MainWindow"
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:Quantum.Editor.Avalonia.Controls"
+    Title="Quantum CoasterWorks Editor"
+    Width="1480"
+    Height="920"
+    MinWidth="1120"
+    MinHeight="720"
+    Background="#0D1218"
+    KeyDown="OnWindowKeyDown">
+    <Window.Styles>
+        <Style Selector="Border.panel">
+            <Setter Property="Background" Value="#151C24" />
+            <Setter Property="BorderBrush" Value="#2B3948" />
+            <Setter Property="BorderThickness" Value="1" />
+        </Style>
+        <Style Selector="TextBlock.panelTitle">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="#AFC4D8" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
+        <Style Selector="Button.toolbar">
+            <Setter Property="Padding" Value="12,6" />
+            <Setter Property="Margin" Value="0,0,6,0" />
+            <Setter Property="MinWidth" Value="58" />
+        </Style>
+        <Style Selector="TextBox.inspectorField">
+            <Setter Property="MinHeight" Value="28" />
+        </Style>
+    </Window.Styles>
+
+    <Grid RowDefinitions="Auto,48,*,5,165,28">
+        <Border
+            x:Name="MenuBarRegion"
+            Grid.Row="0"
+            Background="#111820"
+            BorderBrush="#2B3948"
+            BorderThickness="0,0,0,1">
+            <Menu>
+                <MenuItem Header="_File">
+                    <MenuItem Header="_New Track    Ctrl+N" Click="OnNewDocumentClick" />
+                    <MenuItem Header="_Open…    Ctrl+O" Click="OnOpenDocumentClick" />
+                    <Separator />
+                    <MenuItem Header="_Save    Ctrl+S" Click="OnSaveDocumentClick" />
+                    <MenuItem Header="Save _As…    Ctrl+Shift+S" Click="OnSaveDocumentAsClick" />
+                    <Separator />
+                    <MenuItem Header="E_xit" Click="OnExitClick" />
+                </MenuItem>
+                <MenuItem Header="_Edit">
+                    <MenuItem x:Name="UndoMenuItem" Header="_Undo    Ctrl+Z" Click="OnUndoClick" />
+                    <MenuItem x:Name="RedoMenuItem" Header="_Redo    Ctrl+Y" Click="OnRedoClick" />
+                </MenuItem>
+                <MenuItem Header="_View">
+                    <MenuItem Header="_Fit Track    F" Click="OnFitViewportClick" />
+                    <MenuItem Header="Toggle Transported _Frames" Click="OnMenuShowFramesClick" />
+                </MenuItem>
+            </Menu>
+        </Border>
+
+        <Border
+            x:Name="ToolbarRegion"
+            Grid.Row="1"
+            Background="#121A22"
+            BorderBrush="#2B3948"
+            BorderThickness="0,0,0,1"
+            Padding="10,7">
+            <Grid ColumnDefinitions="Auto,Auto,Auto,16,Auto,Auto,16,Auto,Auto,*,Auto">
+                <Button Classes="toolbar" Content="New" Click="OnNewDocumentClick" />
+                <Button Grid.Column="1" Classes="toolbar" Content="Open" Click="OnOpenDocumentClick" />
+                <Button Grid.Column="2" Classes="toolbar" Content="Save" Click="OnSaveDocumentClick" />
+                <Button x:Name="UndoButton" Grid.Column="4" Classes="toolbar" Content="Undo" Click="OnUndoClick" />
+                <Button x:Name="RedoButton" Grid.Column="5" Classes="toolbar" Content="Redo" Click="OnRedoClick" />
+                <Button Grid.Column="7" Classes="toolbar" Content="Fit" Click="OnFitViewportClick" />
+                <CheckBox
+                    x:Name="ShowFramesCheckBox"
+                    Grid.Column="8"
+                    Margin="8,0,0,0"
+                    VerticalAlignment="Center"
+                    Content="Frames"
+                    IsChecked="True"
+                    IsCheckedChanged="OnShowFramesChanged" />
+                <ComboBox
+                    x:Name="ProjectionComboBox"
+                    Grid.Column="10"
+                    Width="145"
+                    SelectedIndex="0"
+                    SelectionChanged="OnProjectionChanged">
+                    <ComboBoxItem Content="Isometric" />
+                    <ComboBoxItem Content="Top · X/Z" />
+                    <ComboBoxItem Content="Side · X/Y" />
+                </ComboBox>
+            </Grid>
+        </Border>
+
+        <Grid Grid.Row="2" ColumnDefinitions="290,5,*,5,340">
+            <Border
+                x:Name="LeftToolboxRegion"
+                Grid.Column="0"
+                Classes="panel"
+                BorderThickness="0,0,1,0">
+                <Grid RowDefinitions="Auto,Auto,*">
+                    <Border Padding="12,10" BorderBrush="#2B3948" BorderThickness="0,0,0,1">
+                        <StackPanel Spacing="3">
+                            <TextBlock Classes="panelTitle" Text="TRACK WORKSPACE" />
+                            <TextBlock x:Name="DocumentTitleText" FontSize="16" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                            <TextBlock x:Name="DocumentPathText" FontSize="11" Foreground="#7F94A8" TextTrimming="CharacterEllipsis" />
+                        </StackPanel>
+                    </Border>
+                    <TextBlock Grid.Row="1" Margin="12,10,12,6" Classes="panelTitle" Text="OUTLINER" />
+                    <TreeView
+                        x:Name="OutlinerTree"
+                        Grid.Row="2"
+                        Margin="6,0,6,8"
+                        SelectionChanged="OnOutlinerSelectionChanged" />
+                </Grid>
+            </Border>
+
+            <GridSplitter Grid.Column="1" ResizeDirection="Columns" Background="#2B3948" />
+
+            <Border x:Name="ViewportRegion" Grid.Column="2" Background="#11161D">
+                <Grid RowDefinitions="38,*">
+                    <Border Background="#151D26" BorderBrush="#2B3948" BorderThickness="0,0,0,1" Padding="10,7">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <TextBlock x:Name="ViewportStatsText" VerticalAlignment="Center" Foreground="#B8CBDD" />
+                            <TextBlock Grid.Column="1" VerticalAlignment="Center" Foreground="#70869B" Text="Wheel: zoom  ·  Middle/right drag: pan  ·  Click track: inspect" />
+                        </Grid>
+                    </Border>
+                    <controls:TrackViewportControl
+                        x:Name="ViewportControl"
+                        Grid.Row="1"
+                        SampleSelected="OnViewportSampleSelected" />
+                    <Border
+                        Grid.Row="1"
+                        Margin="12"
+                        Padding="9,6"
+                        HorizontalAlignment="Left"
+                        VerticalAlignment="Top"
+                        Background="#CC101720"
+                        CornerRadius="4"
+                        IsHitTestVisible="False">
+                        <TextBlock x:Name="ViewportSelectionOverlay" Foreground="#D8E7F3" />
+                    </Border>
+                </Grid>
+            </Border>
+
+            <GridSplitter Grid.Column="3" ResizeDirection="Columns" Background="#2B3948" />
+
+            <Border
+                x:Name="RightInspectorRegion"
+                Grid.Column="4"
+                Classes="panel"
+                BorderThickness="1,0,0,0">
+                <Grid RowDefinitions="Auto,*">
+                    <Border Padding="12,10" BorderBrush="#2B3948" BorderThickness="0,0,0,1">
+                        <StackPanel Spacing="3">
+                            <TextBlock Classes="panelTitle" Text="INSPECTOR" />
+                            <TextBlock x:Name="InspectorTitleText" FontSize="16" FontWeight="SemiBold" />
+                        </StackPanel>
+                    </Border>
+                    <ScrollViewer Grid.Row="1">
+                        <StackPanel x:Name="InspectorFieldsPanel" Margin="12" Spacing="9" />
+                    </ScrollViewer>
+                </Grid>
+            </Border>
+        </Grid>
+
+        <GridSplitter Grid.Row="3" ResizeDirection="Rows" Background="#2B3948" />
+
+        <Border
+            x:Name="BottomPanelRegion"
+            Grid.Row="4"
+            Classes="panel"
+            BorderThickness="0,1,0,0">
+            <Grid RowDefinitions="34,*">
+                <Border Background="#151D26" BorderBrush="#2B3948" BorderThickness="0,0,0,1" Padding="12,8">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <TextBlock Classes="panelTitle" Text="SAMPLING &amp; FRAME DIAGNOSTICS" />
+                        <TextBlock x:Name="DiagnosticSummaryText" Grid.Column="1" Foreground="#7F94A8" />
+                    </Grid>
+                </Border>
+                <ListBox x:Name="DiagnosticsList" Grid.Row="1" Margin="6" FontFamily="Consolas" FontSize="12" />
+            </Grid>
+        </Border>
+
+        <Border
+            x:Name="StatusBarRegion"
+            Grid.Row="5"
+            Background="#0B1016"
+            BorderBrush="#2B3948"
+            BorderThickness="0,1,0,0"
+            Padding="10,4">
+            <Grid ColumnDefinitions="*,Auto,20,Auto">
+                <TextBlock x:Name="StatusMessageText" VerticalAlignment="Center" Foreground="#9EB3C7" />
+                <TextBlock x:Name="SelectionText" Grid.Column="1" VerticalAlignment="Center" Foreground="#7F94A8" />
+                <TextBlock x:Name="DocumentStateText" Grid.Column="3" VerticalAlignment="Center" Foreground="#C7D7E5" />
+            </Grid>
+        </Border>
+    </Grid>
+</Window>
