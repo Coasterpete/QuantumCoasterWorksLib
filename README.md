@@ -8,13 +8,13 @@ Quantum CoasterWorks is an early-stage coaster design and simulation backend. Th
 - Backend-first architecture: the `Quantum.*` projects should stay engine-agnostic C# libraries.
 - Unity visualization is experimental and should be treated as an optional debug/prototype viewer, not the owner of backend architecture.
 - Future Unity or Unreal adapters may remain valid for PBR previews, ride-through views, and presentation rendering, but those are not part of the current backend preview.
-- No final frontend workflow is selected. `Quantum.Editor.Avalonia` is the initial standalone editor shell scaffolding, with Silk.NET or OpenTK still possible as future technical viewport layers.
+- No final production frontend or 3D renderer is locked. `Quantum.Editor.Avalonia` now provides a functional standalone technical editor vertical slice, with Silk.NET or OpenTK still possible as future high-performance viewport layers.
 
 ## Project Shape
 
 - `Quantum.Core`, `Quantum.Math`, `Quantum.Splines`, `Quantum.Track`, `Quantum.FVD`, `Quantum.Physics`, and `Quantum.IO` contain backend/domain logic.
 - `Quantum.Debug` contains backend diagnostics and command-line tooling.
-- `Quantum.Editor.Avalonia` contains standalone editor shell scaffolding only; it does not implement authoring workflows or viewport rendering yet.
+- `Quantum.Editor.Avalonia` contains a standalone editor workbench for Track Layout Package V2 files, backend compilation, document/outliner/inspector workflows, undo/redo, and an Avalonia-drawn technical viewport.
 - `Quantum.Tests` contains automated tests and contract fixtures.
 - `Assets` contains the current Unity debug visualizer/prototype assets.
 
@@ -35,6 +35,18 @@ Required local tools:
 - Network access to NuGet package sources for a first restore, unless the required packages are already cached locally.
 
 Unity, Blender, Visual Studio, and other renderer/editor tools are optional for the current backend preview. They are not required to restore, build, or test the solution.
+
+## Avalonia Editor Vertical Slice
+
+Run the standalone editor with:
+
+```text
+dotnet run --project Quantum.Editor.Avalonia/Quantum.Editor.Avalonia.csproj
+```
+
+The editor starts with a self-authored seven-section Track Layout Package V2 document so the workspace and technical viewport are immediately useful. It can create, open, validate, compile, edit, undo/redo, and save V2 layout JSON. The outliner, inspector, selected viewport sample, and diagnostics panel remain synchronized. The central viewport renders the sampled centerline and transported normal/binormal axes through the existing `Quantum.Track` runtime; mouse-wheel zoom, middle/right-button pan, track sample selection, fit, frame visibility, and isometric/top/side projections are available.
+
+See [`docs/editor/m156-avalonia-editor.md`](docs/editor/m156-avalonia-editor.md) for supported edits, keyboard shortcuts, architecture boundaries, and current limitations.
 
 From a fresh checkout:
 

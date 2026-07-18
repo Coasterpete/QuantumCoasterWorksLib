@@ -12,11 +12,11 @@ The current Unity prototype demonstrates two distinct adapter styles. `LiveBacke
 
 ## Standalone Editor Candidate
 
-Avalonia is being considered for a future desktop UI shell because it is a mature cross-platform .NET UI framework and fits a C# backend-first project. It can host editor panels, property inspectors, graphs, timelines, and file workflows without forcing the backend into a game-object model.
+Avalonia is being evaluated through the `Quantum.Editor.Avalonia` desktop vertical slice because it is a mature cross-platform .NET UI framework and fits a C# backend-first project. The current slice hosts document IO, an outliner, property inspection, commands, undo/redo, diagnostics, and an Avalonia-drawn technical viewport without forcing the backend into a game-object model.
 
 Silk.NET remains a candidate for a standalone technical viewport because it provides lower-level graphics/windowing access from .NET while allowing Quantum to keep rendering behind an adapter. OpenTK may also be evaluated if it better fits the viewport needs. Either option would let the standalone editor draw tracks, frames, train placeholders, handles, and diagnostics without turning the backend into a renderer.
 
-Avalonia/Silk.NET is therefore a candidate editor-shell/technical-viewport path, not a final frontend decision. The next step is to keep the backend clean enough that competing host and viewport options can be evaluated later.
+Avalonia remains an editor-shell candidate rather than a final production frontend decision. The current viewport deliberately uses Avalonia's mature 2D drawing/input surface to prove workspace and selection workflows. Silk.NET or OpenTK can still be evaluated later behind a thin viewport adapter if larger layouts, 3D navigation, or GPU rendering justify that added infrastructure.
 
 ## Optional High-Fidelity Visualization Targets
 
@@ -26,7 +26,7 @@ Those workflows should stay in thin visualization adapters, prototype projects, 
 
 ## Future Layout
 
-- `Quantum.Editor.Avalonia`: future desktop app shell for windows, panels, inspectors, commands, and host-level UI wiring.
+- `Quantum.Editor.Avalonia`: current desktop technical-editor slice for windows, panels, inspectors, commands, document/workspace state, and host-level UI wiring.
 - `Quantum.Editor.Core` or `Quantum.Editor.Workbench`: optional pure .NET editor state and services layer, if shared editor workflows need to live outside the UI shell.
 - `Quantum.Viewport.SilkNet` or `Quantum.Viewport.OpenTK`: future renderer adapter for drawing sampled coaster data in a standalone viewport.
 - `Quantum.Visualization.Unity`, `Quantum.Visualization.Unreal`, or external host projects: optional high-fidelity visualization, ride-through, PBR, and presentation-rendering adapters.

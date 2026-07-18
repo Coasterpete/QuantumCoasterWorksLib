@@ -21,7 +21,7 @@ QuantumCoasterWorks.sln
 - Quantum.FVD = force vector design systems
 - Quantum.IO = save/load/import/export
 - Quantum.Debug = diagnostics
-- Quantum.Editor.Avalonia = standalone Avalonia editor shell scaffolding
+- Quantum.Editor.Avalonia = standalone Avalonia technical editor and Track Layout Package V2 workspace
 
 ## Frontend / Host Direction
 
@@ -29,7 +29,7 @@ QuantumCoasterWorks.sln
 - Current Unity assets are an optional debug/prototype visualizer.
 - Unity or Unreal may remain valid optional visualization targets for PBR, ride-through, and presentation rendering.
 - No final frontend workflow is selected.
-- `Quantum.Editor.Avalonia` contains the initial standalone Avalonia shell scaffolding.
+- `Quantum.Editor.Avalonia` contains the first integrated standalone editor vertical slice: document IO, outliner, property inspector, commands, undo/redo, diagnostics, and an Avalonia-drawn sampled-track viewport.
 - Future technical viewport candidate is Silk.NET, with OpenTK still available for evaluation.
 
 ## Rule
