@@ -2,6 +2,7 @@ using Quantum.Editor.Avalonia.Models;
 using Quantum.Editor.Avalonia.Services;
 using Quantum.Editor.Avalonia.Services.Commands;
 using Quantum.Editor.Avalonia.Services.Documents;
+using Quantum.Editor.Avalonia.Services.Plots;
 using Quantum.IO.TrackLayout.V2;
 using Quantum.Track.Authoring;
 
@@ -45,6 +46,9 @@ public sealed class EditorWorkspaceTests
             workspace.ViewportSnapshot.Samples[20].RollDegrees,
             9);
         Assert.NotEmpty(workspace.ViewportSnapshot.Diagnostics);
+        Assert.Contains(
+            workspace.ViewportSnapshot.Diagnostics,
+            diagnostic => diagnostic.StartsWith("Math Plot snapshot ", StringComparison.Ordinal));
         Assert.Equal(EditorSelection.Track, workspace.CurrentSelection);
         Assert.Single(workspace.OutlinerNodes);
     }
@@ -181,6 +185,94 @@ public sealed class EditorWorkspaceTests
         Assert.Equal(25, cursor.SampleIndex);
         Assert.Equal(snapshot.StationGrid[25], cursor.Station, 12);
         Assert.Equal(1, notifications);
+    }
+
+    [Fact]
+    public void SelectStationAt_UsesNearestCanonicalSampleAndSynchronizesEditorSelection()
+    {
+        var workspace = new EditorWorkspace();
+        TrackEditorDocument document = workspace.NewDocument();
+        EngineeringSnapshot snapshot = workspace.EngineeringSnapshot!;
+        TrackViewportSnapshot viewport = workspace.ViewportSnapshot;
+        TrackAuthoringGraph graph = document.Graph!;
+        const int lowerIndex = 36;
+        int expectedIndex = lowerIndex + 1;
+        double requestedStation = snapshot.StationGrid[lowerIndex] +
+            ((snapshot.StationGrid[expectedIndex] - snapshot.StationGrid[lowerIndex]) * 0.75);
+
+        workspace.SelectStationAt(requestedStation);
+
+        EngineeringStationCursor cursor = Assert.IsType<EngineeringStationCursor>(workspace.StationCursor);
+        TrackViewportSample expectedSample = viewport.Samples[expectedIndex];
+        Assert.Equal(expectedIndex, cursor.SampleIndex);
+        Assert.Equal(snapshot.StationGrid[expectedIndex], cursor.Station, 12);
+        Assert.Equal(EditorSelectionKind.Sample, workspace.CurrentSelection!.Kind);
+        Assert.Equal(expectedIndex, workspace.CurrentSelection.SampleIndex);
+        Assert.Equal(expectedSample.SectionIndex, workspace.CurrentSelection.SectionIndex);
+        Assert.Equal(
+            workspace.GraphNodes.Single(node => node.RouteIndex == expectedSample.SectionIndex).NodeId,
+            workspace.CurrentSelection.NodeId);
+        Assert.Equal(expectedSample.SectionIndex, workspace.HighlightedSectionIndex);
+        Assert.Same(graph, document.Graph);
+        Assert.Same(snapshot, workspace.EngineeringSnapshot);
+        Assert.Same(viewport, workspace.ViewportSnapshot);
+        Assert.Contains("Math Plot sample", workspace.StatusMessage, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void SectionHighlight_HoverOverridesSelectionAndRestoresItAcrossAllViews()
+    {
+        var workspace = new EditorWorkspace();
+        workspace.NewDocument();
+        EditorGraphNode selected = workspace.GraphNodes.Single(node => node.NodeId == "sweeper");
+        EditorSelection selectedSection = selected.Selection;
+        EngineeringSnapshot snapshot = workspace.EngineeringSnapshot!;
+        TrackViewportSnapshot viewport = workspace.ViewportSnapshot;
+        int notifications = 0;
+        workspace.SectionHighlightChanged += (_, _) => notifications++;
+        workspace.Select(selectedSection);
+
+        workspace.SetHoveredSection(4);
+
+        Assert.Equal(4, workspace.HighlightedSectionIndex);
+        Assert.Same(selectedSection, workspace.CurrentSelection);
+        Assert.Same(snapshot, workspace.EngineeringSnapshot);
+        Assert.Same(viewport, workspace.ViewportSnapshot);
+
+        workspace.SetHoveredSection(null);
+
+        Assert.Equal(selected.RouteIndex, workspace.HighlightedSectionIndex);
+        Assert.Same(selectedSection, workspace.CurrentSelection);
+        Assert.Equal(2, notifications);
+    }
+
+    [Fact]
+    public void SelectedMathPlotStation_ExposesCanonicalInspectorValuesFromSharedSnapshot()
+    {
+        var workspace = new EditorWorkspace();
+        TrackEditorDocument document = workspace.NewDocument();
+        const int sampleIndex = 64;
+
+        workspace.SelectStationSample(sampleIndex);
+
+        EngineeringSnapshot snapshot = workspace.EngineeringSnapshot!;
+        TrackViewportSample viewportSample = workspace.ViewportSnapshot.Samples[sampleIndex];
+        TrackAuthoringGraphNode section = document.GraphCompileResult!
+            .OrderedNodes[workspace.CurrentSelection!.SectionIndex];
+        Assert.Equal(sampleIndex, workspace.CurrentSelection.SampleIndex);
+        Assert.Equal(snapshot.Geometry[sampleIndex].Position.Y,
+            EngineeringPlotProjection.GetValue(snapshot, EngineeringPlotKind.Elevation, sampleIndex));
+        Assert.Equal(snapshot.Geometry[sampleIndex].CurvatureMagnitude,
+            EngineeringPlotProjection.GetValue(snapshot, EngineeringPlotKind.Curvature, sampleIndex));
+        Assert.Equal(viewportSample.RollDegrees,
+            EngineeringPlotProjection.GetValue(snapshot, EngineeringPlotKind.Roll, sampleIndex)!.Value,
+            12);
+        Assert.True(double.IsFinite(
+            EngineeringPlotProjection.GetValue(snapshot, EngineeringPlotKind.Pitch, sampleIndex)!.Value));
+        Assert.True(double.IsFinite(
+            EngineeringPlotProjection.GetValue(snapshot, EngineeringPlotKind.Yaw, sampleIndex)!.Value));
+        Assert.Equal(workspace.CurrentSelection.NodeId, section.Id);
+        Assert.True(section.Section.Length > 0.0);
     }
 
     [Fact]

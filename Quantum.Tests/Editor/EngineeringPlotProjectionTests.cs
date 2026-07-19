@@ -85,4 +85,19 @@ public sealed class EngineeringPlotProjectionTests
                 snapshot,
                 lowerStation + ((upperStation - lowerStation) * 0.51)));
     }
+
+    [Fact]
+    public void SnapshotNavigation_UsesTheSameResolvedSectionForMathPlotsAndViewport()
+    {
+        var workspace = new EditorWorkspace();
+        workspace.NewDocument();
+        EngineeringSnapshot snapshot = workspace.EngineeringSnapshot!;
+
+        for (int sampleIndex = 0; sampleIndex < snapshot.SampleCount; sampleIndex++)
+        {
+            Assert.Equal(
+                workspace.ViewportSnapshot.Samples[sampleIndex].SectionIndex,
+                EngineeringSnapshotNavigation.FindSectionIndex(snapshot, sampleIndex));
+        }
+    }
 }

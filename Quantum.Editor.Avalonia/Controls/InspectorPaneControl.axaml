@@ -1,0 +1,33 @@
+<UserControl
+    x:Class="Quantum.Editor.Avalonia.Controls.InspectorPaneControl"
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <UserControl.Styles>
+        <Style Selector="TextBlock.panelTitle">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="#AFC4D8" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
+        <Style Selector="TextBox.inspectorField">
+            <Setter Property="MinHeight" Value="28" />
+        </Style>
+    </UserControl.Styles>
+
+    <Border
+        Background="#151C24"
+        BorderBrush="#2B3948"
+        BorderThickness="1,0,0,0">
+        <Grid RowDefinitions="Auto,*">
+            <Border Padding="12,10" BorderBrush="#2B3948" BorderThickness="0,0,0,1">
+                <StackPanel Spacing="3">
+                    <TextBlock Classes="panelTitle" Text="INSPECTOR" />
+                    <TextBlock x:Name="InspectorTitleText" FontSize="16" FontWeight="SemiBold" />
+                </StackPanel>
+            </Border>
+            <ScrollViewer Grid.Row="1">
+                <StackPanel x:Name="InspectorFieldsPanel" Margin="12" Spacing="9" />
+            </ScrollViewer>
+        </Grid>
+    </Border>
+</UserControl>

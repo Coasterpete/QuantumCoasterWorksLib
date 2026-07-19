@@ -1,0 +1,46 @@
+<UserControl
+    x:Class="Quantum.Editor.Avalonia.Controls.RoutePaneControl"
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <UserControl.Styles>
+        <Style Selector="TextBlock.panelTitle">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="#AFC4D8" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
+        <Style Selector="Button.graphNode">
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="Padding" Value="12,10" />
+            <Setter Property="Margin" Value="8,0" />
+            <Setter Property="Background" Value="#18232E" />
+            <Setter Property="BorderBrush" Value="#34495C" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="5" />
+        </Style>
+    </UserControl.Styles>
+
+    <Border
+        Background="#151C24"
+        BorderBrush="#2B3948"
+        BorderThickness="0,0,1,0">
+        <Grid RowDefinitions="Auto,Auto,*">
+            <Border Padding="12,10" BorderBrush="#2B3948" BorderThickness="0,0,0,1">
+                <StackPanel Spacing="3">
+                    <TextBlock Classes="panelTitle" Text="TRACK WORKSPACE" />
+                    <TextBlock x:Name="DocumentTitleText" FontSize="16" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                    <TextBlock x:Name="DocumentPathText" FontSize="11" Foreground="#7F94A8" TextTrimming="CharacterEllipsis" />
+                </StackPanel>
+            </Border>
+            <TextBlock Grid.Row="1" Margin="12,10,12,6" Classes="panelTitle" Text="OUTLINER / AUTHORING ROUTE" />
+            <ScrollViewer
+                x:Name="GraphScrollViewer"
+                Grid.Row="2"
+                Margin="4,0,4,8"
+                HorizontalScrollBarVisibility="Disabled">
+                <StackPanel x:Name="GraphNodesPanel" />
+            </ScrollViewer>
+        </Grid>
+    </Border>
+</UserControl>

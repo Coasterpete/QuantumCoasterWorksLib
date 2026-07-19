@@ -24,6 +24,8 @@ public sealed class TrackViewportControl : Control, IViewportSurface
     private TrackViewportSnapshot snapshot = TrackViewportSnapshot.Empty;
     private EditorSelection? selection;
     private int stationCursorSampleIndex = -1;
+    private int highlightedSectionIndex = -1;
+    private int pointerSectionIndex = -1;
     private TrackViewportProjection projection = TrackViewportProjection.Isometric;
     private bool showFrames = true;
     private bool fitPending = true;
@@ -40,6 +42,8 @@ public sealed class TrackViewportControl : Control, IViewportSurface
     }
 
     public event EventHandler<ViewportSampleSelectedEventArgs>? SampleSelected;
+
+    public event EventHandler<SectionPointerChangedEventArgs>? SectionPointerChanged;
 
     string IViewportSurface.Name => "Track technical viewport";
 
@@ -92,6 +96,27 @@ public sealed class TrackViewportControl : Control, IViewportSurface
             }
 
             stationCursorSampleIndex = replacement;
+            InvalidateVisual();
+        }
+    }
+
+    public int HighlightedSectionIndex
+    {
+        get => highlightedSectionIndex;
+        set
+        {
+            int replacement = value;
+            if (replacement < -1)
+            {
+                replacement = -1;
+            }
+
+            if (highlightedSectionIndex == replacement)
+            {
+                return;
+            }
+
+            highlightedSectionIndex = replacement;
             InvalidateVisual();
         }
     }
@@ -164,6 +189,7 @@ public sealed class TrackViewportControl : Control, IViewportSurface
         lastPointerPosition = point.Position;
         if (point.Properties.IsMiddleButtonPressed || point.Properties.IsRightButtonPressed)
         {
+            SetPointerSection(-1);
             panning = true;
             eventArgs.Pointer.Capture(this);
             eventArgs.Handled = true;
@@ -182,6 +208,11 @@ public sealed class TrackViewportControl : Control, IViewportSurface
         base.OnPointerMoved(eventArgs);
         if (!panning)
         {
+            Point pointer = eventArgs.GetPosition(this);
+            SetPointerSection(
+                TryFindNearestSample(pointer, out TrackViewportSample hoveredSample)
+                    ? hoveredSample.SectionIndex
+                    : -1);
             return;
         }
 
@@ -190,6 +221,12 @@ public sealed class TrackViewportControl : Control, IViewportSurface
         lastPointerPosition = position;
         InvalidateVisual();
         eventArgs.Handled = true;
+    }
+
+    protected override void OnPointerExited(PointerEventArgs eventArgs)
+    {
+        base.OnPointerExited(eventArgs);
+        SetPointerSection(-1);
     }
 
     protected override void OnPointerReleased(PointerReleasedEventArgs eventArgs)
@@ -258,7 +295,7 @@ public sealed class TrackViewportControl : Control, IViewportSurface
 
     private void DrawSelectedSectionHighlight(DrawingContext context)
     {
-        int sectionIndex = selection?.SectionIndex ?? -1;
+        int sectionIndex = highlightedSectionIndex;
         if (sectionIndex < 0)
         {
             return;
@@ -349,6 +386,19 @@ public sealed class TrackViewportControl : Control, IViewportSurface
 
         sample = default;
         return false;
+    }
+
+    private void SetPointerSection(int sectionIndex)
+    {
+        if (pointerSectionIndex == sectionIndex)
+        {
+            return;
+        }
+
+        pointerSectionIndex = sectionIndex;
+        SectionPointerChanged?.Invoke(
+            this,
+            new SectionPointerChangedEventArgs(sectionIndex >= 0 ? sectionIndex : null));
     }
 
     private void CalculateFit()

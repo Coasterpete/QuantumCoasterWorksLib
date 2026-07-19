@@ -1,0 +1,23 @@
+<UserControl
+    x:Class="Quantum.Editor.Avalonia.Controls.DiagnosticsPaneControl"
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <UserControl.Styles>
+        <Style Selector="TextBlock.panelTitle">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="#AFC4D8" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
+    </UserControl.Styles>
+
+    <Grid RowDefinitions="34,*">
+        <Border Background="#151D26" BorderBrush="#2B3948" BorderThickness="0,0,0,1" Padding="12,8">
+            <Grid ColumnDefinitions="*,Auto">
+                <TextBlock Classes="panelTitle" Text="SAMPLING &amp; FRAME DIAGNOSTICS" />
+                <TextBlock x:Name="DiagnosticSummaryText" Grid.Column="1" Foreground="#7F94A8" />
+            </Grid>
+        </Border>
+        <ListBox x:Name="DiagnosticsList" Grid.Row="1" Margin="6" FontFamily="Consolas" FontSize="12" />
+    </Grid>
+</UserControl>

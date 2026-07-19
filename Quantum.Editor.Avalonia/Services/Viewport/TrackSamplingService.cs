@@ -50,7 +50,7 @@ public sealed class TrackSamplingService
 
             samples[sampleIndex] = new TrackViewportSample(
                 sampleIndex,
-                ResolveSectionIndex(snapshot.ResolvedSections, geometry.Station),
+                EngineeringSnapshotNavigation.FindSectionIndex(snapshot, sampleIndex),
                 geometry.Station,
                 geometry.Position,
                 geometry.Tangent,
@@ -62,7 +62,7 @@ public sealed class TrackSamplingService
 
         string[] diagnostics =
         {
-            $"Engineering snapshot {snapshot.Revision.SnapshotRevision} contains {snapshot.ResolvedSections.Count} sections over {snapshot.TotalLength:F2} m.",
+            $"Math Plot snapshot {snapshot.Revision.SnapshotRevision} contains {snapshot.ResolvedSections.Count} sections over {snapshot.TotalLength:F2} m.",
             $"Canonical station grid contains {snapshot.SampleCount} samples at approximately {TargetSpacing:F1} m spacing.",
             $"Maximum |curvature|: {maximumCurvature:F5} 1/m.",
             $"Banking range: {maximumRoll:F2}° maximum absolute roll.",
@@ -80,22 +80,4 @@ public sealed class TrackSamplingService
             continuity);
     }
 
-    private static int ResolveSectionIndex(
-        IReadOnlyList<EngineeringResolvedSectionMetadata> sections,
-        double station)
-    {
-        for (int sectionIndex = 0; sectionIndex < sections.Count; sectionIndex++)
-        {
-            EngineeringResolvedSectionMetadata section = sections[sectionIndex];
-            bool contains = station >= section.StartStation &&
-                (station < section.EndStation ||
-                 (section.IncludesEndStation && station <= section.EndStation));
-            if (contains)
-            {
-                return sectionIndex;
-            }
-        }
-
-        return sections.Count - 1;
-    }
 }

@@ -1,0 +1,79 @@
+<UserControl
+    x:Class="Quantum.Editor.Avalonia.Controls.MathPlotsPaneControl"
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:Quantum.Editor.Avalonia.Controls">
+    <UserControl.Styles>
+        <Style Selector="TextBlock.panelTitle">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="#AFC4D8" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
+    </UserControl.Styles>
+
+    <Grid RowDefinitions="40,*">
+        <Border
+            Background="#151D26"
+            BorderBrush="#2B3948"
+            BorderThickness="0,0,0,1"
+            Padding="12,7">
+            <Grid ColumnDefinitions="Auto,16,Auto,Auto,Auto,Auto,Auto,*,Auto">
+                <TextBlock Classes="panelTitle" VerticalAlignment="Center" Text="MATH PLOT WORKSPACE" />
+                <CheckBox
+                    x:Name="ElevationPlotCheckBox"
+                    Grid.Column="2"
+                    VerticalAlignment="Center"
+                    Content="Elevation"
+                    IsChecked="True"
+                    IsCheckedChanged="OnPlotVisibilityChanged" />
+                <CheckBox
+                    x:Name="CurvaturePlotCheckBox"
+                    Grid.Column="3"
+                    Margin="12,0,0,0"
+                    VerticalAlignment="Center"
+                    Content="Curvature"
+                    IsChecked="True"
+                    IsCheckedChanged="OnPlotVisibilityChanged" />
+                <CheckBox
+                    x:Name="RollPlotCheckBox"
+                    Grid.Column="4"
+                    Margin="12,0,0,0"
+                    VerticalAlignment="Center"
+                    Content="Roll"
+                    IsChecked="True"
+                    IsCheckedChanged="OnPlotVisibilityChanged" />
+                <CheckBox
+                    x:Name="PitchPlotCheckBox"
+                    Grid.Column="5"
+                    Margin="12,0,0,0"
+                    VerticalAlignment="Center"
+                    Content="Pitch"
+                    IsChecked="True"
+                    IsCheckedChanged="OnPlotVisibilityChanged" />
+                <CheckBox
+                    x:Name="YawPlotCheckBox"
+                    Grid.Column="6"
+                    Margin="12,0,0,0"
+                    VerticalAlignment="Center"
+                    Content="Yaw"
+                    IsChecked="True"
+                    IsCheckedChanged="OnPlotVisibilityChanged" />
+                <TextBlock
+                    x:Name="StationReadoutText"
+                    Grid.Column="8"
+                    MinWidth="330"
+                    VerticalAlignment="Center"
+                    FontFamily="Consolas"
+                    Foreground="#F4D35E"
+                    Text="Station --" />
+            </Grid>
+        </Border>
+        <controls:EngineeringPlotWorkspaceControl
+            x:Name="EngineeringPlotsControl"
+            Grid.Row="1"
+            SectionPointerChanged="OnSectionPointerChanged"
+            StationChanged="OnStationChanged"
+            StationSelected="OnStationSelected" />
+    </Grid>
+</UserControl>
