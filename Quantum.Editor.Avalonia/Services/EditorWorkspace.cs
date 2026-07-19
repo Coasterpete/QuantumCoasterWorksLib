@@ -6,7 +6,10 @@ using Quantum.Editor.Avalonia.Services.Selection;
 using Quantum.Editor.Avalonia.Services.UndoRedo;
 using Quantum.Editor.Avalonia.Services.Viewport;
 using Quantum.IO.TrackLayout.V2;
+
+
 using Quantum.Track;
+
 using Quantum.Track.Authoring;
 
 namespace Quantum.Editor.Avalonia.Services;
@@ -16,9 +19,17 @@ public sealed class EditorWorkspace
     private readonly TrackDocumentFileService fileService;
     private readonly TrackSamplingService samplingService;
     private TrackEditorDocument? observedDocument;
+
+    private TrackAuthoringCompilation? projectedCompilation;
+
     private IReadOnlyList<EditorGraphNode> graphNodes = Array.Empty<EditorGraphNode>();
+
     private IReadOnlyList<EditorOutlinerNode> outlinerNodes = Array.Empty<EditorOutlinerNode>();
     private TrackViewportSnapshot viewportSnapshot = TrackViewportSnapshot.Empty;
+    private EngineeringSnapshot? engineeringSnapshot;
+    private EngineeringStationCursor? stationCursor;
+    private long compilationRevision;
+    private long snapshotRevision;
     private string statusMessage = "Ready";
 
     public EditorWorkspace(
@@ -46,6 +57,8 @@ public sealed class EditorWorkspace
 
     public event EventHandler? WorkspaceChanged;
 
+    public event EventHandler? StationCursorChanged;
+
     public DocumentService Documents { get; }
 
     public CommandService Commands { get; }
@@ -72,6 +85,10 @@ public sealed class EditorWorkspace
     public IReadOnlyList<EditorOutlinerNode> OutlinerNodes => outlinerNodes;
 
     public TrackViewportSnapshot ViewportSnapshot => viewportSnapshot;
+
+    public EngineeringSnapshot? EngineeringSnapshot => engineeringSnapshot;
+
+    public EngineeringStationCursor? StationCursor => stationCursor;
 
     public string StatusMessage => statusMessage;
 
@@ -231,6 +248,26 @@ public sealed class EditorWorkspace
         }
     }
 
+    public void SetStationCursor(int sampleIndex)
+    {
+        EngineeringSnapshot? snapshot = engineeringSnapshot;
+        if (snapshot is null || sampleIndex < 0 || sampleIndex >= snapshot.SampleCount)
+        {
+            throw new ArgumentOutOfRangeException(nameof(sampleIndex));
+        }
+
+        var replacement = new EngineeringStationCursor(
+            sampleIndex,
+            snapshot.StationGrid[sampleIndex]);
+        if (stationCursor == replacement)
+        {
+            return;
+        }
+
+        stationCursor = replacement;
+        StationCursorChanged?.Invoke(this, EventArgs.Empty);
+    }
+
     public bool UndoLast()
     {
         string? description = UndoRedo.UndoDescription;
@@ -347,12 +384,31 @@ public sealed class EditorWorkspace
             graphNodes = Array.Empty<EditorGraphNode>();
             outlinerNodes = Array.Empty<EditorOutlinerNode>();
             viewportSnapshot = TrackViewportSnapshot.Empty;
+            engineeringSnapshot = null;
+            stationCursor = null;
+            projectedCompilation = null;
         }
         else
         {
             graphNodes = BuildGraphNodes(document.GraphCompileResult.OrderedNodes);
             outlinerNodes = BuildOutliner(document);
-            viewportSnapshot = samplingService.Sample(document);
+            TrackAuthoringCompilation compilation = document.Compilation!;
+            if (!ReferenceEquals(projectedCompilation, compilation))
+            {
+                projectedCompilation = compilation;
+                compilationRevision++;
+                snapshotRevision++;
+                engineeringSnapshot = EngineeringSnapshotBuilder.Build(
+                    compilation,
+                    new EngineeringSnapshotRequest(
+                        compilationRevision,
+                        snapshotRevision,
+                        samplingService.GetSampleCount(compilation.TotalLength)));
+                viewportSnapshot = samplingService.CreateViewportSnapshot(engineeringSnapshot);
+                stationCursor = new EngineeringStationCursor(
+                    0,
+                    engineeringSnapshot.StationGrid[0]);
+            }
         }
 
         WorkspaceChanged?.Invoke(this, EventArgs.Empty);

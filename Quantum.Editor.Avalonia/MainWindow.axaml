@@ -42,7 +42,7 @@
         </Style>
     </Window.Styles>
 
-    <Grid RowDefinitions="Auto,48,*,5,165,28">
+    <Grid RowDefinitions="Auto,48,*,5,300,28">
         <Border
             x:Name="MenuBarRegion"
             Grid.Row="0"
@@ -66,6 +66,7 @@
                 <MenuItem Header="_View">
                     <MenuItem Header="_Fit Track    F" Click="OnFitViewportClick" />
                     <MenuItem Header="Toggle Transported _Frames" Click="OnMenuShowFramesClick" />
+                    <MenuItem Header="Engineering _Plots" Click="OnShowEngineeringPlotsClick" />
                 </MenuItem>
             </Menu>
         </Border>
@@ -186,15 +187,83 @@
             Grid.Row="4"
             Classes="panel"
             BorderThickness="0,1,0,0">
-            <Grid RowDefinitions="34,*">
-                <Border Background="#151D26" BorderBrush="#2B3948" BorderThickness="0,0,0,1" Padding="12,8">
-                    <Grid ColumnDefinitions="*,Auto">
-                        <TextBlock Classes="panelTitle" Text="SAMPLING &amp; FRAME DIAGNOSTICS" />
-                        <TextBlock x:Name="DiagnosticSummaryText" Grid.Column="1" Foreground="#7F94A8" />
+            <TabControl x:Name="BottomWorkspaceTabs" SelectedIndex="0">
+                <TabItem Header="ENGINEERING PLOTS">
+                    <Grid RowDefinitions="40,*">
+                        <Border
+                            Background="#151D26"
+                            BorderBrush="#2B3948"
+                            BorderThickness="0,0,0,1"
+                            Padding="12,7">
+                            <Grid ColumnDefinitions="Auto,16,Auto,Auto,Auto,Auto,Auto,*,Auto">
+                                <TextBlock Classes="panelTitle" VerticalAlignment="Center" Text="PLOT WORKSPACE" />
+                                <CheckBox
+                                    x:Name="ElevationPlotCheckBox"
+                                    Grid.Column="2"
+                                    VerticalAlignment="Center"
+                                    Content="Elevation"
+                                    IsChecked="True"
+                                    IsCheckedChanged="OnPlotVisibilityChanged" />
+                                <CheckBox
+                                    x:Name="CurvaturePlotCheckBox"
+                                    Grid.Column="3"
+                                    Margin="12,0,0,0"
+                                    VerticalAlignment="Center"
+                                    Content="Curvature"
+                                    IsChecked="True"
+                                    IsCheckedChanged="OnPlotVisibilityChanged" />
+                                <CheckBox
+                                    x:Name="RollPlotCheckBox"
+                                    Grid.Column="4"
+                                    Margin="12,0,0,0"
+                                    VerticalAlignment="Center"
+                                    Content="Roll"
+                                    IsChecked="True"
+                                    IsCheckedChanged="OnPlotVisibilityChanged" />
+                                <CheckBox
+                                    x:Name="PitchPlotCheckBox"
+                                    Grid.Column="5"
+                                    Margin="12,0,0,0"
+                                    VerticalAlignment="Center"
+                                    Content="Pitch"
+                                    IsChecked="True"
+                                    IsCheckedChanged="OnPlotVisibilityChanged" />
+                                <CheckBox
+                                    x:Name="YawPlotCheckBox"
+                                    Grid.Column="6"
+                                    Margin="12,0,0,0"
+                                    VerticalAlignment="Center"
+                                    Content="Yaw"
+                                    IsChecked="True"
+                                    IsCheckedChanged="OnPlotVisibilityChanged" />
+                                <TextBlock
+                                    x:Name="StationReadoutText"
+                                    Grid.Column="8"
+                                    MinWidth="142"
+                                    VerticalAlignment="Center"
+                                    FontFamily="Consolas"
+                                    Foreground="#F4D35E"
+                                    Text="Station --" />
+                            </Grid>
+                        </Border>
+                        <controls:EngineeringPlotWorkspaceControl
+                            x:Name="EngineeringPlotsControl"
+                            Grid.Row="1"
+                            StationChanged="OnEngineeringPlotStationChanged" />
                     </Grid>
-                </Border>
-                <ListBox x:Name="DiagnosticsList" Grid.Row="1" Margin="6" FontFamily="Consolas" FontSize="12" />
-            </Grid>
+                </TabItem>
+                <TabItem Header="DIAGNOSTICS">
+                    <Grid RowDefinitions="34,*">
+                        <Border Background="#151D26" BorderBrush="#2B3948" BorderThickness="0,0,0,1" Padding="12,8">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <TextBlock Classes="panelTitle" Text="SAMPLING &amp; FRAME DIAGNOSTICS" />
+                                <TextBlock x:Name="DiagnosticSummaryText" Grid.Column="1" Foreground="#7F94A8" />
+                            </Grid>
+                        </Border>
+                        <ListBox x:Name="DiagnosticsList" Grid.Row="1" Margin="6" FontFamily="Consolas" FontSize="12" />
+                    </Grid>
+                </TabItem>
+            </TabControl>
         </Border>
 
         <Border

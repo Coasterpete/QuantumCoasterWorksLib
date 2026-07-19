@@ -23,6 +23,7 @@ public sealed class TrackViewportControl : Control, IViewportSurface
 
     private TrackViewportSnapshot snapshot = TrackViewportSnapshot.Empty;
     private EditorSelection? selection;
+    private int stationCursorSampleIndex = -1;
     private TrackViewportProjection projection = TrackViewportProjection.Isometric;
     private bool showFrames = true;
     private bool fitPending = true;
@@ -54,6 +55,11 @@ public sealed class TrackViewportControl : Control, IViewportSurface
             }
 
             snapshot = replacement;
+            if (stationCursorSampleIndex >= snapshot.Samples.Count)
+            {
+                stationCursorSampleIndex = -1;
+            }
+
             fitPending = true;
             InvalidateVisual();
         }
@@ -65,6 +71,27 @@ public sealed class TrackViewportControl : Control, IViewportSurface
         set
         {
             selection = value;
+            InvalidateVisual();
+        }
+    }
+
+    public int StationCursorSampleIndex
+    {
+        get => stationCursorSampleIndex;
+        set
+        {
+            int replacement = value;
+            if (replacement < 0 || replacement >= snapshot.Samples.Count)
+            {
+                replacement = -1;
+            }
+
+            if (stationCursorSampleIndex == replacement)
+            {
+                return;
+            }
+
+            stationCursorSampleIndex = replacement;
             InvalidateVisual();
         }
     }
@@ -124,6 +151,7 @@ public sealed class TrackViewportControl : Control, IViewportSurface
             DrawFrames(context);
         }
 
+        DrawStationCursor(context);
         DrawSelectedSample(context);
     }
 
@@ -279,6 +307,20 @@ public sealed class TrackViewportControl : Control, IViewportSurface
             point,
             6.0,
             6.0);
+    }
+
+    private void DrawStationCursor(DrawingContext context)
+    {
+        if (stationCursorSampleIndex < 0 || stationCursorSampleIndex >= snapshot.Samples.Count)
+        {
+            return;
+        }
+
+        Point point = ToScreen(snapshot.Samples[stationCursorSampleIndex].Position);
+        var cursorPen = new Pen(new SolidColorBrush(Color.Parse("#F4D35E")), 2.0);
+        context.DrawEllipse(null, cursorPen, point, 8.0, 8.0);
+        context.DrawLine(cursorPen, new Point(point.X - 12.0, point.Y), new Point(point.X + 12.0, point.Y));
+        context.DrawLine(cursorPen, new Point(point.X, point.Y - 12.0), new Point(point.X, point.Y + 12.0));
     }
 
     private bool TryFindNearestSample(Point pointer, out TrackViewportSample sample)

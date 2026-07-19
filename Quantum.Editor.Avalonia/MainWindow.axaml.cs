@@ -9,6 +9,8 @@ using Quantum.Editor.Avalonia.Models;
 using Quantum.Editor.Avalonia.Services;
 using Quantum.Editor.Avalonia.Services.Commands;
 using Quantum.Editor.Avalonia.Services.Documents;
+using Quantum.Editor.Avalonia.Services.Plots;
+using Quantum.IO.TrackLayout.V2;
 using Quantum.Track;
 using Quantum.Track.Authoring;
 
@@ -36,6 +38,7 @@ public partial class MainWindow : Window
         InitializeComponent();
 
         this.workspace.WorkspaceChanged += OnWorkspaceChanged;
+        this.workspace.StationCursorChanged += OnStationCursorChanged;
         this.workspace.Viewport.SetActiveViewport(ViewportControl);
         this.workspace.Commands.Register(new EditorCommand(
             EditorCommandIds.FitViewport,
@@ -87,6 +90,7 @@ public partial class MainWindow : Window
 
         ViewportControl.Snapshot = snapshot;
         ViewportControl.Selection = selection;
+        EngineeringPlotsControl.Snapshot = workspace.EngineeringSnapshot;
         ViewportStatsText.Text = snapshot.Samples.Count == 0
             ? "No compiled track samples"
             : $"{snapshot.TotalLength:F2} m | {snapshot.Samples.Count} frames | " +
@@ -97,6 +101,23 @@ public partial class MainWindow : Window
         RebuildGraphPanel();
         RebuildInspector();
         RebuildDiagnostics();
+        UpdateStationCursorView();
+    }
+
+    private void OnStationCursorChanged(object? sender, EventArgs eventArgs)
+    {
+        UpdateStationCursorView();
+    }
+
+    private void UpdateStationCursorView()
+    {
+        EngineeringStationCursor? cursor = workspace.StationCursor;
+        int sampleIndex = cursor?.SampleIndex ?? -1;
+        EngineeringPlotsControl.CursorSampleIndex = sampleIndex;
+        ViewportControl.StationCursorSampleIndex = sampleIndex;
+        StationReadoutText.Text = cursor.HasValue
+            ? $"Station {cursor.Value.Station:F2} m"
+            : "Station --";
     }
 
     private void RebuildGraphPanel()
@@ -657,11 +678,50 @@ public partial class MainWindow : Window
         ShowFramesCheckBox.IsChecked = ShowFramesCheckBox.IsChecked != true;
     }
 
+    private void OnShowEngineeringPlotsClick(object? sender, RoutedEventArgs eventArgs)
+    {
+        BottomWorkspaceTabs.SelectedIndex = 0;
+    }
+
+    private void OnPlotVisibilityChanged(object? sender, RoutedEventArgs eventArgs)
+    {
+        if (EngineeringPlotsControl is null)
+        {
+            return;
+        }
+
+        EngineeringPlotsControl.SetPlotEnabled(
+            EngineeringPlotKind.Elevation,
+            ElevationPlotCheckBox?.IsChecked == true);
+        EngineeringPlotsControl.SetPlotEnabled(
+            EngineeringPlotKind.Curvature,
+            CurvaturePlotCheckBox?.IsChecked == true);
+        EngineeringPlotsControl.SetPlotEnabled(
+            EngineeringPlotKind.Roll,
+            RollPlotCheckBox?.IsChecked == true);
+        EngineeringPlotsControl.SetPlotEnabled(
+            EngineeringPlotKind.Pitch,
+            PitchPlotCheckBox?.IsChecked == true);
+        EngineeringPlotsControl.SetPlotEnabled(
+            EngineeringPlotKind.Yaw,
+            YawPlotCheckBox?.IsChecked == true);
+    }
+
+    private void OnEngineeringPlotStationChanged(
+        object? sender,
+        EngineeringStationChangedEventArgs eventArgs)
+    {
+        workspace.SetStationCursor(eventArgs.SampleIndex);
+    }
+
     private void OnViewportSampleSelected(object? sender, ViewportSampleSelectedEventArgs eventArgs)
     {
         TrackViewportSample sample = eventArgs.Sample;
+        workspace.SetStationCursor(sample.SampleIndex);
+
         string? nodeId = ResolveGraphNodeId(sample.SectionIndex);
         workspace.Select(EditorSelection.Sample(sample.SampleIndex, sample.SectionIndex, nodeId));
+
         workspace.SetStatus(
             $"Selected frame sample {sample.SampleIndex} at station {sample.Distance:F2} m.");
     }
