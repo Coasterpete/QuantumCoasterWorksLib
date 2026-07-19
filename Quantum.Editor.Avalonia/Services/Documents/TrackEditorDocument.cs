@@ -1,12 +1,15 @@
+using Quantum.IO.TrackLayout.V2;
 using Quantum.Track;
 using Quantum.Track.Authoring;
-using Quantum.IO.TrackLayout.V2;
 
 namespace Quantum.Editor.Avalonia.Services.Documents;
 
 public sealed class TrackEditorDocument : IEditorDocument
 {
-    private TrackLayoutPackageV2Dto? package;
+    private TrackAuthoringGraph? graph;
+    private TrackLayoutPackageV2GraphAncillaryState? ancillaryState;
+    private string? cleanPackageJson;
+    private bool explicitlyDirty;
 
     public TrackEditorDocument(TrackDocument trackDocument, string displayName)
     {
@@ -17,15 +20,19 @@ public sealed class TrackEditorDocument : IEditorDocument
     }
 
     private TrackEditorDocument(
-        TrackLayoutPackageV2Dto package,
-        TrackAuthoringCompilation compilation,
+        TrackAuthoringGraph graph,
+        TrackLayoutPackageV2GraphAncillaryState ancillaryState,
+        TrackAuthoringGraphCompileResult graphCompileResult,
         string displayName,
         string? filePath)
-        : this(compilation.Document, displayName)
+        : this(graphCompileResult.Compilation!.Document, displayName)
     {
-        this.package = package;
-        Compilation = compilation;
+        this.graph = graph;
+        this.ancillaryState = ancillaryState;
+        GraphCompileResult = graphCompileResult;
+        Compilation = graphCompileResult.Compilation;
         FilePath = filePath;
+        cleanPackageJson = CapturePackageJson();
     }
 
     public event EventHandler? Changed;
@@ -36,13 +43,30 @@ public sealed class TrackEditorDocument : IEditorDocument
 
     public TrackDocument TrackDocument { get; private set; }
 
-    public TrackLayoutPackageV2Dto? Package => package;
+    /// <summary>
+    /// Authoritative editor-facing authoring graph. Section DTOs are produced only
+    /// when the compatibility package snapshot is requested.
+    /// </summary>
+    public TrackAuthoringGraph? Graph => graph;
+
+    public TrackLayoutPackageV2GraphAncillaryState? AncillaryState => ancillaryState;
+
+    public TrackAuthoringGraphCompileResult? GraphCompileResult { get; private set; }
+
+    /// <summary>
+    /// Compatibility snapshot generated from the active graph; callers do not receive
+    /// mutable editor-owned state.
+    /// </summary>
+    public TrackLayoutPackageV2Dto? Package =>
+        graph is null || ancillaryState is null
+            ? null
+            : ExportPackage(graph, ancillaryState);
 
     public TrackAuthoringCompilation? Compilation { get; private set; }
 
     public string? FilePath { get; private set; }
 
-    public bool CanSave => package != null;
+    public bool CanSave => graph != null && ancillaryState != null;
 
     public static TrackEditorDocument Create(
         TrackLayoutPackageV2Dto package,
@@ -51,19 +75,78 @@ public sealed class TrackEditorDocument : IEditorDocument
     {
         ArgumentNullException.ThrowIfNull(package);
 
-        TrackLayoutPackageV2Dto packageCopy = ClonePackage(package);
-        TrackAuthoringCompilation compilation = CompilePackage(packageCopy);
-        return new TrackEditorDocument(packageCopy, compilation, displayName, filePath);
+        TrackLayoutPackageV2GraphImportResult import =
+            TrackLayoutPackageV2GraphAdapter.Import(package);
+        if (!import.Success || import.Graph is null || import.AncillaryState is null)
+        {
+            throw CreatePackageImportException(import.Diagnostics);
+        }
+
+        TrackAuthoringGraphCompileResult graphCompileResult =
+            TrackAuthoringGraphCompiler.Compile(import.Graph);
+        if (!graphCompileResult.Success || graphCompileResult.Compilation is null)
+        {
+            throw new TrackEditorDocumentException(
+                FormatGraphDiagnostics(
+                    "The imported layout graph could not be compiled",
+                    graphCompileResult.Diagnostics),
+                import.Diagnostics);
+        }
+
+        return new TrackEditorDocument(
+            import.Graph,
+            import.AncillaryState,
+            graphCompileResult,
+            displayName,
+            filePath);
     }
 
     public string CapturePackageJson()
     {
-        if (package is null)
+        if (graph is null || ancillaryState is null)
         {
-            throw new InvalidOperationException("This editor document does not have a persistable Track Layout Package V2 model.");
+            throw new InvalidOperationException(
+                "This editor document does not have a persistable Track Layout Package V2 graph model.");
         }
 
-        return TrackLayoutPackageV2Json.Serialize(package, indented: true);
+        return SerializePackage(graph, ancillaryState);
+    }
+
+    internal string CapturePackageJson(TrackAuthoringGraph candidateGraph)
+    {
+        ArgumentNullException.ThrowIfNull(candidateGraph);
+        if (ancillaryState is null)
+        {
+            throw new InvalidOperationException(
+                "This editor document does not have Track Layout Package V2 ancillary state.");
+        }
+
+        return SerializePackage(candidateGraph, ancillaryState);
+    }
+
+    public void ReplaceGraph(TrackAuthoringGraph candidateGraph)
+    {
+        ArgumentNullException.ThrowIfNull(candidateGraph);
+        if (graph is null || ancillaryState is null)
+        {
+            throw new InvalidOperationException(
+                "This editor document does not have an editable authoring graph.");
+        }
+
+        TrackAuthoringGraphCompileResult candidateCompilation =
+            TrackAuthoringGraphCompiler.Compile(candidateGraph);
+        if (!candidateCompilation.Success || candidateCompilation.Compilation is null)
+        {
+            throw new InvalidOperationException(FormatGraphDiagnostics(
+                "The candidate authoring graph was rejected",
+                candidateCompilation.Diagnostics));
+        }
+
+        string candidatePackageJson = CapturePackageJson(candidateGraph);
+        bool candidateIsDirty = explicitlyDirty ||
+            cleanPackageJson is null ||
+            !string.Equals(cleanPackageJson, candidatePackageJson, StringComparison.Ordinal);
+        CommitCompiledGraph(candidateGraph, candidateCompilation, candidateIsDirty);
     }
 
     public void ReplacePackageJson(string json, bool markDirty = true)
@@ -71,12 +154,43 @@ public sealed class TrackEditorDocument : IEditorDocument
         ArgumentNullException.ThrowIfNull(json);
 
         TrackLayoutPackageV2Dto replacement = TrackLayoutPackageV2Json.Deserialize(json);
-        TrackAuthoringCompilation compilation = CompilePackage(replacement);
+        TrackLayoutPackageV2GraphImportResult import =
+            TrackLayoutPackageV2GraphAdapter.Import(replacement);
+        if (!import.Success || import.Graph is null || import.AncillaryState is null)
+        {
+            throw CreatePackageImportException(import.Diagnostics);
+        }
 
-        package = replacement;
-        Compilation = compilation;
-        TrackDocument = compilation.Document;
-        IsDirty = markDirty;
+        TrackAuthoringGraphCompileResult candidateCompilation =
+            TrackAuthoringGraphCompiler.Compile(import.Graph);
+        if (!candidateCompilation.Success || candidateCompilation.Compilation is null)
+        {
+            throw new TrackEditorDocumentException(
+                FormatGraphDiagnostics(
+                    "The replacement layout graph could not be compiled",
+                    candidateCompilation.Diagnostics),
+                import.Diagnostics);
+        }
+
+        string replacementPackageJson = SerializePackage(import.Graph, import.AncillaryState);
+        graph = import.Graph;
+        ancillaryState = import.AncillaryState;
+        GraphCompileResult = candidateCompilation;
+        Compilation = candidateCompilation.Compilation;
+        TrackDocument = candidateCompilation.Compilation.Document;
+
+        if (markDirty)
+        {
+            explicitlyDirty = true;
+            IsDirty = true;
+        }
+        else
+        {
+            explicitlyDirty = false;
+            cleanPackageJson = replacementPackageJson;
+            IsDirty = false;
+        }
+
         Changed?.Invoke(this, EventArgs.Empty);
     }
 
@@ -91,6 +205,7 @@ public sealed class TrackEditorDocument : IEditorDocument
 
     public void MarkDirty()
     {
+        explicitlyDirty = true;
         if (IsDirty)
         {
             return;
@@ -102,6 +217,8 @@ public sealed class TrackEditorDocument : IEditorDocument
 
     public void MarkClean()
     {
+        explicitlyDirty = false;
+        cleanPackageJson = CanSave ? CapturePackageJson() : null;
         if (!IsDirty)
         {
             return;
@@ -111,39 +228,76 @@ public sealed class TrackEditorDocument : IEditorDocument
         Changed?.Invoke(this, EventArgs.Empty);
     }
 
-    private static TrackLayoutPackageV2Dto ClonePackage(TrackLayoutPackageV2Dto source)
+    private void CommitCompiledGraph(
+        TrackAuthoringGraph candidateGraph,
+        TrackAuthoringGraphCompileResult candidateCompilation,
+        bool candidateIsDirty)
     {
-        return TrackLayoutPackageV2Json.Deserialize(
-            TrackLayoutPackageV2Json.Serialize(source));
+        graph = candidateGraph;
+        GraphCompileResult = candidateCompilation;
+        Compilation = candidateCompilation.Compilation;
+        TrackDocument = candidateCompilation.Compilation!.Document;
+        IsDirty = candidateIsDirty;
+        Changed?.Invoke(this, EventArgs.Empty);
     }
 
-    private static TrackAuthoringCompilation CompilePackage(TrackLayoutPackageV2Dto package)
+    private static string SerializePackage(
+        TrackAuthoringGraph sourceGraph,
+        TrackLayoutPackageV2GraphAncillaryState sourceAncillaryState)
     {
-        TrackLayoutPackageV2ImportResult import = TrackLayoutPackageV2Mapper.Import(package);
-        if (!import.Success || import.Definition is null)
+        return TrackLayoutPackageV2Json.Serialize(
+            ExportPackage(sourceGraph, sourceAncillaryState),
+            indented: true);
+    }
+
+    private static TrackLayoutPackageV2Dto ExportPackage(
+        TrackAuthoringGraph sourceGraph,
+        TrackLayoutPackageV2GraphAncillaryState sourceAncillaryState)
+    {
+        TrackLayoutPackageV2GraphExportResult export =
+            TrackLayoutPackageV2GraphAdapter.Export(sourceGraph, sourceAncillaryState);
+        if (!export.Success || export.Package is null)
         {
-            string details = import.Diagnostics.Count == 0
-                ? "The Track Layout Package V2 import failed without diagnostics."
+            if (export.GraphDiagnostics.Count != 0)
+            {
+                throw new InvalidOperationException(FormatGraphDiagnostics(
+                    "The authoring graph could not be exported",
+                    export.GraphDiagnostics));
+            }
+
+            string details = export.PackageDiagnostics.Count == 0
+                ? "The Track Layout Package V2 export failed without diagnostics."
                 : string.Join(
                     Environment.NewLine,
-                    import.Diagnostics.Select(diagnostic =>
+                    export.PackageDiagnostics.Select(diagnostic =>
                         $"{diagnostic.Code} at {diagnostic.Path}: {diagnostic.Message}"));
-            throw new TrackEditorDocumentException(details, import.Diagnostics);
+            throw new TrackEditorDocumentException(details, export.PackageDiagnostics);
         }
 
-        try
-        {
-            return TrackAuthoringDocumentBuilder.Compile(import.Definition);
-        }
-        catch (Exception exception) when (
-            exception is ArgumentException ||
-            exception is InvalidOperationException ||
-            exception is NotSupportedException)
-        {
-            throw new TrackEditorDocumentException(
-                "The imported layout could not be compiled: " + exception.Message,
-                import.Diagnostics,
-                exception);
-        }
+        return export.Package;
+    }
+
+    private static TrackEditorDocumentException CreatePackageImportException(
+        IReadOnlyList<TrackLayoutPackageV2ValidationDiagnostic> diagnostics)
+    {
+        string details = diagnostics.Count == 0
+            ? "The Track Layout Package V2 import failed without diagnostics."
+            : string.Join(
+                Environment.NewLine,
+                diagnostics.Select(diagnostic =>
+                    $"{diagnostic.Code} at {diagnostic.Path}: {diagnostic.Message}"));
+        return new TrackEditorDocumentException(details, diagnostics);
+    }
+
+    private static string FormatGraphDiagnostics(
+        string prefix,
+        IReadOnlyList<TrackAuthoringGraphDiagnostic> diagnostics)
+    {
+        return diagnostics.Count == 0
+            ? prefix + " without diagnostics."
+            : prefix + ": " + string.Join(
+                " ",
+                diagnostics.Select(diagnostic =>
+                    $"{diagnostic.Code}: {diagnostic.Message}"));
     }
 }

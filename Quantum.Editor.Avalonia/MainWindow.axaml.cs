@@ -9,8 +9,8 @@ using Quantum.Editor.Avalonia.Models;
 using Quantum.Editor.Avalonia.Services;
 using Quantum.Editor.Avalonia.Services.Commands;
 using Quantum.Editor.Avalonia.Services.Documents;
-using Quantum.IO.TrackLayout.V2;
 using Quantum.Track;
+using Quantum.Track.Authoring;
 
 namespace Quantum.Editor.Avalonia;
 
@@ -24,8 +24,6 @@ public partial class MainWindow : Window
 
     private readonly EditorWorkspace workspace;
     private readonly Dictionary<string, TextBox> inspectorFields = new(StringComparer.Ordinal);
-    private readonly Dictionary<EditorSelection, TreeViewItem> outlinerItems = new();
-    private bool suppressOutlinerSelection;
 
     public MainWindow()
         : this(CreateWorkspace())
@@ -65,7 +63,7 @@ public partial class MainWindow : Window
 
         Title = document is null
             ? "Quantum CoasterWorks Editor"
-            : $"Quantum CoasterWorks Editor — {document.DisplayName}{(document.IsDirty ? " *" : string.Empty)}";
+            : $"Quantum CoasterWorks Editor - {document.DisplayName}{(document.IsDirty ? " *" : string.Empty)}";
         DocumentTitleText.Text = document is null
             ? "No active document"
             : document.DisplayName + (document.IsDirty ? " *" : string.Empty);
@@ -91,63 +89,115 @@ public partial class MainWindow : Window
         ViewportControl.Selection = selection;
         ViewportStatsText.Text = snapshot.Samples.Count == 0
             ? "No compiled track samples"
-            : $"{snapshot.TotalLength:F2} m  ·  {snapshot.Samples.Count} frames  ·  max |κ| {snapshot.MaximumAbsoluteCurvature:F5} 1/m  ·  max |bank| {snapshot.MaximumAbsoluteRollDegrees:F1}°";
+            : $"{snapshot.TotalLength:F2} m | {snapshot.Samples.Count} frames | " +
+              $"max |k| {snapshot.MaximumAbsoluteCurvature:F5} 1/m | " +
+              $"max |bank| {snapshot.MaximumAbsoluteRollDegrees:F1} deg";
         ViewportSelectionOverlay.Text = DescribeViewportSelection(selection, snapshot);
 
-        RebuildOutliner();
+        RebuildGraphPanel();
         RebuildInspector();
         RebuildDiagnostics();
     }
 
-    private void RebuildOutliner()
+    private void RebuildGraphPanel()
     {
-        suppressOutlinerSelection = true;
-        try
+        GraphNodesPanel.Children.Clear();
+        EditorSelection? selection = workspace.CurrentSelection;
+        string? selectedNodeId = selection?.NodeId;
+        if (selectedNodeId is null && selection?.SectionIndex >= 0)
         {
-            outlinerItems.Clear();
-            var roots = new List<TreeViewItem>();
-            foreach (EditorOutlinerNode node in workspace.OutlinerNodes)
+            selectedNodeId = workspace.GraphNodes
+                .FirstOrDefault(node => node.RouteIndex == selection.SectionIndex)
+                ?.NodeId;
+        }
+
+        for (int index = 0; index < workspace.GraphNodes.Count; index++)
+        {
+            EditorGraphNode node = workspace.GraphNodes[index];
+            bool selected = string.Equals(selectedNodeId, node.NodeId, StringComparison.Ordinal);
+            var header = new Grid
             {
-                roots.Add(CreateTreeItem(node, 0));
-            }
-
-            OutlinerTree.ItemsSource = roots;
-
-            EditorSelection? current = workspace.CurrentSelection;
-            EditorSelection? treeSelection = current?.Kind == EditorSelectionKind.Sample && current.SectionIndex >= 0
-                ? EditorSelection.Section(current.SectionIndex)
-                : current;
-            if (treeSelection != null && outlinerItems.TryGetValue(treeSelection, out TreeViewItem? selectedItem))
+                ColumnDefinitions = new ColumnDefinitions("Auto,*,Auto"),
+                ColumnSpacing = 8
+            };
+            header.Children.Add(new TextBlock
             {
-                OutlinerTree.SelectedItem = selectedItem;
+                Text = (node.RouteIndex + 1).ToString("D2", CultureInfo.InvariantCulture),
+                Foreground = global::Avalonia.Media.Brush.Parse("#6FA9D3"),
+                FontFamily = new global::Avalonia.Media.FontFamily("Consolas"),
+                VerticalAlignment = VerticalAlignment.Center
+            });
+            var title = new TextBlock
+            {
+                Text = node.NodeId,
+                FontSize = 14,
+                FontWeight = global::Avalonia.Media.FontWeight.SemiBold,
+                TextTrimming = global::Avalonia.Media.TextTrimming.CharacterEllipsis
+            };
+            Grid.SetColumn(title, 1);
+            header.Children.Add(title);
+            var kind = new TextBlock
+            {
+                Text = node.SectionKind,
+                Foreground = global::Avalonia.Media.Brush.Parse("#8FA5B9"),
+                FontSize = 11,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            Grid.SetColumn(kind, 2);
+            header.Children.Add(kind);
+
+            var content = new StackPanel
+            {
+                Spacing = 5,
+                Children =
+                {
+                    header,
+                    new TextBlock
+                    {
+                        Text = node.Summary,
+                        Foreground = global::Avalonia.Media.Brush.Parse("#8FA5B9"),
+                        FontSize = 11,
+                        TextWrapping = global::Avalonia.Media.TextWrapping.Wrap
+                    }
+                }
+            };
+            var button = new Button
+            {
+                Tag = node,
+                Content = content,
+                Background = global::Avalonia.Media.Brush.Parse(selected ? "#203B50" : "#18232E"),
+                BorderBrush = global::Avalonia.Media.Brush.Parse(selected ? "#59B5E8" : "#34495C")
+            };
+            button.Classes.Add("graphNode");
+            button.Click += OnGraphNodeClick;
+            GraphNodesPanel.Children.Add(button);
+
+            if (index + 1 < workspace.GraphNodes.Count)
+            {
+                var connector = new Grid
+                {
+                    Height = 28,
+                    IsHitTestVisible = false
+                };
+                connector.Children.Add(new Border
+                {
+                    Width = 2,
+                    Height = 22,
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Top,
+                    Background = global::Avalonia.Media.Brush.Parse("#3E718F")
+                });
+                connector.Children.Add(new TextBlock
+                {
+                    Text = "\u25BC",
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Bottom,
+                    Foreground = global::Avalonia.Media.Brush.Parse("#59B5E8"),
+                    FontSize = 10
+                });
+                GraphNodesPanel.Children.Add(connector);
             }
         }
-        finally
-        {
-            suppressOutlinerSelection = false;
-        }
-    }
-
-    private TreeViewItem CreateTreeItem(EditorOutlinerNode node, int depth)
-    {
-        var item = new TreeViewItem
-        {
-            Header = node.Title,
-            Tag = node,
-            IsExpanded = depth < 2
-        };
-
-        if (node.Selection != null)
-        {
-            outlinerItems[node.Selection] = item;
-        }
-
-        if (node.Children.Count != 0)
-        {
-            item.ItemsSource = node.Children.Select(child => CreateTreeItem(child, depth + 1)).ToArray();
-        }
-
-        return item;
     }
 
     private void RebuildInspector()
@@ -156,127 +206,166 @@ public partial class MainWindow : Window
         InspectorFieldsPanel.Children.Clear();
 
         TrackEditorDocument? document = workspace.ActiveDocument;
-        TrackLayoutPackageV2Dto? package = document?.Package;
         EditorSelection? selection = workspace.CurrentSelection;
-        if (document is null || package is null || selection is null)
+        if (document?.Graph is null || document.GraphCompileResult is null || selection is null)
         {
             InspectorTitleText.Text = "Nothing selected";
-            AddInspectorNote("Select the track, a section, banking key, control point, or viewport sample.");
+            AddInspectorNote("Select a graph node or viewport sample.");
             return;
         }
 
         switch (selection.Kind)
         {
             case EditorSelectionKind.Track:
-                InspectorTitleText.Text = "Track document";
-                AddInspectorField("sourceName", "Source name", package.Metadata.SourceName ?? string.Empty);
-                AddInspectorField("layoutId", "Layout ID", package.Metadata.LayoutId ?? string.Empty);
-                AddInspectorField("units", "Units", package.Metadata.Units, editable: false);
-                AddInspectorField("sections", "Sections", package.Sections.Length.ToString(CultureInfo.InvariantCulture), editable: false);
-                AddInspectorField("length", "Compiled length", $"{workspace.ViewportSnapshot.TotalLength:F3} m", editable: false);
-                if (package.Heartline != null)
-                {
-                    AddInspectorField("heartlineNormal", "Heartline normal", package.Heartline.NormalOffset.ToString("G17", CultureInfo.InvariantCulture));
-                    AddInspectorField("heartlineLateral", "Heartline lateral", package.Heartline.LateralOffset.ToString("G17", CultureInfo.InvariantCulture));
-                }
-                AddApplyButton("Apply track properties", ApplyTrackInspector);
+                BuildTrackInspector(document);
                 break;
-
             case EditorSelectionKind.Section:
-                BuildSectionInspector(package, selection.SectionIndex);
+                BuildGraphNodeInspector(document, selection);
                 break;
-
-            case EditorSelectionKind.BankingKey:
-                BuildBankingInspector(package, selection.ElementIndex);
-                break;
-
-            case EditorSelectionKind.ControlPoint:
-                BuildControlPointInspector(package, selection.SectionIndex, selection.ElementIndex);
-                break;
-
             case EditorSelectionKind.Sample:
                 BuildSampleInspector(selection.SampleIndex);
                 break;
+            case EditorSelectionKind.BankingKey:
+                InspectorTitleText.Text = "Banking key";
+                AddInspectorNote("Banking-key editing is outside the M157 graph-authoring vertical slice.");
+                break;
+            case EditorSelectionKind.ControlPoint:
+                InspectorTitleText.Text = "Spatial control point";
+                AddInspectorNote("Control-point editing is outside the M157 graph-authoring vertical slice.");
+                break;
         }
     }
 
-    private void BuildSectionInspector(TrackLayoutPackageV2Dto package, int sectionIndex)
+    private void BuildTrackInspector(TrackEditorDocument document)
     {
-        if (sectionIndex < 0 || sectionIndex >= package.Sections.Length)
+        InspectorTitleText.Text = "Track document";
+        AddInspectorField(
+            "sourceName",
+            "Source name",
+            document.AncillaryState?.SourceName ?? string.Empty,
+            editable: false);
+        AddInspectorField(
+            "layoutId",
+            "Layout ID",
+            document.AncillaryState?.LayoutId ?? string.Empty,
+            editable: false);
+        AddInspectorField(
+            "units",
+            "Units",
+            document.AncillaryState?.Units ?? string.Empty,
+            editable: false);
+        AddInspectorField(
+            "sections",
+            "Graph nodes",
+            workspace.GraphNodes.Count.ToString(CultureInfo.InvariantCulture),
+            editable: false);
+        AddInspectorField(
+            "length",
+            "Compiled length",
+            $"{workspace.ViewportSnapshot.TotalLength:F3} m",
+            editable: false);
+        HeartlineOffset? heartline = document.AncillaryState?.HeartlineOffset;
+        if (heartline.HasValue)
         {
-            InspectorTitleText.Text = "Invalid section";
-            return;
+            AddInspectorField(
+                "heartlineNormal",
+                "Heartline normal",
+                heartline.Value.NormalOffsetMeters.ToString("G17", CultureInfo.InvariantCulture),
+                editable: false);
+            AddInspectorField(
+                "heartlineLateral",
+                "Heartline lateral",
+                heartline.Value.LateralOffsetMeters.ToString("G17", CultureInfo.InvariantCulture),
+                editable: false);
         }
 
-        TrackLayoutSectionV2Dto section = package.Sections[sectionIndex];
-        InspectorTitleText.Text = $"Section {sectionIndex + 1}: {section.Id}";
-        AddInspectorField("kind", "Kind", section.Kind, editable: false);
-        AddInspectorField("id", "ID", section.Id);
-        AddInspectorField("sectionLength", "Length (m)", section.Length.ToString("G17", CultureInfo.InvariantCulture));
-        AddInspectorField("rollDegrees", "Section roll (°)", (section.RollRadians * 180.0 / System.Math.PI).ToString("G17", CultureInfo.InvariantCulture));
-
-        if (section.Radius.HasValue)
-        {
-            AddInspectorField("radius", "Signed radius (m)", section.Radius.Value.ToString("G17", CultureInfo.InvariantCulture));
-        }
-
-        if (section.StartCurvature.HasValue)
-        {
-            AddInspectorField("startCurvature", "Start curvature", section.StartCurvature.Value.ToString("G17", CultureInfo.InvariantCulture));
-        }
-
-        if (section.EndCurvature.HasValue)
-        {
-            AddInspectorField("endCurvature", "End curvature", section.EndCurvature.Value.ToString("G17", CultureInfo.InvariantCulture));
-        }
-
-        if (section.Degree.HasValue)
-        {
-            AddInspectorField("degree", "NURBS degree", section.Degree.Value.ToString(CultureInfo.InvariantCulture), editable: false);
-        }
-
-        AddApplyButton("Apply section edit", () => ApplySectionInspector(sectionIndex));
+        AddInspectorNote(
+            "M157 edits section nodes through the authoring graph. Document metadata remains read-only.");
     }
 
-    private void BuildBankingInspector(TrackLayoutPackageV2Dto package, int keyIndex)
+    private void BuildGraphNodeInspector(
+        TrackEditorDocument document,
+        EditorSelection selection)
     {
-        TrackBankingKeyV2Dto[] keys = package.Banking?.Keys ?? Array.Empty<TrackBankingKeyV2Dto>();
-        if (keyIndex < 0 || keyIndex >= keys.Length)
+        IReadOnlyList<TrackAuthoringGraphNode> route = document.GraphCompileResult!.OrderedNodes;
+        TrackAuthoringGraphNode? node = selection.NodeId is null
+            ? null
+            : route.FirstOrDefault(candidate =>
+                string.Equals(candidate.Id, selection.NodeId, StringComparison.Ordinal));
+        if (node is null && selection.SectionIndex >= 0 && selection.SectionIndex < route.Count)
         {
-            InspectorTitleText.Text = "Invalid banking key";
+            node = route[selection.SectionIndex];
+        }
+
+        if (node is null)
+        {
+            InspectorTitleText.Text = "Invalid graph node";
             return;
         }
 
-        TrackBankingKeyV2Dto key = keys[keyIndex];
-        InspectorTitleText.Text = $"Banking key {keyIndex}";
-        AddInspectorField("bankDistance", "Distance (m)", key.Distance.ToString("G17", CultureInfo.InvariantCulture));
-        AddInspectorField("bankRollDegrees", "Roll (°)", (key.RollRadians * 180.0 / System.Math.PI).ToString("G17", CultureInfo.InvariantCulture));
-        AddInspectorField("bankInterpolation", "Interpolation", key.InterpolationToNext);
-        AddApplyButton("Apply banking edit", () => ApplyBankingInspector(keyIndex));
-    }
+        GeometricSectionDefinition section = node.Section;
+        InspectorTitleText.Text = "Graph node: " + section.Id;
+        AddInspectorField("id", "Node ID", section.Id, editable: false);
+        AddInspectorField("kind", "Section kind", DescribeSectionKind(section), editable: false);
+        AddInspectorField(
+            "sectionLength",
+            "Length (m)",
+            section.Length.ToString("G17", CultureInfo.InvariantCulture),
+            editable: false);
+        AddInspectorField(
+            "rollDegrees",
+            "Section roll (deg)",
+            (section.RollRadians * 180.0 / System.Math.PI).ToString("G17", CultureInfo.InvariantCulture),
+            editable: false);
 
-    private void BuildControlPointInspector(TrackLayoutPackageV2Dto package, int sectionIndex, int pointIndex)
-    {
-        if (sectionIndex < 0 || sectionIndex >= package.Sections.Length)
+        if (section is ConstantCurvatureSectionDefinition arc)
         {
-            InspectorTitleText.Text = "Invalid control point";
-            return;
+            AddInspectorField(
+                "radius",
+                "Signed radius (m)",
+                arc.Radius.ToString("G17", CultureInfo.InvariantCulture));
+            AddInspectorNote(
+                "Changing signed radius recompiles the complete graph through the existing backend pipeline.");
+            AddApplyButton("Apply radius", () => ApplyRadiusInspector(node.Id));
         }
-
-        TrackLayoutVector3dV2Dto[] points = package.Sections[sectionIndex].ControlPoints ?? Array.Empty<TrackLayoutVector3dV2Dto>();
-        if (pointIndex < 0 || pointIndex >= points.Length)
+        else if (section is CurvatureTransitionSectionDefinition transition)
         {
-            InspectorTitleText.Text = "Invalid control point";
-            return;
+            AddInspectorField(
+                "startCurvature",
+                "Start curvature",
+                transition.StartCurvature.ToString("G17", CultureInfo.InvariantCulture),
+                editable: false);
+            AddInspectorField(
+                "endCurvature",
+                "End curvature",
+                transition.EndCurvature.ToString("G17", CultureInfo.InvariantCulture),
+                editable: false);
+            AddInspectorField(
+                "interpolation",
+                "Interpolation",
+                transition.InterpolationMode.ToString(),
+                editable: false);
+            AddInspectorNote("Transition editing is intentionally deferred beyond M157.");
         }
-
-        TrackLayoutVector3dV2Dto point = points[pointIndex];
-        InspectorTitleText.Text = $"Control point {pointIndex}";
-        AddInspectorField("pointX", "Local X", point.X.ToString("G17", CultureInfo.InvariantCulture));
-        AddInspectorField("pointY", "Local Y", point.Y.ToString("G17", CultureInfo.InvariantCulture));
-        AddInspectorField("pointZ", "Local Z", point.Z.ToString("G17", CultureInfo.InvariantCulture));
-        AddInspectorNote("Spatial edits are revalidated and recompiled. Invalid start/tangent or declared-length changes are rejected.");
-        AddApplyButton("Apply control point edit", () => ApplyControlPointInspector(sectionIndex, pointIndex));
+        else if (section is SpatialSectionDefinition spatial)
+        {
+            AddInspectorField(
+                "degree",
+                "NURBS degree",
+                spatial.Degree.ToString(CultureInfo.InvariantCulture),
+                editable: false);
+            AddInspectorField(
+                "controlPoints",
+                "Control points",
+                spatial.ControlPoints.Count.ToString(CultureInfo.InvariantCulture),
+                editable: false);
+            AddInspectorNote("Spatial control-point editing is intentionally deferred beyond M157.");
+        }
+        else
+        {
+            AddInspectorNote(
+                "Straight-node length editing is deferred because authored banking shares the total station domain.");
+        }
     }
 
     private void BuildSampleInspector(int sampleIndex)
@@ -290,13 +379,17 @@ public partial class MainWindow : Window
         TrackViewportSample sample = workspace.ViewportSnapshot.Samples[sampleIndex];
         InspectorTitleText.Text = $"Frame sample {sample.SampleIndex}";
         AddInspectorField("sampleDistance", "Station", $"{sample.Distance:F3} m", editable: false);
-        AddInspectorField("sampleSection", "Section", (sample.SectionIndex + 1).ToString(CultureInfo.InvariantCulture), editable: false);
+        AddInspectorField(
+            "sampleSection",
+            "Graph node",
+            ResolveGraphNodeId(sample.SectionIndex) ?? (sample.SectionIndex + 1).ToString(CultureInfo.InvariantCulture),
+            editable: false);
         AddInspectorField("samplePosition", "Position", FormatVector(sample.Position), editable: false);
         AddInspectorField("sampleTangent", "Tangent", FormatVector(sample.Tangent), editable: false);
         AddInspectorField("sampleNormal", "Normal", FormatVector(sample.Normal), editable: false);
         AddInspectorField("sampleBinormal", "Binormal", FormatVector(sample.Binormal), editable: false);
         AddInspectorField("sampleCurvature", "Curvature", $"{sample.Curvature:F6} 1/m", editable: false);
-        AddInspectorField("sampleRoll", "Banking", $"{sample.RollDegrees:F3}°", editable: false);
+        AddInspectorField("sampleRoll", "Banking", $"{sample.RollDegrees:F3} deg", editable: false);
     }
 
     private void AddInspectorField(string key, string label, string value, bool editable = true)
@@ -359,89 +452,37 @@ public partial class MainWindow : Window
             foreach (TrackFrameContinuityIssue issue in continuity.Issues.Take(12))
             {
                 lines.Add(
-                    $"{issue.Kind}: {issue.Interval.StartDistance:F2}–{issue.Interval.EndDistance:F2} m, " +
-                    $"{issue.ActualAngleDegrees:F3}° > {issue.ThresholdAngleDegrees:F3}°." );
+                    $"{issue.Kind}: {issue.Interval.StartDistance:F2}-{issue.Interval.EndDistance:F2} m, " +
+                    $"{issue.ActualAngleDegrees:F3} deg > {issue.ThresholdAngleDegrees:F3} deg.");
             }
         }
 
         DiagnosticsList.ItemsSource = lines;
         DiagnosticSummaryText.Text = continuity is null
             ? "No compiled diagnostics"
-            : $"{continuity.IntervalCount} intervals · {continuity.Issues.Count} issues";
+            : $"{continuity.IntervalCount} intervals | {continuity.Issues.Count} issues";
     }
 
-    private void ApplyTrackInspector()
-    {
-        TryApplyInspectorEdit("Edit track properties", package =>
-        {
-            package.Metadata.SourceName = Field("sourceName");
-            package.Metadata.LayoutId = Field("layoutId");
-            if (package.Heartline != null)
-            {
-                package.Heartline.NormalOffset = NumberField("heartlineNormal");
-                package.Heartline.LateralOffset = NumberField("heartlineLateral");
-            }
-        });
-    }
-
-    private void ApplySectionInspector(int sectionIndex)
-    {
-        TryApplyInspectorEdit("Edit section", package =>
-        {
-            TrackLayoutSectionV2Dto section = package.Sections[sectionIndex];
-            double previousLength = section.Length;
-            double newLength = NumberField("sectionLength");
-            section.Id = Field("id");
-            section.Length = newLength;
-            section.RollRadians = NumberField("rollDegrees") * System.Math.PI / 180.0;
-            if (section.Radius.HasValue)
-            {
-                section.Radius = NumberField("radius");
-            }
-            if (section.StartCurvature.HasValue)
-            {
-                section.StartCurvature = NumberField("startCurvature");
-            }
-            if (section.EndCurvature.HasValue)
-            {
-                section.EndCurvature = NumberField("endCurvature");
-            }
-
-            TrackBankingKeyV2Dto[] keys = package.Banking?.Keys ?? Array.Empty<TrackBankingKeyV2Dto>();
-            if (keys.Length != 0)
-            {
-                keys[^1].Distance += newLength - previousLength;
-            }
-        });
-    }
-
-    private void ApplyBankingInspector(int keyIndex)
-    {
-        TryApplyInspectorEdit("Edit banking key", package =>
-        {
-            TrackBankingKeyV2Dto key = package.Banking!.Keys[keyIndex];
-            key.Distance = NumberField("bankDistance");
-            key.RollRadians = NumberField("bankRollDegrees") * System.Math.PI / 180.0;
-            key.InterpolationToNext = Field("bankInterpolation");
-        });
-    }
-
-    private void ApplyControlPointInspector(int sectionIndex, int pointIndex)
-    {
-        TryApplyInspectorEdit("Edit spatial control point", package =>
-        {
-            TrackLayoutVector3dV2Dto point = package.Sections[sectionIndex].ControlPoints![pointIndex];
-            point.X = NumberField("pointX");
-            point.Y = NumberField("pointY");
-            point.Z = NumberField("pointZ");
-        });
-    }
-
-    private void TryApplyInspectorEdit(string description, Action<TrackLayoutPackageV2Dto> edit)
+    private void ApplyRadiusInspector(string nodeId)
     {
         try
         {
-            workspace.ApplyPackageEdit(description, edit);
+            double radius = NumberField("radius");
+            workspace.ApplyGraphEdit($"Edit {nodeId} radius", graph =>
+            {
+                TrackAuthoringGraphNode node = graph.Nodes.Single(candidate =>
+                    string.Equals(candidate.Id, nodeId, StringComparison.Ordinal));
+                ConstantCurvatureSectionDefinition arc =
+                    node.Section as ConstantCurvatureSectionDefinition ??
+                    throw new InvalidOperationException(
+                        $"Graph node ID '{nodeId}' is not a constant-curvature section.");
+                var replacement = new ConstantCurvatureSectionDefinition(
+                    arc.Id,
+                    arc.Length,
+                    radius,
+                    arc.RollRadians);
+                return graph.WithSection(nodeId, replacement);
+            });
         }
         catch (Exception exception) when (exception is FormatException || exception is OverflowException)
         {
@@ -619,21 +660,18 @@ public partial class MainWindow : Window
     private void OnViewportSampleSelected(object? sender, ViewportSampleSelectedEventArgs eventArgs)
     {
         TrackViewportSample sample = eventArgs.Sample;
-        workspace.Select(EditorSelection.Sample(sample.SampleIndex, sample.SectionIndex));
-        workspace.SetStatus($"Selected frame sample {sample.SampleIndex} at station {sample.Distance:F2} m.");
+        string? nodeId = ResolveGraphNodeId(sample.SectionIndex);
+        workspace.Select(EditorSelection.Sample(sample.SampleIndex, sample.SectionIndex, nodeId));
+        workspace.SetStatus(
+            $"Selected frame sample {sample.SampleIndex} at station {sample.Distance:F2} m.");
     }
 
-    private void OnOutlinerSelectionChanged(object? sender, SelectionChangedEventArgs eventArgs)
+    private void OnGraphNodeClick(object? sender, RoutedEventArgs eventArgs)
     {
-        if (suppressOutlinerSelection || OutlinerTree.SelectedItem is not TreeViewItem item)
-        {
-            return;
-        }
-
-        if (item.Tag is EditorOutlinerNode { Selection: not null } node)
+        if (sender is Button { Tag: EditorGraphNode node })
         {
             workspace.Select(node.Selection);
-            workspace.SetStatus("Selected " + node.Title + ".");
+            workspace.SetStatus("Selected graph node " + node.NodeId + ".");
         }
     }
 
@@ -722,12 +760,33 @@ public partial class MainWindow : Window
         return await dialog.ShowDialog<bool>(this);
     }
 
+    private string? ResolveGraphNodeId(int sectionIndex)
+    {
+        return workspace.GraphNodes
+            .FirstOrDefault(node => node.RouteIndex == sectionIndex)
+            ?.NodeId;
+    }
+
+    private static string DescribeSectionKind(GeometricSectionDefinition section)
+    {
+        return section switch
+        {
+            StraightSectionDefinition => "Straight",
+            ConstantCurvatureSectionDefinition => "Constant Curvature",
+            CurvatureTransitionSectionDefinition => "Curvature Transition",
+            SpatialSectionDefinition => "Spatial",
+            _ => section.GetType().Name
+        };
+    }
+
     private static string DescribeSelection(EditorSelection? selection)
     {
         return selection?.Kind switch
         {
             EditorSelectionKind.Track => "Track selected",
-            EditorSelectionKind.Section => $"Section {selection.SectionIndex + 1} selected",
+            EditorSelectionKind.Section =>
+                "Graph node " + (selection.NodeId ?? (selection.SectionIndex + 1).ToString(CultureInfo.InvariantCulture)) +
+                " selected",
             EditorSelectionKind.BankingKey => $"Banking key {selection.ElementIndex} selected",
             EditorSelectionKind.ControlPoint => $"Control point {selection.ElementIndex} selected",
             EditorSelectionKind.Sample => $"Frame sample {selection.SampleIndex} selected",
@@ -744,15 +803,16 @@ public partial class MainWindow : Window
             selection.SampleIndex < snapshot.Samples.Count)
         {
             TrackViewportSample sample = snapshot.Samples[selection.SampleIndex];
-            return $"s {sample.Distance:F2} m\nκ {sample.Curvature:F5} 1/m\nbank {sample.RollDegrees:F2}°";
+            return $"s {sample.Distance:F2} m\nk {sample.Curvature:F5} 1/m\nbank {sample.RollDegrees:F2} deg";
         }
 
         if (selection?.SectionIndex >= 0)
         {
-            return $"Section {selection.SectionIndex + 1}\nClick a frame sample for station diagnostics";
+            string label = selection.NodeId ?? $"Section {selection.SectionIndex + 1}";
+            return label + "\nClick a frame sample for station diagnostics";
         }
 
-        return "Track workspace\nClick a frame sample for station diagnostics";
+        return "Track graph workspace\nSelect a graph node to inspect it";
     }
 
     private static string FormatVector(Quantum.Math.Vector3d vector)
