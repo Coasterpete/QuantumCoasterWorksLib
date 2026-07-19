@@ -42,7 +42,7 @@
         </Style>
     </Window.Styles>
 
-    <Grid RowDefinitions="Auto,48,*,5,300,28">
+    <Grid x:Name="WorkbenchGrid" RowDefinitions="Auto,48,*,5,300,28">
         <Border
             x:Name="MenuBarRegion"
             Grid.Row="0"
@@ -50,7 +50,7 @@
             BorderBrush="#2B3948"
             BorderThickness="0,0,0,1">
             <Menu>
-                <MenuItem Header="_File">
+                <MenuItem x:Name="FileMenu" Header="_File">
                     <MenuItem Header="_New Track    Ctrl+N" Click="OnNewDocumentClick" />
                     <MenuItem Header="_Open…    Ctrl+O" Click="OnOpenDocumentClick" />
                     <Separator />
@@ -59,11 +59,11 @@
                     <Separator />
                     <MenuItem Header="E_xit" Click="OnExitClick" />
                 </MenuItem>
-                <MenuItem Header="_Edit">
+                <MenuItem x:Name="EditMenu" Header="_Edit">
                     <MenuItem x:Name="UndoMenuItem" Header="_Undo    Ctrl+Z" Click="OnUndoClick" />
                     <MenuItem x:Name="RedoMenuItem" Header="_Redo    Ctrl+Y" Click="OnRedoClick" />
                 </MenuItem>
-                <MenuItem Header="_View">
+                <MenuItem x:Name="ViewMenu" Header="_View">
                     <MenuItem Header="_Fit Track    F" Click="OnFitViewportClick" />
                     <MenuItem Header="Toggle Transported _Frames" Click="OnMenuShowFramesClick" />
                     <MenuItem Header="Math _Plots" Click="OnShowEngineeringPlotsClick" />
@@ -79,12 +79,12 @@
             BorderThickness="0,0,0,1"
             Padding="10,7">
             <Grid ColumnDefinitions="Auto,Auto,Auto,16,Auto,Auto,16,Auto,Auto,*,Auto">
-                <Button Classes="toolbar" Content="New" Click="OnNewDocumentClick" />
-                <Button Grid.Column="1" Classes="toolbar" Content="Open" Click="OnOpenDocumentClick" />
-                <Button Grid.Column="2" Classes="toolbar" Content="Save" Click="OnSaveDocumentClick" />
+                <Button x:Name="NewButton" Classes="toolbar" Content="New" Click="OnNewDocumentClick" />
+                <Button x:Name="OpenButton" Grid.Column="1" Classes="toolbar" Content="Open" Click="OnOpenDocumentClick" />
+                <Button x:Name="SaveButton" Grid.Column="2" Classes="toolbar" Content="Save" Click="OnSaveDocumentClick" />
                 <Button x:Name="UndoButton" Grid.Column="4" Classes="toolbar" Content="Undo" Click="OnUndoClick" />
                 <Button x:Name="RedoButton" Grid.Column="5" Classes="toolbar" Content="Redo" Click="OnRedoClick" />
-                <Button Grid.Column="7" Classes="toolbar" Content="Fit" Click="OnFitViewportClick" />
+                <Button x:Name="FitButton" Grid.Column="7" Classes="toolbar" Content="Fit" Click="OnFitViewportClick" />
                 <CheckBox
                     x:Name="ShowFramesCheckBox"
                     Grid.Column="8"
@@ -106,14 +106,14 @@
             </Grid>
         </Border>
 
-        <Grid Grid.Row="2" ColumnDefinitions="320,5,*,5,340">
+        <Grid x:Name="ContentPaneGrid" Grid.Row="2" ColumnDefinitions="320,5,*,5,340">
             <controls:RoutePaneControl
                 x:Name="RoutePane"
                 Grid.Column="0"
                 NodeSelected="OnGraphNodeSelected"
                 SectionPointerChanged="OnSectionPointerChanged" />
 
-            <GridSplitter Grid.Column="1" ResizeDirection="Columns" Background="#2B3948" />
+            <GridSplitter x:Name="RouteSplitter" Grid.Column="1" ResizeDirection="Columns" Background="#2B3948" />
 
             <controls:ViewportPaneControl
                 x:Name="ViewportPane"
@@ -121,12 +121,12 @@
                 SectionPointerChanged="OnSectionPointerChanged"
                 SampleSelected="OnViewportSampleSelected" />
 
-            <GridSplitter Grid.Column="3" ResizeDirection="Columns" Background="#2B3948" />
+            <GridSplitter x:Name="InspectorSplitter" Grid.Column="3" ResizeDirection="Columns" Background="#2B3948" />
 
             <controls:InspectorPaneControl x:Name="InspectorPane" Grid.Column="4" />
         </Grid>
 
-        <GridSplitter Grid.Row="3" ResizeDirection="Rows" Background="#2B3948" />
+        <GridSplitter x:Name="BottomPanelSplitter" Grid.Row="3" ResizeDirection="Rows" Background="#2B3948" />
 
         <Border
             x:Name="BottomPanelRegion"
@@ -134,14 +134,14 @@
             Classes="panel"
             BorderThickness="0,1,0,0">
             <TabControl x:Name="BottomWorkspaceTabs" SelectedIndex="0">
-                <TabItem Header="MATH PLOTS">
+                <TabItem x:Name="MathPlotsTab" Header="MATH PLOTS">
                     <controls:MathPlotsPaneControl
                         x:Name="MathPlotsPane"
                         SectionPointerChanged="OnSectionPointerChanged"
                         StationChanged="OnEngineeringPlotStationChanged"
                         StationSelected="OnEngineeringPlotStationSelected" />
                 </TabItem>
-                <TabItem Header="DIAGNOSTICS">
+                <TabItem x:Name="DiagnosticsTab" Header="DIAGNOSTICS">
                     <controls:DiagnosticsPaneControl x:Name="DiagnosticsPane" />
                 </TabItem>
             </TabControl>

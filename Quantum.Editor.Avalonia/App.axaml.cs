@@ -1,12 +1,15 @@
 using global::Avalonia.Controls.ApplicationLifetimes;
 using global::Avalonia.Markup.Xaml;
 using Quantum.Editor.Avalonia.Services;
+using Quantum.Editor.Avalonia.Services.Workspaces;
 
 namespace Quantum.Editor.Avalonia;
 
 public partial class App : global::Avalonia.Application
 {
     public EditorWorkspace? Workspace { get; private set; }
+
+    public WorkspaceProfileManager? WorkspaceProfiles { get; private set; }
 
     public override void Initialize()
     {
@@ -19,7 +22,8 @@ public partial class App : global::Avalonia.Application
         {
             Workspace = new EditorWorkspace();
             Workspace.NewDocument();
-            desktop.MainWindow = new MainWindow(Workspace);
+            WorkspaceProfiles = new WorkspaceProfileManager();
+            desktop.MainWindow = new MainWindow(Workspace, WorkspaceProfiles);
         }
 
         base.OnFrameworkInitializationCompleted();
