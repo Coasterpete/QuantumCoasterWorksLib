@@ -14,7 +14,7 @@ Quantum CoasterWorks is an early-stage coaster design and simulation backend. Th
 
 - `Quantum.Core`, `Quantum.Math`, `Quantum.Splines`, `Quantum.Track`, `Quantum.FVD`, `Quantum.Physics`, and `Quantum.IO` contain backend/domain logic.
 - `Quantum.Debug` contains backend diagnostics and command-line tooling.
-- `Quantum.Editor.Avalonia` contains a standalone editor workbench for Track Layout Package V2 files, backend compilation, document/outliner/inspector workflows, undo/redo, an Avalonia-drawn technical viewport, the snapshot-driven [M159 Interactive Math Plot Workspace](docs/editor/m159-interactive-math-plots.md), and [M161 workspace profile infrastructure](docs/editor/m161-workspace-profile-infrastructure.md).
+- `Quantum.Editor.Avalonia` contains a standalone editor workbench for Track Layout Package V2 files, backend compilation, document/outliner/inspector workflows, undo/redo, an Avalonia-drawn technical viewport, the snapshot-driven [M159 Interactive Math Plot Workspace](docs/editor/m159-interactive-math-plots.md), [M161 workspace profile infrastructure](docs/editor/m161-workspace-profile-infrastructure.md), and [M162 docking infrastructure](docs/editor/m162-docking-infrastructure.md).
 - `Quantum.Tests` contains automated tests and contract fixtures.
 - `Assets` contains the current Unity debug visualizer/prototype assets.
 
@@ -118,6 +118,8 @@ See [`docs/editor/m157-graph-authoring.md`](docs/editor/m157-graph-authoring.md)
 M160 keeps this layout and behavior intact while extracting the Route, Viewport, Inspector, Math Plots, and Diagnostics regions into reusable Avalonia controls. See [`docs/editor/m160-pane-extraction.md`](docs/editor/m160-pane-extraction.md) for the pane contracts and unchanged backend boundary.
 
 M161 adds profile registration, lookup, default selection, and switching infrastructure around that composition. Track remains the only available workspace and preserves the M160 workbench exactly; Train, Support, Terrain, and Simulation are hidden definitions pending meaningful vertical slices. See [`docs/editor/m161-workspace-profile-infrastructure.md`](docs/editor/m161-workspace-profile-infrastructure.md).
+
+M162 replaces the fixed workbench grid with frontend-only Dock.Avalonia composition. The same five Track panes now resize, dock, tab, and float; closeable panes can be restored from `View > Panes`, while the primary Viewport is non-closeable by default. Layout persistence and additional workspaces remain deferred. See [`docs/editor/m162-docking-infrastructure.md`](docs/editor/m162-docking-infrastructure.md).
 
 From a fresh checkout:
 

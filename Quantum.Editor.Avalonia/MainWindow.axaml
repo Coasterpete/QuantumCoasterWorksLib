@@ -2,7 +2,7 @@
     x:Class="Quantum.Editor.Avalonia.MainWindow"
     xmlns="https://github.com/avaloniaui"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:controls="using:Quantum.Editor.Avalonia.Controls"
+    xmlns:dock="using:Dock.Avalonia.Controls"
     Title="Quantum CoasterWorks Editor"
     Width="1480"
     Height="920"
@@ -42,7 +42,7 @@
         </Style>
     </Window.Styles>
 
-    <Grid x:Name="WorkbenchGrid" RowDefinitions="Auto,48,*,5,300,28">
+    <Grid x:Name="WorkbenchGrid" RowDefinitions="Auto,48,*,28">
         <Border
             x:Name="MenuBarRegion"
             Grid.Row="0"
@@ -67,6 +67,14 @@
                     <MenuItem Header="_Fit Track    F" Click="OnFitViewportClick" />
                     <MenuItem Header="Toggle Transported _Frames" Click="OnMenuShowFramesClick" />
                     <MenuItem Header="Math _Plots" Click="OnShowEngineeringPlotsClick" />
+                    <Separator />
+                    <MenuItem Header="_Panes">
+                        <MenuItem Header="_Route" Tag="route" Click="OnShowPaneClick" />
+                        <MenuItem Header="_Viewport" Tag="viewport" Click="OnShowPaneClick" />
+                        <MenuItem Header="_Inspector" Tag="inspector" Click="OnShowPaneClick" />
+                        <MenuItem Header="_Math Plots" Tag="math-plots" Click="OnShowPaneClick" />
+                        <MenuItem Header="_Diagnostics" Tag="diagnostics" Click="OnShowPaneClick" />
+                    </MenuItem>
                 </MenuItem>
             </Menu>
         </Border>
@@ -106,50 +114,15 @@
             </Grid>
         </Border>
 
-        <Grid x:Name="ContentPaneGrid" Grid.Row="2" ColumnDefinitions="320,5,*,5,340">
-            <controls:RoutePaneControl
-                x:Name="RoutePane"
-                Grid.Column="0"
-                NodeSelected="OnGraphNodeSelected"
-                SectionPointerChanged="OnSectionPointerChanged" />
-
-            <GridSplitter x:Name="RouteSplitter" Grid.Column="1" ResizeDirection="Columns" Background="#2B3948" />
-
-            <controls:ViewportPaneControl
-                x:Name="ViewportPane"
-                Grid.Column="2"
-                SectionPointerChanged="OnSectionPointerChanged"
-                SampleSelected="OnViewportSampleSelected" />
-
-            <GridSplitter x:Name="InspectorSplitter" Grid.Column="3" ResizeDirection="Columns" Background="#2B3948" />
-
-            <controls:InspectorPaneControl x:Name="InspectorPane" Grid.Column="4" />
-        </Grid>
-
-        <GridSplitter x:Name="BottomPanelSplitter" Grid.Row="3" ResizeDirection="Rows" Background="#2B3948" />
-
-        <Border
-            x:Name="BottomPanelRegion"
-            Grid.Row="4"
-            Classes="panel"
-            BorderThickness="0,1,0,0">
-            <TabControl x:Name="BottomWorkspaceTabs" SelectedIndex="0">
-                <TabItem x:Name="MathPlotsTab" Header="MATH PLOTS">
-                    <controls:MathPlotsPaneControl
-                        x:Name="MathPlotsPane"
-                        SectionPointerChanged="OnSectionPointerChanged"
-                        StationChanged="OnEngineeringPlotStationChanged"
-                        StationSelected="OnEngineeringPlotStationSelected" />
-                </TabItem>
-                <TabItem x:Name="DiagnosticsTab" Header="DIAGNOSTICS">
-                    <controls:DiagnosticsPaneControl x:Name="DiagnosticsPane" />
-                </TabItem>
-            </TabControl>
-        </Border>
+        <dock:DockControl
+            x:Name="DockHost"
+            Grid.Row="2"
+            InitializeFactory="False"
+            InitializeLayout="False" />
 
         <Border
             x:Name="StatusBarRegion"
-            Grid.Row="5"
+            Grid.Row="3"
             Background="#0B1016"
             BorderBrush="#2B3948"
             BorderThickness="0,1,0,0"
