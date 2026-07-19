@@ -9,6 +9,7 @@ using Quantum.Editor.Avalonia.Models;
 using Quantum.Editor.Avalonia.Services;
 using Quantum.Editor.Avalonia.Services.Commands;
 using Quantum.Editor.Avalonia.Services.Documents;
+using Quantum.Editor.Avalonia.Services.Workspaces;
 
 namespace Quantum.Editor.Avalonia;
 
@@ -21,26 +22,40 @@ public partial class MainWindow : Window
     };
 
     private readonly EditorWorkspace workspace;
+    private readonly WorkspaceProfileManager workspaceProfiles;
 
     public MainWindow()
-        : this(CreateWorkspace())
+        : this(CreateWorkspace(), new WorkspaceProfileManager())
     {
     }
 
     public MainWindow(EditorWorkspace workspace)
+        : this(workspace, new WorkspaceProfileManager())
+    {
+    }
+
+    public MainWindow(
+        EditorWorkspace workspace,
+        WorkspaceProfileManager workspaceProfiles)
     {
         this.workspace = workspace ?? throw new ArgumentNullException(nameof(workspace));
+        this.workspaceProfiles = workspaceProfiles ??
+            throw new ArgumentNullException(nameof(workspaceProfiles));
         InitializeComponent();
 
         this.workspace.WorkspaceChanged += OnWorkspaceChanged;
         this.workspace.StationCursorChanged += OnStationCursorChanged;
         this.workspace.SectionHighlightChanged += OnSectionHighlightChanged;
+        this.workspaceProfiles.CurrentProfileChanged += OnCurrentProfileChanged;
         this.workspace.Viewport.SetActiveViewport(ViewportPane);
         this.workspace.Commands.Register(new EditorCommand(
             EditorCommandIds.FitViewport,
             _ => ViewportPane.FitToTrack()));
+        ApplyWorkspaceProfile(this.workspaceProfiles.CurrentProfile);
         UpdateWorkspaceView();
     }
+
+    public WorkspaceProfileManager WorkspaceProfiles => workspaceProfiles;
 
     private static EditorWorkspace CreateWorkspace()
     {
@@ -52,6 +67,66 @@ public partial class MainWindow : Window
     private void OnWorkspaceChanged(object? sender, EventArgs eventArgs)
     {
         UpdateWorkspaceView();
+    }
+
+    private void OnCurrentProfileChanged(object? sender, EventArgs eventArgs)
+    {
+        ApplyWorkspaceProfile(workspaceProfiles.CurrentProfile);
+        UpdateWorkspaceView();
+    }
+
+    private void ApplyWorkspaceProfile(WorkspaceProfile profile)
+    {
+        bool showRoute = profile.IsPaneVisibleByDefault(WorkspacePaneIds.Route);
+        bool showViewport = profile.IsPaneVisibleByDefault(WorkspacePaneIds.Viewport);
+        bool showInspector = profile.IsPaneVisibleByDefault(WorkspacePaneIds.Inspector);
+        bool showMathPlots = profile.IsPaneVisibleByDefault(WorkspacePaneIds.MathPlots);
+        bool showDiagnostics = profile.IsPaneVisibleByDefault(WorkspacePaneIds.Diagnostics);
+        bool showBottomPanel = showMathPlots || showDiagnostics;
+
+        RoutePane.IsVisible = showRoute;
+        ViewportPane.IsVisible = showViewport;
+        InspectorPane.IsVisible = showInspector;
+        RouteSplitter.IsVisible = showRoute && showViewport;
+        InspectorSplitter.IsVisible = showViewport && showInspector;
+        MathPlotsTab.IsVisible = showMathPlots;
+        DiagnosticsTab.IsVisible = showDiagnostics;
+        BottomPanelRegion.IsVisible = showBottomPanel;
+        BottomPanelSplitter.IsVisible = showBottomPanel;
+        if (showBottomPanel &&
+            BottomWorkspaceTabs.SelectedItem is Control selectedTab &&
+            !selectedTab.IsVisible)
+        {
+            BottomWorkspaceTabs.SelectedItem = showMathPlots ? MathPlotsTab : DiagnosticsTab;
+        }
+
+        ContentPaneGrid.ColumnDefinitions[0].Width = new GridLength(showRoute ? 320 : 0);
+        ContentPaneGrid.ColumnDefinitions[1].Width = new GridLength(showRoute && showViewport ? 5 : 0);
+        ContentPaneGrid.ColumnDefinitions[2].Width = showViewport
+            ? new GridLength(1, GridUnitType.Star)
+            : new GridLength(0);
+        ContentPaneGrid.ColumnDefinitions[3].Width = new GridLength(showViewport && showInspector ? 5 : 0);
+        ContentPaneGrid.ColumnDefinitions[4].Width = new GridLength(showInspector ? 340 : 0);
+        WorkbenchGrid.RowDefinitions[3].Height = new GridLength(showBottomPanel ? 5 : 0);
+        WorkbenchGrid.RowDefinitions[4].Height = new GridLength(showBottomPanel ? 300 : 0);
+
+        bool showFileCommands = profile.HasCommandGroup(WorkspaceCommandGroupIds.File);
+        bool showEditCommands = profile.HasCommandGroup(WorkspaceCommandGroupIds.Edit);
+        bool showViewCommands = profile.HasCommandGroup(WorkspaceCommandGroupIds.View);
+        FileMenu.IsVisible = showFileCommands;
+        EditMenu.IsVisible = showEditCommands;
+        ViewMenu.IsVisible = showViewCommands;
+        NewButton.IsVisible = showFileCommands;
+        OpenButton.IsVisible = showFileCommands;
+        SaveButton.IsVisible = showFileCommands;
+        UndoButton.IsVisible = showEditCommands;
+        RedoButton.IsVisible = showEditCommands;
+        FitButton.IsVisible = showViewCommands;
+        ShowFramesCheckBox.IsVisible = showViewCommands;
+        ProjectionComboBox.IsVisible = showViewCommands;
+
+        ShowFramesCheckBox.IsChecked = profile.IsOverlayEnabledByDefault(
+            WorkspaceOverlayIds.TransportedFrames);
     }
 
     private void UpdateWorkspaceView()
