@@ -65,19 +65,20 @@ dotnet build QuantumCoasterWorks.sln -c Release
 dotnet test QuantumCoasterWorks.sln -c Release
 ```
 
-## Avalonia Editor — M156
+## Avalonia Editor — M157
 
-Milestone 156 delivers a functional technical-editor vertical slice built on Avalonia and the existing engine-agnostic Quantum backend. It is an active development tool, not a production-ready coaster editor.
-
-![Quantum CoasterWorks Avalonia editor main workspace](docs/images/editor/editor-main-workspace.png)
+Milestone 157 extends the Avalonia technical-editor slice with graph-based section authoring while keeping the existing engine-agnostic Quantum backend authoritative for geometry. It is an active development tool, not a production-ready coaster editor.
 
 The current editor includes:
 
-- a Track Layout Package V2 document workspace with New, Open, Save, and dirty-state handling;
+- an authoritative backend `TrackAuthoringGraph` reconstructed from Track Layout Package V2 on Open;
+- a connected single-route graph panel for the existing showcase sections;
+- signed-radius editing for constant-curvature graph nodes with immediate backend recompilation;
+- atomic immutable-graph Undo/Redo and savepoint-aware dirty-state handling;
+- Track Layout Package V2 Save/Open round trips without a new graph file format;
 - an interactive track viewport with pan, zoom, fit-to-track, sample picking, and section highlighting;
-- a synchronized track/section/banking outliner and property inspector;
+- synchronized graph-node selection, Inspector state, and viewport section highlighting;
 - a sampling and transported-frame diagnostics panel;
-- an undo/redo foundation for validated document edits;
 - transported normal/binormal frame visualization; and
 - isometric, top X/Z, and side X/Y camera-orientation presets.
 
@@ -93,17 +94,13 @@ The central technical viewport draws the sampled centerline and transported fram
 
 ![Avalonia editor sampled-track viewport with transported frames](docs/images/editor/editor-viewport.png)
 
-### Outliner and inspector
+### Graph authoring and inspector
 
-The outliner exposes the active layout's ordered sections, banking keys, and heartline summary. Selecting an item updates the inspector, while viewport sample selection identifies and highlights the owning section.
-
-| Outliner | Inspector |
-| --- | --- |
-| ![Avalonia editor track outliner](docs/images/editor/editor-outliner.png) | ![Avalonia editor property inspector](docs/images/editor/editor-inspector.png) |
+The graph panel displays the deterministic connected section route. Selecting a node updates the Inspector and highlights its compiled section in the viewport. M157's first editable node parameter is the signed radius on an existing constant-curvature section; other node values remain inspectable and read-only.
 
 ### Toolbar and document workflow
 
-The toolbar provides New, Open, Save, Undo, Redo, fit-to-track, and transported-frame visibility controls. New/Open/Save operate on the versioned Track Layout Package V2 contract, and validated inspector edits participate in the undo/redo history.
+The toolbar provides New, Open, Save, Undo, Redo, fit-to-track, and transported-frame visibility controls. New/Open/Save continue to use the versioned Track Layout Package V2 contract. Only successfully compiled immutable graph snapshots participate in Undo/Redo history.
 
 ![Avalonia editor toolbar and document controls](docs/images/editor/editor-toolbar.png)
 
@@ -116,7 +113,7 @@ The viewport currently provides three technical camera-orientation presets:
 | ![Isometric camera preset selector](docs/images/editor/editor-camera-isometric-preset.png) | ![Top X/Z camera preset selector](docs/images/editor/editor-camera-top-preset.png) | ![Side X/Y camera preset selector](docs/images/editor/editor-camera-side-preset.png) |
 | ![Avalonia editor isometric track view](docs/images/editor/editor-isometric-view.png) | ![Avalonia editor top X/Z track view](docs/images/editor/editor-top-view.png) | ![Avalonia editor side X/Y track view](docs/images/editor/editor-side-view.png) |
 
-See [`docs/editor/m156-avalonia-editor.md`](docs/editor/m156-avalonia-editor.md) for supported edits, keyboard shortcuts, architecture boundaries, and current limitations.
+See [`docs/editor/m157-graph-authoring.md`](docs/editor/m157-graph-authoring.md) for the graph workflow, source-of-truth boundary, atomic commit behavior, persistence rules, smoke test, and exclusions. The M156 editor foundation remains documented in [`docs/editor/m156-avalonia-editor.md`](docs/editor/m156-avalonia-editor.md).
 
 From a fresh checkout:
 

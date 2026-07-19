@@ -1,3 +1,4 @@
+using System.Globalization;
 using Quantum.Editor.Avalonia.Models;
 using Quantum.Editor.Avalonia.Services.Commands;
 using Quantum.Editor.Avalonia.Services.Documents;
@@ -5,6 +6,10 @@ using Quantum.Editor.Avalonia.Services.Selection;
 using Quantum.Editor.Avalonia.Services.UndoRedo;
 using Quantum.Editor.Avalonia.Services.Viewport;
 using Quantum.IO.TrackLayout.V2;
+
+
+using Quantum.Track;
+
 using Quantum.Track.Authoring;
 
 namespace Quantum.Editor.Avalonia.Services;
@@ -14,7 +19,11 @@ public sealed class EditorWorkspace
     private readonly TrackDocumentFileService fileService;
     private readonly TrackSamplingService samplingService;
     private TrackEditorDocument? observedDocument;
+
     private TrackAuthoringCompilation? projectedCompilation;
+
+    private IReadOnlyList<EditorGraphNode> graphNodes = Array.Empty<EditorGraphNode>();
+
     private IReadOnlyList<EditorOutlinerNode> outlinerNodes = Array.Empty<EditorOutlinerNode>();
     private TrackViewportSnapshot viewportSnapshot = TrackViewportSnapshot.Empty;
     private EngineeringSnapshot? engineeringSnapshot;
@@ -67,6 +76,12 @@ public sealed class EditorWorkspace
             ? null
             : Selection.SelectedItems[0] as EditorSelection;
 
+    public IReadOnlyList<EditorGraphNode> GraphNodes => graphNodes;
+
+    /// <summary>
+    /// Preserved compatibility projection for non-graph callers. The Avalonia M157
+    /// surface uses <see cref="GraphNodes"/>.
+    /// </summary>
     public IReadOnlyList<EditorOutlinerNode> OutlinerNodes => outlinerNodes;
 
     public TrackViewportSnapshot ViewportSnapshot => viewportSnapshot;
@@ -83,7 +98,7 @@ public sealed class EditorWorkspace
             TrackPackageFactory.CreateShowcasePackage(),
             "Untitled Layout");
         document.MarkDirty();
-        ActivateDocument(document, "Created a new Track Layout Package V2 document.");
+        ActivateDocument(document, "Created a new graph-authoring document from the showcase layout.");
         return document;
     }
 
@@ -102,37 +117,64 @@ public sealed class EditorWorkspace
         SetStatus($"Saved {document.FilePath}.");
     }
 
-    public bool ApplyPackageEdit(
+    public bool ApplyGraphEdit(
         string description,
-        Action<TrackLayoutPackageV2Dto> edit)
+        Func<TrackAuthoringGraph, TrackAuthoringGraph> edit)
     {
         ArgumentNullException.ThrowIfNull(edit);
 
         TrackEditorDocument? document = ActiveDocument;
-        if (document?.Package is null)
+        TrackAuthoringGraph? beforeGraph = document?.Graph;
+        if (document is null || beforeGraph is null)
         {
-            SetStatus("The active document cannot be edited as a Track Layout Package V2 document.");
+            SetStatus("The active document does not have an editable authoring graph.");
             return false;
         }
 
-        string beforeJson = document.CapturePackageJson();
-        TrackLayoutPackageV2Dto candidate = TrackLayoutPackageV2Json.Deserialize(beforeJson);
-        edit(candidate);
-        string afterJson = TrackLayoutPackageV2Json.Serialize(candidate, indented: true);
-
-        if (string.Equals(beforeJson, afterJson, StringComparison.Ordinal))
+        TrackAuthoringGraph candidateGraph;
+        try
         {
-            SetStatus("No editor values changed.");
+            candidateGraph = edit(beforeGraph) ??
+                throw new InvalidOperationException("A graph edit cannot return null.");
+        }
+        catch (Exception exception) when (
+            exception is ArgumentException ||
+            exception is InvalidOperationException ||
+            exception is NotSupportedException)
+        {
+            SetStatus("Edit rejected: " + exception.Message.Replace(Environment.NewLine, " "));
+            return false;
+        }
+
+        if (ReferenceEquals(beforeGraph, candidateGraph))
+        {
+            SetStatus("No graph values changed.");
+            return false;
+        }
+
+        TrackAuthoringGraphCompileResult candidateCompilation =
+            TrackAuthoringGraphCompiler.Compile(candidateGraph);
+        if (!candidateCompilation.Success || candidateCompilation.Compilation is null)
+        {
+            SetStatus("Edit rejected: " + FormatGraphDiagnostics(candidateCompilation.Diagnostics));
             return false;
         }
 
         try
         {
-            UndoRedo.Execute(new TrackPackageSnapshotOperation(
+            string beforeJson = document.CapturePackageJson();
+            string afterJson = document.CapturePackageJson(candidateGraph);
+            if (string.Equals(beforeJson, afterJson, StringComparison.Ordinal))
+            {
+                SetStatus("No graph values changed.");
+                return false;
+            }
+
+            UndoRedo.Execute(new TrackGraphSnapshotOperation(
                 description,
                 document,
-                beforeJson,
-                afterJson));
+                beforeGraph,
+                candidateGraph));
             SetStatus(description + ".");
             return true;
         }
@@ -140,6 +182,54 @@ public sealed class EditorWorkspace
             exception is TrackEditorDocumentException ||
             exception is ArgumentException ||
             exception is InvalidOperationException)
+        {
+            SetStatus("Edit rejected: " + exception.Message.Replace(Environment.NewLine, " "));
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Compatibility bridge for existing callers. Package edits are re-imported as a
+    /// candidate graph and enter history only as immutable graph snapshots. M157 does
+    /// not permit this bridge to change non-graph ancillary state.
+    /// </summary>
+    public bool ApplyPackageEdit(
+        string description,
+        Action<TrackLayoutPackageV2Dto> edit)
+    {
+        ArgumentNullException.ThrowIfNull(edit);
+
+        TrackEditorDocument? document = ActiveDocument;
+        TrackLayoutPackageV2Dto? package = document?.Package;
+        if (document is null || package is null || document.AncillaryState is null)
+        {
+            SetStatus("The active document cannot be edited through the V2 compatibility adapter.");
+            return false;
+        }
+
+        try
+        {
+            edit(package);
+            TrackLayoutPackageV2GraphImportResult import =
+                TrackLayoutPackageV2GraphAdapter.Import(package);
+            if (!import.Success || import.Graph is null || import.AncillaryState is null)
+            {
+                SetStatus("Edit rejected: " + FormatPackageDiagnostics(import.Diagnostics));
+                return false;
+            }
+
+            if (!AncillaryStateEquals(document.AncillaryState, import.AncillaryState))
+            {
+                SetStatus("Edit rejected: M157 package compatibility edits cannot change metadata or heartline state.");
+                return false;
+            }
+
+            return ApplyGraphEdit(description, _ => import.Graph);
+        }
+        catch (Exception exception) when (
+            exception is ArgumentException ||
+            exception is InvalidOperationException ||
+            exception is NotSupportedException)
         {
             SetStatus("Edit rejected: " + exception.Message.Replace(Environment.NewLine, " "));
             return false;
@@ -238,7 +328,9 @@ public sealed class EditorWorkspace
         Commands.Register(new EditorCommand(
             EditorCommandIds.SaveDocumentAs,
             parameter => SaveDocument((string)parameter!),
-            parameter => ActiveDocument?.CanSave == true && parameter is string path && !string.IsNullOrWhiteSpace(path)));
+            parameter => ActiveDocument?.CanSave == true &&
+                         parameter is string path &&
+                         !string.IsNullOrWhiteSpace(path)));
         Commands.Register(new EditorCommand(
             EditorCommandIds.Undo,
             _ => UndoLast(),
@@ -287,8 +379,9 @@ public sealed class EditorWorkspace
     private void RefreshDocumentProjection()
     {
         TrackEditorDocument? document = ActiveDocument;
-        if (document?.Package is null)
+        if (document?.Graph is null || document.GraphCompileResult is null)
         {
+            graphNodes = Array.Empty<EditorGraphNode>();
             outlinerNodes = Array.Empty<EditorOutlinerNode>();
             viewportSnapshot = TrackViewportSnapshot.Empty;
             engineeringSnapshot = null;
@@ -297,6 +390,7 @@ public sealed class EditorWorkspace
         }
         else
         {
+            graphNodes = BuildGraphNodes(document.GraphCompileResult.OrderedNodes);
             outlinerNodes = BuildOutliner(document);
             TrackAuthoringCompilation compilation = document.Compilation!;
             if (!ReferenceEquals(projectedCompilation, compilation))
@@ -320,17 +414,34 @@ public sealed class EditorWorkspace
         WorkspaceChanged?.Invoke(this, EventArgs.Empty);
     }
 
+    private static IReadOnlyList<EditorGraphNode> BuildGraphNodes(
+        IReadOnlyList<TrackAuthoringGraphNode> orderedNodes)
+    {
+        var result = new EditorGraphNode[orderedNodes.Count];
+        for (int routeIndex = 0; routeIndex < orderedNodes.Count; routeIndex++)
+        {
+            GeometricSectionDefinition section = orderedNodes[routeIndex].Section;
+            result[routeIndex] = new EditorGraphNode(
+                section.Id,
+                routeIndex,
+                DescribeSectionKind(section),
+                DescribeSectionSummary(section));
+        }
+
+        return result;
+    }
+
     private static IReadOnlyList<EditorOutlinerNode> BuildOutliner(TrackEditorDocument document)
     {
-        TrackLayoutPackageV2Dto package = document.Package!;
-        var sectionNodes = new List<EditorOutlinerNode>(package.Sections.Length);
-        for (int sectionIndex = 0; sectionIndex < package.Sections.Length; sectionIndex++)
+        IReadOnlyList<TrackAuthoringGraphNode> route = document.GraphCompileResult!.OrderedNodes;
+        var sectionNodes = new List<EditorOutlinerNode>(route.Count);
+        for (int sectionIndex = 0; sectionIndex < route.Count; sectionIndex++)
         {
-            TrackLayoutSectionV2Dto section = package.Sections[sectionIndex];
+            GeometricSectionDefinition section = route[sectionIndex].Section;
             var controlPointNodes = new List<EditorOutlinerNode>();
-            if (section.ControlPoints != null)
+            if (section is SpatialSectionDefinition spatial)
             {
-                for (int pointIndex = 0; pointIndex < section.ControlPoints.Length; pointIndex++)
+                for (int pointIndex = 0; pointIndex < spatial.ControlPoints.Count; pointIndex++)
                 {
                     controlPointNodes.Add(new EditorOutlinerNode(
                         $"Control point {pointIndex}",
@@ -339,21 +450,23 @@ public sealed class EditorWorkspace
             }
 
             sectionNodes.Add(new EditorOutlinerNode(
-                $"{sectionIndex + 1}. {section.Id}  ·  {section.Kind}  ·  {section.Length:F1} m",
-                EditorSelection.Section(sectionIndex),
+                $"{sectionIndex + 1}. {section.Id} | {DescribeSectionKind(section)} | {section.Length:F1} m",
+                EditorSelection.GraphNode(section.Id, sectionIndex),
                 controlPointNodes));
         }
 
         var bankingNodes = new List<EditorOutlinerNode>();
-        TrackBankingKeyV2Dto[] bankingKeys = package.Banking?.Keys ?? Array.Empty<TrackBankingKeyV2Dto>();
-        for (int keyIndex = 0; keyIndex < bankingKeys.Length; keyIndex++)
+        IReadOnlyList<BankingProfileKey> bankingKeys =
+            document.Graph!.Banking?.Keys ?? Array.Empty<BankingProfileKey>();
+        for (int keyIndex = 0; keyIndex < bankingKeys.Count; keyIndex++)
         {
-            TrackBankingKeyV2Dto key = bankingKeys[keyIndex];
+            BankingProfileKey key = bankingKeys[keyIndex];
             bankingNodes.Add(new EditorOutlinerNode(
-                $"Key {keyIndex}  ·  {key.Distance:F1} m  ·  {key.RollRadians * 180.0 / System.Math.PI:F1}°",
+                $"Key {keyIndex} | {key.Distance:F1} m | {key.RollRadians * 180.0 / System.Math.PI:F1} deg",
                 EditorSelection.BankingKey(keyIndex)));
         }
 
+        HeartlineOffset? heartline = document.AncillaryState?.HeartlineOffset;
         return new[]
         {
             new EditorOutlinerNode(
@@ -364,10 +477,84 @@ public sealed class EditorWorkspace
                     new EditorOutlinerNode($"Sections ({sectionNodes.Count})", children: sectionNodes),
                     new EditorOutlinerNode($"Banking ({bankingNodes.Count} keys)", children: bankingNodes),
                     new EditorOutlinerNode(
-                        package.Heartline is null
+                        !heartline.HasValue
                             ? "Heartline: none"
-                            : $"Heartline: N {package.Heartline.NormalOffset:F2} m / B {package.Heartline.LateralOffset:F2} m")
+                            : $"Heartline: N {heartline.Value.NormalOffsetMeters:F2} m / " +
+                              $"B {heartline.Value.LateralOffsetMeters:F2} m")
                 })
         };
+    }
+
+    private static string DescribeSectionKind(GeometricSectionDefinition section)
+    {
+        return section switch
+        {
+            StraightSectionDefinition => "Straight",
+            ConstantCurvatureSectionDefinition => "Constant Curvature",
+            CurvatureTransitionSectionDefinition => "Curvature Transition",
+            SpatialSectionDefinition => "Spatial",
+            _ => section.GetType().Name
+        };
+    }
+
+    private static string DescribeSectionSummary(GeometricSectionDefinition section)
+    {
+        string length = section.Length.ToString("F1", CultureInfo.InvariantCulture);
+        return section switch
+        {
+            ConstantCurvatureSectionDefinition arc =>
+                $"Length {length} m | Radius {arc.Radius.ToString("F2", CultureInfo.InvariantCulture)} m",
+            CurvatureTransitionSectionDefinition transition =>
+                $"Length {length} m | k {transition.StartCurvature.ToString("F4", CultureInfo.InvariantCulture)}" +
+                $" -> {transition.EndCurvature.ToString("F4", CultureInfo.InvariantCulture)} 1/m",
+            SpatialSectionDefinition spatial =>
+                $"Length {length} m | Degree {spatial.Degree} | {spatial.ControlPoints.Count} points",
+            _ => $"Length {length} m"
+        };
+    }
+
+    private static bool AncillaryStateEquals(
+        TrackLayoutPackageV2GraphAncillaryState first,
+        TrackLayoutPackageV2GraphAncillaryState second)
+    {
+        return string.Equals(first.Contract, second.Contract, StringComparison.Ordinal) &&
+               first.Version == second.Version &&
+               string.Equals(first.Units, second.Units, StringComparison.Ordinal) &&
+               string.Equals(first.SourceName, second.SourceName, StringComparison.Ordinal) &&
+               string.Equals(first.LayoutId, second.LayoutId, StringComparison.Ordinal) &&
+               HeartlineEquals(first.HeartlineOffset, second.HeartlineOffset);
+    }
+
+    private static bool HeartlineEquals(HeartlineOffset? first, HeartlineOffset? second)
+    {
+        if (!first.HasValue || !second.HasValue)
+        {
+            return first.HasValue == second.HasValue;
+        }
+
+        return first.Value.NormalOffsetMeters == second.Value.NormalOffsetMeters &&
+               first.Value.LateralOffsetMeters == second.Value.LateralOffsetMeters;
+    }
+
+    private static string FormatGraphDiagnostics(
+        IReadOnlyList<TrackAuthoringGraphDiagnostic> diagnostics)
+    {
+        return diagnostics.Count == 0
+            ? "Graph compilation failed without diagnostics."
+            : string.Join(
+                " ",
+                diagnostics.Select(diagnostic =>
+                    $"{diagnostic.Code}: {diagnostic.Message}"));
+    }
+
+    private static string FormatPackageDiagnostics(
+        IReadOnlyList<TrackLayoutPackageV2ValidationDiagnostic> diagnostics)
+    {
+        return diagnostics.Count == 0
+            ? "Package import failed without diagnostics."
+            : string.Join(
+                " ",
+                diagnostics.Select(diagnostic =>
+                    $"{diagnostic.Code} at {diagnostic.Path}: {diagnostic.Message}"));
     }
 }
