@@ -8,6 +8,7 @@ using Quantum.Editor.Avalonia.Controls;
 using Quantum.Editor.Avalonia.Models;
 using Quantum.Editor.Avalonia.Services;
 using Quantum.Editor.Avalonia.Services.Commands;
+using Quantum.Editor.Avalonia.Services.Docking;
 using Quantum.Editor.Avalonia.Services.Documents;
 using Quantum.Editor.Avalonia.Services.Workspaces;
 
@@ -23,6 +24,12 @@ public partial class MainWindow : Window
 
     private readonly EditorWorkspace workspace;
     private readonly WorkspaceProfileManager workspaceProfiles;
+    private readonly EditorDockingAdapter docking;
+    private readonly RoutePaneControl RoutePane;
+    private readonly ViewportPaneControl ViewportPane;
+    private readonly InspectorPaneControl InspectorPane;
+    private readonly MathPlotsPaneControl MathPlotsPane;
+    private readonly DiagnosticsPaneControl DiagnosticsPane;
 
     public MainWindow()
         : this(CreateWorkspace(), new WorkspaceProfileManager())
@@ -43,6 +50,27 @@ public partial class MainWindow : Window
             throw new ArgumentNullException(nameof(workspaceProfiles));
         InitializeComponent();
 
+        RoutePane = new RoutePaneControl();
+        ViewportPane = new ViewportPaneControl();
+        InspectorPane = new InspectorPaneControl();
+        MathPlotsPane = new MathPlotsPaneControl();
+        DiagnosticsPane = new DiagnosticsPaneControl();
+        WirePaneInteractions();
+
+        DockPaneRegistry paneRegistry = DockPaneRegistry.CreateDefaultTrack();
+        docking = new EditorDockingAdapter(
+            paneRegistry,
+            new Dictionary<string, object>(StringComparer.Ordinal)
+            {
+                [WorkspacePaneIds.Route] = RoutePane,
+                [WorkspacePaneIds.Viewport] = ViewportPane,
+                [WorkspacePaneIds.Inspector] = InspectorPane,
+                [WorkspacePaneIds.MathPlots] = MathPlotsPane,
+                [WorkspacePaneIds.Diagnostics] = DiagnosticsPane
+            });
+        DockHost.Factory = docking.Factory;
+        DockHost.Layout = docking.Layout;
+
         this.workspace.WorkspaceChanged += OnWorkspaceChanged;
         this.workspace.StationCursorChanged += OnStationCursorChanged;
         this.workspace.SectionHighlightChanged += OnSectionHighlightChanged;
@@ -57,11 +85,24 @@ public partial class MainWindow : Window
 
     public WorkspaceProfileManager WorkspaceProfiles => workspaceProfiles;
 
+    public EditorDockingAdapter Docking => docking;
+
     private static EditorWorkspace CreateWorkspace()
     {
         var result = new EditorWorkspace();
         result.NewDocument();
         return result;
+    }
+
+    private void WirePaneInteractions()
+    {
+        RoutePane.NodeSelected += OnGraphNodeSelected;
+        RoutePane.SectionPointerChanged += OnSectionPointerChanged;
+        ViewportPane.SectionPointerChanged += OnSectionPointerChanged;
+        ViewportPane.SampleSelected += OnViewportSampleSelected;
+        MathPlotsPane.SectionPointerChanged += OnSectionPointerChanged;
+        MathPlotsPane.StationChanged += OnEngineeringPlotStationChanged;
+        MathPlotsPane.StationSelected += OnEngineeringPlotStationSelected;
     }
 
     private void OnWorkspaceChanged(object? sender, EventArgs eventArgs)
@@ -77,38 +118,21 @@ public partial class MainWindow : Window
 
     private void ApplyWorkspaceProfile(WorkspaceProfile profile)
     {
-        bool showRoute = profile.IsPaneVisibleByDefault(WorkspacePaneIds.Route);
-        bool showViewport = profile.IsPaneVisibleByDefault(WorkspacePaneIds.Viewport);
-        bool showInspector = profile.IsPaneVisibleByDefault(WorkspacePaneIds.Inspector);
-        bool showMathPlots = profile.IsPaneVisibleByDefault(WorkspacePaneIds.MathPlots);
-        bool showDiagnostics = profile.IsPaneVisibleByDefault(WorkspacePaneIds.Diagnostics);
-        bool showBottomPanel = showMathPlots || showDiagnostics;
-
-        RoutePane.IsVisible = showRoute;
-        ViewportPane.IsVisible = showViewport;
-        InspectorPane.IsVisible = showInspector;
-        RouteSplitter.IsVisible = showRoute && showViewport;
-        InspectorSplitter.IsVisible = showViewport && showInspector;
-        MathPlotsTab.IsVisible = showMathPlots;
-        DiagnosticsTab.IsVisible = showDiagnostics;
-        BottomPanelRegion.IsVisible = showBottomPanel;
-        BottomPanelSplitter.IsVisible = showBottomPanel;
-        if (showBottomPanel &&
-            BottomWorkspaceTabs.SelectedItem is Control selectedTab &&
-            !selectedTab.IsVisible)
-        {
-            BottomWorkspaceTabs.SelectedItem = showMathPlots ? MathPlotsTab : DiagnosticsTab;
-        }
-
-        ContentPaneGrid.ColumnDefinitions[0].Width = new GridLength(showRoute ? 320 : 0);
-        ContentPaneGrid.ColumnDefinitions[1].Width = new GridLength(showRoute && showViewport ? 5 : 0);
-        ContentPaneGrid.ColumnDefinitions[2].Width = showViewport
-            ? new GridLength(1, GridUnitType.Star)
-            : new GridLength(0);
-        ContentPaneGrid.ColumnDefinitions[3].Width = new GridLength(showViewport && showInspector ? 5 : 0);
-        ContentPaneGrid.ColumnDefinitions[4].Width = new GridLength(showInspector ? 340 : 0);
-        WorkbenchGrid.RowDefinitions[3].Height = new GridLength(showBottomPanel ? 5 : 0);
-        WorkbenchGrid.RowDefinitions[4].Height = new GridLength(showBottomPanel ? 300 : 0);
+        docking.SetPaneVisible(
+            WorkspacePaneIds.Route,
+            profile.IsPaneVisibleByDefault(WorkspacePaneIds.Route));
+        docking.SetPaneVisible(
+            WorkspacePaneIds.Viewport,
+            profile.IsPaneVisibleByDefault(WorkspacePaneIds.Viewport));
+        docking.SetPaneVisible(
+            WorkspacePaneIds.Inspector,
+            profile.IsPaneVisibleByDefault(WorkspacePaneIds.Inspector));
+        docking.SetPaneVisible(
+            WorkspacePaneIds.MathPlots,
+            profile.IsPaneVisibleByDefault(WorkspacePaneIds.MathPlots));
+        docking.SetPaneVisible(
+            WorkspacePaneIds.Diagnostics,
+            profile.IsPaneVisibleByDefault(WorkspacePaneIds.Diagnostics));
 
         bool showFileCommands = profile.HasCommandGroup(WorkspaceCommandGroupIds.File);
         bool showEditCommands = profile.HasCommandGroup(WorkspaceCommandGroupIds.Edit);
@@ -361,7 +385,15 @@ public partial class MainWindow : Window
 
     private void OnShowEngineeringPlotsClick(object? sender, RoutedEventArgs eventArgs)
     {
-        BottomWorkspaceTabs.SelectedIndex = 0;
+        docking.ShowPane(WorkspacePaneIds.MathPlots);
+    }
+
+    private void OnShowPaneClick(object? sender, RoutedEventArgs eventArgs)
+    {
+        if (sender is MenuItem { Tag: string paneId })
+        {
+            docking.ShowPane(paneId);
+        }
     }
 
     private void OnEngineeringPlotStationChanged(
