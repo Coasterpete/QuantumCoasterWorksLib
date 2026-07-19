@@ -15,10 +15,20 @@ public sealed record EditorSelection(
     int ElementIndex = -1,
     int SampleIndex = -1)
 {
+    public string? NodeId { get; init; }
+
     public static EditorSelection Track { get; } = new(EditorSelectionKind.Track);
 
     public static EditorSelection Section(int sectionIndex) =>
         new(EditorSelectionKind.Section, sectionIndex);
+
+    public static EditorSelection GraphNode(string nodeId, int sectionIndex) =>
+        new(EditorSelectionKind.Section, sectionIndex)
+        {
+            NodeId = string.IsNullOrWhiteSpace(nodeId)
+                ? throw new ArgumentException("Graph node ID is required.", nameof(nodeId))
+                : nodeId
+        };
 
     public static EditorSelection BankingKey(int keyIndex) =>
         new(EditorSelectionKind.BankingKey, ElementIndex: keyIndex);
@@ -26,6 +36,12 @@ public sealed record EditorSelection(
     public static EditorSelection ControlPoint(int sectionIndex, int pointIndex) =>
         new(EditorSelectionKind.ControlPoint, sectionIndex, pointIndex);
 
-    public static EditorSelection Sample(int sampleIndex, int sectionIndex) =>
-        new(EditorSelectionKind.Sample, sectionIndex, SampleIndex: sampleIndex);
+    public static EditorSelection Sample(
+        int sampleIndex,
+        int sectionIndex,
+        string? nodeId = null) =>
+        new(EditorSelectionKind.Sample, sectionIndex, SampleIndex: sampleIndex)
+        {
+            NodeId = nodeId
+        };
 }

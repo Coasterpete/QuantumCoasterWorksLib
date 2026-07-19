@@ -30,6 +30,16 @@
         <Style Selector="TextBox.inspectorField">
             <Setter Property="MinHeight" Value="28" />
         </Style>
+        <Style Selector="Button.graphNode">
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="Padding" Value="12,10" />
+            <Setter Property="Margin" Value="8,0" />
+            <Setter Property="Background" Value="#18232E" />
+            <Setter Property="BorderBrush" Value="#34495C" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="5" />
+        </Style>
     </Window.Styles>
 
     <Grid RowDefinitions="Auto,48,*,5,165,28">
@@ -95,7 +105,7 @@
             </Grid>
         </Border>
 
-        <Grid Grid.Row="2" ColumnDefinitions="290,5,*,5,340">
+        <Grid Grid.Row="2" ColumnDefinitions="320,5,*,5,340">
             <Border
                 x:Name="LeftToolboxRegion"
                 Grid.Column="0"
@@ -109,12 +119,14 @@
                             <TextBlock x:Name="DocumentPathText" FontSize="11" Foreground="#7F94A8" TextTrimming="CharacterEllipsis" />
                         </StackPanel>
                     </Border>
-                    <TextBlock Grid.Row="1" Margin="12,10,12,6" Classes="panelTitle" Text="OUTLINER" />
-                    <TreeView
-                        x:Name="OutlinerTree"
+                    <TextBlock Grid.Row="1" Margin="12,10,12,6" Classes="panelTitle" Text="AUTHORING GRAPH / SINGLE ROUTE" />
+                    <ScrollViewer
+                        x:Name="GraphScrollViewer"
                         Grid.Row="2"
-                        Margin="6,0,6,8"
-                        SelectionChanged="OnOutlinerSelectionChanged" />
+                        Margin="4,0,4,8"
+                        HorizontalScrollBarVisibility="Disabled">
+                        <StackPanel x:Name="GraphNodesPanel" />
+                    </ScrollViewer>
                 </Grid>
             </Border>
 
