@@ -14,7 +14,7 @@ Quantum CoasterWorks is an early-stage coaster design and simulation backend. Th
 
 - `Quantum.Core`, `Quantum.Math`, `Quantum.Splines`, `Quantum.Track`, `Quantum.FVD`, `Quantum.Physics`, and `Quantum.IO` contain backend/domain logic.
 - `Quantum.Debug` contains backend diagnostics and command-line tooling.
-- `Quantum.Editor.Avalonia` contains a standalone editor workbench for Track Layout Package V2 files, backend compilation, document/outliner/inspector workflows, undo/redo, an Avalonia-drawn technical viewport, and the snapshot-driven [M158.2 engineering plot workspace](docs/editor/m158-2-engineering-plot-workspace.md).
+- `Quantum.Editor.Avalonia` contains a standalone editor workbench for Track Layout Package V2 files, backend compilation, document/outliner/inspector workflows, undo/redo, an Avalonia-drawn technical viewport, and the snapshot-driven [M159 Interactive Math Plot Workspace](docs/editor/m159-interactive-math-plots.md).
 - `Quantum.Tests` contains automated tests and contract fixtures.
 - `Assets` contains the current Unity debug visualizer/prototype assets.
 
@@ -114,6 +114,8 @@ The viewport currently provides three technical camera-orientation presets:
 | ![Avalonia editor isometric track view](docs/images/editor/editor-isometric-view.png) | ![Avalonia editor top X/Z track view](docs/images/editor/editor-top-view.png) | ![Avalonia editor side X/Y track view](docs/images/editor/editor-side-view.png) |
 
 See [`docs/editor/m157-graph-authoring.md`](docs/editor/m157-graph-authoring.md) for the graph workflow, source-of-truth boundary, atomic commit behavior, persistence rules, smoke test, and exclusions. The M156 editor foundation remains documented in [`docs/editor/m156-avalonia-editor.md`](docs/editor/m156-avalonia-editor.md).
+
+M160 keeps this layout and behavior intact while extracting the Route, Viewport, Inspector, Math Plots, and Diagnostics regions into reusable Avalonia controls. See [`docs/editor/m160-pane-extraction.md`](docs/editor/m160-pane-extraction.md) for the pane contracts and unchanged backend boundary.
 
 From a fresh checkout:
 

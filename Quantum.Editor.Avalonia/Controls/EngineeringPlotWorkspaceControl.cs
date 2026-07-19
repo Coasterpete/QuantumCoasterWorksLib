@@ -3,6 +3,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Media;
+using Quantum.Editor.Avalonia.Services;
 using Quantum.Editor.Avalonia.Services.Plots;
 using Quantum.Track.Authoring;
 
@@ -28,6 +29,8 @@ public sealed class EngineeringPlotWorkspaceControl : Control
     private EngineeringSnapshot? snapshot;
     private EngineeringPlotKind enabledPlots = EngineeringPlotKind.All;
     private int cursorSampleIndex = -1;
+    private int highlightedSectionIndex = -1;
+    private int pointerSectionIndex = -1;
 
     public EngineeringPlotWorkspaceControl()
     {
@@ -35,6 +38,10 @@ public sealed class EngineeringPlotWorkspaceControl : Control
     }
 
     public event EventHandler<EngineeringStationChangedEventArgs>? StationChanged;
+
+    public event EventHandler<EngineeringStationChangedEventArgs>? StationSelected;
+
+    public event EventHandler<SectionPointerChangedEventArgs>? SectionPointerChanged;
 
     public EngineeringSnapshot? Snapshot
     {
@@ -79,11 +86,32 @@ public sealed class EngineeringPlotWorkspaceControl : Control
         }
     }
 
+    public int HighlightedSectionIndex
+    {
+        get => highlightedSectionIndex;
+        set
+        {
+            int replacement = value;
+            if (replacement < 0 || replacement >= (snapshot?.ResolvedSections.Count ?? 0))
+            {
+                replacement = -1;
+            }
+
+            if (highlightedSectionIndex == replacement)
+            {
+                return;
+            }
+
+            highlightedSectionIndex = replacement;
+            InvalidateVisual();
+        }
+    }
+
     public void SetPlotEnabled(EngineeringPlotKind plot, bool isEnabled)
     {
         if (!PlotOrder.Contains(plot))
         {
-            throw new ArgumentOutOfRangeException(nameof(plot), plot, "A single engineering plot is required.");
+            throw new ArgumentOutOfRangeException(nameof(plot), plot, "A single Math Plot is required.");
         }
 
         EngineeringPlotKind replacement = isEnabled
@@ -109,7 +137,7 @@ public sealed class EngineeringPlotWorkspaceControl : Control
             .ToArray();
         if (currentSnapshot is null || currentSnapshot.SampleCount == 0)
         {
-            DrawText(context, "No engineering snapshot", new Point(16.0, 14.0), "#7F94A8", 12.0);
+            DrawText(context, "No Math Plot snapshot available", new Point(16.0, 14.0), "#7F94A8", 12.0);
             return;
         }
 
@@ -159,6 +187,7 @@ public sealed class EngineeringPlotWorkspaceControl : Control
         Point pointer = eventArgs.GetPosition(this);
         if (!stationBounds.Contains(pointer) || stationBounds.Width <= 0.0)
         {
+            SetPointerSection(-1);
             return;
         }
 
@@ -170,19 +199,68 @@ public sealed class EngineeringPlotWorkspaceControl : Control
         int sampleIndex = EngineeringPlotProjection.FindNearestSampleIndex(
             currentSnapshot,
             requestedStation);
-        if (sampleIndex < 0 || sampleIndex == cursorSampleIndex)
+        if (sampleIndex < 0)
+        {
+            return;
+        }
+
+        SetPointerSection(EngineeringSnapshotNavigation.FindSectionIndex(currentSnapshot, sampleIndex));
+        if (sampleIndex != cursorSampleIndex)
+        {
+            cursorSampleIndex = sampleIndex;
+            InvalidateVisual();
+            StationChanged?.Invoke(
+                this,
+                new EngineeringStationChangedEventArgs(
+                    sampleIndex,
+                    currentSnapshot.StationGrid[sampleIndex]));
+        }
+
+        eventArgs.Handled = true;
+    }
+
+    protected override void OnPointerPressed(PointerPressedEventArgs eventArgs)
+    {
+        base.OnPointerPressed(eventArgs);
+        EngineeringSnapshot? currentSnapshot = snapshot;
+        PointerPoint pointerPoint = eventArgs.GetCurrentPoint(this);
+        Rect stationBounds = GetStationBounds();
+        if (currentSnapshot is null ||
+            enabledPlots == EngineeringPlotKind.None ||
+            !pointerPoint.Properties.IsLeftButtonPressed ||
+            !stationBounds.Contains(pointerPoint.Position) ||
+            stationBounds.Width <= 0.0)
+        {
+            return;
+        }
+
+        double fraction = System.Math.Clamp(
+            (pointerPoint.Position.X - stationBounds.Left) / stationBounds.Width,
+            0.0,
+            1.0);
+        int sampleIndex = EngineeringPlotProjection.FindNearestSampleIndex(
+            currentSnapshot,
+            currentSnapshot.TotalLength * fraction);
+        if (sampleIndex < 0)
         {
             return;
         }
 
         cursorSampleIndex = sampleIndex;
+        SetPointerSection(EngineeringSnapshotNavigation.FindSectionIndex(currentSnapshot, sampleIndex));
         InvalidateVisual();
-        StationChanged?.Invoke(
+        StationSelected?.Invoke(
             this,
             new EngineeringStationChangedEventArgs(
                 sampleIndex,
                 currentSnapshot.StationGrid[sampleIndex]));
         eventArgs.Handled = true;
+    }
+
+    protected override void OnPointerExited(PointerEventArgs eventArgs)
+    {
+        base.OnPointerExited(eventArgs);
+        SetPointerSection(-1);
     }
 
     private void DrawPlot(
@@ -196,6 +274,7 @@ public sealed class EngineeringPlotWorkspaceControl : Control
         context.DrawRectangle(null, borderPen, plotBounds);
 
         (double minimum, double maximum) = FindRange(currentSnapshot, plot);
+        DrawHighlightedSection(context, currentSnapshot, plotBounds);
         DrawPlotGrid(context, plotBounds, minimum, maximum);
         DrawSectionBoundaries(context, currentSnapshot, plotBounds);
         DrawSeries(context, currentSnapshot, plot, plotBounds, minimum, maximum);
@@ -277,6 +356,26 @@ public sealed class EngineeringPlotWorkspaceControl : Control
                 new Point(x, plotBounds.Top),
                 new Point(x, plotBounds.Bottom));
         }
+    }
+
+    private void DrawHighlightedSection(
+        DrawingContext context,
+        EngineeringSnapshot currentSnapshot,
+        Rect plotBounds)
+    {
+        if (highlightedSectionIndex < 0 ||
+            highlightedSectionIndex >= currentSnapshot.ResolvedSections.Count)
+        {
+            return;
+        }
+
+        EngineeringResolvedSectionMetadata section =
+            currentSnapshot.ResolvedSections[highlightedSectionIndex];
+        double left = MapStation(section.StartStation, currentSnapshot.TotalLength, plotBounds);
+        double right = MapStation(section.EndStation, currentSnapshot.TotalLength, plotBounds);
+        context.FillRectangle(
+            Brush("#F4D35E", 0.12),
+            new Rect(left, plotBounds.Top, System.Math.Max(1.0, right - left), plotBounds.Height));
     }
 
     private static void DrawSeries(
@@ -455,6 +554,19 @@ public sealed class EngineeringPlotWorkspaceControl : Control
     private static string ValueFormat(EngineeringPlotKind plot)
     {
         return plot == EngineeringPlotKind.Curvature ? "F5" : "F2";
+    }
+
+    private void SetPointerSection(int sectionIndex)
+    {
+        if (pointerSectionIndex == sectionIndex)
+        {
+            return;
+        }
+
+        pointerSectionIndex = sectionIndex;
+        SectionPointerChanged?.Invoke(
+            this,
+            new SectionPointerChangedEventArgs(sectionIndex >= 0 ? sectionIndex : null));
     }
 
     private static Pen Pen(string color, double thickness)

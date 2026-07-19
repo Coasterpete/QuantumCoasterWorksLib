@@ -1,4 +1,4 @@
-# Milestone 158 Engineering-Profile Workspace Direction
+# Milestone 158 Math Plot Workspace Direction
 
 ## Status and purpose
 
@@ -9,7 +9,7 @@ Quantum's primary editor will become a precision track-engineering workspace
 inspired by openFVeiD/FVD workflows while retaining Quantum's own code,
 architecture, terminology, branding, and engineering capabilities. The primary
 working surface will combine a 3D technical viewport with synchronized
-engineering profiles, diagnostics, section boundaries, control points, and
+Math Plots, diagnostics, section boundaries, control points, and
 numeric inspectors. A node or bubble graph must not define the editor's visual
 identity.
 
@@ -213,7 +213,7 @@ developer diagnostics, topology inspection, advanced route operations, or
 future workflows where graph structure is genuinely the clearest view. It must
 not occupy the primary workspace by default or become a second authoring model.
 
-The graph itself remains authoritative. The engineering-profile workspace sends
+The graph itself remains authoritative. The Math Plot Workspace sends
 edits to `TrackAuthoringGraph`; it does not mutate a parallel list of plotted
 sections. Open/Save compatibility continues through the established graph and
 Track Layout Package adapters until a later contract is deliberately approved.
@@ -222,7 +222,7 @@ Track Layout Package adapters until a later contract is deliberately approved.
 
 M158 should deliver a focused vertical slice of the new editing identity:
 
-1. Make the synchronized viewport and engineering plot stack the default
+1. Make the synchronized viewport and Math Plot stack the default
    workspace, with the node canvas moved behind a secondary/internal surface.
 2. Introduce one revisioned, editor-facing engineering snapshot sourced from
    the active `TrackAuthoringCompilation`. Backend calculations remain in

@@ -1,8 +1,8 @@
-# Milestone 158.2 Engineering Plot Workspace
+# Milestone 158.2 Math Plot Workspace
 
 ## Scope
 
-Milestone 158.2 adds the first read-only engineering plot workspace to the Avalonia editor. The workspace is bottom-docked beside the existing diagnostics tab and can be resized with the existing horizontal splitter.
+Milestone 158.2 adds the first read-only Math Plot Workspace to the Avalonia editor. The workspace is bottom-docked beside the existing diagnostics tab and can be resized with the existing horizontal splitter.
 
 The workspace displays synchronized station-distance plots for:
 
@@ -14,7 +14,7 @@ The workspace displays synchronized station-distance plots for:
 
 Each plot can be enabled or disabled independently. Every visible plot uses the same horizontal station scale and draws the resolved section boundaries as vertical dashed markers.
 
-![Engineering plot workspace with synchronized station cursor](../images/editor/editor-engineering-plots.png)
+![Math Plot Workspace with synchronized station cursor](../images/editor/editor-engineering-plots.png)
 
 ## Canonical data flow
 

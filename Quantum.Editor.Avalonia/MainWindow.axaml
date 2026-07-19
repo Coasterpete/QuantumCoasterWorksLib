@@ -66,7 +66,7 @@
                 <MenuItem Header="_View">
                     <MenuItem Header="_Fit Track    F" Click="OnFitViewportClick" />
                     <MenuItem Header="Toggle Transported _Frames" Click="OnMenuShowFramesClick" />
-                    <MenuItem Header="Engineering _Plots" Click="OnShowEngineeringPlotsClick" />
+                    <MenuItem Header="Math _Plots" Click="OnShowEngineeringPlotsClick" />
                 </MenuItem>
             </Menu>
         </Border>
@@ -107,77 +107,23 @@
         </Border>
 
         <Grid Grid.Row="2" ColumnDefinitions="320,5,*,5,340">
-            <Border
-                x:Name="LeftToolboxRegion"
+            <controls:RoutePaneControl
+                x:Name="RoutePane"
                 Grid.Column="0"
-                Classes="panel"
-                BorderThickness="0,0,1,0">
-                <Grid RowDefinitions="Auto,Auto,*">
-                    <Border Padding="12,10" BorderBrush="#2B3948" BorderThickness="0,0,0,1">
-                        <StackPanel Spacing="3">
-                            <TextBlock Classes="panelTitle" Text="TRACK WORKSPACE" />
-                            <TextBlock x:Name="DocumentTitleText" FontSize="16" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                            <TextBlock x:Name="DocumentPathText" FontSize="11" Foreground="#7F94A8" TextTrimming="CharacterEllipsis" />
-                        </StackPanel>
-                    </Border>
-                    <TextBlock Grid.Row="1" Margin="12,10,12,6" Classes="panelTitle" Text="AUTHORING GRAPH / SINGLE ROUTE" />
-                    <ScrollViewer
-                        x:Name="GraphScrollViewer"
-                        Grid.Row="2"
-                        Margin="4,0,4,8"
-                        HorizontalScrollBarVisibility="Disabled">
-                        <StackPanel x:Name="GraphNodesPanel" />
-                    </ScrollViewer>
-                </Grid>
-            </Border>
+                NodeSelected="OnGraphNodeSelected"
+                SectionPointerChanged="OnSectionPointerChanged" />
 
             <GridSplitter Grid.Column="1" ResizeDirection="Columns" Background="#2B3948" />
 
-            <Border x:Name="ViewportRegion" Grid.Column="2" Background="#11161D">
-                <Grid RowDefinitions="38,*">
-                    <Border Background="#151D26" BorderBrush="#2B3948" BorderThickness="0,0,0,1" Padding="10,7">
-                        <Grid ColumnDefinitions="*,Auto">
-                            <TextBlock x:Name="ViewportStatsText" VerticalAlignment="Center" Foreground="#B8CBDD" />
-                            <TextBlock Grid.Column="1" VerticalAlignment="Center" Foreground="#70869B" Text="Wheel: zoom  ·  Middle/right drag: pan  ·  Click track: inspect" />
-                        </Grid>
-                    </Border>
-                    <controls:TrackViewportControl
-                        x:Name="ViewportControl"
-                        Grid.Row="1"
-                        SampleSelected="OnViewportSampleSelected" />
-                    <Border
-                        Grid.Row="1"
-                        Margin="12"
-                        Padding="9,6"
-                        HorizontalAlignment="Left"
-                        VerticalAlignment="Top"
-                        Background="#CC101720"
-                        CornerRadius="4"
-                        IsHitTestVisible="False">
-                        <TextBlock x:Name="ViewportSelectionOverlay" Foreground="#D8E7F3" />
-                    </Border>
-                </Grid>
-            </Border>
+            <controls:ViewportPaneControl
+                x:Name="ViewportPane"
+                Grid.Column="2"
+                SectionPointerChanged="OnSectionPointerChanged"
+                SampleSelected="OnViewportSampleSelected" />
 
             <GridSplitter Grid.Column="3" ResizeDirection="Columns" Background="#2B3948" />
 
-            <Border
-                x:Name="RightInspectorRegion"
-                Grid.Column="4"
-                Classes="panel"
-                BorderThickness="1,0,0,0">
-                <Grid RowDefinitions="Auto,*">
-                    <Border Padding="12,10" BorderBrush="#2B3948" BorderThickness="0,0,0,1">
-                        <StackPanel Spacing="3">
-                            <TextBlock Classes="panelTitle" Text="INSPECTOR" />
-                            <TextBlock x:Name="InspectorTitleText" FontSize="16" FontWeight="SemiBold" />
-                        </StackPanel>
-                    </Border>
-                    <ScrollViewer Grid.Row="1">
-                        <StackPanel x:Name="InspectorFieldsPanel" Margin="12" Spacing="9" />
-                    </ScrollViewer>
-                </Grid>
-            </Border>
+            <controls:InspectorPaneControl x:Name="InspectorPane" Grid.Column="4" />
         </Grid>
 
         <GridSplitter Grid.Row="3" ResizeDirection="Rows" Background="#2B3948" />
@@ -188,80 +134,15 @@
             Classes="panel"
             BorderThickness="0,1,0,0">
             <TabControl x:Name="BottomWorkspaceTabs" SelectedIndex="0">
-                <TabItem Header="ENGINEERING PLOTS">
-                    <Grid RowDefinitions="40,*">
-                        <Border
-                            Background="#151D26"
-                            BorderBrush="#2B3948"
-                            BorderThickness="0,0,0,1"
-                            Padding="12,7">
-                            <Grid ColumnDefinitions="Auto,16,Auto,Auto,Auto,Auto,Auto,*,Auto">
-                                <TextBlock Classes="panelTitle" VerticalAlignment="Center" Text="PLOT WORKSPACE" />
-                                <CheckBox
-                                    x:Name="ElevationPlotCheckBox"
-                                    Grid.Column="2"
-                                    VerticalAlignment="Center"
-                                    Content="Elevation"
-                                    IsChecked="True"
-                                    IsCheckedChanged="OnPlotVisibilityChanged" />
-                                <CheckBox
-                                    x:Name="CurvaturePlotCheckBox"
-                                    Grid.Column="3"
-                                    Margin="12,0,0,0"
-                                    VerticalAlignment="Center"
-                                    Content="Curvature"
-                                    IsChecked="True"
-                                    IsCheckedChanged="OnPlotVisibilityChanged" />
-                                <CheckBox
-                                    x:Name="RollPlotCheckBox"
-                                    Grid.Column="4"
-                                    Margin="12,0,0,0"
-                                    VerticalAlignment="Center"
-                                    Content="Roll"
-                                    IsChecked="True"
-                                    IsCheckedChanged="OnPlotVisibilityChanged" />
-                                <CheckBox
-                                    x:Name="PitchPlotCheckBox"
-                                    Grid.Column="5"
-                                    Margin="12,0,0,0"
-                                    VerticalAlignment="Center"
-                                    Content="Pitch"
-                                    IsChecked="True"
-                                    IsCheckedChanged="OnPlotVisibilityChanged" />
-                                <CheckBox
-                                    x:Name="YawPlotCheckBox"
-                                    Grid.Column="6"
-                                    Margin="12,0,0,0"
-                                    VerticalAlignment="Center"
-                                    Content="Yaw"
-                                    IsChecked="True"
-                                    IsCheckedChanged="OnPlotVisibilityChanged" />
-                                <TextBlock
-                                    x:Name="StationReadoutText"
-                                    Grid.Column="8"
-                                    MinWidth="142"
-                                    VerticalAlignment="Center"
-                                    FontFamily="Consolas"
-                                    Foreground="#F4D35E"
-                                    Text="Station --" />
-                            </Grid>
-                        </Border>
-                        <controls:EngineeringPlotWorkspaceControl
-                            x:Name="EngineeringPlotsControl"
-                            Grid.Row="1"
-                            StationChanged="OnEngineeringPlotStationChanged" />
-                    </Grid>
+                <TabItem Header="MATH PLOTS">
+                    <controls:MathPlotsPaneControl
+                        x:Name="MathPlotsPane"
+                        SectionPointerChanged="OnSectionPointerChanged"
+                        StationChanged="OnEngineeringPlotStationChanged"
+                        StationSelected="OnEngineeringPlotStationSelected" />
                 </TabItem>
                 <TabItem Header="DIAGNOSTICS">
-                    <Grid RowDefinitions="34,*">
-                        <Border Background="#151D26" BorderBrush="#2B3948" BorderThickness="0,0,0,1" Padding="12,8">
-                            <Grid ColumnDefinitions="*,Auto">
-                                <TextBlock Classes="panelTitle" Text="SAMPLING &amp; FRAME DIAGNOSTICS" />
-                                <TextBlock x:Name="DiagnosticSummaryText" Grid.Column="1" Foreground="#7F94A8" />
-                            </Grid>
-                        </Border>
-                        <ListBox x:Name="DiagnosticsList" Grid.Row="1" Margin="6" FontFamily="Consolas" FontSize="12" />
-                    </Grid>
+                    <controls:DiagnosticsPaneControl x:Name="DiagnosticsPane" />
                 </TabItem>
             </TabControl>
         </Border>

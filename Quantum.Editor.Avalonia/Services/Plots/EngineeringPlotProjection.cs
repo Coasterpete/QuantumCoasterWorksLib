@@ -31,7 +31,7 @@ public static class EngineeringPlotProjection
             EngineeringPlotKind.Yaw => System.Math.Atan2(
                 geometry.Tangent.Z,
                 geometry.Tangent.X) * RadiansToDegrees,
-            _ => throw new ArgumentOutOfRangeException(nameof(plot), plot, "A single engineering plot is required.")
+            _ => throw new ArgumentOutOfRangeException(nameof(plot), plot, "A single Math Plot is required.")
         };
     }
 
@@ -39,46 +39,6 @@ public static class EngineeringPlotProjection
         EngineeringSnapshot snapshot,
         double station)
     {
-        ArgumentNullException.ThrowIfNull(snapshot);
-        if (snapshot.SampleCount == 0)
-        {
-            return -1;
-        }
-
-        double clampedStation = System.Math.Clamp(station, 0.0, snapshot.TotalLength);
-        int upperIndex = LowerBound(snapshot.StationGrid, clampedStation);
-        if (upperIndex <= 0)
-        {
-            return 0;
-        }
-
-        if (upperIndex >= snapshot.SampleCount)
-        {
-            return snapshot.SampleCount - 1;
-        }
-
-        double lowerDelta = clampedStation - snapshot.StationGrid[upperIndex - 1];
-        double upperDelta = snapshot.StationGrid[upperIndex] - clampedStation;
-        return lowerDelta <= upperDelta ? upperIndex - 1 : upperIndex;
-    }
-
-    private static int LowerBound(IReadOnlyList<double> stations, double station)
-    {
-        int lower = 0;
-        int upper = stations.Count;
-        while (lower < upper)
-        {
-            int middle = lower + ((upper - lower) / 2);
-            if (stations[middle] < station)
-            {
-                lower = middle + 1;
-            }
-            else
-            {
-                upper = middle;
-            }
-        }
-
-        return lower;
+        return EngineeringSnapshotNavigation.FindNearestSampleIndex(snapshot, station);
     }
 }

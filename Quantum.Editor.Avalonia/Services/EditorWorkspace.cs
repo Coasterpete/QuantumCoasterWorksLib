@@ -28,6 +28,7 @@ public sealed class EditorWorkspace
     private TrackViewportSnapshot viewportSnapshot = TrackViewportSnapshot.Empty;
     private EngineeringSnapshot? engineeringSnapshot;
     private EngineeringStationCursor? stationCursor;
+    private int hoveredSectionIndex = -1;
     private long compilationRevision;
     private long snapshotRevision;
     private string statusMessage = "Ready";
@@ -59,6 +60,8 @@ public sealed class EditorWorkspace
 
     public event EventHandler? StationCursorChanged;
 
+    public event EventHandler? SectionHighlightChanged;
+
     public DocumentService Documents { get; }
 
     public CommandService Commands { get; }
@@ -89,6 +92,14 @@ public sealed class EditorWorkspace
     public EngineeringSnapshot? EngineeringSnapshot => engineeringSnapshot;
 
     public EngineeringStationCursor? StationCursor => stationCursor;
+
+    /// <summary>
+    /// The one effective section highlight shared by every editor surface.
+    /// A transient pointer hover takes precedence over the persistent selection.
+    /// </summary>
+    public int HighlightedSectionIndex => hoveredSectionIndex >= 0
+        ? hoveredSectionIndex
+        : CurrentSelection?.SectionIndex ?? -1;
 
     public string StatusMessage => statusMessage;
 
@@ -268,6 +279,54 @@ public sealed class EditorWorkspace
         StationCursorChanged?.Invoke(this, EventArgs.Empty);
     }
 
+    public void SelectStationSample(int sampleIndex)
+    {
+        if (sampleIndex < 0 || sampleIndex >= viewportSnapshot.Samples.Count)
+        {
+            throw new ArgumentOutOfRangeException(nameof(sampleIndex));
+        }
+
+        TrackViewportSample sample = viewportSnapshot.Samples[sampleIndex];
+        string? nodeId = graphNodes
+            .FirstOrDefault(node => node.RouteIndex == sample.SectionIndex)
+            ?.NodeId;
+
+        SetStationCursor(sampleIndex);
+        Select(EditorSelection.Sample(sampleIndex, sample.SectionIndex, nodeId));
+        SetStatus(
+            $"Selected Math Plot sample {sample.SampleIndex} at station {sample.Distance:F2} m.");
+    }
+
+    public void SelectStationAt(double station)
+    {
+        EngineeringSnapshot snapshot = engineeringSnapshot ??
+            throw new InvalidOperationException("There is no Math Plot snapshot to select.");
+        int sampleIndex = EngineeringSnapshotNavigation.FindNearestSampleIndex(snapshot, station);
+        if (sampleIndex < 0)
+        {
+            throw new InvalidOperationException("The Math Plot snapshot has no canonical samples.");
+        }
+
+        SelectStationSample(sampleIndex);
+    }
+
+    public void SetHoveredSection(int? sectionIndex)
+    {
+        int replacement = sectionIndex ?? -1;
+        if (replacement < -1 || replacement >= graphNodes.Count)
+        {
+            throw new ArgumentOutOfRangeException(nameof(sectionIndex));
+        }
+
+        if (hoveredSectionIndex == replacement)
+        {
+            return;
+        }
+
+        hoveredSectionIndex = replacement;
+        SectionHighlightChanged?.Invoke(this, EventArgs.Empty);
+    }
+
     public bool UndoLast()
     {
         string? description = UndoRedo.UndoDescription;
@@ -386,6 +445,7 @@ public sealed class EditorWorkspace
             viewportSnapshot = TrackViewportSnapshot.Empty;
             engineeringSnapshot = null;
             stationCursor = null;
+            hoveredSectionIndex = -1;
             projectedCompilation = null;
         }
         else
@@ -408,6 +468,11 @@ public sealed class EditorWorkspace
                 stationCursor = new EngineeringStationCursor(
                     0,
                     engineeringSnapshot.StationGrid[0]);
+            }
+
+            if (hoveredSectionIndex >= graphNodes.Count)
+            {
+                hoveredSectionIndex = -1;
             }
         }
 

@@ -9,10 +9,6 @@ using Quantum.Editor.Avalonia.Models;
 using Quantum.Editor.Avalonia.Services;
 using Quantum.Editor.Avalonia.Services.Commands;
 using Quantum.Editor.Avalonia.Services.Documents;
-using Quantum.Editor.Avalonia.Services.Plots;
-using Quantum.IO.TrackLayout.V2;
-using Quantum.Track;
-using Quantum.Track.Authoring;
 
 namespace Quantum.Editor.Avalonia;
 
@@ -25,7 +21,6 @@ public partial class MainWindow : Window
     };
 
     private readonly EditorWorkspace workspace;
-    private readonly Dictionary<string, TextBox> inspectorFields = new(StringComparer.Ordinal);
 
     public MainWindow()
         : this(CreateWorkspace())
@@ -39,10 +34,11 @@ public partial class MainWindow : Window
 
         this.workspace.WorkspaceChanged += OnWorkspaceChanged;
         this.workspace.StationCursorChanged += OnStationCursorChanged;
-        this.workspace.Viewport.SetActiveViewport(ViewportControl);
+        this.workspace.SectionHighlightChanged += OnSectionHighlightChanged;
+        this.workspace.Viewport.SetActiveViewport(ViewportPane);
         this.workspace.Commands.Register(new EditorCommand(
             EditorCommandIds.FitViewport,
-            _ => ViewportControl.FitToTrack()));
+            _ => ViewportPane.FitToTrack()));
         UpdateWorkspaceView();
     }
 
@@ -67,10 +63,13 @@ public partial class MainWindow : Window
         Title = document is null
             ? "Quantum CoasterWorks Editor"
             : $"Quantum CoasterWorks Editor - {document.DisplayName}{(document.IsDirty ? " *" : string.Empty)}";
-        DocumentTitleText.Text = document is null
+        RoutePane.DocumentTitle = document is null
             ? "No active document"
             : document.DisplayName + (document.IsDirty ? " *" : string.Empty);
-        DocumentPathText.Text = document?.FilePath ?? "Unsaved Track Layout Package V2";
+        RoutePane.DocumentPath = document?.FilePath ?? "Unsaved Track Layout Package V2";
+        RoutePane.GraphNodes = workspace.GraphNodes;
+        RoutePane.Selection = selection;
+
         DocumentStateText.Text = document is null
             ? "NO DOCUMENT"
             : document.IsDirty ? "MODIFIED" : "SAVED";
@@ -88,20 +87,13 @@ public partial class MainWindow : Window
         UndoMenuItem.IsEnabled = workspace.UndoRedo.CanUndo;
         RedoMenuItem.IsEnabled = workspace.UndoRedo.CanRedo;
 
-        ViewportControl.Snapshot = snapshot;
-        ViewportControl.Selection = selection;
-        EngineeringPlotsControl.Snapshot = workspace.EngineeringSnapshot;
-        ViewportStatsText.Text = snapshot.Samples.Count == 0
-            ? "No compiled track samples"
-            : $"{snapshot.TotalLength:F2} m | {snapshot.Samples.Count} frames | " +
-              $"max |k| {snapshot.MaximumAbsoluteCurvature:F5} 1/m | " +
-              $"max |bank| {snapshot.MaximumAbsoluteRollDegrees:F1} deg";
-        ViewportSelectionOverlay.Text = DescribeViewportSelection(selection, snapshot);
-
-        RebuildGraphPanel();
-        RebuildInspector();
-        RebuildDiagnostics();
+        ViewportPane.Snapshot = snapshot;
+        ViewportPane.Selection = selection;
+        MathPlotsPane.Snapshot = workspace.EngineeringSnapshot;
+        InspectorPane.Refresh(workspace);
+        DiagnosticsPane.Snapshot = snapshot;
         UpdateStationCursorView();
+        UpdateSectionHighlightView();
     }
 
     private void OnStationCursorChanged(object? sender, EventArgs eventArgs)
@@ -113,422 +105,36 @@ public partial class MainWindow : Window
     {
         EngineeringStationCursor? cursor = workspace.StationCursor;
         int sampleIndex = cursor?.SampleIndex ?? -1;
-        EngineeringPlotsControl.CursorSampleIndex = sampleIndex;
-        ViewportControl.StationCursorSampleIndex = sampleIndex;
-        StationReadoutText.Text = cursor.HasValue
-            ? $"Station {cursor.Value.Station:F2} m"
+        MathPlotsPane.CursorSampleIndex = sampleIndex;
+        ViewportPane.StationCursorSampleIndex = sampleIndex;
+        MathPlotsPane.StationReadout = cursor.HasValue
+            ? DescribeStationCursor(cursor.Value)
             : "Station --";
     }
 
-    private void RebuildGraphPanel()
+    private string DescribeStationCursor(EngineeringStationCursor cursor)
     {
-        GraphNodesPanel.Children.Clear();
-        EditorSelection? selection = workspace.CurrentSelection;
-        string? selectedNodeId = selection?.NodeId;
-        if (selectedNodeId is null && selection?.SectionIndex >= 0)
-        {
-            selectedNodeId = workspace.GraphNodes
-                .FirstOrDefault(node => node.RouteIndex == selection.SectionIndex)
-                ?.NodeId;
-        }
-
-        for (int index = 0; index < workspace.GraphNodes.Count; index++)
-        {
-            EditorGraphNode node = workspace.GraphNodes[index];
-            bool selected = string.Equals(selectedNodeId, node.NodeId, StringComparison.Ordinal);
-            var header = new Grid
-            {
-                ColumnDefinitions = new ColumnDefinitions("Auto,*,Auto"),
-                ColumnSpacing = 8
-            };
-            header.Children.Add(new TextBlock
-            {
-                Text = (node.RouteIndex + 1).ToString("D2", CultureInfo.InvariantCulture),
-                Foreground = global::Avalonia.Media.Brush.Parse("#6FA9D3"),
-                FontFamily = new global::Avalonia.Media.FontFamily("Consolas"),
-                VerticalAlignment = VerticalAlignment.Center
-            });
-            var title = new TextBlock
-            {
-                Text = node.NodeId,
-                FontSize = 14,
-                FontWeight = global::Avalonia.Media.FontWeight.SemiBold,
-                TextTrimming = global::Avalonia.Media.TextTrimming.CharacterEllipsis
-            };
-            Grid.SetColumn(title, 1);
-            header.Children.Add(title);
-            var kind = new TextBlock
-            {
-                Text = node.SectionKind,
-                Foreground = global::Avalonia.Media.Brush.Parse("#8FA5B9"),
-                FontSize = 11,
-                VerticalAlignment = VerticalAlignment.Center
-            };
-            Grid.SetColumn(kind, 2);
-            header.Children.Add(kind);
-
-            var content = new StackPanel
-            {
-                Spacing = 5,
-                Children =
-                {
-                    header,
-                    new TextBlock
-                    {
-                        Text = node.Summary,
-                        Foreground = global::Avalonia.Media.Brush.Parse("#8FA5B9"),
-                        FontSize = 11,
-                        TextWrapping = global::Avalonia.Media.TextWrapping.Wrap
-                    }
-                }
-            };
-            var button = new Button
-            {
-                Tag = node,
-                Content = content,
-                Background = global::Avalonia.Media.Brush.Parse(selected ? "#203B50" : "#18232E"),
-                BorderBrush = global::Avalonia.Media.Brush.Parse(selected ? "#59B5E8" : "#34495C")
-            };
-            button.Classes.Add("graphNode");
-            button.Click += OnGraphNodeClick;
-            GraphNodesPanel.Children.Add(button);
-
-            if (index + 1 < workspace.GraphNodes.Count)
-            {
-                var connector = new Grid
-                {
-                    Height = 28,
-                    IsHitTestVisible = false
-                };
-                connector.Children.Add(new Border
-                {
-                    Width = 2,
-                    Height = 22,
-                    HorizontalAlignment = HorizontalAlignment.Center,
-                    VerticalAlignment = VerticalAlignment.Top,
-                    Background = global::Avalonia.Media.Brush.Parse("#3E718F")
-                });
-                connector.Children.Add(new TextBlock
-                {
-                    Text = "\u25BC",
-                    HorizontalAlignment = HorizontalAlignment.Center,
-                    VerticalAlignment = VerticalAlignment.Bottom,
-                    Foreground = global::Avalonia.Media.Brush.Parse("#59B5E8"),
-                    FontSize = 10
-                });
-                GraphNodesPanel.Children.Add(connector);
-            }
-        }
+        TrackViewportSample? sample = cursor.SampleIndex >= 0 &&
+            cursor.SampleIndex < workspace.ViewportSnapshot.Samples.Count
+                ? workspace.ViewportSnapshot.Samples[cursor.SampleIndex]
+                : null;
+        string sectionId = sample.HasValue
+            ? ResolveGraphNodeId(sample.Value.SectionIndex) ?? "--"
+            : "--";
+        return $"Station {cursor.Station:F2} m  |  Sample {cursor.SampleIndex}  |  Section {sectionId}";
     }
 
-    private void RebuildInspector()
+    private void OnSectionHighlightChanged(object? sender, EventArgs eventArgs)
     {
-        inspectorFields.Clear();
-        InspectorFieldsPanel.Children.Clear();
-
-        TrackEditorDocument? document = workspace.ActiveDocument;
-        EditorSelection? selection = workspace.CurrentSelection;
-        if (document?.Graph is null || document.GraphCompileResult is null || selection is null)
-        {
-            InspectorTitleText.Text = "Nothing selected";
-            AddInspectorNote("Select a graph node or viewport sample.");
-            return;
-        }
-
-        switch (selection.Kind)
-        {
-            case EditorSelectionKind.Track:
-                BuildTrackInspector(document);
-                break;
-            case EditorSelectionKind.Section:
-                BuildGraphNodeInspector(document, selection);
-                break;
-            case EditorSelectionKind.Sample:
-                BuildSampleInspector(selection.SampleIndex);
-                break;
-            case EditorSelectionKind.BankingKey:
-                InspectorTitleText.Text = "Banking key";
-                AddInspectorNote("Banking-key editing is outside the M157 graph-authoring vertical slice.");
-                break;
-            case EditorSelectionKind.ControlPoint:
-                InspectorTitleText.Text = "Spatial control point";
-                AddInspectorNote("Control-point editing is outside the M157 graph-authoring vertical slice.");
-                break;
-        }
+        UpdateSectionHighlightView();
     }
 
-    private void BuildTrackInspector(TrackEditorDocument document)
+    private void UpdateSectionHighlightView()
     {
-        InspectorTitleText.Text = "Track document";
-        AddInspectorField(
-            "sourceName",
-            "Source name",
-            document.AncillaryState?.SourceName ?? string.Empty,
-            editable: false);
-        AddInspectorField(
-            "layoutId",
-            "Layout ID",
-            document.AncillaryState?.LayoutId ?? string.Empty,
-            editable: false);
-        AddInspectorField(
-            "units",
-            "Units",
-            document.AncillaryState?.Units ?? string.Empty,
-            editable: false);
-        AddInspectorField(
-            "sections",
-            "Graph nodes",
-            workspace.GraphNodes.Count.ToString(CultureInfo.InvariantCulture),
-            editable: false);
-        AddInspectorField(
-            "length",
-            "Compiled length",
-            $"{workspace.ViewportSnapshot.TotalLength:F3} m",
-            editable: false);
-        HeartlineOffset? heartline = document.AncillaryState?.HeartlineOffset;
-        if (heartline.HasValue)
-        {
-            AddInspectorField(
-                "heartlineNormal",
-                "Heartline normal",
-                heartline.Value.NormalOffsetMeters.ToString("G17", CultureInfo.InvariantCulture),
-                editable: false);
-            AddInspectorField(
-                "heartlineLateral",
-                "Heartline lateral",
-                heartline.Value.LateralOffsetMeters.ToString("G17", CultureInfo.InvariantCulture),
-                editable: false);
-        }
-
-        AddInspectorNote(
-            "M157 edits section nodes through the authoring graph. Document metadata remains read-only.");
-    }
-
-    private void BuildGraphNodeInspector(
-        TrackEditorDocument document,
-        EditorSelection selection)
-    {
-        IReadOnlyList<TrackAuthoringGraphNode> route = document.GraphCompileResult!.OrderedNodes;
-        TrackAuthoringGraphNode? node = selection.NodeId is null
-            ? null
-            : route.FirstOrDefault(candidate =>
-                string.Equals(candidate.Id, selection.NodeId, StringComparison.Ordinal));
-        if (node is null && selection.SectionIndex >= 0 && selection.SectionIndex < route.Count)
-        {
-            node = route[selection.SectionIndex];
-        }
-
-        if (node is null)
-        {
-            InspectorTitleText.Text = "Invalid graph node";
-            return;
-        }
-
-        GeometricSectionDefinition section = node.Section;
-        InspectorTitleText.Text = "Graph node: " + section.Id;
-        AddInspectorField("id", "Node ID", section.Id, editable: false);
-        AddInspectorField("kind", "Section kind", DescribeSectionKind(section), editable: false);
-        AddInspectorField(
-            "sectionLength",
-            "Length (m)",
-            section.Length.ToString("G17", CultureInfo.InvariantCulture),
-            editable: false);
-        AddInspectorField(
-            "rollDegrees",
-            "Section roll (deg)",
-            (section.RollRadians * 180.0 / System.Math.PI).ToString("G17", CultureInfo.InvariantCulture),
-            editable: false);
-
-        if (section is ConstantCurvatureSectionDefinition arc)
-        {
-            AddInspectorField(
-                "radius",
-                "Signed radius (m)",
-                arc.Radius.ToString("G17", CultureInfo.InvariantCulture));
-            AddInspectorNote(
-                "Changing signed radius recompiles the complete graph through the existing backend pipeline.");
-            AddApplyButton("Apply radius", () => ApplyRadiusInspector(node.Id));
-        }
-        else if (section is CurvatureTransitionSectionDefinition transition)
-        {
-            AddInspectorField(
-                "startCurvature",
-                "Start curvature",
-                transition.StartCurvature.ToString("G17", CultureInfo.InvariantCulture),
-                editable: false);
-            AddInspectorField(
-                "endCurvature",
-                "End curvature",
-                transition.EndCurvature.ToString("G17", CultureInfo.InvariantCulture),
-                editable: false);
-            AddInspectorField(
-                "interpolation",
-                "Interpolation",
-                transition.InterpolationMode.ToString(),
-                editable: false);
-            AddInspectorNote("Transition editing is intentionally deferred beyond M157.");
-        }
-        else if (section is SpatialSectionDefinition spatial)
-        {
-            AddInspectorField(
-                "degree",
-                "NURBS degree",
-                spatial.Degree.ToString(CultureInfo.InvariantCulture),
-                editable: false);
-            AddInspectorField(
-                "controlPoints",
-                "Control points",
-                spatial.ControlPoints.Count.ToString(CultureInfo.InvariantCulture),
-                editable: false);
-            AddInspectorNote("Spatial control-point editing is intentionally deferred beyond M157.");
-        }
-        else
-        {
-            AddInspectorNote(
-                "Straight-node length editing is deferred because authored banking shares the total station domain.");
-        }
-    }
-
-    private void BuildSampleInspector(int sampleIndex)
-    {
-        if (sampleIndex < 0 || sampleIndex >= workspace.ViewportSnapshot.Samples.Count)
-        {
-            InspectorTitleText.Text = "Invalid sample";
-            return;
-        }
-
-        TrackViewportSample sample = workspace.ViewportSnapshot.Samples[sampleIndex];
-        InspectorTitleText.Text = $"Frame sample {sample.SampleIndex}";
-        AddInspectorField("sampleDistance", "Station", $"{sample.Distance:F3} m", editable: false);
-        AddInspectorField(
-            "sampleSection",
-            "Graph node",
-            ResolveGraphNodeId(sample.SectionIndex) ?? (sample.SectionIndex + 1).ToString(CultureInfo.InvariantCulture),
-            editable: false);
-        AddInspectorField("samplePosition", "Position", FormatVector(sample.Position), editable: false);
-        AddInspectorField("sampleTangent", "Tangent", FormatVector(sample.Tangent), editable: false);
-        AddInspectorField("sampleNormal", "Normal", FormatVector(sample.Normal), editable: false);
-        AddInspectorField("sampleBinormal", "Binormal", FormatVector(sample.Binormal), editable: false);
-        AddInspectorField("sampleCurvature", "Curvature", $"{sample.Curvature:F6} 1/m", editable: false);
-        AddInspectorField("sampleRoll", "Banking", $"{sample.RollDegrees:F3} deg", editable: false);
-    }
-
-    private void AddInspectorField(string key, string label, string value, bool editable = true)
-    {
-        var grid = new Grid
-        {
-            ColumnDefinitions = new ColumnDefinitions("118,*"),
-            ColumnSpacing = 8
-        };
-        var labelBlock = new TextBlock
-        {
-            Text = label,
-            VerticalAlignment = VerticalAlignment.Center,
-            Foreground = global::Avalonia.Media.Brush.Parse("#8FA5B9"),
-            TextWrapping = global::Avalonia.Media.TextWrapping.Wrap
-        };
-        var field = new TextBox
-        {
-            Text = value,
-            IsReadOnly = !editable,
-            Classes = { "inspectorField" }
-        };
-        Grid.SetColumn(field, 1);
-        grid.Children.Add(labelBlock);
-        grid.Children.Add(field);
-        InspectorFieldsPanel.Children.Add(grid);
-        inspectorFields[key] = field;
-    }
-
-    private void AddInspectorNote(string text)
-    {
-        InspectorFieldsPanel.Children.Add(new TextBlock
-        {
-            Text = text,
-            Foreground = global::Avalonia.Media.Brush.Parse("#7F94A8"),
-            TextWrapping = global::Avalonia.Media.TextWrapping.Wrap,
-            Margin = new global::Avalonia.Thickness(0, 4)
-        });
-    }
-
-    private void AddApplyButton(string label, Action apply)
-    {
-        var button = new Button
-        {
-            Content = label,
-            HorizontalAlignment = HorizontalAlignment.Stretch,
-            Margin = new global::Avalonia.Thickness(0, 6, 0, 0)
-        };
-        button.Click += (_, _) => apply();
-        InspectorFieldsPanel.Children.Add(button);
-    }
-
-    private void RebuildDiagnostics()
-    {
-        TrackViewportSnapshot snapshot = workspace.ViewportSnapshot;
-        var lines = new List<string>(snapshot.Diagnostics);
-        TrackFrameContinuityReport? continuity = snapshot.ContinuityReport;
-        if (continuity != null)
-        {
-            foreach (TrackFrameContinuityIssue issue in continuity.Issues.Take(12))
-            {
-                lines.Add(
-                    $"{issue.Kind}: {issue.Interval.StartDistance:F2}-{issue.Interval.EndDistance:F2} m, " +
-                    $"{issue.ActualAngleDegrees:F3} deg > {issue.ThresholdAngleDegrees:F3} deg.");
-            }
-        }
-
-        DiagnosticsList.ItemsSource = lines;
-        DiagnosticSummaryText.Text = continuity is null
-            ? "No compiled diagnostics"
-            : $"{continuity.IntervalCount} intervals | {continuity.Issues.Count} issues";
-    }
-
-    private void ApplyRadiusInspector(string nodeId)
-    {
-        try
-        {
-            double radius = NumberField("radius");
-            workspace.ApplyGraphEdit($"Edit {nodeId} radius", graph =>
-            {
-                TrackAuthoringGraphNode node = graph.Nodes.Single(candidate =>
-                    string.Equals(candidate.Id, nodeId, StringComparison.Ordinal));
-                ConstantCurvatureSectionDefinition arc =
-                    node.Section as ConstantCurvatureSectionDefinition ??
-                    throw new InvalidOperationException(
-                        $"Graph node ID '{nodeId}' is not a constant-curvature section.");
-                var replacement = new ConstantCurvatureSectionDefinition(
-                    arc.Id,
-                    arc.Length,
-                    radius,
-                    arc.RollRadians);
-                return graph.WithSection(nodeId, replacement);
-            });
-        }
-        catch (Exception exception) when (exception is FormatException || exception is OverflowException)
-        {
-            workspace.SetStatus("Edit rejected: " + exception.Message);
-        }
-    }
-
-    private string Field(string key)
-    {
-        return inspectorFields.TryGetValue(key, out TextBox? field)
-            ? field.Text ?? string.Empty
-            : throw new InvalidOperationException($"Inspector field '{key}' is unavailable.");
-    }
-
-    private double NumberField(string key)
-    {
-        string value = Field(key);
-        if (!double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out double number) ||
-            double.IsNaN(number) ||
-            double.IsInfinity(number))
-        {
-            throw new FormatException($"'{value}' is not a finite invariant-culture number for {key}.");
-        }
-
-        return number;
+        int highlightedSectionIndex = workspace.HighlightedSectionIndex;
+        MathPlotsPane.HighlightedSectionIndex = highlightedSectionIndex;
+        ViewportPane.HighlightedSectionIndex = highlightedSectionIndex;
+        RoutePane.HighlightedSectionIndex = highlightedSectionIndex;
     }
 
     private async void OnNewDocumentClick(object? sender, RoutedEventArgs eventArgs)
@@ -652,12 +258,12 @@ public partial class MainWindow : Window
 
     private void OnProjectionChanged(object? sender, SelectionChangedEventArgs eventArgs)
     {
-        if (ViewportControl is null || ProjectionComboBox is null)
+        if (ViewportPane is null || ProjectionComboBox is null)
         {
             return;
         }
 
-        ViewportControl.Projection = ProjectionComboBox.SelectedIndex switch
+        ViewportPane.Projection = ProjectionComboBox.SelectedIndex switch
         {
             1 => TrackViewportProjection.Top,
             2 => TrackViewportProjection.Side,
@@ -667,9 +273,9 @@ public partial class MainWindow : Window
 
     private void OnShowFramesChanged(object? sender, RoutedEventArgs eventArgs)
     {
-        if (ViewportControl != null && ShowFramesCheckBox != null)
+        if (ViewportPane != null && ShowFramesCheckBox != null)
         {
-            ViewportControl.ShowFrames = ShowFramesCheckBox.IsChecked == true;
+            ViewportPane.ShowFrames = ShowFramesCheckBox.IsChecked == true;
         }
     }
 
@@ -683,30 +289,6 @@ public partial class MainWindow : Window
         BottomWorkspaceTabs.SelectedIndex = 0;
     }
 
-    private void OnPlotVisibilityChanged(object? sender, RoutedEventArgs eventArgs)
-    {
-        if (EngineeringPlotsControl is null)
-        {
-            return;
-        }
-
-        EngineeringPlotsControl.SetPlotEnabled(
-            EngineeringPlotKind.Elevation,
-            ElevationPlotCheckBox?.IsChecked == true);
-        EngineeringPlotsControl.SetPlotEnabled(
-            EngineeringPlotKind.Curvature,
-            CurvaturePlotCheckBox?.IsChecked == true);
-        EngineeringPlotsControl.SetPlotEnabled(
-            EngineeringPlotKind.Roll,
-            RollPlotCheckBox?.IsChecked == true);
-        EngineeringPlotsControl.SetPlotEnabled(
-            EngineeringPlotKind.Pitch,
-            PitchPlotCheckBox?.IsChecked == true);
-        EngineeringPlotsControl.SetPlotEnabled(
-            EngineeringPlotKind.Yaw,
-            YawPlotCheckBox?.IsChecked == true);
-    }
-
     private void OnEngineeringPlotStationChanged(
         object? sender,
         EngineeringStationChangedEventArgs eventArgs)
@@ -714,25 +296,33 @@ public partial class MainWindow : Window
         workspace.SetStationCursor(eventArgs.SampleIndex);
     }
 
+    private void OnEngineeringPlotStationSelected(
+        object? sender,
+        EngineeringStationChangedEventArgs eventArgs)
+    {
+        workspace.SelectStationAt(eventArgs.Station);
+    }
+
+    private void OnSectionPointerChanged(
+        object? sender,
+        SectionPointerChangedEventArgs eventArgs)
+    {
+        workspace.SetHoveredSection(eventArgs.SectionIndex);
+    }
+
     private void OnViewportSampleSelected(object? sender, ViewportSampleSelectedEventArgs eventArgs)
     {
         TrackViewportSample sample = eventArgs.Sample;
-        workspace.SetStationCursor(sample.SampleIndex);
-
-        string? nodeId = ResolveGraphNodeId(sample.SectionIndex);
-        workspace.Select(EditorSelection.Sample(sample.SampleIndex, sample.SectionIndex, nodeId));
-
+        workspace.SelectStationSample(sample.SampleIndex);
         workspace.SetStatus(
-            $"Selected frame sample {sample.SampleIndex} at station {sample.Distance:F2} m.");
+            $"Selected viewport sample {sample.SampleIndex} at station {sample.Distance:F2} m.");
     }
 
-    private void OnGraphNodeClick(object? sender, RoutedEventArgs eventArgs)
+    private void OnGraphNodeSelected(object? sender, GraphNodeSelectedEventArgs eventArgs)
     {
-        if (sender is Button { Tag: EditorGraphNode node })
-        {
-            workspace.Select(node.Selection);
-            workspace.SetStatus("Selected graph node " + node.NodeId + ".");
-        }
+        EditorGraphNode node = eventArgs.Node;
+        workspace.Select(node.Selection);
+        workspace.SetStatus("Selected section " + node.NodeId + ".");
     }
 
     private async void OnWindowKeyDown(object? sender, KeyEventArgs eventArgs)
@@ -827,56 +417,18 @@ public partial class MainWindow : Window
             ?.NodeId;
     }
 
-    private static string DescribeSectionKind(GeometricSectionDefinition section)
-    {
-        return section switch
-        {
-            StraightSectionDefinition => "Straight",
-            ConstantCurvatureSectionDefinition => "Constant Curvature",
-            CurvatureTransitionSectionDefinition => "Curvature Transition",
-            SpatialSectionDefinition => "Spatial",
-            _ => section.GetType().Name
-        };
-    }
-
     private static string DescribeSelection(EditorSelection? selection)
     {
         return selection?.Kind switch
         {
             EditorSelectionKind.Track => "Track selected",
             EditorSelectionKind.Section =>
-                "Graph node " + (selection.NodeId ?? (selection.SectionIndex + 1).ToString(CultureInfo.InvariantCulture)) +
+                "Section " + (selection.NodeId ?? (selection.SectionIndex + 1).ToString(CultureInfo.InvariantCulture)) +
                 " selected",
             EditorSelectionKind.BankingKey => $"Banking key {selection.ElementIndex} selected",
             EditorSelectionKind.ControlPoint => $"Control point {selection.ElementIndex} selected",
-            EditorSelectionKind.Sample => $"Frame sample {selection.SampleIndex} selected",
+            EditorSelectionKind.Sample => $"Station sample {selection.SampleIndex} selected",
             _ => "No selection"
         };
-    }
-
-    private static string DescribeViewportSelection(
-        EditorSelection? selection,
-        TrackViewportSnapshot snapshot)
-    {
-        if (selection?.Kind == EditorSelectionKind.Sample &&
-            selection.SampleIndex >= 0 &&
-            selection.SampleIndex < snapshot.Samples.Count)
-        {
-            TrackViewportSample sample = snapshot.Samples[selection.SampleIndex];
-            return $"s {sample.Distance:F2} m\nk {sample.Curvature:F5} 1/m\nbank {sample.RollDegrees:F2} deg";
-        }
-
-        if (selection?.SectionIndex >= 0)
-        {
-            string label = selection.NodeId ?? $"Section {selection.SectionIndex + 1}";
-            return label + "\nClick a frame sample for station diagnostics";
-        }
-
-        return "Track graph workspace\nSelect a graph node to inspect it";
-    }
-
-    private static string FormatVector(Quantum.Math.Vector3d vector)
-    {
-        return $"({vector.X:F4}, {vector.Y:F4}, {vector.Z:F4})";
     }
 }

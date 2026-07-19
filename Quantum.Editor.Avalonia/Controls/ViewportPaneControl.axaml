@@ -1,0 +1,32 @@
+<UserControl
+    x:Class="Quantum.Editor.Avalonia.Controls.ViewportPaneControl"
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:Quantum.Editor.Avalonia.Controls">
+    <Border Background="#11161D">
+        <Grid RowDefinitions="38,*">
+            <Border Background="#151D26" BorderBrush="#2B3948" BorderThickness="0,0,0,1" Padding="10,7">
+                <Grid ColumnDefinitions="*,Auto">
+                    <TextBlock x:Name="ViewportStatsText" VerticalAlignment="Center" Foreground="#B8CBDD" />
+                    <TextBlock Grid.Column="1" VerticalAlignment="Center" Foreground="#70869B" Text="Wheel: zoom  ·  Middle/right drag: pan  ·  Click track: inspect" />
+                </Grid>
+            </Border>
+            <controls:TrackViewportControl
+                x:Name="ViewportControl"
+                Grid.Row="1"
+                SectionPointerChanged="OnSectionPointerChanged"
+                SampleSelected="OnSampleSelected" />
+            <Border
+                Grid.Row="1"
+                Margin="12"
+                Padding="9,6"
+                HorizontalAlignment="Left"
+                VerticalAlignment="Top"
+                Background="#CC101720"
+                CornerRadius="4"
+                IsHitTestVisible="False">
+                <TextBlock x:Name="ViewportSelectionOverlay" Foreground="#D8E7F3" />
+            </Border>
+        </Grid>
+    </Border>
+</UserControl>
