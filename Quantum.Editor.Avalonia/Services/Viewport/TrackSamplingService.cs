@@ -1,5 +1,4 @@
 using Quantum.Editor.Avalonia.Models;
-using Quantum.Editor.Avalonia.Services.Documents;
 using Quantum.Track;
 using Quantum.Track.Authoring;
 
@@ -11,48 +10,50 @@ public sealed class TrackSamplingService
     private const double TargetSpacing = 1.5;
     private const double RadiansToDegrees = 180.0 / System.Math.PI;
 
-    public TrackViewportSnapshot Sample(TrackEditorDocument document)
+    public int GetSampleCount(double totalLength)
     {
-        ArgumentNullException.ThrowIfNull(document);
+        if (!double.IsFinite(totalLength) || totalLength <= 0.0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(totalLength));
+        }
 
-        TrackAuthoringCompilation? compilation = document.Compilation;
-        if (compilation is null || compilation.TotalLength <= 0.0)
+        return System.Math.Clamp(
+            (int)System.Math.Ceiling(totalLength / TargetSpacing) + 1,
+            2,
+            MaximumSampleCount);
+    }
+
+    public TrackViewportSnapshot CreateViewportSnapshot(EngineeringSnapshot snapshot)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+        if (snapshot.SampleCount == 0 || snapshot.TotalLength <= 0.0)
         {
             return TrackViewportSnapshot.Empty;
         }
 
-        double[] distances = BuildDistances(compilation.TotalLength);
-        var evaluator = new TrackEvaluator(compilation.Runtime);
-        TrackFrame[] frames = BankingProfileSampler.SampleFramesAtDistances(
-            evaluator,
-            compilation.BankingProfile,
-            distances);
-        TrackFrameSmoothnessReport smoothness = TrackFrameSmoothnessDiagnostics.Analyze(
-            frames,
-            distances);
         TrackFrameContinuityReport continuity = TrackFrameContinuityDiagnostics.Analyze(
-            frames,
-            distances,
+            snapshot.OrientationFrames,
+            snapshot.StationGrid,
             TrackFrameContinuityThresholds.Default);
 
-        var samples = new TrackViewportSample[frames.Length];
+        var samples = new TrackViewportSample[snapshot.SampleCount];
+        double maximumCurvature = 0.0;
         double maximumRoll = 0.0;
-
-        for (int index = 0; index < frames.Length; index++)
+        for (int sampleIndex = 0; sampleIndex < snapshot.SampleCount; sampleIndex++)
         {
-            double curvature = ResolveCurvature(index, smoothness);
-            double rollDegrees = BankingProfileSampler.SampleRollRadians(
-                compilation.BankingProfile,
-                distances[index]) * RadiansToDegrees;
+            EngineeringGeometrySample geometry = snapshot.Geometry[sampleIndex];
+            TrackFrame frame = snapshot.OrientationFrames[sampleIndex];
+            double curvature = geometry.CurvatureMagnitude ?? 0.0;
+            double rollDegrees = snapshot.BankingRollRadians[sampleIndex] * RadiansToDegrees;
+            maximumCurvature = System.Math.Max(maximumCurvature, System.Math.Abs(curvature));
             maximumRoll = System.Math.Max(maximumRoll, System.Math.Abs(rollDegrees));
 
-            TrackFrame frame = frames[index];
-            samples[index] = new TrackViewportSample(
-                index,
-                ResolveSectionIndex(compilation.ResolvedSections, distances[index]),
-                distances[index],
-                frame.Position,
-                frame.Tangent,
+            samples[sampleIndex] = new TrackViewportSample(
+                sampleIndex,
+                ResolveSectionIndex(snapshot.ResolvedSections, geometry.Station),
+                geometry.Station,
+                geometry.Position,
+                geometry.Tangent,
                 frame.Normal,
                 frame.Binormal,
                 curvature,
@@ -61,9 +62,9 @@ public sealed class TrackSamplingService
 
         string[] diagnostics =
         {
-            $"Compiled {compilation.ResolvedSections.Count} sections over {compilation.TotalLength:F2} m.",
-            $"Sampled {samples.Length} transported frames at approximately {TargetSpacing:F1} m spacing.",
-            $"Maximum |curvature|: {smoothness.CurvatureEstimate.MaxAbsolute:F5} 1/m.",
+            $"Engineering snapshot {snapshot.Revision.SnapshotRevision} contains {snapshot.ResolvedSections.Count} sections over {snapshot.TotalLength:F2} m.",
+            $"Canonical station grid contains {snapshot.SampleCount} samples at approximately {TargetSpacing:F1} m spacing.",
+            $"Maximum |curvature|: {maximumCurvature:F5} 1/m.",
             $"Banking range: {maximumRoll:F2}° maximum absolute roll.",
             continuity.HasDiscontinuities
                 ? $"Frame continuity: {continuity.Issues.Count} threshold issue(s)."
@@ -72,48 +73,26 @@ public sealed class TrackSamplingService
 
         return new TrackViewportSnapshot(
             samples,
-            compilation.TotalLength,
-            smoothness.CurvatureEstimate.MaxAbsolute,
+            snapshot.TotalLength,
+            maximumCurvature,
             maximumRoll,
             diagnostics,
             continuity);
     }
 
-    private static double[] BuildDistances(double totalLength)
-    {
-        int sampleCount = System.Math.Clamp(
-            (int)System.Math.Ceiling(totalLength / TargetSpacing) + 1,
-            2,
-            MaximumSampleCount);
-        var distances = new double[sampleCount];
-        for (int index = 0; index < sampleCount; index++)
-        {
-            distances[index] = totalLength * index / (sampleCount - 1);
-        }
-
-        return distances;
-    }
-
-    private static double ResolveCurvature(int sampleIndex, TrackFrameSmoothnessReport smoothness)
-    {
-        if (smoothness.IntervalCount == 0)
-        {
-            return 0.0;
-        }
-
-        int intervalIndex = System.Math.Min(sampleIndex, smoothness.IntervalCount - 1);
-        return smoothness.Intervals[intervalIndex].CurvatureEstimate;
-    }
-
     private static int ResolveSectionIndex(
-        IReadOnlyList<ResolvedSectionInterval<GeometricSectionDefinition>> sections,
-        double distance)
+        IReadOnlyList<EngineeringResolvedSectionMetadata> sections,
+        double station)
     {
-        for (int index = 0; index < sections.Count; index++)
+        for (int sectionIndex = 0; sectionIndex < sections.Count; sectionIndex++)
         {
-            if (sections[index].Contains(distance))
+            EngineeringResolvedSectionMetadata section = sections[sectionIndex];
+            bool contains = station >= section.StartStation &&
+                (station < section.EndStation ||
+                 (section.IncludesEndStation && station <= section.EndStation));
+            if (contains)
             {
-                return index;
+                return sectionIndex;
             }
         }
 

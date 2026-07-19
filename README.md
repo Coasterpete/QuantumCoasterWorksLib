@@ -14,7 +14,7 @@ Quantum CoasterWorks is an early-stage coaster design and simulation backend. Th
 
 - `Quantum.Core`, `Quantum.Math`, `Quantum.Splines`, `Quantum.Track`, `Quantum.FVD`, `Quantum.Physics`, and `Quantum.IO` contain backend/domain logic.
 - `Quantum.Debug` contains backend diagnostics and command-line tooling.
-- `Quantum.Editor.Avalonia` contains a standalone editor workbench for Track Layout Package V2 files, backend compilation, document/outliner/inspector workflows, undo/redo, and an Avalonia-drawn technical viewport.
+- `Quantum.Editor.Avalonia` contains a standalone editor workbench for Track Layout Package V2 files, backend compilation, document/outliner/inspector workflows, undo/redo, an Avalonia-drawn technical viewport, and the snapshot-driven [M158.2 engineering plot workspace](docs/editor/m158-2-engineering-plot-workspace.md).
 - `Quantum.Tests` contains automated tests and contract fixtures.
 - `Assets` contains the current Unity debug visualizer/prototype assets.
 

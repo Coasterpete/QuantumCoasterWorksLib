@@ -3,6 +3,7 @@ using Quantum.Editor.Avalonia.Services;
 using Quantum.Editor.Avalonia.Services.Commands;
 using Quantum.Editor.Avalonia.Services.Documents;
 using Quantum.IO.TrackLayout.V2;
+using Quantum.Track.Authoring;
 
 namespace Quantum.Tests;
 
@@ -22,6 +23,13 @@ public sealed class EditorWorkspaceTests
         Assert.Equal(195.0, document.Compilation!.TotalLength, 9);
         Assert.True(workspace.ViewportSnapshot.Samples.Count > 100);
         Assert.Equal(document.Compilation.TotalLength, workspace.ViewportSnapshot.TotalLength, 9);
+        EngineeringSnapshot snapshot = Assert.IsType<EngineeringSnapshot>(workspace.EngineeringSnapshot);
+        Assert.Equal(snapshot.SampleCount, workspace.ViewportSnapshot.Samples.Count);
+        Assert.Equal(snapshot.Geometry[20].Position, workspace.ViewportSnapshot.Samples[20].Position);
+        Assert.Equal(snapshot.Geometry[20].Tangent, workspace.ViewportSnapshot.Samples[20].Tangent);
+        Assert.Equal(snapshot.BankingRollRadians[20] * 180.0 / System.Math.PI,
+            workspace.ViewportSnapshot.Samples[20].RollDegrees,
+            9);
         Assert.NotEmpty(workspace.ViewportSnapshot.Diagnostics);
         Assert.Equal(EditorSelection.Track, workspace.CurrentSelection);
         Assert.Single(workspace.OutlinerNodes);
@@ -77,6 +85,25 @@ public sealed class EditorWorkspaceTests
         Assert.Equal(EditorSelectionKind.Sample, workspace.CurrentSelection!.Kind);
         Assert.Equal(sample.SampleIndex, workspace.CurrentSelection.SampleIndex);
         Assert.Equal(sample.SectionIndex, workspace.CurrentSelection.SectionIndex);
+    }
+
+    [Fact]
+    public void SetStationCursor_UsesCanonicalEngineeringStationAndNotifiesOnce()
+    {
+        var workspace = new EditorWorkspace();
+        workspace.NewDocument();
+        EngineeringSnapshot snapshot = workspace.EngineeringSnapshot!;
+        int notifications = 0;
+        workspace.StationCursorChanged += (_, _) => notifications++;
+
+        workspace.SetStationCursor(25);
+        workspace.SetStationCursor(25);
+
+        EngineeringStationCursor cursor = Assert.IsType<EngineeringStationCursor>(
+            workspace.StationCursor);
+        Assert.Equal(25, cursor.SampleIndex);
+        Assert.Equal(snapshot.StationGrid[25], cursor.Station, 12);
+        Assert.Equal(1, notifications);
     }
 
     [Fact]
