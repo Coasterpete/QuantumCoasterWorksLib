@@ -22,6 +22,12 @@ Quantum CoasterWorks is an early-stage coaster design and simulation backend. Th
 
 *M165's first functional Train Workspace, with immutable consist configuration, a deterministic schematic, and calculated summary values.*
 
+### Workspace Switching
+
+![Switching between the Quantum CoasterWorks Track and Train workspaces](docs/images/editor/workspace-switching.gif)
+
+*The M165 workspace selector switching between the Track and Train layouts. [Open the higher-quality MP4 recording](docs/images/editor/workspace-switching.mp4).*
+
 ## Current Status
 
 - Current milestone: **M165**, an early-development technical preview that introduces the first functional Train Workspace.
