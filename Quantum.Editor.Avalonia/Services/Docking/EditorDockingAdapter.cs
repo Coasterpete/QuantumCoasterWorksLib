@@ -9,18 +9,20 @@ namespace Quantum.Editor.Avalonia.Services.Docking;
 public sealed class EditorDockingAdapter
 {
     private readonly EditorDockFactory factory;
+    private readonly DockLayoutPersistenceService? persistence;
 
     public EditorDockingAdapter(
         DockPaneRegistry registry,
-        IReadOnlyDictionary<string, object> paneContexts)
+        IReadOnlyDictionary<string, object> paneContexts,
+        DockLayoutPersistenceService? persistence = null)
     {
         Registry = registry ?? throw new ArgumentNullException(nameof(registry));
         ArgumentNullException.ThrowIfNull(paneContexts);
         ValidatePaneContexts(registry, paneContexts);
 
+        this.persistence = persistence;
         factory = new EditorDockFactory(registry, paneContexts);
-        Layout = factory.CreateLayout();
-        factory.InitLayout(Layout);
+        Layout = CreateInitialLayout();
         IsInitialized = true;
     }
 
@@ -28,9 +30,25 @@ public sealed class EditorDockingAdapter
 
     public IFactory Factory => factory;
 
-    public IRootDock Layout { get; }
+    public IRootDock Layout { get; private set; }
+
+    public DockLayoutLoadStatus LoadStatus { get; private set; } = DockLayoutLoadStatus.Missing;
+
+    public bool RestoredSavedLayout { get; private set; }
 
     public bool IsInitialized { get; }
+
+    public bool TrySaveLayout() => persistence?.TrySaveLayout(Layout) ?? false;
+
+    public IRootDock ResetLayout()
+    {
+        persistence?.TryDiscardSavedLayout();
+        CloseLayout(Layout);
+        Layout = CreateDefaultLayout();
+        RestoredSavedLayout = false;
+        LoadStatus = DockLayoutLoadStatus.Missing;
+        return Layout;
+    }
 
     public IDockable GetPane(string paneId)
     {
@@ -91,6 +109,44 @@ public sealed class EditorDockingAdapter
 
     private static bool IsHidden(IDockable pane) =>
         pane.Owner is IRootDock root && root.HiddenDockables?.Contains(pane) == true;
+
+    private IRootDock CreateInitialLayout()
+    {
+        if (persistence is not null)
+        {
+            LoadStatus = persistence.TryLoadLayout(out IRootDock? restoredLayout);
+            if (LoadStatus == DockLayoutLoadStatus.Restored && restoredLayout is not null)
+            {
+                try
+                {
+                    factory.InitLayout(restoredLayout);
+                    RestoredSavedLayout = true;
+                    return restoredLayout;
+                }
+                catch (Exception)
+                {
+                    LoadStatus = DockLayoutLoadStatus.Failed;
+                }
+            }
+        }
+
+        return CreateDefaultLayout();
+    }
+
+    private IRootDock CreateDefaultLayout()
+    {
+        IRootDock layout = factory.CreateLayout();
+        factory.InitLayout(layout);
+        return layout;
+    }
+
+    private static void CloseLayout(IRootDock layout)
+    {
+        if (layout.Close.CanExecute(null))
+        {
+            layout.Close.Execute(null);
+        }
+    }
 
     private static void ValidatePaneContexts(
         DockPaneRegistry registry,

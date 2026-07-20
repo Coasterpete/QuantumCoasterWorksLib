@@ -32,22 +32,37 @@ public partial class MainWindow : Window
     private readonly DiagnosticsPaneControl DiagnosticsPane;
 
     public MainWindow()
-        : this(CreateWorkspace(), new WorkspaceProfileManager())
+        : this(
+            CreateWorkspace(),
+            new WorkspaceProfileManager(),
+            new DockLayoutPersistenceService())
     {
     }
 
     public MainWindow(EditorWorkspace workspace)
-        : this(workspace, new WorkspaceProfileManager())
+        : this(
+            workspace,
+            new WorkspaceProfileManager(),
+            new DockLayoutPersistenceService())
     {
     }
 
     public MainWindow(
         EditorWorkspace workspace,
         WorkspaceProfileManager workspaceProfiles)
+        : this(workspace, workspaceProfiles, new DockLayoutPersistenceService())
+    {
+    }
+
+    public MainWindow(
+        EditorWorkspace workspace,
+        WorkspaceProfileManager workspaceProfiles,
+        DockLayoutPersistenceService layoutPersistence)
     {
         this.workspace = workspace ?? throw new ArgumentNullException(nameof(workspace));
         this.workspaceProfiles = workspaceProfiles ??
             throw new ArgumentNullException(nameof(workspaceProfiles));
+        ArgumentNullException.ThrowIfNull(layoutPersistence);
         InitializeComponent();
 
         RoutePane = new RoutePaneControl();
@@ -67,7 +82,8 @@ public partial class MainWindow : Window
                 [WorkspacePaneIds.Inspector] = InspectorPane,
                 [WorkspacePaneIds.MathPlots] = MathPlotsPane,
                 [WorkspacePaneIds.Diagnostics] = DiagnosticsPane
-            });
+            },
+            layoutPersistence);
         DockHost.Factory = docking.Factory;
         DockHost.Layout = docking.Layout;
 
@@ -79,7 +95,10 @@ public partial class MainWindow : Window
         this.workspace.Commands.Register(new EditorCommand(
             EditorCommandIds.FitViewport,
             _ => ViewportPane.FitToTrack()));
-        ApplyWorkspaceProfile(this.workspaceProfiles.CurrentProfile);
+        Closing += OnWindowClosing;
+        ApplyWorkspaceProfile(
+            this.workspaceProfiles.CurrentProfile,
+            applyPaneVisibilityDefaults: !docking.RestoredSavedLayout);
         UpdateWorkspaceView();
     }
 
@@ -112,27 +131,34 @@ public partial class MainWindow : Window
 
     private void OnCurrentProfileChanged(object? sender, EventArgs eventArgs)
     {
-        ApplyWorkspaceProfile(workspaceProfiles.CurrentProfile);
+        ApplyWorkspaceProfile(
+            workspaceProfiles.CurrentProfile,
+            applyPaneVisibilityDefaults: true);
         UpdateWorkspaceView();
     }
 
-    private void ApplyWorkspaceProfile(WorkspaceProfile profile)
+    private void ApplyWorkspaceProfile(
+        WorkspaceProfile profile,
+        bool applyPaneVisibilityDefaults)
     {
-        docking.SetPaneVisible(
-            WorkspacePaneIds.Route,
-            profile.IsPaneVisibleByDefault(WorkspacePaneIds.Route));
-        docking.SetPaneVisible(
-            WorkspacePaneIds.Viewport,
-            profile.IsPaneVisibleByDefault(WorkspacePaneIds.Viewport));
-        docking.SetPaneVisible(
-            WorkspacePaneIds.Inspector,
-            profile.IsPaneVisibleByDefault(WorkspacePaneIds.Inspector));
-        docking.SetPaneVisible(
-            WorkspacePaneIds.MathPlots,
-            profile.IsPaneVisibleByDefault(WorkspacePaneIds.MathPlots));
-        docking.SetPaneVisible(
-            WorkspacePaneIds.Diagnostics,
-            profile.IsPaneVisibleByDefault(WorkspacePaneIds.Diagnostics));
+        if (applyPaneVisibilityDefaults)
+        {
+            docking.SetPaneVisible(
+                WorkspacePaneIds.Route,
+                profile.IsPaneVisibleByDefault(WorkspacePaneIds.Route));
+            docking.SetPaneVisible(
+                WorkspacePaneIds.Viewport,
+                profile.IsPaneVisibleByDefault(WorkspacePaneIds.Viewport));
+            docking.SetPaneVisible(
+                WorkspacePaneIds.Inspector,
+                profile.IsPaneVisibleByDefault(WorkspacePaneIds.Inspector));
+            docking.SetPaneVisible(
+                WorkspacePaneIds.MathPlots,
+                profile.IsPaneVisibleByDefault(WorkspacePaneIds.MathPlots));
+            docking.SetPaneVisible(
+                WorkspacePaneIds.Diagnostics,
+                profile.IsPaneVisibleByDefault(WorkspacePaneIds.Diagnostics));
+        }
 
         bool showFileCommands = profile.HasCommandGroup(WorkspaceCommandGroupIds.File);
         bool showEditCommands = profile.HasCommandGroup(WorkspaceCommandGroupIds.Edit);
@@ -355,6 +381,11 @@ public partial class MainWindow : Window
         Close();
     }
 
+    private void OnWindowClosing(object? sender, WindowClosingEventArgs eventArgs)
+    {
+        docking.TrySaveLayout();
+    }
+
     private void OnProjectionChanged(object? sender, SelectionChangedEventArgs eventArgs)
     {
         if (ViewportPane is null || ProjectionComboBox is null)
@@ -394,6 +425,12 @@ public partial class MainWindow : Window
         {
             docking.ShowPane(paneId);
         }
+    }
+
+    private void OnResetLayoutClick(object? sender, RoutedEventArgs eventArgs)
+    {
+        DockHost.Layout = docking.ResetLayout();
+        workspace.SetStatus("Docking layout reset to the default Track workspace.");
     }
 
     private void OnEngineeringPlotStationChanged(

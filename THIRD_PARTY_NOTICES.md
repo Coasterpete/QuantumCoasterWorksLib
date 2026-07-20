@@ -20,12 +20,12 @@ None currently.
 
 ### Dock
 
-- Packages: `Dock.Avalonia`, `Dock.Avalonia.Themes.Fluent`, and `Dock.Model.Mvvm`
+- Packages: `Dock.Avalonia`, `Dock.Avalonia.Themes.Fluent`, `Dock.Model.Mvvm`, and `Dock.Serializer.Newtonsoft`
 - Version: `12.0.0.2`
 - License: MIT, per NuGet package metadata
 - NuGet: https://www.nuget.org/packages/Dock.Avalonia/12.0.0.2
 - Source repository: https://github.com/wieslawsoltes/Dock
-- Current use: dockable pane composition in `Quantum.Editor.Avalonia`
+- Current use: dockable pane composition and frontend-only layout serialization in `Quantum.Editor.Avalonia`
 
 The optional Unity debug/prototype visualizer may use a local copied DLL at `Assets/Plugins/Quantum/GShark.dll`. That file is generated/copied by `tools/copy-quantum-unity-dlls.ps1` from restored outputs and is intentionally ignored rather than committed.
 
