@@ -2,7 +2,6 @@
     x:Class="Quantum.Editor.Avalonia.MainWindow"
     xmlns="https://github.com/avaloniaui"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:dock="using:Dock.Avalonia.Controls"
     Title="Quantum CoasterWorks Editor"
     Width="1480"
     Height="920"
@@ -51,12 +50,12 @@
             BorderThickness="0,0,0,1">
             <Menu>
                 <MenuItem x:Name="FileMenu" Header="_File">
-                    <MenuItem Header="_New Track    Ctrl+N" Click="OnNewDocumentClick" />
-                    <MenuItem Header="_Open…    Ctrl+O" Click="OnOpenDocumentClick" />
-                    <Separator />
-                    <MenuItem Header="_Save    Ctrl+S" Click="OnSaveDocumentClick" />
-                    <MenuItem Header="Save _As…    Ctrl+Shift+S" Click="OnSaveDocumentAsClick" />
-                    <Separator />
+                    <MenuItem x:Name="NewTrackMenuItem" Header="_New Track    Ctrl+N" Click="OnNewDocumentClick" />
+                    <MenuItem x:Name="OpenTrackMenuItem" Header="_Open…    Ctrl+O" Click="OnOpenDocumentClick" />
+                    <Separator x:Name="TrackFileOpenSeparator" />
+                    <MenuItem x:Name="SaveTrackMenuItem" Header="_Save    Ctrl+S" Click="OnSaveDocumentClick" />
+                    <MenuItem x:Name="SaveTrackAsMenuItem" Header="Save _As…    Ctrl+Shift+S" Click="OnSaveDocumentAsClick" />
+                    <Separator x:Name="TrackFileExitSeparator" />
                     <MenuItem Header="E_xit" Click="OnExitClick" />
                 </MenuItem>
                 <MenuItem x:Name="EditMenu" Header="_Edit">
@@ -64,13 +63,13 @@
                     <MenuItem x:Name="RedoMenuItem" Header="_Redo    Ctrl+Y" Click="OnRedoClick" />
                 </MenuItem>
                 <MenuItem x:Name="ViewMenu" Header="_View">
-                    <MenuItem Header="_Fit Track    F" Click="OnFitViewportClick" />
-                    <MenuItem Header="Toggle Transported _Frames" Click="OnMenuShowFramesClick" />
-                    <MenuItem Header="Math _Plots" Click="OnShowEngineeringPlotsClick" />
-                    <Separator />
+                    <MenuItem x:Name="FitTrackMenuItem" Header="_Fit Track    F" Click="OnFitViewportClick" />
+                    <MenuItem x:Name="TransportedFramesMenuItem" Header="Toggle Transported _Frames" Click="OnMenuShowFramesClick" />
+                    <MenuItem x:Name="MathPlotsMenuItem" Header="Math _Plots" Click="OnShowEngineeringPlotsClick" />
+                    <Separator x:Name="TrackViewSeparator" />
                     <MenuItem x:Name="PanesMenu" Header="_Panes" />
-                    <Separator />
-                    <MenuItem Header="_Reset Layout" Click="OnResetLayoutClick" />
+                    <Separator x:Name="LayoutSeparator" />
+                    <MenuItem x:Name="ResetLayoutMenuItem" Header="_Reset Layout" Click="OnResetLayoutClick" />
                 </MenuItem>
             </Menu>
         </Border>
@@ -121,11 +120,11 @@
             </Grid>
         </Border>
 
-        <dock:DockControl
-            x:Name="DockHost"
+        <ContentControl
+            x:Name="DockHostRegion"
             Grid.Row="2"
-            InitializeFactory="False"
-            InitializeLayout="False" />
+            HorizontalContentAlignment="Stretch"
+            VerticalContentAlignment="Stretch" />
 
         <Border
             x:Name="StatusBarRegion"

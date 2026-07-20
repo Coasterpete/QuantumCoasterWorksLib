@@ -1,3 +1,4 @@
+using Avalonia.Controls;
 using Dock.Model.Controls;
 using Dock.Model.Core;
 using Dock.Model.Mvvm.Controls;
@@ -9,6 +10,20 @@ namespace Quantum.Tests;
 
 public sealed class DockingInfrastructureTests
 {
+    [Fact]
+    public void ViewLocator_PresentsRegisteredFrontendControlForDockable()
+    {
+        var control = new Border();
+        var dockable = new Tool { Context = control };
+        var locator = new EditorDockableViewLocator();
+
+        Assert.True(locator.Match(dockable));
+        ContentControl host = Assert.IsAssignableFrom<ContentControl>(locator.Build(dockable));
+        Assert.Null(host.Content);
+        Assert.False(locator.Match(new Tool()));
+        Assert.Null(locator.Build(new object()));
+    }
+
     [Fact]
     public void Registry_RegistersTrackPanesAndKeepsViewportNonCloseable()
     {

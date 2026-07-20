@@ -1,0 +1,35 @@
+<UserControl
+    x:Class="Quantum.Editor.Avalonia.Controls.TrainSummaryPaneControl"
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Border Background="#151C24" BorderBrush="#2B3948" BorderThickness="1">
+        <Grid RowDefinitions="Auto,*">
+            <Border Padding="12,10" BorderBrush="#2B3948" BorderThickness="0,0,0,1">
+                <StackPanel Spacing="3">
+                    <TextBlock FontSize="12" FontWeight="SemiBold" Foreground="#AFC4D8" Text="TRAIN SUMMARY" />
+                    <TextBlock Foreground="#7F94A8" Text="Calculated from the last valid backend definition" />
+                </StackPanel>
+            </Border>
+            <ScrollViewer Grid.Row="1">
+                <StackPanel Margin="14" Spacing="12">
+                    <TextBlock x:Name="ValidationStatusText" FontWeight="SemiBold" TextWrapping="Wrap" />
+                    <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto" RowSpacing="9">
+                        <TextBlock Foreground="#9EB3C7" Text="Approx. consist length" />
+                        <TextBlock x:Name="TotalLengthText" Grid.Column="1" FontWeight="SemiBold" />
+                        <TextBlock Grid.Row="1" Foreground="#9EB3C7" Text="Inter-car gap" />
+                        <TextBlock x:Name="InterCarGapText" Grid.Row="1" Grid.Column="1" FontWeight="SemiBold" />
+                        <TextBlock Grid.Row="2" Foreground="#9EB3C7" Text="Car-center spacing" />
+                        <TextBlock x:Name="CarSpacingText" Grid.Row="2" Grid.Column="1" />
+                        <TextBlock Grid.Row="3" Foreground="#9EB3C7" Text="Car dimensions L/W/H" />
+                        <TextBlock x:Name="CarDimensionsText" Grid.Row="3" Grid.Column="1" />
+                        <TextBlock Grid.Row="4" Foreground="#9EB3C7" Text="Bogie spacing" />
+                        <TextBlock x:Name="BogieSpacingText" Grid.Row="4" Grid.Column="1" />
+                        <TextBlock Grid.Row="5" Foreground="#9EB3C7" Text="Definition revision" />
+                        <TextBlock x:Name="RevisionText" Grid.Row="5" Grid.Column="1" />
+                    </Grid>
+                    <TextBlock x:Name="GeometryNoteText" Foreground="#F4D35E" TextWrapping="Wrap" />
+                </StackPanel>
+            </ScrollViewer>
+        </Grid>
+    </Border>
+</UserControl>

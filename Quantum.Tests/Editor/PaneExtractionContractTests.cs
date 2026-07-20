@@ -13,7 +13,10 @@ public sealed class PaneExtractionContractTests
         typeof(ViewportPaneControl),
         typeof(InspectorPaneControl),
         typeof(MathPlotsPaneControl),
-        typeof(DiagnosticsPaneControl)
+        typeof(DiagnosticsPaneControl),
+        typeof(TrainConfigurationPaneControl),
+        typeof(TrainPreviewPaneControl),
+        typeof(TrainSummaryPaneControl)
     };
 
     [Theory]

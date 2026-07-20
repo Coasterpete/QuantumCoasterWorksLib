@@ -12,4 +12,10 @@ public static class DockingLayoutIds
     public const string ViewportHost = "track-viewport-host";
     public const string InspectorHost = "track-inspector-host";
     public const string BottomHost = "track-bottom-host";
+    public const string TrainRoot = "train-root";
+    public const string TrainMain = "train-main";
+    public const string TrainTop = "train-top";
+    public const string TrainConfigurationHost = "train-configuration-host";
+    public const string TrainPreviewHost = "train-preview-host";
+    public const string TrainSummaryHost = "train-summary-host";
 }

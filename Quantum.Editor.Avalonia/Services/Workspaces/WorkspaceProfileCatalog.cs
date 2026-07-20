@@ -36,7 +36,7 @@ public sealed class WorkspaceProfileCatalog
     {
         var result = new WorkspaceProfileCatalog();
         result.Register(CreateTrackProfile(), makeDefault: true);
-        result.Register(CreateFutureProfile(WorkspaceProfileId.Train, "Train", "train"));
+        result.Register(CreateTrainProfile());
         result.Register(CreateFutureProfile(WorkspaceProfileId.Support, "Supports", "support"));
         result.Register(CreateFutureProfile(WorkspaceProfileId.Terrain, "Terrain", "terrain"));
         result.Register(CreateFutureProfile(WorkspaceProfileId.Simulation, "Simulation", "simulation"));
@@ -131,11 +131,35 @@ public sealed class WorkspaceProfileCatalog
             {
                 WorkspaceCommandGroupIds.File,
                 WorkspaceCommandGroupIds.Edit,
-                WorkspaceCommandGroupIds.View
+                WorkspaceCommandGroupIds.View,
+                WorkspaceCommandGroupIds.Layout
             },
             overlayDefaults: new Dictionary<string, bool>
             {
                 [WorkspaceOverlayIds.TransportedFrames] = true
+            });
+    }
+
+    private static WorkspaceProfile CreateTrainProfile()
+    {
+        string[] panes =
+        {
+            WorkspacePaneIds.TrainConfiguration,
+            WorkspacePaneIds.TrainPreview,
+            WorkspacePaneIds.TrainSummary
+        };
+
+        return new WorkspaceProfile(
+            WorkspaceProfileId.Train,
+            "Train",
+            WorkspaceComposition.CreateTrain(),
+            icon: "train",
+            availablePanes: panes,
+            defaultVisiblePanes: panes,
+            commandGroups: new[] { WorkspaceCommandGroupIds.Layout },
+            overlayDefaults: new Dictionary<string, bool>
+            {
+                [WorkspaceOverlayIds.TransportedFrames] = false
             });
     }
 

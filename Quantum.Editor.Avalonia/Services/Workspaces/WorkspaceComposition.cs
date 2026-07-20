@@ -31,6 +31,13 @@ public sealed class WorkspaceComposition
             CreateDefaultTrackLayout);
     }
 
+    public static WorkspaceComposition CreateTrain()
+    {
+        return new WorkspaceComposition(
+            DockPaneRegistry.CreateDefaultTrain(),
+            CreateDefaultTrainLayout);
+    }
+
     public static WorkspaceComposition CreateComingSoon(
         WorkspaceProfileId workspaceId,
         string displayName)
@@ -132,6 +139,79 @@ public sealed class WorkspaceComposition
         IRootDock root = builder.CreateWorkspaceRootDock();
         root.Id = DockingLayoutIds.Root;
         root.Title = "Track workspace";
+        root.IsCollapsable = false;
+        root.DefaultDockable = main;
+        root.ActiveDockable = main;
+        root.VisibleDockables = builder.CreateDockableList(main);
+        return root;
+    }
+
+    private static IRootDock CreateDefaultTrainLayout(IWorkspaceDockLayoutBuilder builder)
+    {
+        IDockable configuration = builder.GetPane(WorkspacePaneIds.TrainConfiguration);
+        IDockable preview = builder.GetPane(WorkspacePaneIds.TrainPreview);
+        IDockable summary = builder.GetPane(WorkspacePaneIds.TrainSummary);
+
+        var configurationHost = new ToolDock
+        {
+            Id = DockingLayoutIds.TrainConfigurationHost,
+            Title = "Train configuration",
+            Alignment = Alignment.Left,
+            AutoHide = false,
+            IsExpanded = true,
+            Proportion = 0.31,
+            ActiveDockable = configuration,
+            VisibleDockables = builder.CreateDockableList(configuration)
+        };
+        var previewHost = new DocumentDock
+        {
+            Id = DockingLayoutIds.TrainPreviewHost,
+            Title = "Train preview",
+            IsCollapsable = false,
+            CanCreateDocument = false,
+            EnableWindowDrag = false,
+            Proportion = 0.69,
+            ActiveDockable = preview,
+            VisibleDockables = builder.CreateDockableList(preview)
+        };
+        var top = new ProportionalDock
+        {
+            Id = DockingLayoutIds.TrainTop,
+            Title = "Train workbench",
+            Orientation = Orientation.Horizontal,
+            Proportion = 0.72,
+            ActiveDockable = previewHost,
+            VisibleDockables = builder.CreateDockableList(
+                configurationHost,
+                new ProportionalDockSplitter(),
+                previewHost)
+        };
+        var summaryHost = new ToolDock
+        {
+            Id = DockingLayoutIds.TrainSummaryHost,
+            Title = "Train summary",
+            Alignment = Alignment.Bottom,
+            AutoHide = false,
+            IsExpanded = true,
+            Proportion = 0.28,
+            ActiveDockable = summary,
+            VisibleDockables = builder.CreateDockableList(summary)
+        };
+        var main = new ProportionalDock
+        {
+            Id = DockingLayoutIds.TrainMain,
+            Title = "Train workspace",
+            Orientation = Orientation.Vertical,
+            ActiveDockable = top,
+            VisibleDockables = builder.CreateDockableList(
+                top,
+                new ProportionalDockSplitter(),
+                summaryHost)
+        };
+
+        IRootDock root = builder.CreateWorkspaceRootDock();
+        root.Id = DockingLayoutIds.TrainRoot;
+        root.Title = "Train workspace";
         root.IsCollapsable = false;
         root.DefaultDockable = main;
         root.ActiveDockable = main;
