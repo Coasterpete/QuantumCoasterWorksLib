@@ -2,9 +2,29 @@
 
 Quantum CoasterWorks is an early-stage coaster design and simulation backend. The current repository is focused on deterministic track, spline, FVD, physics, IO, and train placement systems rather than a finished editor application.
 
+## Screenshots
+
+### Track Workspace
+
+![Quantum CoasterWorks Track Workspace](docs/images/editor/track-workspace.png)
+
+*Route authoring, transported-frame viewport diagnostics, Inspector data, and synchronized engineering plots in the Track Workspace.*
+
+### Engineering Math Plots
+
+![Quantum CoasterWorks engineering math plots](docs/images/editor/math-plots.png)
+
+*Station-based elevation, curvature, roll, pitch, and yaw plots for inspecting compiled track geometry.*
+
+### Train Workspace
+
+![Quantum CoasterWorks Train Workspace](docs/images/editor/train-workspace.png)
+
+*M165's first functional Train Workspace, with immutable consist configuration, a deterministic schematic, and calculated summary values.*
+
 ## Current Status
 
-- Early development / technical preview.
+- Current milestone: **M165**, an early-development technical preview that introduces the first functional Train Workspace.
 - Backend-first architecture: the `Quantum.*` projects should stay engine-agnostic C# libraries.
 - Unity visualization is experimental and should be treated as an optional debug/prototype viewer, not the owner of backend architecture.
 - Future Unity or Unreal adapters may remain valid for PBR previews, ride-through views, and presentation rendering, but those are not part of the current backend preview.
@@ -96,8 +116,6 @@ dotnet run --project Quantum.Editor.Avalonia/Quantum.Editor.Avalonia.csproj
 
 The central technical viewport draws the sampled centerline and transported frames produced by `Quantum.Track`. It supports fit-to-track, mouse-wheel zoom, middle/right-button panning, selectable frame samples, section colors, and synchronized selection details.
 
-![Avalonia editor sampled-track viewport with transported frames](docs/images/editor/editor-viewport.png)
-
 ### Graph authoring and inspector
 
 The graph panel displays the deterministic connected section route. Selecting a node updates the Inspector and highlights its compiled section in the viewport. M157's first editable node parameter is the signed radius on an existing constant-curvature section; other node values remain inspectable and read-only.
@@ -106,16 +124,13 @@ The graph panel displays the deterministic connected section route. Selecting a 
 
 The toolbar provides New, Open, Save, Undo, Redo, fit-to-track, and transported-frame visibility controls. New/Open/Save continue to use the versioned Track Layout Package V2 contract. Only successfully compiled immutable graph snapshots participate in Undo/Redo history.
 
-![Avalonia editor toolbar and document controls](docs/images/editor/editor-toolbar.png)
-
 ### Camera views
 
 The viewport currently provides three technical camera-orientation presets:
 
-| Isometric | Top X/Z | Side X/Y |
-| --- | --- | --- |
-| ![Isometric camera preset selector](docs/images/editor/editor-camera-isometric-preset.png) | ![Top X/Z camera preset selector](docs/images/editor/editor-camera-top-preset.png) | ![Side X/Y camera preset selector](docs/images/editor/editor-camera-side-preset.png) |
-| ![Avalonia editor isometric track view](docs/images/editor/editor-isometric-view.png) | ![Avalonia editor top X/Z track view](docs/images/editor/editor-top-view.png) | ![Avalonia editor side X/Y track view](docs/images/editor/editor-side-view.png) |
+- Isometric
+- Top X/Z
+- Side X/Y
 
 See [`docs/editor/m157-graph-authoring.md`](docs/editor/m157-graph-authoring.md) for the graph workflow, source-of-truth boundary, atomic commit behavior, persistence rules, smoke test, and exclusions. The M156 editor foundation remains documented in [`docs/editor/m156-avalonia-editor.md`](docs/editor/m156-avalonia-editor.md).
 
