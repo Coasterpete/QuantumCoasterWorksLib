@@ -11,8 +11,7 @@ public sealed class WorkspaceProfileInfrastructureTests
         var profile = new WorkspaceProfile(
             new WorkspaceProfileId("custom"),
             "Custom",
-            availablePanes: new[] { WorkspacePaneIds.Viewport },
-            defaultVisiblePanes: new[] { WorkspacePaneIds.Viewport });
+            WorkspaceComposition.CreateComingSoon(new WorkspaceProfileId("custom"), "Custom"));
 
         catalog.Register(profile);
 
@@ -24,7 +23,7 @@ public sealed class WorkspaceProfileInfrastructureTests
     }
 
     [Fact]
-    public void DefaultCatalog_SelectsCompleteTrackWorkspaceAndHidesFutureDefinitions()
+    public void DefaultCatalog_SelectsCompleteTrackWorkspaceAndExposesFutureDefinitions()
     {
         WorkspaceProfileCatalog catalog = WorkspaceProfileCatalog.CreateDefault();
 
@@ -42,11 +41,27 @@ public sealed class WorkspaceProfileInfrastructureTests
 
         Assert.Equal(5, catalog.Profiles.Count);
         Assert.Collection(catalog.AvailableProfiles, profile => Assert.Equal(WorkspaceProfileId.Track, profile.Id));
-        Assert.Collection(catalog.VisibleProfiles, profile => Assert.Equal(WorkspaceProfileId.Track, profile.Id));
+        Assert.Equal(5, catalog.VisibleProfiles.Count);
         Assert.False(catalog.Get(WorkspaceProfileId.Train).IsAvailable);
-        Assert.False(catalog.Get(WorkspaceProfileId.Support).IsVisible);
+        Assert.True(catalog.Get(WorkspaceProfileId.Support).IsVisible);
         Assert.False(catalog.Get(WorkspaceProfileId.Terrain).IsAvailable);
-        Assert.False(catalog.Get(WorkspaceProfileId.Simulation).IsVisible);
+        Assert.True(catalog.Get(WorkspaceProfileId.Simulation).IsVisible);
+    }
+
+    [Fact]
+    public void Catalog_LooksUpCompositionThroughRegisteredProfile()
+    {
+        WorkspaceProfileCatalog catalog = WorkspaceProfileCatalog.CreateDefault();
+        WorkspaceProfile track = catalog.Get(WorkspaceProfileId.Track);
+
+        Assert.Same(track.Composition, catalog.GetComposition(WorkspaceProfileId.Track));
+        Assert.True(catalog.TryGetComposition(
+            WorkspaceProfileId.Track,
+            out WorkspaceComposition composition));
+        Assert.Same(track.Composition, composition);
+        Assert.False(catalog.TryGetComposition(
+            new WorkspaceProfileId("missing"),
+            out _));
     }
 
     [Fact]
@@ -65,13 +80,21 @@ public sealed class WorkspaceProfileInfrastructureTests
     public void Manager_SwitchesOnlyToAvailableRegisteredProfilesAndNotifiesOnce()
     {
         var catalog = new WorkspaceProfileCatalog();
-        var track = new WorkspaceProfile(WorkspaceProfileId.Track, "Track");
-        var alternate = new WorkspaceProfile(new WorkspaceProfileId("alternate"), "Alternate");
+        var track = new WorkspaceProfile(
+            WorkspaceProfileId.Track,
+            "Track",
+            WorkspaceComposition.CreateComingSoon(WorkspaceProfileId.Track, "Track"));
+        var alternateId = new WorkspaceProfileId("alternate");
+        var alternate = new WorkspaceProfile(
+            alternateId,
+            "Alternate",
+            WorkspaceComposition.CreateComingSoon(alternateId, "Alternate"));
         var unavailable = new WorkspaceProfile(
             WorkspaceProfileId.Train,
             "Train",
+            WorkspaceComposition.CreateComingSoon(WorkspaceProfileId.Train, "Train"),
             isAvailable: false,
-            isVisible: false);
+            isVisible: true);
         catalog.Register(track, makeDefault: true);
         catalog.Register(alternate);
         catalog.Register(unavailable);
@@ -95,5 +118,47 @@ public sealed class WorkspaceProfileInfrastructureTests
         manager.ResetToDefault();
         Assert.Same(track, manager.CurrentProfile);
         Assert.Equal(2, notifications);
+    }
+
+    [Fact]
+    public void Selector_InitializesWithTrackAndFourDisabledComingSoonWorkspaces()
+    {
+        var manager = new WorkspaceProfileManager(WorkspaceProfileCatalog.CreateDefault());
+
+        var selector = new WorkspaceSelectorModel(manager);
+
+        Assert.Equal(WorkspaceProfileId.Track, selector.SelectedItem.Id);
+        Assert.Equal(
+            new[]
+            {
+                WorkspaceProfileId.Track,
+                WorkspaceProfileId.Train,
+                WorkspaceProfileId.Support,
+                WorkspaceProfileId.Terrain,
+                WorkspaceProfileId.Simulation
+            },
+            selector.Items.Select(item => item.Id));
+        Assert.True(selector.Items[0].IsEnabled);
+        Assert.Equal("Track", selector.Items[0].DisplayText);
+        Assert.All(
+            selector.Items.Skip(1),
+            item =>
+            {
+                Assert.False(item.IsEnabled);
+                Assert.EndsWith(" (Coming Soon)", item.DisplayText);
+            });
+    }
+
+    [Fact]
+    public void Selector_ActivatesTrackAndRejectsDisabledPlaceholderWorkspace()
+    {
+        var manager = new WorkspaceProfileManager(WorkspaceProfileCatalog.CreateDefault());
+        var selector = new WorkspaceSelectorModel(manager);
+
+        Assert.True(selector.TryActivate(WorkspaceProfileId.Track));
+        Assert.Equal(WorkspaceProfileId.Track, selector.SelectedItem.Id);
+
+        Assert.False(selector.TryActivate(WorkspaceProfileId.Train));
+        Assert.Equal(WorkspaceProfileId.Track, selector.SelectedItem.Id);
     }
 }

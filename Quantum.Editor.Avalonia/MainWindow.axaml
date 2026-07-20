@@ -68,13 +68,7 @@
                     <MenuItem Header="Toggle Transported _Frames" Click="OnMenuShowFramesClick" />
                     <MenuItem Header="Math _Plots" Click="OnShowEngineeringPlotsClick" />
                     <Separator />
-                    <MenuItem Header="_Panes">
-                        <MenuItem Header="_Route" Tag="route" Click="OnShowPaneClick" />
-                        <MenuItem Header="_Viewport" Tag="viewport" Click="OnShowPaneClick" />
-                        <MenuItem Header="_Inspector" Tag="inspector" Click="OnShowPaneClick" />
-                        <MenuItem Header="_Math Plots" Tag="math-plots" Click="OnShowPaneClick" />
-                        <MenuItem Header="_Diagnostics" Tag="diagnostics" Click="OnShowPaneClick" />
-                    </MenuItem>
+                    <MenuItem x:Name="PanesMenu" Header="_Panes" />
                     <Separator />
                     <MenuItem Header="_Reset Layout" Click="OnResetLayoutClick" />
                 </MenuItem>
@@ -88,7 +82,7 @@
             BorderBrush="#2B3948"
             BorderThickness="0,0,0,1"
             Padding="10,7">
-            <Grid ColumnDefinitions="Auto,Auto,Auto,16,Auto,Auto,16,Auto,Auto,*,Auto">
+            <Grid ColumnDefinitions="Auto,Auto,Auto,16,Auto,Auto,16,Auto,Auto,*,Auto,12,Auto">
                 <Button x:Name="NewButton" Classes="toolbar" Content="New" Click="OnNewDocumentClick" />
                 <Button x:Name="OpenButton" Grid.Column="1" Classes="toolbar" Content="Open" Click="OnOpenDocumentClick" />
                 <Button x:Name="SaveButton" Grid.Column="2" Classes="toolbar" Content="Save" Click="OnSaveDocumentClick" />
@@ -103,9 +97,20 @@
                     Content="Frames"
                     IsChecked="True"
                     IsCheckedChanged="OnShowFramesChanged" />
+                <StackPanel
+                    Grid.Column="10"
+                    Orientation="Horizontal"
+                    VerticalAlignment="Center"
+                    Spacing="8">
+                    <TextBlock VerticalAlignment="Center" Foreground="#9EB3C7" Text="Workspace" />
+                    <ComboBox
+                        x:Name="WorkspaceSelectorComboBox"
+                        Width="190"
+                        SelectionChanged="OnWorkspaceSelectorChanged" />
+                </StackPanel>
                 <ComboBox
                     x:Name="ProjectionComboBox"
-                    Grid.Column="10"
+                    Grid.Column="12"
                     Width="145"
                     SelectedIndex="0"
                     SelectionChanged="OnProjectionChanged">

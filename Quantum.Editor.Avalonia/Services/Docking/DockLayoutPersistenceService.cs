@@ -2,6 +2,7 @@ using System.Text.Json;
 using Dock.Model.Controls;
 using Dock.Model.Core;
 using Dock.Serializer;
+using Quantum.Editor.Avalonia.Services.Workspaces;
 
 namespace Quantum.Editor.Avalonia.Services.Docking;
 
@@ -44,13 +45,26 @@ public sealed class DockLayoutPersistenceService
 
     public static string GetDefaultLayoutFilePath()
     {
+        return GetDefaultLayoutFilePath(WorkspaceProfileId.Track);
+    }
+
+    public static string GetDefaultLayoutFilePath(WorkspaceProfileId workspaceId)
+    {
+        if (workspaceId.IsEmpty)
+        {
+            throw new ArgumentException("A workspace identifier is required.", nameof(workspaceId));
+        }
+
         string localApplicationData = Environment.GetFolderPath(
             Environment.SpecialFolder.LocalApplicationData);
+        string fileName = workspaceId == WorkspaceProfileId.Track
+            ? LayoutFileName
+            : workspaceId.Value + "-docking-layout.json";
         return Path.Combine(
             localApplicationData,
             "QuantumCoasterWorks",
             "Editor",
-            LayoutFileName);
+            fileName);
     }
 
     public DockLayoutLoadStatus TryLoadLayout(out IRootDock? layout)
