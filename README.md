@@ -14,7 +14,7 @@ Quantum CoasterWorks is an early-stage coaster design and simulation backend. Th
 
 - `Quantum.Core`, `Quantum.Math`, `Quantum.Splines`, `Quantum.Track`, `Quantum.FVD`, `Quantum.Physics`, and `Quantum.IO` contain backend/domain logic.
 - `Quantum.Debug` contains backend diagnostics and command-line tooling.
-- `Quantum.Editor.Avalonia` contains a standalone editor workbench for Track Layout Package V2 files, backend compilation, document/outliner/inspector workflows, undo/redo, an Avalonia-drawn technical viewport, the snapshot-driven [M159 Interactive Math Plot Workspace](docs/editor/m159-interactive-math-plots.md), [M161 workspace profile infrastructure](docs/editor/m161-workspace-profile-infrastructure.md), [M162 docking infrastructure](docs/editor/m162-docking-infrastructure.md), [M163 docking layout persistence](docs/editor/m163-docking-layout-persistence.md), and [M164 workspace selection and composition switching](docs/editor/m164-workspace-selector-composition-switching.md).
+- `Quantum.Editor.Avalonia` contains functional Track and Train technical workspaces. Track provides the Track Layout Package V2 workflow, backend compilation, graph authoring, engineering plots, undo/redo, and an Avalonia-drawn viewport. Train provides the [M165 immutable consist editor, deterministic schematic, and calculated summary](docs/editor/m165-first-functional-train-workspace.md). Both use the [M164 workspace selector and isolated per-workspace docking composition](docs/editor/m164-workspace-selector-composition-switching.md).
 - `Quantum.Tests` contains automated tests and contract fixtures.
 - `Assets` contains the current Unity debug visualizer/prototype assets.
 
@@ -65,12 +65,16 @@ dotnet build QuantumCoasterWorks.sln -c Release
 dotnet test QuantumCoasterWorks.sln -c Release
 ```
 
-## Avalonia Editor — M157
+## Avalonia Editor — M165
 
-Milestone 157 extends the Avalonia technical-editor slice with graph-based section authoring while keeping the existing engine-agnostic Quantum backend authoritative for geometry. It is an active development tool, not a production-ready coaster editor.
+The Avalonia technical editor now has functional Track and Train workspaces while keeping the existing engine-agnostic Quantum backend authoritative for geometry. It is an active development tool, not a production-ready coaster editor.
 
 The current editor includes:
 
+- a workspace selector with functional Track and Train profiles plus disabled Supports, Terrain, and Simulation placeholders;
+- a Train consist editor backed atomically by immutable `Quantum.Track` geometry and layout types;
+- a deterministic 2D Train schematic and calculated consist summary;
+- independent in-memory and persisted docking layouts for Track and Train;
 - an authoritative backend `TrackAuthoringGraph` reconstructed from Track Layout Package V2 on Open;
 - a connected single-route graph panel for the existing showcase sections;
 - signed-radius editing for constant-curvature graph nodes with immediate backend recompilation;
@@ -124,6 +128,8 @@ M162 replaces the fixed workbench grid with frontend-only Dock.Avalonia composit
 M163 saves that frontend docking graph when the editor closes and restores it on the next startup, including pane positions, proportions, floating windows, tab groups, active tabs, and hidden panes. Missing, invalid, or incompatible files fall back to the M162 default Track layout. `View > Reset Layout` discards the saved arrangement and recreates the default without replacing the current document. See [`docs/editor/m163-docking-layout-persistence.md`](docs/editor/m163-docking-layout-persistence.md).
 
 M164 adds a toolbar workspace selector and moves default docking composition ownership into registered workspace profiles. Track remains the only enabled workspace and keeps its M163 layout and persistence behavior; Train, Supports, Terrain, and Simulation are visible as disabled `Coming Soon` entries. See [`docs/editor/m164-workspace-selector-composition-switching.md`](docs/editor/m164-workspace-selector-composition-switching.md).
+
+M165 enables Train as the first additional functional workspace. Its Configuration pane atomically constructs the existing immutable backend `TrainConsistDefinition`; invalid input leaves the last valid definition intact. Preview and Summary provide a deterministic geometry schematic and calculated consist readouts, while Track-only commands stay inactive and Track/Train layouts remain isolated. Supports, Terrain, and Simulation remain disabled. See [`docs/editor/m165-first-functional-train-workspace.md`](docs/editor/m165-first-functional-train-workspace.md).
 
 From a fresh checkout:
 

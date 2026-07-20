@@ -1,0 +1,20 @@
+<UserControl
+    x:Class="Quantum.Editor.Avalonia.Controls.TrainPreviewPaneControl"
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:Quantum.Editor.Avalonia.Controls">
+    <Border Background="#151C24" BorderBrush="#2B3948" BorderThickness="1">
+        <Grid RowDefinitions="Auto,*,Auto">
+            <Border Padding="12,10" BorderBrush="#2B3948" BorderThickness="0,0,0,1">
+                <StackPanel Spacing="3">
+                    <TextBlock FontSize="12" FontWeight="SemiBold" Foreground="#AFC4D8" Text="TRAIN PREVIEW" />
+                    <TextBlock Foreground="#7F94A8" Text="Deterministic top-view geometry schematic" />
+                </StackPanel>
+            </Border>
+            <controls:TrainConsistPreviewControl x:Name="PreviewControl" Grid.Row="1" />
+            <Border Grid.Row="2" Padding="12,8" BorderBrush="#2B3948" BorderThickness="0,1,0,0">
+                <TextBlock x:Name="PreviewCaptionText" Foreground="#9EB3C7" TextWrapping="Wrap" />
+            </Border>
+        </Grid>
+    </Border>
+</UserControl>

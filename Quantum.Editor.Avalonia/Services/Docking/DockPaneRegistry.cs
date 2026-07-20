@@ -27,6 +27,22 @@ public sealed class DockPaneRegistry
         return result;
     }
 
+    public static DockPaneRegistry CreateDefaultTrain()
+    {
+        var result = new DockPaneRegistry();
+        result.Register(new DockPaneRegistration(
+            WorkspacePaneIds.TrainConfiguration,
+            "Train Configuration"));
+        result.Register(new DockPaneRegistration(
+            WorkspacePaneIds.TrainPreview,
+            "Train Preview",
+            canClose: false));
+        result.Register(new DockPaneRegistration(
+            WorkspacePaneIds.TrainSummary,
+            "Train Summary"));
+        return result;
+    }
+
     public void Register(DockPaneRegistration pane)
     {
         ArgumentNullException.ThrowIfNull(pane);

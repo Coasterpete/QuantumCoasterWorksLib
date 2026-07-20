@@ -4,12 +4,14 @@ using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Layout;
 using Avalonia.Platform.Storage;
+using Dock.Avalonia.Controls;
 using Quantum.Editor.Avalonia.Controls;
 using Quantum.Editor.Avalonia.Models;
 using Quantum.Editor.Avalonia.Services;
 using Quantum.Editor.Avalonia.Services.Commands;
 using Quantum.Editor.Avalonia.Services.Docking;
 using Quantum.Editor.Avalonia.Services.Documents;
+using Quantum.Editor.Avalonia.Services.Trains;
 using Quantum.Editor.Avalonia.Services.Workspaces;
 
 namespace Quantum.Editor.Avalonia;
@@ -27,13 +29,19 @@ public partial class MainWindow : Window
     private readonly WorkspaceSelectorModel workspaceSelector;
     private readonly IReadOnlyDictionary<string, object> paneContexts;
     private readonly Dictionary<WorkspaceProfileId, EditorDockingAdapter> dockingByWorkspace = new();
+    private readonly Dictionary<WorkspaceProfileId, DockControl> dockHostsByWorkspace = new();
     private EditorDockingAdapter docking;
+    private DockControl dockHost;
     private bool synchronizingWorkspaceSelector;
     private readonly RoutePaneControl RoutePane;
     private readonly ViewportPaneControl ViewportPane;
     private readonly InspectorPaneControl InspectorPane;
     private readonly MathPlotsPaneControl MathPlotsPane;
     private readonly DiagnosticsPaneControl DiagnosticsPane;
+    private readonly TrainConsistEditorSession trainConsistSession;
+    private readonly TrainConfigurationPaneControl TrainConfigurationPane;
+    private readonly TrainPreviewPaneControl TrainPreviewPane;
+    private readonly TrainSummaryPaneControl TrainSummaryPane;
 
     public MainWindow()
         : this(
@@ -74,6 +82,12 @@ public partial class MainWindow : Window
         InspectorPane = new InspectorPaneControl();
         MathPlotsPane = new MathPlotsPaneControl();
         DiagnosticsPane = new DiagnosticsPaneControl();
+        trainConsistSession = new TrainConsistEditorSession();
+        TrainConfigurationPane = new TrainConfigurationPaneControl();
+        TrainPreviewPane = new TrainPreviewPaneControl();
+        TrainSummaryPane = new TrainSummaryPaneControl();
+        TrainConfigurationPane.Bind(trainConsistSession);
+        trainConsistSession.StateChanged += OnTrainConsistStateChanged;
         WirePaneInteractions();
 
         paneContexts = new Dictionary<string, object>(StringComparer.Ordinal)
@@ -82,7 +96,10 @@ public partial class MainWindow : Window
             [WorkspacePaneIds.Viewport] = ViewportPane,
             [WorkspacePaneIds.Inspector] = InspectorPane,
             [WorkspacePaneIds.MathPlots] = MathPlotsPane,
-            [WorkspacePaneIds.Diagnostics] = DiagnosticsPane
+            [WorkspacePaneIds.Diagnostics] = DiagnosticsPane,
+            [WorkspacePaneIds.TrainConfiguration] = TrainConfigurationPane,
+            [WorkspacePaneIds.TrainPreview] = TrainPreviewPane,
+            [WorkspacePaneIds.TrainSummary] = TrainSummaryPane
         };
         workspaceSelector = new WorkspaceSelectorModel(this.workspaceProfiles);
         docking = new EditorDockingAdapter(
@@ -90,8 +107,9 @@ public partial class MainWindow : Window
             ResolvePaneContexts(this.workspaceProfiles.CurrentProfile.Composition),
             layoutPersistence);
         dockingByWorkspace.Add(this.workspaceProfiles.CurrentProfileId, docking);
-        DockHost.Factory = docking.Factory;
-        DockHost.Layout = docking.Layout;
+        dockHost = CreateDockHost(docking);
+        dockHostsByWorkspace.Add(this.workspaceProfiles.CurrentProfileId, dockHost);
+        DockHostRegion.Content = dockHost;
         InitializeWorkspaceSelector();
         PopulatePaneMenu();
 
@@ -115,6 +133,8 @@ public partial class MainWindow : Window
     public WorkspaceSelectorModel WorkspaceSelector => workspaceSelector;
 
     public EditorDockingAdapter Docking => docking;
+
+    public TrainConsistEditorSession TrainConsistSession => trainConsistSession;
 
     private static EditorWorkspace CreateWorkspace()
     {
@@ -160,12 +180,24 @@ public partial class MainWindow : Window
                 new DockLayoutPersistenceService(
                     DockLayoutPersistenceService.GetDefaultLayoutFilePath(profile.Id)));
             dockingByWorkspace.Add(profile.Id, nextDocking);
+            dockHostsByWorkspace.Add(profile.Id, CreateDockHost(nextDocking));
         }
 
         docking = nextDocking;
-        DockHost.Factory = docking.Factory;
-        DockHost.Layout = docking.Layout;
+        dockHost = dockHostsByWorkspace[profile.Id];
+        DockHostRegion.Content = dockHost;
         PopulatePaneMenu();
+    }
+
+    private static DockControl CreateDockHost(EditorDockingAdapter adapter)
+    {
+        return new DockControl
+        {
+            InitializeFactory = false,
+            InitializeLayout = false,
+            Factory = adapter.Factory,
+            Layout = adapter.Layout
+        };
     }
 
     private IReadOnlyDictionary<string, object> ResolvePaneContexts(
@@ -237,9 +269,23 @@ public partial class MainWindow : Window
         bool showFileCommands = profile.HasCommandGroup(WorkspaceCommandGroupIds.File);
         bool showEditCommands = profile.HasCommandGroup(WorkspaceCommandGroupIds.Edit);
         bool showViewCommands = profile.HasCommandGroup(WorkspaceCommandGroupIds.View);
-        FileMenu.IsVisible = showFileCommands;
+        bool showLayoutCommands = profile.HasCommandGroup(WorkspaceCommandGroupIds.Layout);
+        FileMenu.IsVisible = true;
         EditMenu.IsVisible = showEditCommands;
-        ViewMenu.IsVisible = showViewCommands;
+        ViewMenu.IsVisible = showViewCommands || showLayoutCommands;
+        NewTrackMenuItem.IsVisible = showFileCommands;
+        OpenTrackMenuItem.IsVisible = showFileCommands;
+        SaveTrackMenuItem.IsVisible = showFileCommands;
+        SaveTrackAsMenuItem.IsVisible = showFileCommands;
+        TrackFileOpenSeparator.IsVisible = showFileCommands;
+        TrackFileExitSeparator.IsVisible = showFileCommands;
+        FitTrackMenuItem.IsVisible = showViewCommands;
+        TransportedFramesMenuItem.IsVisible = showViewCommands;
+        MathPlotsMenuItem.IsVisible = showViewCommands;
+        TrackViewSeparator.IsVisible = showViewCommands && showLayoutCommands;
+        PanesMenu.IsVisible = showLayoutCommands;
+        LayoutSeparator.IsVisible = showLayoutCommands;
+        ResetLayoutMenuItem.IsVisible = showLayoutCommands;
         NewButton.IsVisible = showFileCommands;
         OpenButton.IsVisible = showFileCommands;
         SaveButton.IsVisible = showFileCommands;
@@ -259,9 +305,12 @@ public partial class MainWindow : Window
         EditorSelection? selection = workspace.CurrentSelection;
         TrackViewportSnapshot snapshot = workspace.ViewportSnapshot;
 
-        Title = document is null
-            ? "Quantum CoasterWorks Editor"
-            : $"Quantum CoasterWorks Editor - {document.DisplayName}{(document.IsDirty ? " *" : string.Empty)}";
+        bool trackActive = workspaceProfiles.CurrentProfileId == WorkspaceProfileId.Track;
+        Title = trackActive
+            ? document is null
+                ? "Quantum CoasterWorks Editor"
+                : $"Quantum CoasterWorks Editor - {document.DisplayName}{(document.IsDirty ? " *" : string.Empty)}"
+            : "Quantum CoasterWorks Editor - " + workspaceProfiles.CurrentProfile.DisplayName;
         RoutePane.DocumentTitle = document is null
             ? "No active document"
             : document.DisplayName + (document.IsDirty ? " *" : string.Empty);
@@ -269,11 +318,22 @@ public partial class MainWindow : Window
         RoutePane.GraphNodes = workspace.GraphNodes;
         RoutePane.Selection = selection;
 
-        DocumentStateText.Text = document is null
-            ? "NO DOCUMENT"
-            : document.IsDirty ? "MODIFIED" : "SAVED";
-        StatusMessageText.Text = workspace.StatusMessage;
-        SelectionText.Text = DescribeSelection(selection);
+        if (trackActive)
+        {
+            DocumentStateText.Text = document is null
+                ? "NO DOCUMENT"
+                : document.IsDirty ? "MODIFIED" : "SAVED";
+            StatusMessageText.Text = workspace.StatusMessage;
+            SelectionText.Text = DescribeSelection(selection);
+        }
+        else if (workspaceProfiles.CurrentProfileId == WorkspaceProfileId.Train)
+        {
+            DocumentStateText.Text = "VALID CONSIST";
+            StatusMessageText.Text = trainConsistSession.LastAttemptSucceeded
+                ? "Train definition is valid and backed by Quantum.Track."
+                : "Train edit rejected: " + trainConsistSession.LastValidationMessage;
+            SelectionText.Text = $"{trainConsistSession.CurrentDefinition.CarCount} car consist";
+        }
 
         UndoButton.IsEnabled = workspace.UndoRedo.CanUndo;
         RedoButton.IsEnabled = workspace.UndoRedo.CanRedo;
@@ -291,8 +351,24 @@ public partial class MainWindow : Window
         MathPlotsPane.Snapshot = workspace.EngineeringSnapshot;
         InspectorPane.Refresh(workspace);
         DiagnosticsPane.Snapshot = snapshot;
+        RefreshTrainWorkspaceView();
         UpdateStationCursorView();
         UpdateSectionHighlightView();
+    }
+
+    private void OnTrainConsistStateChanged(object? sender, EventArgs eventArgs)
+    {
+        RefreshTrainWorkspaceView();
+        if (workspaceProfiles.CurrentProfileId == WorkspaceProfileId.Train)
+        {
+            UpdateWorkspaceView();
+        }
+    }
+
+    private void RefreshTrainWorkspaceView()
+    {
+        TrainPreviewPane.Definition = trainConsistSession.CurrentDefinition;
+        TrainSummaryPane.Refresh(trainConsistSession);
     }
 
     private void OnStationCursorChanged(object? sender, EventArgs eventArgs)
@@ -524,7 +600,7 @@ public partial class MainWindow : Window
 
     private void OnResetLayoutClick(object? sender, RoutedEventArgs eventArgs)
     {
-        DockHost.Layout = docking.ResetLayout();
+        dockHost.Layout = docking.ResetLayout();
         workspace.SetStatus(
             $"Docking layout reset to the default {workspaceProfiles.CurrentProfile.DisplayName} workspace.");
     }
@@ -569,32 +645,36 @@ public partial class MainWindow : Window
     {
         bool control = eventArgs.KeyModifiers.HasFlag(KeyModifiers.Control);
         bool shift = eventArgs.KeyModifiers.HasFlag(KeyModifiers.Shift);
+        WorkspaceProfile profile = workspaceProfiles.CurrentProfile;
+        bool trackFileCommands = profile.HasCommandGroup(WorkspaceCommandGroupIds.File);
+        bool trackEditCommands = profile.HasCommandGroup(WorkspaceCommandGroupIds.Edit);
+        bool trackViewCommands = profile.HasCommandGroup(WorkspaceCommandGroupIds.View);
 
-        if (control && eventArgs.Key == Key.N)
+        if (trackFileCommands && control && eventArgs.Key == Key.N)
         {
             OnNewDocumentClick(sender, new RoutedEventArgs());
         }
-        else if (control && eventArgs.Key == Key.O)
+        else if (trackFileCommands && control && eventArgs.Key == Key.O)
         {
             OnOpenDocumentClick(sender, new RoutedEventArgs());
         }
-        else if (control && eventArgs.Key == Key.S && shift)
+        else if (trackFileCommands && control && eventArgs.Key == Key.S && shift)
         {
             await SaveDocumentAsAsync();
         }
-        else if (control && eventArgs.Key == Key.S)
+        else if (trackFileCommands && control && eventArgs.Key == Key.S)
         {
             OnSaveDocumentClick(sender, new RoutedEventArgs());
         }
-        else if (control && eventArgs.Key == Key.Z)
+        else if (trackEditCommands && control && eventArgs.Key == Key.Z)
         {
             workspace.Commands.Execute(EditorCommandIds.Undo);
         }
-        else if (control && eventArgs.Key == Key.Y)
+        else if (trackEditCommands && control && eventArgs.Key == Key.Y)
         {
             workspace.Commands.Execute(EditorCommandIds.Redo);
         }
-        else if (!control && eventArgs.Key == Key.F)
+        else if (trackViewCommands && !control && eventArgs.Key == Key.F)
         {
             workspace.Commands.Execute(EditorCommandIds.FitViewport);
         }

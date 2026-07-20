@@ -10,6 +10,9 @@ public static class WorkspacePaneIds
     public const string Inspector = "inspector";
     public const string MathPlots = "math-plots";
     public const string Diagnostics = "diagnostics";
+    public const string TrainConfiguration = "train-configuration";
+    public const string TrainPreview = "train-preview";
+    public const string TrainSummary = "train-summary";
 }
 
 /// <summary>
@@ -20,6 +23,7 @@ public static class WorkspaceCommandGroupIds
     public const string File = "file";
     public const string Edit = "edit";
     public const string View = "view";
+    public const string Layout = "layout";
 }
 
 /// <summary>

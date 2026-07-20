@@ -1,0 +1,67 @@
+<UserControl
+    x:Class="Quantum.Editor.Avalonia.Controls.TrainConfigurationPaneControl"
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <UserControl.Styles>
+        <Style Selector="TextBlock.panelTitle">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="#AFC4D8" />
+        </Style>
+        <Style Selector="TextBlock.fieldLabel">
+            <Setter Property="Foreground" Value="#9EB3C7" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style Selector="TextBox.trainField">
+            <Setter Property="MinHeight" Value="30" />
+            <Setter Property="HorizontalContentAlignment" Value="Right" />
+        </Style>
+    </UserControl.Styles>
+
+    <Border Background="#151C24" BorderBrush="#2B3948" BorderThickness="1">
+        <Grid RowDefinitions="Auto,*">
+            <Border Padding="12,10" BorderBrush="#2B3948" BorderThickness="0,0,0,1">
+                <StackPanel Spacing="3">
+                    <TextBlock Classes="panelTitle" Text="TRAIN CONFIGURATION" />
+                    <TextBlock Foreground="#7F94A8" Text="Immutable backend consist geometry" />
+                </StackPanel>
+            </Border>
+
+            <ScrollViewer Grid.Row="1">
+                <StackPanel Margin="14" Spacing="10">
+                    <Grid ColumnDefinitions="*,112" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto" RowSpacing="8">
+                        <TextBlock Classes="fieldLabel" Text="Car count" />
+                        <TextBox x:Name="CarCountTextBox" Grid.Column="1" Classes="trainField" />
+
+                        <TextBlock Grid.Row="1" Classes="fieldLabel" Text="Car-center spacing (m)" />
+                        <TextBox x:Name="CarSpacingTextBox" Grid.Row="1" Grid.Column="1" Classes="trainField" />
+
+                        <TextBlock Grid.Row="2" Classes="fieldLabel" Text="Car body length (m)" />
+                        <TextBox x:Name="CarLengthTextBox" Grid.Row="2" Grid.Column="1" Classes="trainField" />
+
+                        <TextBlock Grid.Row="3" Classes="fieldLabel" Text="Car body width (m)" />
+                        <TextBox x:Name="CarWidthTextBox" Grid.Row="3" Grid.Column="1" Classes="trainField" />
+
+                        <TextBlock Grid.Row="4" Classes="fieldLabel" Text="Car body height (m)" />
+                        <TextBox x:Name="CarHeightTextBox" Grid.Row="4" Grid.Column="1" Classes="trainField" />
+
+                        <TextBlock Grid.Row="5" Classes="fieldLabel" Text="Bogie spacing (m)" />
+                        <TextBox x:Name="BogieSpacingTextBox" Grid.Row="5" Grid.Column="1" Classes="trainField" />
+                    </Grid>
+
+                    <Button
+                        HorizontalAlignment="Right"
+                        MinWidth="132"
+                        Padding="14,7"
+                        Content="Apply Definition"
+                        Click="OnApplyClick" />
+                    <TextBlock
+                        x:Name="ValidationText"
+                        Foreground="#9EE493"
+                        Text="Valid consist definition"
+                        TextWrapping="Wrap" />
+                </StackPanel>
+            </ScrollViewer>
+        </Grid>
+    </Border>
+</UserControl>
