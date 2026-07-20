@@ -37,7 +37,7 @@ public sealed class WorkspaceProfileCatalog
         var result = new WorkspaceProfileCatalog();
         result.Register(CreateTrackProfile(), makeDefault: true);
         result.Register(CreateFutureProfile(WorkspaceProfileId.Train, "Train", "train"));
-        result.Register(CreateFutureProfile(WorkspaceProfileId.Support, "Support", "support"));
+        result.Register(CreateFutureProfile(WorkspaceProfileId.Support, "Supports", "support"));
         result.Register(CreateFutureProfile(WorkspaceProfileId.Terrain, "Terrain", "terrain"));
         result.Register(CreateFutureProfile(WorkspaceProfileId.Simulation, "Simulation", "simulation"));
         return result;
@@ -92,6 +92,23 @@ public sealed class WorkspaceProfileCatalog
         return profile;
     }
 
+    public bool TryGetComposition(
+        WorkspaceProfileId id,
+        out WorkspaceComposition composition)
+    {
+        if (TryGet(id, out WorkspaceProfile profile))
+        {
+            composition = profile.Composition;
+            return true;
+        }
+
+        composition = null!;
+        return false;
+    }
+
+    public WorkspaceComposition GetComposition(WorkspaceProfileId id) =>
+        Get(id).Composition;
+
     private static WorkspaceProfile CreateTrackProfile()
     {
         string[] panes =
@@ -106,6 +123,7 @@ public sealed class WorkspaceProfileCatalog
         return new WorkspaceProfile(
             WorkspaceProfileId.Track,
             "Track",
+            WorkspaceComposition.CreateTrack(),
             icon: "track",
             availablePanes: panes,
             defaultVisiblePanes: panes,
@@ -129,8 +147,9 @@ public sealed class WorkspaceProfileCatalog
         return new WorkspaceProfile(
             id,
             displayName,
+            WorkspaceComposition.CreateComingSoon(id, displayName),
             icon,
             isAvailable: false,
-            isVisible: false);
+            isVisible: true);
     }
 }

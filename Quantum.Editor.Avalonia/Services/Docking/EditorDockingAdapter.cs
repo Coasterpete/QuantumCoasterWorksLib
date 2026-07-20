@@ -1,5 +1,6 @@
 using Dock.Model.Controls;
 using Dock.Model.Core;
+using Quantum.Editor.Avalonia.Services.Workspaces;
 
 namespace Quantum.Editor.Avalonia.Services.Docking;
 
@@ -12,21 +13,24 @@ public sealed class EditorDockingAdapter
     private readonly DockLayoutPersistenceService? persistence;
 
     public EditorDockingAdapter(
-        DockPaneRegistry registry,
+        WorkspaceComposition composition,
         IReadOnlyDictionary<string, object> paneContexts,
         DockLayoutPersistenceService? persistence = null)
     {
-        Registry = registry ?? throw new ArgumentNullException(nameof(registry));
+        Composition = composition ?? throw new ArgumentNullException(nameof(composition));
+        Registry = composition.Panes;
         ArgumentNullException.ThrowIfNull(paneContexts);
-        ValidatePaneContexts(registry, paneContexts);
+        ValidatePaneContexts(Registry, paneContexts);
 
         this.persistence = persistence;
-        factory = new EditorDockFactory(registry, paneContexts);
+        factory = new EditorDockFactory(composition, paneContexts);
         Layout = CreateInitialLayout();
         IsInitialized = true;
     }
 
     public DockPaneRegistry Registry { get; }
+
+    public WorkspaceComposition Composition { get; }
 
     public IFactory Factory => factory;
 

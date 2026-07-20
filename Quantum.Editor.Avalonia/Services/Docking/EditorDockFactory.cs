@@ -8,19 +8,21 @@ using Quantum.Editor.Avalonia.Services.Workspaces;
 namespace Quantum.Editor.Avalonia.Services.Docking;
 
 /// <summary>
-/// Dock.Avalonia model factory for the current Track workspace composition.
+/// Dock.Avalonia model factory for a registered workspace composition.
 /// </summary>
-internal sealed class EditorDockFactory : Factory
+internal sealed class EditorDockFactory : Factory, IWorkspaceDockLayoutBuilder
 {
+    private readonly WorkspaceComposition composition;
     private readonly DockPaneRegistry registry;
     private readonly IReadOnlyDictionary<string, object> paneContexts;
     private readonly Dictionary<string, IDockable> panes = new(StringComparer.Ordinal);
 
     public EditorDockFactory(
-        DockPaneRegistry registry,
+        WorkspaceComposition composition,
         IReadOnlyDictionary<string, object> paneContexts)
     {
-        this.registry = registry ?? throw new ArgumentNullException(nameof(registry));
+        this.composition = composition ?? throw new ArgumentNullException(nameof(composition));
+        registry = composition.Panes;
         this.paneContexts = paneContexts ?? throw new ArgumentNullException(nameof(paneContexts));
         HideToolsOnClose = true;
     }
@@ -30,85 +32,12 @@ internal sealed class EditorDockFactory : Factory
     public override IRootDock CreateLayout()
     {
         panes.Clear();
+        foreach (DockPaneRegistration pane in registry.Panes)
+        {
+            CreatePane(pane.Id);
+        }
 
-        IDockable route = CreatePane(WorkspacePaneIds.Route);
-        IDockable viewport = CreatePane(WorkspacePaneIds.Viewport);
-        IDockable inspector = CreatePane(WorkspacePaneIds.Inspector);
-        IDockable mathPlots = CreatePane(WorkspacePaneIds.MathPlots);
-        IDockable diagnostics = CreatePane(WorkspacePaneIds.Diagnostics);
-
-        var routeHost = new ToolDock
-        {
-            Id = DockingLayoutIds.RouteHost,
-            Title = "Route",
-            Alignment = Alignment.Left,
-            Proportion = 0.22,
-            ActiveDockable = route,
-            VisibleDockables = CreateList(route)
-        };
-        var viewportHost = new DocumentDock
-        {
-            Id = DockingLayoutIds.ViewportHost,
-            Title = "Viewport",
-            IsCollapsable = false,
-            CanCreateDocument = false,
-            EnableWindowDrag = false,
-            Proportion = 0.55,
-            ActiveDockable = viewport,
-            VisibleDockables = CreateList(viewport)
-        };
-        var inspectorHost = new ToolDock
-        {
-            Id = DockingLayoutIds.InspectorHost,
-            Title = "Inspector",
-            Alignment = Alignment.Right,
-            Proportion = 0.23,
-            ActiveDockable = inspector,
-            VisibleDockables = CreateList(inspector)
-        };
-        var top = new ProportionalDock
-        {
-            Id = DockingLayoutIds.Top,
-            Title = "Track workbench",
-            Orientation = Orientation.Horizontal,
-            Proportion = 0.64,
-            ActiveDockable = viewportHost,
-            VisibleDockables = CreateList<IDockable>(
-                routeHost,
-                new ProportionalDockSplitter(),
-                viewportHost,
-                new ProportionalDockSplitter(),
-                inspectorHost)
-        };
-        var bottomHost = new ToolDock
-        {
-            Id = DockingLayoutIds.BottomHost,
-            Title = "Engineering",
-            Alignment = Alignment.Bottom,
-            Proportion = 0.36,
-            ActiveDockable = mathPlots,
-            VisibleDockables = CreateList(mathPlots, diagnostics)
-        };
-        var main = new ProportionalDock
-        {
-            Id = DockingLayoutIds.Main,
-            Title = "Track workspace",
-            Orientation = Orientation.Vertical,
-            ActiveDockable = top,
-            VisibleDockables = CreateList<IDockable>(
-                top,
-                new ProportionalDockSplitter(),
-                bottomHost)
-        };
-
-        var root = (RootDock)CreateRootDock();
-        root.Id = DockingLayoutIds.Root;
-        root.Title = "Track workspace";
-        root.IsCollapsable = false;
-        root.DefaultDockable = main;
-        root.ActiveDockable = main;
-        root.VisibleDockables = CreateList<IDockable>(main);
-        return root;
+        return composition.CreateLayout(this);
     }
 
     public override void InitLayout(IDockable layout)
@@ -182,4 +111,9 @@ internal sealed class EditorDockFactory : Factory
         panes.Add(paneId, result);
         return result;
     }
+
+    IList<IDockable> IWorkspaceDockLayoutBuilder.CreateDockableList(
+        params IDockable[] dockables) => CreateList<IDockable>(dockables);
+
+    IRootDock IWorkspaceDockLayoutBuilder.CreateWorkspaceRootDock() => CreateRootDock();
 }

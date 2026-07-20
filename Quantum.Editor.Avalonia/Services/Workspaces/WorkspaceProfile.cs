@@ -14,6 +14,7 @@ public sealed class WorkspaceProfile
     public WorkspaceProfile(
         WorkspaceProfileId id,
         string displayName,
+        WorkspaceComposition composition,
         string? icon = null,
         IEnumerable<string>? availablePanes = null,
         IEnumerable<string>? defaultVisiblePanes = null,
@@ -34,6 +35,7 @@ public sealed class WorkspaceProfile
 
         Id = id;
         DisplayName = displayName.Trim();
+        Composition = composition ?? throw new ArgumentNullException(nameof(composition));
         Icon = icon;
         IsAvailable = isAvailable;
         IsVisible = isVisible;
@@ -59,11 +61,21 @@ public sealed class WorkspaceProfile
         DefaultPaneVisibility = new ReadOnlyDictionary<string, bool>(
             panes.ToDictionary(pane => pane, defaultVisiblePaneSet.Contains, StringComparer.Ordinal));
         OverlayDefaults = CopyOverlayDefaults(overlayDefaults);
+
+        string? unregisteredPane = panes.FirstOrDefault(pane => !Composition.Panes.Contains(pane));
+        if (unregisteredPane != null)
+        {
+            throw new ArgumentException(
+                $"Available pane '{unregisteredPane}' is not registered by the workspace composition.",
+                nameof(availablePanes));
+        }
     }
 
     public WorkspaceProfileId Id { get; }
 
     public string DisplayName { get; }
+
+    public WorkspaceComposition Composition { get; }
 
     public string? Icon { get; }
 

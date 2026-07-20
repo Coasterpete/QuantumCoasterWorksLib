@@ -28,12 +28,14 @@ public sealed class DockingInfrastructureTests
     [Fact]
     public void Adapter_InitializesDockFactoryWithRegisteredFrontendContexts()
     {
-        DockPaneRegistry registry = DockPaneRegistry.CreateDefaultTrack();
+        WorkspaceComposition composition = WorkspaceComposition.CreateTrack();
+        DockPaneRegistry registry = composition.Panes;
         IReadOnlyDictionary<string, object> contexts = CreateContexts(registry);
 
-        var adapter = new EditorDockingAdapter(registry, contexts);
+        var adapter = new EditorDockingAdapter(composition, contexts);
 
         Assert.True(adapter.IsInitialized);
+        Assert.Same(composition, adapter.Composition);
         Assert.Equal(DockingLayoutIds.Root, adapter.Layout.Id);
         Assert.Same(adapter.Factory, adapter.Layout.Factory);
         foreach (DockPaneRegistration registration in registry.Panes)
@@ -285,17 +287,21 @@ public sealed class DockingInfrastructureTests
 
     private static EditorDockingAdapter CreateAdapter()
     {
-        DockPaneRegistry registry = DockPaneRegistry.CreateDefaultTrack();
-        return new EditorDockingAdapter(registry, CreateContexts(registry));
+        WorkspaceComposition composition = WorkspaceProfileCatalog.CreateDefault()
+            .GetComposition(WorkspaceProfileId.Track);
+        return new EditorDockingAdapter(
+            composition,
+            CreateContexts(composition.Panes));
     }
 
     private static EditorDockingAdapter CreateAdapter(
         DockLayoutPersistenceService persistence,
         out IReadOnlyDictionary<string, object> contexts)
     {
-        DockPaneRegistry registry = DockPaneRegistry.CreateDefaultTrack();
-        contexts = CreateContexts(registry);
-        return new EditorDockingAdapter(registry, contexts, persistence);
+        WorkspaceComposition composition = WorkspaceProfileCatalog.CreateDefault()
+            .GetComposition(WorkspaceProfileId.Track);
+        contexts = CreateContexts(composition.Panes);
+        return new EditorDockingAdapter(composition, contexts, persistence);
     }
 
     private static IReadOnlyDictionary<string, object> CreateContexts(DockPaneRegistry registry) =>
