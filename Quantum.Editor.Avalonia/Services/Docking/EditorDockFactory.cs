@@ -113,6 +113,7 @@ internal sealed class EditorDockFactory : Factory
 
     public override void InitLayout(IDockable layout)
     {
+        RebindRegisteredPanes(layout);
         ContextLocator = registry.Panes.ToDictionary(
             pane => pane.Id,
             pane => new Func<object?>(() => paneContexts[pane.Id]),
@@ -127,6 +128,42 @@ internal sealed class EditorDockFactory : Factory
         };
 
         base.InitLayout(layout);
+    }
+
+    private void RebindRegisteredPanes(IDockable layout)
+    {
+        var registeredPanes = new Dictionary<string, IDockable>(StringComparer.Ordinal);
+        foreach (IDockable dockable in DockLayoutTraversal.Enumerate(layout))
+        {
+            if (!registry.TryGet(dockable.Id, out DockPaneRegistration? registration))
+            {
+                continue;
+            }
+
+            if (!registeredPanes.TryAdd(registration.Id, dockable))
+            {
+                throw new InvalidDataException(
+                    $"Docking layout contains duplicate pane '{registration.Id}'.");
+            }
+
+            dockable.Title = registration.Title;
+            dockable.CanClose = registration.CanClose;
+        }
+
+        foreach (DockPaneRegistration registration in registry.Panes)
+        {
+            if (!registeredPanes.ContainsKey(registration.Id))
+            {
+                throw new InvalidDataException(
+                    $"Docking layout is missing pane '{registration.Id}'.");
+            }
+        }
+
+        panes.Clear();
+        foreach ((string paneId, IDockable pane) in registeredPanes)
+        {
+            panes.Add(paneId, pane);
+        }
     }
 
     private IDockable CreatePane(string paneId)

@@ -1,6 +1,7 @@
 using global::Avalonia.Controls.ApplicationLifetimes;
 using global::Avalonia.Markup.Xaml;
 using Quantum.Editor.Avalonia.Services;
+using Quantum.Editor.Avalonia.Services.Docking;
 using Quantum.Editor.Avalonia.Services.Workspaces;
 
 namespace Quantum.Editor.Avalonia;
@@ -23,7 +24,10 @@ public partial class App : global::Avalonia.Application
             Workspace = new EditorWorkspace();
             Workspace.NewDocument();
             WorkspaceProfiles = new WorkspaceProfileManager();
-            desktop.MainWindow = new MainWindow(Workspace, WorkspaceProfiles);
+            desktop.MainWindow = new MainWindow(
+                Workspace,
+                WorkspaceProfiles,
+                new DockLayoutPersistenceService());
         }
 
         base.OnFrameworkInitializationCompleted();
