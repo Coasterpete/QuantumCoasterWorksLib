@@ -37,7 +37,14 @@ public sealed class PaneExtractionContractTests
         AssertProperty<RoutePaneControl>(nameof(RoutePaneControl.Selection), canWrite: true);
         AssertProperty<RoutePaneControl>(nameof(RoutePaneControl.HighlightedSectionIndex), canWrite: true);
         Assert.NotNull(typeof(RoutePaneControl).GetEvent(nameof(RoutePaneControl.NodeSelected)));
+        Assert.NotNull(typeof(RoutePaneControl).GetEvent(nameof(RoutePaneControl.AddSectionRequested)));
+        Assert.NotNull(typeof(RoutePaneControl).GetEvent(nameof(RoutePaneControl.InsertBeforeRequested)));
+        Assert.NotNull(typeof(RoutePaneControl).GetEvent(nameof(RoutePaneControl.InsertAfterRequested)));
+        Assert.NotNull(typeof(RoutePaneControl).GetEvent(nameof(RoutePaneControl.DeleteSectionRequested)));
+        Assert.NotNull(typeof(RoutePaneControl).GetEvent(nameof(RoutePaneControl.MoveUpRequested)));
+        Assert.NotNull(typeof(RoutePaneControl).GetEvent(nameof(RoutePaneControl.MoveDownRequested)));
         Assert.NotNull(typeof(RoutePaneControl).GetEvent(nameof(RoutePaneControl.SectionPointerChanged)));
+        Assert.True(typeof(Window).IsAssignableFrom(typeof(SectionEditorDialog)));
     }
 
     [Fact]

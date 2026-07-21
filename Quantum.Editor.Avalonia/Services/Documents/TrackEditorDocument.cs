@@ -22,17 +22,17 @@ public sealed class TrackEditorDocument : IEditorDocument
     private TrackEditorDocument(
         TrackAuthoringGraph graph,
         TrackLayoutPackageV2GraphAncillaryState ancillaryState,
-        TrackAuthoringGraphCompileResult graphCompileResult,
+        TrackAuthoringGraphCompileResult? graphCompileResult,
         string displayName,
         string? filePath)
-        : this(graphCompileResult.Compilation!.Document, displayName)
+        : this(graphCompileResult?.Compilation?.Document ?? new TrackDocument(), displayName)
     {
         this.graph = graph;
         this.ancillaryState = ancillaryState;
         GraphCompileResult = graphCompileResult;
-        Compilation = graphCompileResult.Compilation;
+        Compilation = graphCompileResult?.Compilation;
         FilePath = filePath;
-        cleanPackageJson = CapturePackageJson();
+        cleanPackageJson = CanSave ? CapturePackageJson() : null;
     }
 
     public event EventHandler? Changed;
@@ -58,15 +58,43 @@ public sealed class TrackEditorDocument : IEditorDocument
     /// mutable editor-owned state.
     /// </summary>
     public TrackLayoutPackageV2Dto? Package =>
-        graph is null || ancillaryState is null
+        !CanSave
             ? null
-            : ExportPackage(graph, ancillaryState);
+            : ExportPackage(graph!, ancillaryState!);
 
     public TrackAuthoringCompilation? Compilation { get; private set; }
 
     public string? FilePath { get; private set; }
 
-    public bool CanSave => graph != null && ancillaryState != null;
+    public bool CanSave =>
+        graph != null &&
+        graph.Nodes.Count != 0 &&
+        ancillaryState != null &&
+        Compilation != null;
+
+    public bool IsEmpty => graph?.Nodes.Count == 0;
+
+    public static TrackEditorDocument CreateEmpty(
+        string displayName,
+        string? sourceName = null)
+    {
+        var graph = new TrackAuthoringGraph(
+            Array.Empty<TrackAuthoringGraphNode>(),
+            Array.Empty<TrackAuthoringGraphEdge>());
+        var ancillaryState = new TrackLayoutPackageV2GraphAncillaryState(
+            TrackLayoutPackageV2Dto.ContractName,
+            TrackLayoutPackageV2Dto.ContractVersion,
+            "meters",
+            sourceName,
+            layoutId: null,
+            heartlineOffset: null);
+        return new TrackEditorDocument(
+            graph,
+            ancillaryState,
+            graphCompileResult: null,
+            displayName,
+            filePath: null);
+    }
 
     public static TrackEditorDocument Create(
         TrackLayoutPackageV2Dto package,
@@ -103,13 +131,13 @@ public sealed class TrackEditorDocument : IEditorDocument
 
     public string CapturePackageJson()
     {
-        if (graph is null || ancillaryState is null)
+        if (!CanSave)
         {
             throw new InvalidOperationException(
-                "This editor document does not have a persistable Track Layout Package V2 graph model.");
+                "A non-empty successfully compiled route is required before saving Track Layout Package V2.");
         }
 
-        return SerializePackage(graph, ancillaryState);
+        return SerializePackage(graph!, ancillaryState!);
     }
 
     internal string CapturePackageJson(TrackAuthoringGraph candidateGraph)
@@ -131,6 +159,22 @@ public sealed class TrackEditorDocument : IEditorDocument
         {
             throw new InvalidOperationException(
                 "This editor document does not have an editable authoring graph.");
+        }
+
+        TrackAuthoringGraphRouteResult route =
+            TrackAuthoringGraphRouteValidator.Validate(candidateGraph);
+        if (!route.Success)
+        {
+            throw new InvalidOperationException(FormatGraphDiagnostics(
+                "The candidate authoring route was rejected",
+                route.Diagnostics));
+        }
+
+        if (candidateGraph.Nodes.Count == 0)
+        {
+            bool emptyIsDirty = explicitlyDirty || cleanPackageJson != null;
+            CommitEmptyGraph(candidateGraph, emptyIsDirty);
+            return;
         }
 
         TrackAuthoringGraphCompileResult candidateCompilation =
@@ -237,6 +281,18 @@ public sealed class TrackEditorDocument : IEditorDocument
         GraphCompileResult = candidateCompilation;
         Compilation = candidateCompilation.Compilation;
         TrackDocument = candidateCompilation.Compilation!.Document;
+        IsDirty = candidateIsDirty;
+        Changed?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void CommitEmptyGraph(
+        TrackAuthoringGraph candidateGraph,
+        bool candidateIsDirty)
+    {
+        graph = candidateGraph;
+        GraphCompileResult = null;
+        Compilation = null;
+        TrackDocument = new TrackDocument();
         IsDirty = candidateIsDirty;
         Changed?.Invoke(this, EventArgs.Empty);
     }

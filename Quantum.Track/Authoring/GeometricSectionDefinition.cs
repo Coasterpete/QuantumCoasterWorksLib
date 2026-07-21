@@ -3,25 +3,20 @@ namespace Quantum.Track.Authoring
     /// <summary>
     /// Base authoring definition for one ordered geometric track section.
     /// </summary>
-    public abstract class GeometricSectionDefinition
+    public abstract class GeometricSectionDefinition : TrackAuthoringSectionDefinition
     {
         protected GeometricSectionDefinition(
             string id,
             double length,
             double rollRadians)
+            : base(id, TrackAuthoringSectionFamily.Geometry)
         {
-            Id = AuthoringValidation.RequireId(id);
             Length = AuthoringValidation.RequirePositiveFinite(length, nameof(length), "Section length");
             RollRadians = AuthoringValidation.RequireFinite(
                 rollRadians,
                 nameof(rollRadians),
                 "Section roll");
         }
-
-        /// <summary>
-        /// Stable section identifier. The supplied value is preserved exactly.
-        /// </summary>
-        public string Id { get; }
 
         /// <summary>
         /// Section length in station-distance units.

@@ -71,6 +71,8 @@ namespace Quantum.Track.Authoring
         /// </summary>
         public int Degree { get; }
 
+        public override string TypeId => TrackAuthoringSectionTypeIds.Spatial;
+
         private static void ValidateControlPoints(IReadOnlyList<Vector3d> controlPoints)
         {
             for (int i = 0; i < controlPoints.Count; i++)

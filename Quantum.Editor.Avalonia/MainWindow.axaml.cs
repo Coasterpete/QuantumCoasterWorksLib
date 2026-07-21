@@ -13,6 +13,7 @@ using Quantum.Editor.Avalonia.Services.Docking;
 using Quantum.Editor.Avalonia.Services.Documents;
 using Quantum.Editor.Avalonia.Services.Trains;
 using Quantum.Editor.Avalonia.Services.Workspaces;
+using Quantum.Track.Authoring;
 
 namespace Quantum.Editor.Avalonia;
 
@@ -146,6 +147,12 @@ public partial class MainWindow : Window
     private void WirePaneInteractions()
     {
         RoutePane.NodeSelected += OnGraphNodeSelected;
+        RoutePane.AddSectionRequested += OnAddSectionRequested;
+        RoutePane.InsertBeforeRequested += OnInsertBeforeRequested;
+        RoutePane.InsertAfterRequested += OnInsertAfterRequested;
+        RoutePane.DeleteSectionRequested += OnDeleteSectionRequested;
+        RoutePane.MoveUpRequested += OnMoveUpRequested;
+        RoutePane.MoveDownRequested += OnMoveDownRequested;
         RoutePane.SectionPointerChanged += OnSectionPointerChanged;
         ViewportPane.SectionPointerChanged += OnSectionPointerChanged;
         ViewportPane.SampleSelected += OnViewportSampleSelected;
@@ -317,6 +324,10 @@ public partial class MainWindow : Window
         RoutePane.DocumentPath = document?.FilePath ?? "Unsaved Track Layout Package V2";
         RoutePane.GraphNodes = workspace.GraphNodes;
         RoutePane.Selection = selection;
+        bool canSaveTrack = document?.CanSave == true;
+        SaveButton.IsEnabled = canSaveTrack;
+        SaveTrackMenuItem.IsEnabled = canSaveTrack;
+        SaveTrackAsMenuItem.IsEnabled = canSaveTrack;
 
         if (trackActive)
         {
@@ -639,6 +650,90 @@ public partial class MainWindow : Window
         EditorGraphNode node = eventArgs.Node;
         workspace.Select(node.Selection);
         workspace.SetStatus("Selected section " + node.NodeId + ".");
+    }
+
+    private async void OnAddSectionRequested(object? sender, EventArgs eventArgs)
+    {
+        TrackAuthoringSectionDefinition? section = await ShowSectionEditorAsync();
+        if (section != null)
+        {
+            workspace.AddSection(section);
+        }
+    }
+
+    private async void OnInsertBeforeRequested(
+        object? sender,
+        GraphNodeSelectedEventArgs eventArgs)
+    {
+        TrackAuthoringSectionDefinition? section = await ShowSectionEditorAsync();
+        if (section != null)
+        {
+            workspace.InsertSectionBefore(eventArgs.Node.NodeId, section);
+        }
+    }
+
+    private async void OnInsertAfterRequested(
+        object? sender,
+        GraphNodeSelectedEventArgs eventArgs)
+    {
+        TrackAuthoringSectionDefinition? section = await ShowSectionEditorAsync();
+        if (section != null)
+        {
+            workspace.InsertSectionAfter(eventArgs.Node.NodeId, section);
+        }
+    }
+
+    private void OnDeleteSectionRequested(
+        object? sender,
+        GraphNodeSelectedEventArgs eventArgs)
+    {
+        workspace.DeleteSection(eventArgs.Node.NodeId);
+    }
+
+    private void OnMoveUpRequested(
+        object? sender,
+        GraphNodeSelectedEventArgs eventArgs)
+    {
+        workspace.MoveSectionUp(eventArgs.Node.NodeId);
+    }
+
+    private void OnMoveDownRequested(
+        object? sender,
+        GraphNodeSelectedEventArgs eventArgs)
+    {
+        workspace.MoveSectionDown(eventArgs.Node.NodeId);
+    }
+
+    private Task<TrackAuthoringSectionDefinition?> ShowSectionEditorAsync()
+    {
+        var dialog = new SectionEditorDialog(SuggestSectionId);
+        return dialog.ShowDialog<TrackAuthoringSectionDefinition?>(this);
+    }
+
+    private string SuggestSectionId(string typeId)
+    {
+        string prefix = typeId switch
+        {
+            TrackAuthoringSectionTypeIds.Straight => "straight",
+            TrackAuthoringSectionTypeIds.ConstantCurvature => "curve",
+            TrackAuthoringSectionTypeIds.CurvatureTransition => "transition",
+            _ => "section"
+        };
+        var existingIds = new HashSet<string>(
+            workspace.GraphNodes.Select(node => node.NodeId),
+            StringComparer.Ordinal);
+        if (!existingIds.Contains(prefix))
+        {
+            return prefix;
+        }
+
+        int suffix = 2;
+        while (existingIds.Contains(prefix + "-" + suffix.ToString(CultureInfo.InvariantCulture)))
+        {
+            suffix++;
+        }
+
+        return prefix + "-" + suffix.ToString(CultureInfo.InvariantCulture);
     }
 
     private async void OnWindowKeyDown(object? sender, KeyEventArgs eventArgs)

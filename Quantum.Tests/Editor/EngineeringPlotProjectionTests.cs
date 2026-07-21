@@ -10,7 +10,7 @@ public sealed class EngineeringPlotProjectionTests
     public void GetValue_ProjectsEveryPlotDirectlyFromEngineeringSnapshot()
     {
         var workspace = new EditorWorkspace();
-        workspace.NewDocument();
+        EditorTestDocumentFactory.ActivateShowcase(workspace);
         EngineeringSnapshot snapshot = workspace.EngineeringSnapshot!;
         const int sampleIndex = 37;
         EngineeringGeometrySample geometry = snapshot.Geometry[sampleIndex];
@@ -63,7 +63,7 @@ public sealed class EngineeringPlotProjectionTests
     public void FindNearestSampleIndex_ClampsAndUsesCanonicalStationGrid()
     {
         var workspace = new EditorWorkspace();
-        workspace.NewDocument();
+        EditorTestDocumentFactory.ActivateShowcase(workspace);
         EngineeringSnapshot snapshot = workspace.EngineeringSnapshot!;
         double lowerStation = snapshot.StationGrid[10];
         double upperStation = snapshot.StationGrid[11];
@@ -90,7 +90,7 @@ public sealed class EngineeringPlotProjectionTests
     public void SnapshotNavigation_UsesTheSameResolvedSectionForMathPlotsAndViewport()
     {
         var workspace = new EditorWorkspace();
-        workspace.NewDocument();
+        EditorTestDocumentFactory.ActivateShowcase(workspace);
         EngineeringSnapshot snapshot = workspace.EngineeringSnapshot!;
 
         for (int sampleIndex = 0; sampleIndex < snapshot.SampleCount; sampleIndex++)

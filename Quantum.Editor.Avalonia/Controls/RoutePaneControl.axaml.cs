@@ -24,6 +24,18 @@ public partial class RoutePaneControl : UserControl
 
     public event EventHandler<SectionPointerChangedEventArgs>? SectionPointerChanged;
 
+    public event EventHandler? AddSectionRequested;
+
+    public event EventHandler<GraphNodeSelectedEventArgs>? InsertBeforeRequested;
+
+    public event EventHandler<GraphNodeSelectedEventArgs>? InsertAfterRequested;
+
+    public event EventHandler<GraphNodeSelectedEventArgs>? DeleteSectionRequested;
+
+    public event EventHandler<GraphNodeSelectedEventArgs>? MoveUpRequested;
+
+    public event EventHandler<GraphNodeSelectedEventArgs>? MoveDownRequested;
+
     public string DocumentTitle
     {
         get => DocumentTitleText.Text ?? string.Empty;
@@ -173,6 +185,15 @@ public partial class RoutePaneControl : UserControl
             button.BorderBrush = Brush.Parse(
                 highlighted ? "#F4D35E" : selected ? "#59B5E8" : "#34495C");
         }
+
+        EditorGraphNode? selectedNode = SelectedNode();
+        bool hasSelection = selectedNode != null;
+        InsertBeforeButton.IsEnabled = hasSelection;
+        InsertAfterButton.IsEnabled = hasSelection;
+        DeleteSectionButton.IsEnabled = hasSelection;
+        MoveUpButton.IsEnabled = selectedNode?.RouteIndex > 0;
+        MoveDownButton.IsEnabled =
+            selectedNode != null && selectedNode.RouteIndex < graphNodes.Count - 1;
     }
 
     private void OnGraphNodeClick(object? sender, RoutedEventArgs eventArgs)
@@ -194,5 +215,59 @@ public partial class RoutePaneControl : UserControl
     private void OnGraphNodePointerExited(object? sender, PointerEventArgs eventArgs)
     {
         SectionPointerChanged?.Invoke(this, new SectionPointerChangedEventArgs(null));
+    }
+
+    private void OnAddSectionClick(object? sender, RoutedEventArgs eventArgs)
+    {
+        AddSectionRequested?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void OnInsertBeforeClick(object? sender, RoutedEventArgs eventArgs)
+    {
+        RaiseSelectedNode(InsertBeforeRequested);
+    }
+
+    private void OnInsertAfterClick(object? sender, RoutedEventArgs eventArgs)
+    {
+        RaiseSelectedNode(InsertAfterRequested);
+    }
+
+    private void OnDeleteSectionClick(object? sender, RoutedEventArgs eventArgs)
+    {
+        RaiseSelectedNode(DeleteSectionRequested);
+    }
+
+    private void OnMoveUpClick(object? sender, RoutedEventArgs eventArgs)
+    {
+        RaiseSelectedNode(MoveUpRequested);
+    }
+
+    private void OnMoveDownClick(object? sender, RoutedEventArgs eventArgs)
+    {
+        RaiseSelectedNode(MoveDownRequested);
+    }
+
+    private void RaiseSelectedNode(
+        EventHandler<GraphNodeSelectedEventArgs>? handler)
+    {
+        EditorGraphNode? node = SelectedNode();
+        if (node != null)
+        {
+            handler?.Invoke(this, new GraphNodeSelectedEventArgs(node));
+        }
+    }
+
+    private EditorGraphNode? SelectedNode()
+    {
+        if (selection?.NodeId is string nodeId)
+        {
+            return graphNodes.FirstOrDefault(node =>
+                string.Equals(node.NodeId, nodeId, StringComparison.Ordinal));
+        }
+
+        return selection?.SectionIndex >= 0
+            ? graphNodes.FirstOrDefault(node =>
+                node.RouteIndex == selection.SectionIndex)
+            : null;
     }
 }

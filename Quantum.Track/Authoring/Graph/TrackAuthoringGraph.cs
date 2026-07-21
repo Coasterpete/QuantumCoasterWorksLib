@@ -80,7 +80,7 @@ namespace Quantum.Track.Authoring
         /// </summary>
         public TrackAuthoringGraph WithSection(
             string nodeId,
-            GeometricSectionDefinition replacement)
+            TrackAuthoringSectionDefinition replacement)
         {
             if (nodeId is null)
             {
