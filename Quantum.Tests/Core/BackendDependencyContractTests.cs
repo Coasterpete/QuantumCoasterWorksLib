@@ -15,7 +15,8 @@ public sealed class BackendDependencyContractTests
         "Quantum.Physics",
         "Quantum.FVD",
         "Quantum.IO",
-        "Quantum.Debug"
+        "Quantum.Debug",
+        "Quantum.Application"
     };
 
     private static readonly string[] BackendProjectPaths =
@@ -27,7 +28,8 @@ public sealed class BackendDependencyContractTests
         "Quantum.Physics/Quantum.Physics.csproj",
         "Quantum.FVD/Quantum.FVD.csproj",
         "Quantum.IO/Quantum.IO.csproj",
-        "Quantum.Debug/Quantum.Debug.csproj"
+        "Quantum.Debug/Quantum.Debug.csproj",
+        "Quantum.Application/Quantum.Application.csproj"
     };
 
     private static readonly string[] ForbiddenFrontendOrRendererNames =

@@ -1,3 +1,4 @@
+using Quantum.Application.Authoring;
 using Quantum.IO.TrackLayout.V2;
 using Quantum.Track;
 using Quantum.Track.Authoring;
@@ -144,7 +145,7 @@ public sealed class TrackEditorDocument : IEditorDocument
         return currentPackageJson!;
     }
 
-    internal TrackEditorGraphState CaptureGraphState()
+    internal PreparedTrackGraphState CaptureGraphState()
     {
         if (graph is null)
         {
@@ -152,10 +153,14 @@ public sealed class TrackEditorDocument : IEditorDocument
                 "This editor document does not have an editable authoring graph.");
         }
 
-        return new TrackEditorGraphState(graph, GraphCompileResult, currentPackageJson);
+        return PreparedTrackGraphState.FromPreparedData(
+            graph,
+            ancillaryState!,
+            GraphCompileResult,
+            currentPackageJson);
     }
 
-    internal TrackEditorGraphState PrepareGraphState(
+    internal PreparedTrackGraphState PrepareGraphState(
         TrackAuthoringGraph candidateGraph,
         TrackAuthoringGraphCompileResult? candidateCompilation)
     {
@@ -168,7 +173,10 @@ public sealed class TrackEditorDocument : IEditorDocument
 
         if (candidateGraph.Nodes.Count == 0)
         {
-            return new TrackEditorGraphState(candidateGraph, null, null);
+            return PreparedTrackGraphState.FromEvaluation(
+                candidateGraph,
+                ancillaryState,
+                graphCompileResult: null);
         }
 
         if (candidateCompilation is null ||
@@ -180,14 +188,10 @@ public sealed class TrackEditorDocument : IEditorDocument
                 nameof(candidateCompilation));
         }
 
-        string packageJson = SerializePackage(
+        return PreparedTrackGraphState.FromEvaluation(
             candidateGraph,
             ancillaryState,
             candidateCompilation);
-        return new TrackEditorGraphState(
-            candidateGraph,
-            candidateCompilation,
-            packageJson);
     }
 
     public void ReplaceGraph(TrackAuthoringGraph candidateGraph)
@@ -226,7 +230,7 @@ public sealed class TrackEditorDocument : IEditorDocument
         ReplaceGraphState(PrepareGraphState(candidateGraph, candidateCompilation));
     }
 
-    internal void ReplaceGraphState(TrackEditorGraphState candidateState)
+    internal void ReplaceGraphState(PreparedTrackGraphState candidateState)
     {
         ArgumentNullException.ThrowIfNull(candidateState);
         if (graph is null || ancillaryState is null)
@@ -238,7 +242,7 @@ public sealed class TrackEditorDocument : IEditorDocument
         bool candidateIsDirty = explicitlyDirty ||
             !string.Equals(
                 cleanPackageJson,
-                candidateState.PackageJson,
+                candidateState.CanonicalPackageJson,
                 StringComparison.Ordinal);
         if (candidateState.GraphCompileResult is null)
         {
@@ -249,7 +253,7 @@ public sealed class TrackEditorDocument : IEditorDocument
         CommitCompiledGraph(
             candidateState.Graph,
             candidateState.GraphCompileResult,
-            candidateState.PackageJson!,
+            candidateState.CanonicalPackageJson!,
             candidateIsDirty);
     }
 

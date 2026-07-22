@@ -1,3 +1,4 @@
+using Quantum.Application.Authoring;
 using Quantum.Editor.Avalonia.Services.Documents;
 using Quantum.Track.Authoring;
 
@@ -11,8 +12,8 @@ public sealed class TrackGraphSnapshotOperation : IUndoableEditorOperation
     private readonly TrackEditorDocument document;
     private readonly TrackAuthoringGraph? beforeGraph;
     private readonly TrackAuthoringGraph? afterGraph;
-    private readonly TrackEditorGraphState? beforeState;
-    private readonly TrackEditorGraphState? afterState;
+    private readonly PreparedTrackGraphState? beforeState;
+    private readonly PreparedTrackGraphState? afterState;
 
     public TrackGraphSnapshotOperation(
         string description,
@@ -31,8 +32,8 @@ public sealed class TrackGraphSnapshotOperation : IUndoableEditorOperation
     internal TrackGraphSnapshotOperation(
         string description,
         TrackEditorDocument document,
-        TrackEditorGraphState beforeState,
-        TrackEditorGraphState afterState)
+        PreparedTrackGraphState beforeState,
+        PreparedTrackGraphState afterState)
     {
         Description = string.IsNullOrWhiteSpace(description)
             ? throw new ArgumentException("Operation description is required.", nameof(description))

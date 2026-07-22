@@ -29,6 +29,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Quantum.Application\Quantum.Application.csproj" />
     <ProjectReference Include="..\Quantum.Core\Quantum.Core.csproj" />
     <ProjectReference Include="..\Quantum.Debug\Quantum.Debug.csproj" />
     <ProjectReference Include="..\Quantum.Editor.Avalonia\Quantum.Editor.Avalonia.csproj" />

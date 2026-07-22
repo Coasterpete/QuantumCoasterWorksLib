@@ -1,4 +1,5 @@
 using System.Globalization;
+using Quantum.Application.Authoring;
 using Quantum.Editor.Avalonia.Models;
 using Quantum.Editor.Avalonia.Services.Commands;
 using Quantum.Editor.Avalonia.Services.Documents;
@@ -141,7 +142,7 @@ public sealed class EditorWorkspace
             return false;
         }
 
-        TrackEditorGraphState beforeState = document.CaptureGraphState();
+        PreparedTrackGraphState beforeState = document.CaptureGraphState();
         TrackAuthoringGraph beforeGraph = beforeState.Graph;
 
         TrackAuthoringGraph candidateGraph;
@@ -187,14 +188,15 @@ public sealed class EditorWorkspace
 
         try
         {
-            TrackEditorGraphState afterState = document.PrepareGraphState(
+            PreparedTrackGraphState afterState = document.PrepareGraphState(
                 candidateGraph,
                 candidateCompilation);
-            if (beforeState.PackageJson is not null && afterState.PackageJson is not null)
+            if (beforeState.CanonicalPackageJson is not null &&
+                afterState.CanonicalPackageJson is not null)
             {
                 if (string.Equals(
-                    beforeState.PackageJson,
-                    afterState.PackageJson,
+                    beforeState.CanonicalPackageJson,
+                    afterState.CanonicalPackageJson,
                     StringComparison.Ordinal))
                 {
                     SetStatus("No graph values changed.");
