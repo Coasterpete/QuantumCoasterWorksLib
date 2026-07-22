@@ -72,6 +72,19 @@ namespace Quantum.Track.Authoring
                     routeResult.Diagnostics);
             }
 
+            // Empty is a valid editor/session state even though it is intentionally not
+            // a compilable or persistable track package.
+            if (candidateGraph.Nodes.Count == 0)
+            {
+                return new TrackAuthoringCandidateEvaluation(
+                    sourceGraph,
+                    operation,
+                    candidateGraph,
+                    routeResult,
+                    null,
+                    Array.Empty<TrackAuthoringGraphDiagnostic>());
+            }
+
             TrackAuthoringGraphCompileResult compileResult = compiler(candidateGraph);
             IReadOnlyList<TrackAuthoringGraphDiagnostic> diagnostics = compileResult.Diagnostics;
             return new TrackAuthoringCandidateEvaluation(

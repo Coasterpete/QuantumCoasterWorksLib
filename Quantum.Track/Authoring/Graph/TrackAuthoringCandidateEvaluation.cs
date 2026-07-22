@@ -45,8 +45,8 @@ namespace Quantum.Track.Authoring
         public bool CommitEligible =>
             CandidateGraph != null &&
             RouteResult?.Success == true &&
-            CompileResult?.Success == true &&
-            Compilation != null;
+            (CandidateGraph.Nodes.Count == 0 ||
+             (CompileResult?.Success == true && Compilation != null));
 
         /// <summary>
         /// Conservatively detects whether the active immutable graph snapshot changed

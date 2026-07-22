@@ -115,6 +115,20 @@ public sealed class BackendDependencyContractTests
     }
 
     [Fact]
+    public void QuantumApplication_ReferencesOnlyTrackAndPersistenceQuantumAssemblies()
+    {
+        Assembly application = Assembly.Load(new AssemblyName("Quantum.Application"));
+        string[] quantumReferences = application.GetReferencedAssemblies()
+            .Select(reference => reference.Name)
+            .Where(name => name != null && name.StartsWith("Quantum.", StringComparison.Ordinal))
+            .Cast<string>()
+            .OrderBy(name => name, StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.Equal(new[] { "Quantum.IO", "Quantum.Track" }, quantumReferences);
+    }
+
+    [Fact]
     public void QuantumBackendProjects_DoNotReferenceFrontendOrBrowserPackages()
     {
         string repoRoot = ResolveRepositoryRoot();

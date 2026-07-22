@@ -155,6 +155,31 @@ public sealed class TrackAuthoringCandidateEvaluatorTests
     }
 
     [Fact]
+    public void EmptyCandidate_IsAValidUncompiledEditorState()
+    {
+        TrackAuthoringGraph source = Graph(new StraightSectionDefinition("a", 3.0));
+        var operation = new TestCompoundOperation(_ => Graph());
+        int compileCount = 0;
+
+        TrackAuthoringCandidateEvaluation result = TrackAuthoringCandidateEvaluator.Evaluate(
+            source,
+            operation,
+            graph =>
+            {
+                compileCount++;
+                return TrackAuthoringGraphCompiler.Compile(graph);
+            });
+
+        Assert.True(result.CommitEligible);
+        Assert.NotNull(result.CandidateGraph);
+        Assert.Empty(result.CandidateGraph!.Nodes);
+        Assert.Null(result.CompileResult);
+        Assert.Null(result.Compilation);
+        Assert.Empty(result.Diagnostics);
+        Assert.Equal(0, compileCount);
+    }
+
+    [Fact]
     public void InvalidCandidateRoute_RetainsValidationResultAndDoesNotCompile()
     {
         var source = new TrackAuthoringGraph(
