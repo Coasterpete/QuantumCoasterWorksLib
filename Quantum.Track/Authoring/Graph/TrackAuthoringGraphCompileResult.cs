@@ -12,12 +12,18 @@ namespace Quantum.Track.Authoring
         private readonly IReadOnlyList<TrackAuthoringGraphDiagnostic> _diagnostics;
 
         internal TrackAuthoringGraphCompileResult(
+            TrackAuthoringGraph sourceGraph,
             bool success,
             IEnumerable<TrackAuthoringGraphNode> orderedNodes,
             TrackAuthoringDefinition? definition,
             TrackAuthoringCompilation? compilation,
             IEnumerable<TrackAuthoringGraphDiagnostic> diagnostics)
         {
+            if (sourceGraph is null)
+            {
+                throw new ArgumentNullException(nameof(sourceGraph));
+            }
+
             if (orderedNodes is null)
             {
                 throw new ArgumentNullException(nameof(orderedNodes));
@@ -28,6 +34,7 @@ namespace Quantum.Track.Authoring
                 throw new ArgumentNullException(nameof(diagnostics));
             }
 
+            SourceGraph = sourceGraph;
             Success = success;
             _orderedNodes = new List<TrackAuthoringGraphNode>(orderedNodes).AsReadOnly();
             Definition = definition;
@@ -36,6 +43,11 @@ namespace Quantum.Track.Authoring
         }
 
         public bool Success { get; }
+
+        /// <summary>
+        /// Gets the immutable graph instance evaluated to produce this result.
+        /// </summary>
+        public TrackAuthoringGraph SourceGraph { get; }
 
         public IReadOnlyList<TrackAuthoringGraphNode> OrderedNodes => _orderedNodes;
 

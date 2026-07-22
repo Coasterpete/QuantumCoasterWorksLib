@@ -9,8 +9,10 @@ namespace Quantum.Editor.Avalonia.Services.UndoRedo;
 public sealed class TrackGraphSnapshotOperation : IUndoableEditorOperation
 {
     private readonly TrackEditorDocument document;
-    private readonly TrackAuthoringGraph beforeGraph;
-    private readonly TrackAuthoringGraph afterGraph;
+    private readonly TrackAuthoringGraph? beforeGraph;
+    private readonly TrackAuthoringGraph? afterGraph;
+    private readonly TrackEditorGraphState? beforeState;
+    private readonly TrackEditorGraphState? afterState;
 
     public TrackGraphSnapshotOperation(
         string description,
@@ -26,9 +28,41 @@ public sealed class TrackGraphSnapshotOperation : IUndoableEditorOperation
         this.afterGraph = afterGraph ?? throw new ArgumentNullException(nameof(afterGraph));
     }
 
+    internal TrackGraphSnapshotOperation(
+        string description,
+        TrackEditorDocument document,
+        TrackEditorGraphState beforeState,
+        TrackEditorGraphState afterState)
+    {
+        Description = string.IsNullOrWhiteSpace(description)
+            ? throw new ArgumentException("Operation description is required.", nameof(description))
+            : description;
+        this.document = document ?? throw new ArgumentNullException(nameof(document));
+        this.beforeState = beforeState ?? throw new ArgumentNullException(nameof(beforeState));
+        this.afterState = afterState ?? throw new ArgumentNullException(nameof(afterState));
+    }
+
     public string Description { get; }
 
-    public void Execute() => document.ReplaceGraph(afterGraph);
+    public void Execute()
+    {
+        if (afterState is not null)
+        {
+            document.ReplaceGraphState(afterState);
+            return;
+        }
 
-    public void Undo() => document.ReplaceGraph(beforeGraph);
+        document.ReplaceGraph(afterGraph!);
+    }
+
+    public void Undo()
+    {
+        if (beforeState is not null)
+        {
+            document.ReplaceGraphState(beforeState);
+            return;
+        }
+
+        document.ReplaceGraph(beforeGraph!);
+    }
 }

@@ -135,12 +135,14 @@ public sealed class EditorWorkspace
         ArgumentNullException.ThrowIfNull(edit);
 
         TrackEditorDocument? document = ActiveDocument;
-        TrackAuthoringGraph? beforeGraph = document?.Graph;
-        if (document is null || beforeGraph is null)
+        if (document?.Graph is null)
         {
             SetStatus("The active document does not have an editable authoring graph.");
             return false;
         }
+
+        TrackEditorGraphState beforeState = document.CaptureGraphState();
+        TrackAuthoringGraph beforeGraph = beforeState.Graph;
 
         TrackAuthoringGraph candidateGraph;
         try
@@ -171,9 +173,10 @@ public sealed class EditorWorkspace
             return false;
         }
 
+        TrackAuthoringGraphCompileResult? candidateCompilation = null;
         if (candidateGraph.Nodes.Count != 0)
         {
-            TrackAuthoringGraphCompileResult candidateCompilation =
+            candidateCompilation =
                 TrackAuthoringGraphCompiler.Compile(candidateGraph);
             if (!candidateCompilation.Success || candidateCompilation.Compilation is null)
             {
@@ -184,11 +187,15 @@ public sealed class EditorWorkspace
 
         try
         {
-            if (beforeGraph.Nodes.Count != 0 && candidateGraph.Nodes.Count != 0)
+            TrackEditorGraphState afterState = document.PrepareGraphState(
+                candidateGraph,
+                candidateCompilation);
+            if (beforeState.PackageJson is not null && afterState.PackageJson is not null)
             {
-                string beforeJson = document.CapturePackageJson();
-                string afterJson = document.CapturePackageJson(candidateGraph);
-                if (string.Equals(beforeJson, afterJson, StringComparison.Ordinal))
+                if (string.Equals(
+                    beforeState.PackageJson,
+                    afterState.PackageJson,
+                    StringComparison.Ordinal))
                 {
                     SetStatus("No graph values changed.");
                     return false;
@@ -198,8 +205,8 @@ public sealed class EditorWorkspace
             UndoRedo.Execute(new TrackGraphSnapshotOperation(
                 description,
                 document,
-                beforeGraph,
-                candidateGraph));
+                beforeState,
+                afterState));
             SetStatus(description + ".");
             return true;
         }

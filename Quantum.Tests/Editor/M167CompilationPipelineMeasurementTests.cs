@@ -10,7 +10,7 @@ namespace Quantum.Tests;
 public sealed class M167CompilationPipelineMeasurementTests
 {
     [Fact]
-    public void Baseline_ApplyGraphEdit_CompilesFiveTimesAndBuildsOneProjection()
+    public void ApplyGraphEdit_CompilesOnceAndBuildsOneProjection()
     {
         var workspace = new EditorWorkspace();
         TrackEditorDocument document = EditorTestDocumentFactory.ActivateShowcase(workspace);
@@ -35,14 +35,15 @@ public sealed class M167CompilationPipelineMeasurementTests
                     section.RollRadians)));
 
         Assert.True(applied);
-        Assert.Equal(5, authoring.GraphCompilerInvocationCount);
+        Assert.Equal(1, authoring.GraphCompilerInvocationCount);
         Assert.Equal(1, authoring.EngineeringSnapshotBuildCount);
         Assert.Equal(1, viewport.ViewportProjectionBuildCount);
+        Assert.Same(document.Graph, document.GraphCompileResult!.SourceGraph);
         AssertPositiveTimings(authoring, viewport);
     }
 
     [Fact]
-    public void Baseline_Save_CompilesTwiceWithoutRebuildingProjection()
+    public void Save_DoesNotCompileOrRebuildProjection()
     {
         var workspace = new EditorWorkspace();
         EditorTestDocumentFactory.ActivateShowcase(workspace);
@@ -57,10 +58,12 @@ public sealed class M167CompilationPipelineMeasurementTests
 
             workspace.SaveDocument(filePath);
 
-            Assert.Equal(2, authoring.GraphCompilerInvocationCount);
+            Assert.Equal(0, authoring.GraphCompilerInvocationCount);
             Assert.Equal(0, authoring.EngineeringSnapshotBuildCount);
             Assert.Equal(0, viewport.ViewportProjectionBuildCount);
-            Assert.True(authoring.GraphCompilerElapsed > TimeSpan.Zero);
+            Assert.Equal(TimeSpan.Zero, authoring.GraphCompilerElapsed);
+            Assert.Equal(TimeSpan.Zero, authoring.EngineeringSnapshotBuildElapsed);
+            Assert.Equal(TimeSpan.Zero, viewport.ViewportProjectionBuildElapsed);
         }
         finally
         {
@@ -69,7 +72,7 @@ public sealed class M167CompilationPipelineMeasurementTests
     }
 
     [Fact]
-    public void Baseline_Open_CompilesThreeTimesAndBuildsOneProjection()
+    public void Open_CompilesOnceAndBuildsOneProjection()
     {
         string filePath = TemporaryFilePath();
         File.WriteAllText(
@@ -89,7 +92,7 @@ public sealed class M167CompilationPipelineMeasurementTests
 
             workspace.OpenDocument(filePath);
 
-            Assert.Equal(3, authoring.GraphCompilerInvocationCount);
+            Assert.Equal(1, authoring.GraphCompilerInvocationCount);
             Assert.Equal(1, authoring.EngineeringSnapshotBuildCount);
             Assert.Equal(1, viewport.ViewportProjectionBuildCount);
             AssertPositiveTimings(authoring, viewport);
@@ -101,10 +104,11 @@ public sealed class M167CompilationPipelineMeasurementTests
     }
 
     [Fact]
-    public void Baseline_UndoAndRedo_EachCompileTwiceAndBuildOneProjection()
+    public void UndoAndRedo_ReusePreparedStatesAndBuildOneProjection()
     {
         var workspace = new EditorWorkspace();
         TrackEditorDocument document = EditorTestDocumentFactory.ActivateShowcase(workspace);
+        TrackAuthoringCompilation beforeCompilation = document.Compilation!;
         ConstantCurvatureSectionDefinition section = Assert.IsType<ConstantCurvatureSectionDefinition>(
             document.Graph!.Nodes.Single(node => node.Id == "sweeper").Section);
         Assert.True(workspace.ApplyGraphEdit(
@@ -117,13 +121,46 @@ public sealed class M167CompilationPipelineMeasurementTests
                     section.Length,
                     radius: 30.0,
                     section.RollRadians))));
+        TrackAuthoringCompilation afterCompilation = document.Compilation!;
 
         AssertHistoryMeasurement(
             workspace.UndoLast,
-            expectedCompilerInvocations: 2);
+            expectedCompilerInvocations: 0);
+        Assert.Same(beforeCompilation, document.Compilation);
         AssertHistoryMeasurement(
             workspace.RedoLast,
-            expectedCompilerInvocations: 2);
+            expectedCompilerInvocations: 0);
+        Assert.Same(afterCompilation, document.Compilation);
+    }
+
+    [Fact]
+    public void ReplaceGraph_CompilesOnceAndBuildsOneProjection()
+    {
+        var workspace = new EditorWorkspace();
+        TrackEditorDocument document = EditorTestDocumentFactory.ActivateShowcase(workspace);
+        ConstantCurvatureSectionDefinition section = Assert.IsType<ConstantCurvatureSectionDefinition>(
+            document.Graph!.Nodes.Single(node => node.Id == "sweeper").Section);
+        TrackAuthoringGraph replacement = TrackAuthoringGraphOperations.Replace(
+            document.Graph,
+            section.Id,
+            new ConstantCurvatureSectionDefinition(
+                section.Id,
+                section.Length,
+                radius: 30.0,
+                section.RollRadians));
+
+        using TrackAuthoringPipelineMeasurement authoring =
+            TrackAuthoringPipelineMeasurement.Begin();
+        using EditorViewportPipelineMeasurement viewport =
+            EditorViewportPipelineMeasurement.Begin();
+
+        document.ReplaceGraph(replacement);
+
+        Assert.Equal(1, authoring.GraphCompilerInvocationCount);
+        Assert.Equal(1, authoring.EngineeringSnapshotBuildCount);
+        Assert.Equal(1, viewport.ViewportProjectionBuildCount);
+        Assert.Same(replacement, document.GraphCompileResult!.SourceGraph);
+        AssertPositiveTimings(authoring, viewport);
     }
 
     private static void AssertHistoryMeasurement(
@@ -140,7 +177,9 @@ public sealed class M167CompilationPipelineMeasurementTests
         Assert.Equal(expectedCompilerInvocations, authoring.GraphCompilerInvocationCount);
         Assert.Equal(1, authoring.EngineeringSnapshotBuildCount);
         Assert.Equal(1, viewport.ViewportProjectionBuildCount);
-        AssertPositiveTimings(authoring, viewport);
+        Assert.Equal(TimeSpan.Zero, authoring.GraphCompilerElapsed);
+        Assert.True(authoring.EngineeringSnapshotBuildElapsed > TimeSpan.Zero);
+        Assert.True(viewport.ViewportProjectionBuildElapsed > TimeSpan.Zero);
     }
 
     private static void AssertPositiveTimings(
