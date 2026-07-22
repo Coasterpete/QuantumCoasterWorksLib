@@ -12,6 +12,9 @@
         <Style Selector="TextBox.inspectorField">
             <Setter Property="MinHeight" Value="28" />
         </Style>
+        <Style Selector="NumericUpDown.inspectorField">
+            <Setter Property="MinHeight" Value="28" />
+        </Style>
     </UserControl.Styles>
 
     <Border

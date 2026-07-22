@@ -1,4 +1,3 @@
-using System.Globalization;
 using Avalonia.Controls;
 using Avalonia.Layout;
 using Avalonia.Media;
@@ -14,11 +13,11 @@ public sealed class SectionEditorDialog : Window
 {
     private readonly ComboBox typeSelector;
     private readonly TextBox idField;
-    private readonly TextBox lengthField;
-    private readonly TextBox rollField;
-    private readonly TextBox radiusField;
-    private readonly TextBox startCurvatureField;
-    private readonly TextBox endCurvatureField;
+    private readonly NumericUpDown lengthField;
+    private readonly NumericUpDown rollField;
+    private readonly NumericUpDown radiusField;
+    private readonly NumericUpDown startCurvatureField;
+    private readonly NumericUpDown endCurvatureField;
     private readonly Control radiusRow;
     private readonly Control startCurvatureRow;
     private readonly Control endCurvatureRow;
@@ -48,11 +47,26 @@ public sealed class SectionEditorDialog : Window
         typeSelector.SelectionChanged += (_, _) => UpdateTypePresentation();
 
         idField = CreateTextBox();
-        lengthField = CreateTextBox("10");
-        rollField = CreateTextBox("0");
-        radiusField = CreateTextBox("25");
-        startCurvatureField = CreateTextBox("0");
-        endCurvatureField = CreateTextBox("0.04");
+        lengthField = AuthoringNumericControls.Create(
+            "length",
+            AuthoringNumericParameterKind.LengthMeters,
+            10.0);
+        rollField = AuthoringNumericControls.Create(
+            "rollDegrees",
+            AuthoringNumericParameterKind.RollDegrees,
+            0.0);
+        radiusField = AuthoringNumericControls.Create(
+            "radius",
+            AuthoringNumericParameterKind.SignedRadiusMeters,
+            25.0);
+        startCurvatureField = AuthoringNumericControls.Create(
+            "startCurvature",
+            AuthoringNumericParameterKind.CurvaturePerMeter,
+            0.0);
+        endCurvatureField = AuthoringNumericControls.Create(
+            "endCurvature",
+            AuthoringNumericParameterKind.CurvaturePerMeter,
+            0.04);
 
         lastSuggestedId = suggestId(TrackAuthoringSectionTypeIds.Straight);
         idField.Text = lastSuggestedId;
@@ -70,8 +84,8 @@ public sealed class SectionEditorDialog : Window
             }
         };
         radiusRow = CreateFieldRow("Signed radius (m)", radiusField);
-        startCurvatureRow = CreateFieldRow("Start curvature", startCurvatureField);
-        endCurvatureRow = CreateFieldRow("End curvature", endCurvatureField);
+        startCurvatureRow = CreateFieldRow("Start curvature (1/m)", startCurvatureField);
+        endCurvatureRow = CreateFieldRow("End curvature (1/m)", endCurvatureField);
         fields.Children.Add(radiusRow);
         fields.Children.Add(startCurvatureRow);
         fields.Children.Add(endCurvatureRow);
@@ -275,21 +289,9 @@ public sealed class SectionEditorDialog : Window
         return new TextBox { Text = text, IsReadOnly = true, MinHeight = 30 };
     }
 
-    private static double Number(TextBox field, string label)
+    private static double Number(NumericUpDown field, string label)
     {
-        string value = field.Text ?? string.Empty;
-        if (!double.TryParse(
-                value,
-                NumberStyles.Float,
-                CultureInfo.InvariantCulture,
-                out double number) ||
-            !double.IsFinite(number))
-        {
-            throw new FormatException(
-                $"'{value}' is not a finite invariant-culture number for {label}.");
-        }
-
-        return number;
+        return AuthoringNumericControls.ReadFiniteDouble(field, label);
     }
 
     private sealed class SectionChoice

@@ -14,6 +14,8 @@ namespace Quantum.Editor.Avalonia.Controls;
 public partial class InspectorPaneControl : UserControl
 {
     private readonly Dictionary<string, TextBox> inspectorFields = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, NumericUpDown> numericInspectorFields =
+        new(StringComparer.Ordinal);
     private EditorWorkspace? workspace;
 
     public InspectorPaneControl()
@@ -33,6 +35,7 @@ public partial class InspectorPaneControl : UserControl
     {
         EditorWorkspace currentWorkspace = GetWorkspace();
         inspectorFields.Clear();
+        numericInspectorFields.Clear();
         InspectorFieldsPanel.Children.Clear();
 
         TrackEditorDocument? document = currentWorkspace.ActiveDocument;
@@ -100,13 +103,13 @@ public partial class InspectorPaneControl : UserControl
         {
             AddInspectorField(
                 "heartlineNormal",
-                "Heartline normal",
-                heartline.Value.NormalOffsetMeters.ToString("G17", CultureInfo.InvariantCulture),
+                "Heartline normal (m)",
+                heartline.Value.NormalOffsetMeters.ToString("0.######", CultureInfo.InvariantCulture),
                 editable: false);
             AddInspectorField(
                 "heartlineLateral",
-                "Heartline lateral",
-                heartline.Value.LateralOffsetMeters.ToString("G17", CultureInfo.InvariantCulture),
+                "Heartline lateral (m)",
+                heartline.Value.LateralOffsetMeters.ToString("0.######", CultureInfo.InvariantCulture),
                 editable: false);
         }
 
@@ -145,36 +148,55 @@ public partial class InspectorPaneControl : UserControl
         InspectorTitleText.Text = "Section: " + section.Id;
         AddInspectorField("id", "Section ID", section.Id, editable: false);
         AddInspectorField("kind", "Section type", DescribeSectionKind(section), editable: false);
-        AddInspectorField(
-            "sectionLength",
-            "Length (m)",
-            section.Length.ToString("G17", CultureInfo.InvariantCulture),
-            editable: supportsParameterEditing);
-        AddInspectorField(
-            "rollDegrees",
-            "Section roll (deg)",
-            (section.RollRadians * 180.0 / System.Math.PI).ToString("G17", CultureInfo.InvariantCulture),
-            editable: supportsParameterEditing);
+        if (supportsParameterEditing)
+        {
+            AddInspectorNumericField(
+                "sectionLength",
+                "Length (m)",
+                section.Length,
+                AuthoringNumericParameterKind.LengthMeters);
+            AddInspectorNumericField(
+                "rollDegrees",
+                "Section roll (deg)",
+                section.RollRadians * 180.0 / System.Math.PI,
+                AuthoringNumericParameterKind.RollDegrees);
+        }
+        else
+        {
+            AddInspectorField(
+                "sectionLength",
+                "Length (m)",
+                section.Length.ToString("0.######", CultureInfo.InvariantCulture),
+                editable: false);
+            AddInspectorField(
+                "rollDegrees",
+                "Section roll (deg)",
+                (section.RollRadians * 180.0 / System.Math.PI).ToString(
+                    "0.###",
+                    CultureInfo.InvariantCulture),
+                editable: false);
+        }
 
         if (section is ConstantCurvatureSectionDefinition arc)
         {
-            AddInspectorField(
+            AddInspectorNumericField(
                 "radius",
                 "Signed radius (m)",
-                arc.Radius.ToString("G17", CultureInfo.InvariantCulture));
+                arc.Radius,
+                AuthoringNumericParameterKind.SignedRadiusMeters);
         }
         else if (section is CurvatureTransitionSectionDefinition transition)
         {
-            AddInspectorField(
+            AddInspectorNumericField(
                 "startCurvature",
-                "Start curvature",
-                transition.StartCurvature.ToString("G17", CultureInfo.InvariantCulture),
-                editable: true);
-            AddInspectorField(
+                "Start curvature (1/m)",
+                transition.StartCurvature,
+                AuthoringNumericParameterKind.CurvaturePerMeter);
+            AddInspectorNumericField(
                 "endCurvature",
-                "End curvature",
-                transition.EndCurvature.ToString("G17", CultureInfo.InvariantCulture),
-                editable: true);
+                "End curvature (1/m)",
+                transition.EndCurvature,
+                AuthoringNumericParameterKind.CurvaturePerMeter);
             AddInspectorField(
                 "interpolation",
                 "Interpolation",
@@ -348,7 +370,7 @@ public partial class InspectorPaneControl : UserControl
             : "Unavailable";
     }
 
-    private void AddInspectorField(string key, string label, string value, bool editable = true)
+    private void AddInspectorField(string key, string label, string value, bool editable = false)
     {
         var grid = new Grid
         {
@@ -373,6 +395,34 @@ public partial class InspectorPaneControl : UserControl
         grid.Children.Add(field);
         InspectorFieldsPanel.Children.Add(grid);
         inspectorFields[key] = field;
+    }
+
+    private void AddInspectorNumericField(
+        string key,
+        string label,
+        double value,
+        AuthoringNumericParameterKind kind)
+    {
+        var grid = new Grid
+        {
+            ColumnDefinitions = new ColumnDefinitions("118,*"),
+            ColumnSpacing = 8
+        };
+        var labelBlock = new TextBlock
+        {
+            Text = label,
+            VerticalAlignment = VerticalAlignment.Center,
+            Foreground = Brush.Parse("#8FA5B9"),
+            TextWrapping = TextWrapping.Wrap
+        };
+        NumericUpDown field = AuthoringNumericControls.Create(key, kind, value);
+        field.Classes.Add("inspectorField");
+
+        Grid.SetColumn(field, 1);
+        grid.Children.Add(labelBlock);
+        grid.Children.Add(field);
+        InspectorFieldsPanel.Children.Add(grid);
+        numericInspectorFields[key] = field;
     }
 
     private void AddInspectorNote(string text)
@@ -445,24 +495,12 @@ public partial class InspectorPaneControl : UserControl
         }
     }
 
-    private string Field(string key)
-    {
-        return inspectorFields.TryGetValue(key, out TextBox? field)
-            ? field.Text ?? string.Empty
-            : throw new InvalidOperationException($"Inspector field '{key}' is unavailable.");
-    }
-
     private double NumberField(string key)
     {
-        string value = Field(key);
-        if (!double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out double number) ||
-            double.IsNaN(number) ||
-            double.IsInfinity(number))
-        {
-            throw new FormatException($"'{value}' is not a finite invariant-culture number for {key}.");
-        }
-
-        return number;
+        return numericInspectorFields.TryGetValue(key, out NumericUpDown? field)
+            ? AuthoringNumericControls.ReadFiniteDouble(field, key)
+            : throw new InvalidOperationException(
+                $"Inspector numeric field '{key}' is unavailable.");
     }
 
     private EditorWorkspace GetWorkspace()
