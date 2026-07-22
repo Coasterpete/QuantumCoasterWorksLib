@@ -11,6 +11,7 @@ namespace Quantum.Application.Authoring
             string targetSectionId,
             string parameterIdentity,
             string description,
+            ProvisionalEditRevision? newestProvisionalRevision,
             EvaluatedTrackCandidate? newestCandidate,
             EvaluatedTrackCandidate? presentedCandidate)
         {
@@ -20,6 +21,7 @@ namespace Quantum.Application.Authoring
             TargetSectionId = RequireText(targetSectionId, nameof(targetSectionId));
             ParameterIdentity = RequireText(parameterIdentity, nameof(parameterIdentity));
             Description = RequireText(description, nameof(description));
+            NewestProvisionalRevision = newestProvisionalRevision;
             NewestCandidate = newestCandidate;
             PresentedCandidate = presentedCandidate;
         }
@@ -38,8 +40,7 @@ namespace Quantum.Application.Authoring
 
         public EvaluatedTrackCandidate? NewestCandidate { get; }
 
-        public ProvisionalEditRevision? NewestProvisionalRevision =>
-            NewestCandidate?.Revision.ProvisionalEditRevision;
+        public ProvisionalEditRevision? NewestProvisionalRevision { get; }
 
         /// <summary>
         /// Last valid candidate retained for presentation. It may be older than the
@@ -50,15 +51,19 @@ namespace Quantum.Application.Authoring
         public bool IsPresentedCandidateCurrent =>
             PresentedCandidate != null &&
             NewestCandidate != null &&
+            NewestProvisionalRevision.HasValue &&
             NewestCandidate.IsCommitEligible &&
+            NewestCandidate.Revision.ProvisionalEditRevision == NewestProvisionalRevision.Value &&
             PresentedCandidate.Revision == NewestCandidate.Revision;
 
-        internal InteractiveAuthoringTransaction WithCandidate(
-            EvaluatedTrackCandidate candidate)
+        internal InteractiveAuthoringTransaction WithReservedProvisionalRevision(
+            ProvisionalEditRevision provisionalRevision)
         {
-            if (candidate is null)
+            if (provisionalRevision.TransactionRevision != Revision)
             {
-                throw new ArgumentNullException(nameof(candidate));
+                throw new ArgumentException(
+                    "A provisional revision must belong to this transaction.",
+                    nameof(provisionalRevision));
             }
 
             return new InteractiveAuthoringTransaction(
@@ -68,6 +73,34 @@ namespace Quantum.Application.Authoring
                 TargetSectionId,
                 ParameterIdentity,
                 Description,
+                provisionalRevision,
+                NewestCandidate,
+                PresentedCandidate);
+        }
+
+        internal InteractiveAuthoringTransaction WithCandidate(
+            EvaluatedTrackCandidate candidate)
+        {
+            if (candidate is null)
+            {
+                throw new ArgumentNullException(nameof(candidate));
+            }
+
+            if (!NewestProvisionalRevision.HasValue ||
+                candidate.Revision.ProvisionalEditRevision != NewestProvisionalRevision.Value)
+            {
+                throw new InvalidOperationException(
+                    "Only the newest reserved provisional revision may be adopted.");
+            }
+
+            return new InteractiveAuthoringTransaction(
+                Revision,
+                BaseCommittedRevision,
+                BeforeState,
+                TargetSectionId,
+                ParameterIdentity,
+                Description,
+                NewestProvisionalRevision,
                 candidate,
                 candidate.IsCommitEligible ? candidate : PresentedCandidate);
         }

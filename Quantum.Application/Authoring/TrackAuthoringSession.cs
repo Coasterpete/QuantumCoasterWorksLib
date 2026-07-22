@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using Quantum.IO.TrackLayout.V2;
 using Quantum.Track.Authoring;
 
@@ -11,9 +10,11 @@ namespace Quantum.Application.Authoring
     /// </summary>
     public sealed class TrackAuthoringSession
     {
+        private readonly object syncRoot = new object();
         private AuthoringSessionId sessionId;
         private long committedRevisionSequence;
         private long transactionRevisionSequence;
+        private long synchronousRequestRevisionSequence;
         private CommittedTrackState committedState;
         private PreparedTrackGraphState presentedState;
         private InteractiveAuthoringTransaction? activeTransaction;
@@ -38,29 +39,47 @@ namespace Quantum.Application.Authoring
             SetCleanBaseline(initialState, markClean);
         }
 
-        public AuthoringSessionId SessionId => sessionId;
+        public AuthoringSessionId SessionId
+        {
+            get { lock (syncRoot) { return sessionId; } }
+        }
 
-        public CommittedTrackState CommittedState => committedState;
+        public CommittedTrackState CommittedState
+        {
+            get { lock (syncRoot) { return committedState; } }
+        }
 
-        public PreparedTrackGraphState PresentedState => presentedState;
+        public PreparedTrackGraphState PresentedState
+        {
+            get { lock (syncRoot) { return presentedState; } }
+        }
 
-        public InteractiveAuthoringTransaction? ActiveTransaction => activeTransaction;
+        public InteractiveAuthoringTransaction? ActiveTransaction
+        {
+            get { lock (syncRoot) { return activeTransaction; } }
+        }
 
         public AuthoringHistory History { get; }
 
-        public bool HasCleanBaseline => hasCleanBaseline;
+        public bool HasCleanBaseline
+        {
+            get { lock (syncRoot) { return hasCleanBaseline; } }
+        }
 
-        public string? CleanCanonicalPackageBaseline => cleanCanonicalPackageJson;
+        public string? CleanCanonicalPackageBaseline
+        {
+            get { lock (syncRoot) { return cleanCanonicalPackageJson; } }
+        }
 
-        public string? PersistableCanonicalPackageJson =>
-            committedState.CanonicalPackageJson;
+        public string? PersistableCanonicalPackageJson
+        {
+            get { lock (syncRoot) { return committedState.CanonicalPackageJson; } }
+        }
 
-        public bool IsDirty =>
-            !hasCleanBaseline ||
-            !string.Equals(
-                cleanCanonicalPackageJson,
-                committedState.CanonicalPackageJson,
-                StringComparison.Ordinal);
+        public bool IsDirty
+        {
+            get { lock (syncRoot) { return IsDirtyCore(); } }
+        }
 
         public static TrackAuthoringSession Create(
             TrackAuthoringGraph graph,
@@ -74,15 +93,18 @@ namespace Quantum.Application.Authoring
 
         public AuthoringSessionSnapshot CaptureSnapshot()
         {
-            return new AuthoringSessionSnapshot(
-                sessionId,
-                committedState,
-                presentedState,
-                activeTransaction,
-                IsDirty,
-                History.UndoCount,
-                History.RedoCount,
-                History.RetainedPackageByteCount);
+            lock (syncRoot)
+            {
+                return new AuthoringSessionSnapshot(
+                    sessionId,
+                    committedState,
+                    presentedState,
+                    activeTransaction,
+                    IsDirtyCore(),
+                    History.UndoCount,
+                    History.RedoCount,
+                    History.RetainedPackageByteCount);
+            }
         }
 
         public InteractiveAuthoringTransaction BeginTransaction(
@@ -100,23 +122,27 @@ namespace Quantum.Application.Authoring
             string parameterIdentity,
             string operationDescription)
         {
-            if (activeTransaction != null)
+            lock (syncRoot)
             {
-                throw new InvalidOperationException(
-                    "Only one interactive authoring transaction may be active.");
-            }
+                if (activeTransaction != null)
+                {
+                    throw new InvalidOperationException(
+                        "Only one interactive authoring transaction may be active.");
+                }
 
-            transactionRevisionSequence++;
-            activeTransaction = new InteractiveAuthoringTransaction(
-                new TransactionRevision(sessionId, transactionRevisionSequence),
-                committedState.Revision,
-                committedState.PreparedState,
-                targetSectionId,
-                parameterIdentity,
-                operationDescription,
-                newestCandidate: null,
-                presentedCandidate: null);
-            return activeTransaction;
+                transactionRevisionSequence++;
+                activeTransaction = new InteractiveAuthoringTransaction(
+                    new TransactionRevision(sessionId, transactionRevisionSequence),
+                    committedState.Revision,
+                    committedState.PreparedState,
+                    targetSectionId,
+                    parameterIdentity,
+                    operationDescription,
+                    newestProvisionalRevision: null,
+                    newestCandidate: null,
+                    presentedCandidate: null);
+                return activeTransaction;
+            }
         }
 
         /// <summary>
@@ -132,181 +158,254 @@ namespace Quantum.Application.Authoring
                 throw new ArgumentNullException(nameof(operation));
             }
 
-            if (activeTransaction is null)
+            AuthoringCandidateReservationResult reservation;
+            lock (syncRoot)
             {
-                return RejectedUpdate(
-                    AuthoringSessionDiagnosticCode.NoActiveTransaction,
-                    "There is no active authoring transaction.");
+                synchronousRequestRevisionSequence++;
+                reservation = ReserveCandidateCore(
+                    transactionRevision,
+                    operation,
+                    new EvaluationRequestRevision(
+                        sessionId,
+                        synchronousRequestRevisionSequence),
+                    DateTimeOffset.UtcNow);
             }
 
-            if (activeTransaction.Revision != transactionRevision)
+            if (reservation.Request is null)
             {
-                return RejectedUpdate(
-                    AuthoringSessionDiagnosticCode.TransactionRevisionMismatch,
-                    "The submitted transaction revision does not match the active transaction.");
+                return new CandidateUpdateResult(
+                    wasEvaluated: false,
+                    candidate: null,
+                    reservation.Diagnostics);
             }
 
-            if (activeTransaction.BaseCommittedRevision != committedState.Revision)
+            TrackCandidateEvaluationProduct product =
+                new ProductionTrackCandidateEvaluator()
+                    .EvaluateAsync(reservation.Request, System.Threading.CancellationToken.None)
+                    .GetAwaiter()
+                    .GetResult();
+            AuthoringCandidatePublicationResult publication = PublishCandidate(product);
+            return publication.UpdateResult;
+        }
+
+        internal AuthoringCandidateReservationResult ReserveCandidate(
+            TransactionRevision transactionRevision,
+            ITrackAuthoringCandidateOperation operation,
+            EvaluationRequestRevision requestRevision,
+            DateTimeOffset submittedAtUtc)
+        {
+            if (operation is null)
             {
-                return RejectedUpdate(
-                    AuthoringSessionDiagnosticCode.CommittedRevisionMismatch,
-                    "The transaction base no longer matches the committed source revision.");
+                throw new ArgumentNullException(nameof(operation));
             }
 
-            long provisionalSequence =
-                (activeTransaction.NewestProvisionalRevision?.Sequence ?? 0) + 1;
-            var provisionalRevision = new ProvisionalEditRevision(
-                activeTransaction.Revision,
-                provisionalSequence);
-            var candidateRevision = new EvaluatedCandidateRevision(
-                activeTransaction.BaseCommittedRevision,
-                provisionalRevision);
-
-            TrackAuthoringCandidateEvaluation evaluation =
-                TrackAuthoringCandidateEvaluator.Evaluate(
-                    activeTransaction.BeforeState.Graph,
-                    operation);
-            var diagnostics = new List<AuthoringSessionDiagnostic>();
-            PreparedTrackGraphState? preparedState = null;
-
-            if (!evaluation.CommitEligible || evaluation.CandidateGraph is null)
+            lock (syncRoot)
             {
-                diagnostics.Add(new AuthoringSessionDiagnostic(
-                    AuthoringSessionDiagnosticCode.CandidateRejected,
-                    "The candidate operation did not produce a valid authoring state."));
+                return ReserveCandidateCore(
+                    transactionRevision,
+                    operation,
+                    requestRevision,
+                    submittedAtUtc);
             }
-            else
+        }
+
+        internal bool IsEvaluationRequestCurrent(AuthoringEvaluationRequest request)
+        {
+            if (request is null)
             {
-                try
+                throw new ArgumentNullException(nameof(request));
+            }
+
+            lock (syncRoot)
+            {
+                return IsEvaluationRequestCurrentCore(request);
+            }
+        }
+
+        internal AuthoringCandidatePublicationResult PublishCandidate(
+            TrackCandidateEvaluationProduct product)
+        {
+            if (product is null)
+            {
+                throw new ArgumentNullException(nameof(product));
+            }
+
+            lock (syncRoot)
+            {
+                EvaluatedTrackCandidate candidate = product.Candidate;
+                if (!IsCandidateRevisionCurrentCore(candidate.Revision))
                 {
-                    preparedState = PreparedTrackGraphState.FromEvaluation(
-                        evaluation.CandidateGraph,
-                        activeTransaction.BeforeState.AncillaryState,
-                        evaluation.CompileResult);
+                    return new AuthoringCandidatePublicationResult(
+                        acceptedBySession: false,
+                        new CandidateUpdateResult(
+                            wasEvaluated: true,
+                            candidate: null,
+                            new[]
+                            {
+                                new AuthoringSessionDiagnostic(
+                                    AuthoringSessionDiagnosticCode.CandidateRevisionMismatch,
+                                    "The evaluated candidate is not the active newest provisional revision.")
+                            }));
                 }
-                catch (Exception exception) when (
-                    exception is ArgumentException ||
-                    exception is InvalidOperationException ||
-                    exception is NotSupportedException)
+
+                activeTransaction = activeTransaction!.WithCandidate(candidate);
+                if (candidate.IsCommitEligible)
                 {
-                    diagnostics.Add(new AuthoringSessionDiagnostic(
-                        AuthoringSessionDiagnosticCode.PersistencePreparationFailed,
-                        exception.Message));
+                    presentedState = candidate.PreparedState!;
                 }
-            }
 
-            var candidate = new EvaluatedTrackCandidate(
-                candidateRevision,
-                evaluation,
-                preparedState,
-                diagnostics);
-            activeTransaction = activeTransaction.WithCandidate(candidate);
-            if (candidate.IsCommitEligible)
+                return new AuthoringCandidatePublicationResult(
+                    acceptedBySession: true,
+                    new CandidateUpdateResult(
+                        wasEvaluated: true,
+                        candidate,
+                        candidate.ApplicationDiagnostics));
+            }
+        }
+
+        internal bool TryGetNewestCandidate(
+            TransactionRevision transactionRevision,
+            out EvaluatedCandidateRevision candidateRevision,
+            out EvaluatedTrackCandidate? candidate)
+        {
+            lock (syncRoot)
             {
-                presentedState = candidate.PreparedState!;
-            }
+                if (activeTransaction is null ||
+                    activeTransaction.Revision != transactionRevision ||
+                    !activeTransaction.NewestProvisionalRevision.HasValue)
+                {
+                    candidateRevision = default;
+                    candidate = null;
+                    return false;
+                }
 
-            return new CandidateUpdateResult(
-                wasEvaluated: true,
-                candidate,
-                diagnostics);
+                ProvisionalEditRevision provisionalRevision =
+                    activeTransaction.NewestProvisionalRevision.Value;
+                candidateRevision = new EvaluatedCandidateRevision(
+                    activeTransaction.BaseCommittedRevision,
+                    provisionalRevision);
+                candidate = activeTransaction.NewestCandidate?.Revision.ProvisionalEditRevision ==
+                    provisionalRevision
+                    ? activeTransaction.NewestCandidate
+                    : null;
+                return true;
+            }
         }
 
         public AuthoringCommitResult Commit(EvaluatedCandidateRevision candidateRevision)
         {
-            if (activeTransaction is null)
+            lock (syncRoot)
             {
-                return RejectedCommit(
-                    AuthoringSessionDiagnosticCode.NoActiveTransaction,
-                    "There is no active authoring transaction.");
-            }
+                if (activeTransaction is null)
+                {
+                    return RejectedCommit(
+                        AuthoringSessionDiagnosticCode.NoActiveTransaction,
+                        "There is no active authoring transaction.");
+                }
 
-            if (activeTransaction.BaseCommittedRevision != committedState.Revision)
-            {
-                return RejectedCommit(
-                    AuthoringSessionDiagnosticCode.CommittedRevisionMismatch,
-                    "The transaction base no longer matches the committed source revision.");
-            }
+                if (activeTransaction.BaseCommittedRevision != committedState.Revision)
+                {
+                    return RejectedCommit(
+                        AuthoringSessionDiagnosticCode.CommittedRevisionMismatch,
+                        "The transaction base no longer matches the committed source revision.");
+                }
 
-            EvaluatedTrackCandidate? candidate = activeTransaction.NewestCandidate;
-            if (candidate is null || candidate.Revision != candidateRevision)
-            {
-                return RejectedCommit(
-                    AuthoringSessionDiagnosticCode.CandidateRevisionMismatch,
-                    "Only the exact newest evaluated candidate revision may be committed.");
-            }
+                EvaluatedTrackCandidate? candidate = activeTransaction.NewestCandidate;
+                if (!activeTransaction.NewestProvisionalRevision.HasValue ||
+                    candidateRevision.ProvisionalEditRevision !=
+                        activeTransaction.NewestProvisionalRevision.Value ||
+                    candidate is null ||
+                    candidate.Revision != candidateRevision)
+                {
+                    return RejectedCommit(
+                        AuthoringSessionDiagnosticCode.CandidateRevisionMismatch,
+                        "Only the exact newest evaluated candidate revision may be committed.");
+                }
 
-            if (!candidate.IsCommitEligible || candidate.PreparedState is null)
-            {
-                return RejectedCommit(
-                    AuthoringSessionDiagnosticCode.CandidateRejected,
-                    "The newest evaluated candidate is invalid and cannot be committed.");
-            }
+                if (!candidate.IsCommitEligible || candidate.PreparedState is null)
+                {
+                    return RejectedCommit(
+                        AuthoringSessionDiagnosticCode.CandidateRejected,
+                        "The newest evaluated candidate is invalid and cannot be committed.");
+                }
 
-            PreparedTrackGraphState beforeState = activeTransaction.BeforeState;
-            PreparedTrackGraphState afterState = candidate.PreparedState;
-            if (beforeState.HasSameCanonicalContent(afterState))
-            {
+                PreparedTrackGraphState beforeState = activeTransaction.BeforeState;
+                PreparedTrackGraphState afterState = candidate.PreparedState;
+                if (beforeState.HasSameCanonicalContent(afterState))
+                {
+                    activeTransaction = null;
+                    presentedState = committedState.PreparedState;
+                    return new AuthoringCommitResult(
+                        succeeded: true,
+                        changed: false,
+                        committedState,
+                        Array.Empty<AuthoringSessionDiagnostic>());
+                }
+
+                History.Record(new AuthoringHistoryEntry(
+                    activeTransaction.Description,
+                    beforeState,
+                    afterState));
+                AdoptCommittedState(afterState);
                 activeTransaction = null;
-                presentedState = committedState.PreparedState;
                 return new AuthoringCommitResult(
                     succeeded: true,
-                    changed: false,
+                    changed: true,
                     committedState,
                     Array.Empty<AuthoringSessionDiagnostic>());
             }
-
-            History.Record(new AuthoringHistoryEntry(
-                activeTransaction.Description,
-                beforeState,
-                afterState));
-            AdoptCommittedState(afterState);
-            activeTransaction = null;
-            return new AuthoringCommitResult(
-                succeeded: true,
-                changed: true,
-                committedState,
-                Array.Empty<AuthoringSessionDiagnostic>());
         }
 
         public bool Cancel(TransactionRevision transactionRevision)
         {
-            if (activeTransaction is null ||
-                activeTransaction.Revision != transactionRevision)
+            lock (syncRoot)
             {
-                return false;
-            }
+                if (activeTransaction is null ||
+                    activeTransaction.Revision != transactionRevision)
+                {
+                    return false;
+                }
 
-            activeTransaction = null;
-            presentedState = committedState.PreparedState;
-            return true;
+                activeTransaction = null;
+                presentedState = committedState.PreparedState;
+                return true;
+            }
         }
 
         public bool Undo()
         {
-            if (activeTransaction != null || !History.TryUndo(out AuthoringHistoryEntry? entry))
+            lock (syncRoot)
             {
-                return false;
-            }
+                if (activeTransaction != null || !History.TryUndo(out AuthoringHistoryEntry? entry))
+                {
+                    return false;
+                }
 
-            AdoptCommittedState(entry!.BeforeState);
-            return true;
+                AdoptCommittedState(entry!.BeforeState);
+                return true;
+            }
         }
 
         public bool Redo()
         {
-            if (activeTransaction != null || !History.TryRedo(out AuthoringHistoryEntry? entry))
+            lock (syncRoot)
             {
-                return false;
-            }
+                if (activeTransaction != null || !History.TryRedo(out AuthoringHistoryEntry? entry))
+                {
+                    return false;
+                }
 
-            AdoptCommittedState(entry!.AfterState);
-            return true;
+                AdoptCommittedState(entry!.AfterState);
+                return true;
+            }
         }
 
         public void MarkClean()
         {
-            SetCleanBaseline(committedState.PreparedState, markClean: true);
+            lock (syncRoot)
+            {
+                SetCleanBaseline(committedState.PreparedState, markClean: true);
+            }
         }
 
         /// <summary>
@@ -322,16 +421,20 @@ namespace Quantum.Application.Authoring
                 throw new ArgumentNullException(nameof(replacement));
             }
 
-            sessionId = AuthoringSessionId.New();
-            committedRevisionSequence = 0;
-            transactionRevisionSequence = 0;
-            committedState = new CommittedTrackState(
-                replacement,
-                new CommittedSourceRevision(sessionId, sequence: 0));
-            presentedState = replacement;
-            activeTransaction = null;
-            History.Clear();
-            SetCleanBaseline(replacement, markClean);
+            lock (syncRoot)
+            {
+                sessionId = AuthoringSessionId.New();
+                committedRevisionSequence = 0;
+                transactionRevisionSequence = 0;
+                synchronousRequestRevisionSequence = 0;
+                committedState = new CommittedTrackState(
+                    replacement,
+                    new CommittedSourceRevision(sessionId, sequence: 0));
+                presentedState = replacement;
+                activeTransaction = null;
+                History.Clear();
+                SetCleanBaseline(replacement, markClean);
+            }
         }
 
         public AuthoringOneShotResult ApplyOneShot(
@@ -355,6 +458,76 @@ namespace Quantum.Application.Authoring
             return new AuthoringOneShotResult(update, commit);
         }
 
+        private AuthoringCandidateReservationResult ReserveCandidateCore(
+            TransactionRevision transactionRevision,
+            ITrackAuthoringCandidateOperation operation,
+            EvaluationRequestRevision requestRevision,
+            DateTimeOffset submittedAtUtc)
+        {
+            if (activeTransaction is null)
+            {
+                return RejectedReservation(
+                    AuthoringSessionDiagnosticCode.NoActiveTransaction,
+                    "There is no active authoring transaction.");
+            }
+
+            if (requestRevision.SessionId != sessionId ||
+                activeTransaction.Revision != transactionRevision)
+            {
+                return RejectedReservation(
+                    AuthoringSessionDiagnosticCode.TransactionRevisionMismatch,
+                    "The submitted transaction revision does not match the active transaction.");
+            }
+
+            if (activeTransaction.BaseCommittedRevision != committedState.Revision)
+            {
+                return RejectedReservation(
+                    AuthoringSessionDiagnosticCode.CommittedRevisionMismatch,
+                    "The transaction base no longer matches the committed source revision.");
+            }
+
+            long provisionalSequence =
+                (activeTransaction.NewestProvisionalRevision?.Sequence ?? 0) + 1;
+            var provisionalRevision = new ProvisionalEditRevision(
+                activeTransaction.Revision,
+                provisionalSequence);
+            var candidateRevision = new EvaluatedCandidateRevision(
+                activeTransaction.BaseCommittedRevision,
+                provisionalRevision);
+            var request = new AuthoringEvaluationRequest(
+                requestRevision,
+                candidateRevision,
+                activeTransaction.BeforeState.Graph,
+                activeTransaction.BeforeState.AncillaryState,
+                operation,
+                submittedAtUtc);
+            activeTransaction =
+                activeTransaction.WithReservedProvisionalRevision(provisionalRevision);
+            return new AuthoringCandidateReservationResult(
+                request,
+                Array.Empty<AuthoringSessionDiagnostic>());
+        }
+
+        private bool IsEvaluationRequestCurrentCore(AuthoringEvaluationRequest request)
+        {
+            return request.SessionId == sessionId &&
+                ReferenceEquals(request.SourceGraph, activeTransaction?.BeforeState.Graph) &&
+                ReferenceEquals(request.AncillaryState, activeTransaction?.BeforeState.AncillaryState) &&
+                IsCandidateRevisionCurrentCore(request.CandidateRevision);
+        }
+
+        private bool IsCandidateRevisionCurrentCore(EvaluatedCandidateRevision revision)
+        {
+            return activeTransaction != null &&
+                revision.BaseCommittedRevision == committedState.Revision &&
+                revision.ProvisionalEditRevision.TransactionRevision ==
+                    activeTransaction.Revision &&
+                activeTransaction.BaseCommittedRevision == committedState.Revision &&
+                activeTransaction.NewestProvisionalRevision.HasValue &&
+                revision.ProvisionalEditRevision ==
+                    activeTransaction.NewestProvisionalRevision.Value;
+        }
+
         private void AdoptCommittedState(PreparedTrackGraphState preparedState)
         {
             committedRevisionSequence++;
@@ -374,13 +547,21 @@ namespace Quantum.Application.Authoring
                 : null;
         }
 
-        private static CandidateUpdateResult RejectedUpdate(
+        private bool IsDirtyCore()
+        {
+            return !hasCleanBaseline ||
+                !string.Equals(
+                    cleanCanonicalPackageJson,
+                    committedState.CanonicalPackageJson,
+                    StringComparison.Ordinal);
+        }
+
+        private static AuthoringCandidateReservationResult RejectedReservation(
             AuthoringSessionDiagnosticCode code,
             string message)
         {
-            return new CandidateUpdateResult(
-                wasEvaluated: false,
-                candidate: null,
+            return new AuthoringCandidateReservationResult(
+                request: null,
                 new[] { new AuthoringSessionDiagnostic(code, message) });
         }
 

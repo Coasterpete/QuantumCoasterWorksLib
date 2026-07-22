@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 
 namespace Quantum.Track.Authoring
 {
@@ -36,6 +37,7 @@ namespace Quantum.Track.Authoring
             }
 
             TrackAuthoringGraph candidateGraph;
+            var applicationStopwatch = Stopwatch.StartNew();
             try
             {
                 candidateGraph = operation.Apply(sourceGraph) ??
@@ -47,6 +49,7 @@ namespace Quantum.Track.Authoring
                 exception is InvalidOperationException ||
                 exception is NotSupportedException)
             {
+                applicationStopwatch.Stop();
                 var operationDiagnostic = new TrackAuthoringGraphDiagnostic(
                     TrackAuthoringGraphDiagnosticCode.CandidateOperationFailed,
                     $"Candidate operation '{operation.OperationTypeId}' failed: {exception.Message}");
@@ -56,36 +59,48 @@ namespace Quantum.Track.Authoring
                     null,
                     null,
                     null,
-                    new[] { operationDiagnostic });
+                    new[] { operationDiagnostic },
+                    applicationStopwatch.Elapsed,
+                    TimeSpan.Zero);
             }
+
+            applicationStopwatch.Stop();
+            var validationStopwatch = Stopwatch.StartNew();
 
             TrackAuthoringGraphRouteResult routeResult =
                 TrackAuthoringGraphRouteValidator.Validate(candidateGraph);
             if (!routeResult.Success)
             {
+                validationStopwatch.Stop();
                 return new TrackAuthoringCandidateEvaluation(
                     sourceGraph,
                     operation,
                     candidateGraph,
                     routeResult,
                     null,
-                    routeResult.Diagnostics);
+                    routeResult.Diagnostics,
+                    applicationStopwatch.Elapsed,
+                    validationStopwatch.Elapsed);
             }
 
             // Empty is a valid editor/session state even though it is intentionally not
             // a compilable or persistable track package.
             if (candidateGraph.Nodes.Count == 0)
             {
+                validationStopwatch.Stop();
                 return new TrackAuthoringCandidateEvaluation(
                     sourceGraph,
                     operation,
                     candidateGraph,
                     routeResult,
                     null,
-                    Array.Empty<TrackAuthoringGraphDiagnostic>());
+                    Array.Empty<TrackAuthoringGraphDiagnostic>(),
+                    applicationStopwatch.Elapsed,
+                    validationStopwatch.Elapsed);
             }
 
             TrackAuthoringGraphCompileResult compileResult = compiler(candidateGraph);
+            validationStopwatch.Stop();
             IReadOnlyList<TrackAuthoringGraphDiagnostic> diagnostics = compileResult.Diagnostics;
             return new TrackAuthoringCandidateEvaluation(
                 sourceGraph,
@@ -93,7 +108,9 @@ namespace Quantum.Track.Authoring
                 candidateGraph,
                 routeResult,
                 compileResult,
-                diagnostics);
+                diagnostics,
+                applicationStopwatch.Elapsed,
+                validationStopwatch.Elapsed);
         }
     }
 }
