@@ -301,7 +301,10 @@ namespace Quantum.Application.Authoring
             TimeSpan totalEvaluationTime,
             TimeSpan submitToResultTime,
             TimeSpan submitToPresentTime,
-            int compilerInvocationCount)
+            int compilerInvocationCount,
+            IEnumerable<TimeSpan> submitToPresentSamples,
+            long discardedPostLifecycleCompletions,
+            long abandonedFinalCommits)
         {
             Submitted = submitted;
             Started = started;
@@ -324,6 +327,12 @@ namespace Quantum.Application.Authoring
             SubmitToResultTime = submitToResultTime;
             SubmitToPresentTime = submitToPresentTime;
             CompilerInvocationCount = compilerInvocationCount;
+            SubmitToPresentSamples = new List<TimeSpan>(
+                submitToPresentSamples ??
+                    throw new ArgumentNullException(nameof(submitToPresentSamples)))
+                .AsReadOnly();
+            DiscardedPostLifecycleCompletions = discardedPostLifecycleCompletions;
+            AbandonedFinalCommits = abandonedFinalCommits;
         }
 
         public long Submitted { get; }
@@ -347,5 +356,9 @@ namespace Quantum.Application.Authoring
         public TimeSpan SubmitToResultTime { get; }
         public TimeSpan SubmitToPresentTime { get; }
         public int CompilerInvocationCount { get; }
+        public IReadOnlyList<TimeSpan> SubmitToPresentSamples { get; }
+        public long RejectedStaleCompletions => Stale;
+        public long DiscardedPostLifecycleCompletions { get; }
+        public long AbandonedFinalCommits { get; }
     }
 }

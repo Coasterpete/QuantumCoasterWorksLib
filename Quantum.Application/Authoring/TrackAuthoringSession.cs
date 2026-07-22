@@ -61,6 +61,26 @@ namespace Quantum.Application.Authoring
 
         public AuthoringHistory History { get; }
 
+        public bool CanUndo
+        {
+            get { lock (syncRoot) { return History.CanUndo; } }
+        }
+
+        public bool CanRedo
+        {
+            get { lock (syncRoot) { return History.CanRedo; } }
+        }
+
+        public string? UndoDescription
+        {
+            get { lock (syncRoot) { return History.UndoDescription; } }
+        }
+
+        public string? RedoDescription
+        {
+            get { lock (syncRoot) { return History.RedoDescription; } }
+        }
+
         public bool HasCleanBaseline
         {
             get { lock (syncRoot) { return hasCleanBaseline; } }
@@ -397,6 +417,75 @@ namespace Quantum.Application.Authoring
 
                 AdoptCommittedState(entry!.AfterState);
                 return true;
+            }
+        }
+
+        /// <summary>
+        /// Adopts an already validated and persistence-ready state as one logical
+        /// editor command. This is the bridge used by existing one-shot editor
+        /// commands so interactive and non-interactive changes share this session's
+        /// single authoritative history.
+        /// </summary>
+        public AuthoringCommitResult CommitPreparedEdit(
+            string operationDescription,
+            PreparedTrackGraphState preparedState)
+        {
+            if (string.IsNullOrWhiteSpace(operationDescription))
+            {
+                throw new ArgumentException(
+                    "An operation description is required.",
+                    nameof(operationDescription));
+            }
+
+            if (preparedState is null)
+            {
+                throw new ArgumentNullException(nameof(preparedState));
+            }
+
+            lock (syncRoot)
+            {
+                if (activeTransaction != null)
+                {
+                    return RejectedCommit(
+                        AuthoringSessionDiagnosticCode.TransactionActive,
+                        "A prepared editor command cannot commit during an active transaction.");
+                }
+
+                PreparedTrackGraphState beforeState = committedState.PreparedState;
+                if (beforeState.HasSameCanonicalContent(preparedState))
+                {
+                    presentedState = beforeState;
+                    return new AuthoringCommitResult(
+                        succeeded: true,
+                        changed: false,
+                        committedState,
+                        Array.Empty<AuthoringSessionDiagnostic>());
+                }
+
+                History.Record(new AuthoringHistoryEntry(
+                    operationDescription,
+                    beforeState,
+                    preparedState));
+                AdoptCommittedState(preparedState);
+                return new AuthoringCommitResult(
+                    succeeded: true,
+                    changed: true,
+                    committedState,
+                    Array.Empty<AuthoringSessionDiagnostic>());
+            }
+        }
+
+        public void ClearHistory()
+        {
+            lock (syncRoot)
+            {
+                if (activeTransaction != null)
+                {
+                    throw new InvalidOperationException(
+                        "History cannot be cleared during an active transaction.");
+                }
+
+                History.Clear();
             }
         }
 

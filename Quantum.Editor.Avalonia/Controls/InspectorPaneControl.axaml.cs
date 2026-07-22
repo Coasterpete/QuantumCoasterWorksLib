@@ -25,7 +25,9 @@ public partial class InspectorPaneControl : UserControl
     private TextBlock? lengthScrubStatus;
     private string? activeInspectorNodeId;
     private double scrubStartLength;
+    private double keyboardOffsetFromStart;
     private double? lastSubmittedLength;
+    private bool restoreLengthScrubberKeyboardFocus;
 
     public InspectorPaneControl()
     {
@@ -477,10 +479,23 @@ public partial class InspectorPaneControl : UserControl
     private StraightLengthScrubberControl CreateLengthScrubber()
     {
         var scrubber = new StraightLengthScrubberControl();
+        scrubber.IsEnabled = !GetWorkspace().IsInteractiveEditActive;
         scrubber.ScrubStarted += OnLengthScrubStarted;
         scrubber.ScrubDelta += OnLengthScrubDelta;
+        scrubber.KeyboardIncrementRequested += OnLengthKeyboardIncrementRequested;
         scrubber.CommitRequested += OnLengthScrubCommitRequested;
         scrubber.CancelRequested += OnLengthScrubCancelRequested;
+        if (restoreLengthScrubberKeyboardFocus)
+        {
+            Dispatcher.UIThread.Post(() =>
+            {
+                if (scrubber.IsEffectivelyEnabled)
+                {
+                    scrubber.Focus();
+                }
+            });
+        }
+
         return scrubber;
     }
 
@@ -495,6 +510,7 @@ public partial class InspectorPaneControl : UserControl
         }
 
         scrubStartLength = currentWorkspace.StraightLengthEdit!.CommittedLength;
+        keyboardOffsetFromStart = 0.0;
         lastSubmittedLength = null;
         SubmitLengthPreview(scrubStartLength);
     }
@@ -505,14 +521,24 @@ public partial class InspectorPaneControl : UserControl
     {
         EditorWorkspace currentWorkspace = GetWorkspace();
         currentWorkspace.RecordStraightLengthPointerUpdate();
-        double sensitivity = (eventArgs.Modifiers & KeyModifiers.Shift) != 0
-            ? 0.01
-            : (eventArgs.Modifiers & KeyModifiers.Control) != 0
-                ? 1.0
-                : 0.1;
+        double sensitivity = currentWorkspace.StraightLengthScrubSensitivity.Resolve(
+            (eventArgs.Modifiers & KeyModifiers.Shift) != 0,
+            (eventArgs.Modifiers & KeyModifiers.Control) != 0);
         double absoluteLength =
             scrubStartLength + (eventArgs.TotalHorizontalDelta * sensitivity);
         SubmitLengthPreview(absoluteLength);
+    }
+
+    private void OnLengthKeyboardIncrementRequested(
+        object? sender,
+        StraightLengthKeyboardIncrementEventArgs eventArgs)
+    {
+        EditorWorkspace currentWorkspace = GetWorkspace();
+        double sensitivity = currentWorkspace.StraightLengthScrubSensitivity.Resolve(
+            (eventArgs.Modifiers & KeyModifiers.Shift) != 0,
+            (eventArgs.Modifiers & KeyModifiers.Control) != 0);
+        keyboardOffsetFromStart += eventArgs.Direction * sensitivity;
+        SubmitLengthPreview(scrubStartLength + keyboardOffsetFromStart);
     }
 
     private void SubmitLengthPreview(double absoluteLength)
@@ -553,8 +579,11 @@ public partial class InspectorPaneControl : UserControl
         });
     }
 
-    private async void OnLengthScrubCommitRequested(object? sender, EventArgs eventArgs)
+    private async void OnLengthScrubCommitRequested(
+        object? sender,
+        StraightLengthScrubCommitEventArgs eventArgs)
     {
+        restoreLengthScrubberKeyboardFocus = eventArgs.WasKeyboardGesture;
         try
         {
             await GetWorkspace().CommitStraightLengthEditAsync();
@@ -570,11 +599,25 @@ public partial class InspectorPaneControl : UserControl
             GetWorkspace().CancelStraightLengthEdit();
             GetWorkspace().SetStatus("Live edit commit failed: " + exception.Message);
         }
+        finally
+        {
+            restoreLengthScrubberKeyboardFocus = false;
+        }
     }
 
-    private void OnLengthScrubCancelRequested(object? sender, EventArgs eventArgs)
+    private void OnLengthScrubCancelRequested(
+        object? sender,
+        StraightLengthScrubCancelEventArgs eventArgs)
     {
-        GetWorkspace().CancelStraightLengthEdit();
+        restoreLengthScrubberKeyboardFocus = eventArgs.WasKeyboardGesture;
+        try
+        {
+            GetWorkspace().CancelStraightLengthEdit();
+        }
+        finally
+        {
+            restoreLengthScrubberKeyboardFocus = false;
+        }
     }
 
     private bool CanRefreshActiveScrubInPlace(EditorWorkspace editorWorkspace)
@@ -605,7 +648,7 @@ public partial class InspectorPaneControl : UserControl
             if (lengthScrubStatus is not null)
             {
                 lengthScrubStatus.Text =
-                    "Drag ↔ for live preview. Shift: fine, Ctrl: coarse.";
+                    "Drag ↔ or use Left/Right. Enter commits; Escape cancels. Shift: fine, Ctrl: coarse.";
             }
 
             return;

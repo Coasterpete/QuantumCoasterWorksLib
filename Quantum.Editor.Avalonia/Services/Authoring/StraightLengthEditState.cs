@@ -49,7 +49,16 @@ public sealed record StraightLengthInteractionMetrics(
     long StaleCompletions,
     TimeSpan SubmitToPresentLatency,
     TimeSpan FinalCommitWaitLatency,
-    int CompilerInvocationCount);
+    int CompilerInvocationCount,
+    IReadOnlyList<TimeSpan> SubmitToPresentLatencySamples,
+    IReadOnlyList<TimeSpan> FinalCommitWaitLatencySamples)
+{
+    public LatencyPercentileSummary SubmitToPresentPercentiles =>
+        LatencyPercentiles.Calculate(SubmitToPresentLatencySamples);
+
+    public LatencyPercentileSummary FinalCommitWaitPercentiles =>
+        LatencyPercentiles.Calculate(FinalCommitWaitLatencySamples);
+}
 
 /// <summary>
 /// Defers construction of the immutable straight definition until candidate

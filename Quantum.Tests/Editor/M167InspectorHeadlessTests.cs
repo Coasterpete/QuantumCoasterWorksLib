@@ -1,4 +1,5 @@
 using Avalonia;
+using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Headless;
@@ -340,6 +341,99 @@ public sealed class M167InspectorHeadlessTests
     }
 
     [Fact]
+    public async Task KeyboardArrowsUseNormalFineAndCoarseStepsThenEnterCommitsExactNewest()
+    {
+        await DispatchAsync(async () =>
+        {
+            using Host host = CreateHost();
+            Assert.True(host.Scrubber.Focus());
+            Assert.True(host.Scrubber.IsKeyboardFocusWithin);
+
+            PressKey(host, Key.Right, RawInputModifiers.None, PhysicalKey.ArrowRight);
+            await WaitUntilAsync(() =>
+                host.Workspace.StraightLengthEdit?.AcceptedPreviewLength == 30.1);
+            PressKey(host, Key.Right, RawInputModifiers.Shift, PhysicalKey.ArrowRight);
+            await WaitUntilAsync(() =>
+                host.Workspace.StraightLengthEdit?.AcceptedPreviewLength == 30.11);
+            PressKey(host, Key.Right, RawInputModifiers.Control, PhysicalKey.ArrowRight);
+            await WaitUntilAsync(() =>
+                host.Workspace.StraightLengthEdit?.AcceptedPreviewLength == 31.11);
+
+            Assert.Equal(31.11, host.Workspace.StraightLengthEdit!.RawLength, 9);
+            Assert.True(host.Scrubber.IsKeyboardFocusWithin);
+            PressKey(host, Key.Enter, RawInputModifiers.None, PhysicalKey.Enter);
+            Assert.False(host.Scrubber.IsEnabled);
+            await WaitUntilAsync(() => !host.Workspace.IsInteractiveEditActive);
+
+            Assert.Equal(31.11, StraightLength(host.Document), 9);
+            Assert.True(host.Workspace.UndoRedo.CanUndo);
+            await WaitUntilAsync(() =>
+                host.Inspector.LengthScrubber?.IsKeyboardFocusWithin == true);
+        });
+    }
+
+    [Fact]
+    public async Task KeyboardEscapeCancelsAndRestoresFocusWithoutHistory()
+    {
+        await DispatchAsync(async () =>
+        {
+            using Host host = CreateHost();
+            Assert.True(host.Scrubber.Focus());
+            PressKey(host, Key.Left, RawInputModifiers.None, PhysicalKey.ArrowLeft);
+            await WaitUntilAsync(() =>
+                host.Workspace.StraightLengthEdit?.AcceptedPreviewLength == 29.9);
+            PressKey(host, Key.Escape, RawInputModifiers.None, PhysicalKey.Escape);
+            await WaitUntilAsync(() => !host.Workspace.IsInteractiveEditActive);
+
+            Assert.Equal(30.0, StraightLength(host.Document), 9);
+            Assert.False(host.Workspace.UndoRedo.CanUndo);
+            await WaitUntilAsync(() =>
+                host.Inspector.LengthScrubber?.IsKeyboardFocusWithin == true);
+        });
+    }
+
+    [Fact]
+    public async Task ConfiguredPointerSensitivityReplacesDefaults()
+    {
+        await DispatchAsync(async () =>
+        {
+            using Host host = CreateHost(new StraightLengthScrubSensitivity(
+                normalMetersPerStep: 0.2,
+                fineMetersPerStep: 0.02,
+                coarseMetersPerStep: 2.0));
+            Point origin = CenterInWindow(host.Scrubber, host.Window);
+            host.Window.MouseDown(origin, MouseButton.Left, RawInputModifiers.None);
+            host.Window.MouseMove(
+                new Point(origin.X + 10.0, origin.Y),
+                RawInputModifiers.None);
+            await WaitUntilAsync(() =>
+                host.Workspace.StraightLengthEdit?.AcceptedPreviewLength == 32.0);
+            host.Scrubber.Cancel();
+            await WaitUntilAsync(() => !host.Workspace.IsInteractiveEditActive);
+        });
+    }
+
+    [Fact]
+    public async Task ScrubberExposesAccessibleNameHelpAndDisabledState()
+    {
+        await DispatchAsync(async () =>
+        {
+            using Host host = CreateHost();
+            Assert.Equal(
+                "Straight section length live editor",
+                AutomationProperties.GetName(host.Scrubber));
+            Assert.Contains("Enter commits", AutomationProperties.GetHelpText(host.Scrubber));
+            Assert.True(host.Scrubber.IsEnabled);
+
+            Assert.True(host.Workspace.BeginStraightLengthEdit("launch"));
+            host.Inspector.Refresh(host.Workspace);
+            Assert.False(host.Inspector.LengthScrubber!.IsEnabled);
+            host.Workspace.CancelStraightLengthEdit();
+            await WaitUntilAsync(() => !host.Workspace.IsInteractiveEditActive);
+        });
+    }
+
+    [Fact]
     public async Task TypedApplyStillUsesExistingOneShotPath()
     {
         await DispatchAsync(async () =>
@@ -380,9 +474,10 @@ public sealed class M167InspectorHeadlessTests
             CancellationToken.None);
     }
 
-    private static Host CreateHost()
+    private static Host CreateHost(StraightLengthScrubSensitivity? sensitivity = null)
     {
-        var workspace = new EditorWorkspace();
+        var workspace = new EditorWorkspace(
+            straightLengthScrubSensitivity: sensitivity);
         TrackEditorDocument document = CreateDocument();
         workspace.Documents.SetActiveDocument(document);
         EditorGraphNode launch = workspace.GraphNodes.Single(node => node.NodeId == "launch");
@@ -435,6 +530,16 @@ public sealed class M167InspectorHeadlessTests
         var localCenter = new Point(control.Bounds.Width * 0.5, control.Bounds.Height * 0.5);
         return control.TranslatePoint(localCenter, window) ??
             throw new InvalidOperationException("The scrubber is not attached to the test window.");
+    }
+
+    private static void PressKey(
+        Host host,
+        Key key,
+        RawInputModifiers modifiers,
+        PhysicalKey physicalKey)
+    {
+        host.Window.KeyPress(key, modifiers, physicalKey, null);
+        Dispatcher.UIThread.RunJobs();
     }
 
     private static async Task WaitUntilAsync(Func<bool> condition)

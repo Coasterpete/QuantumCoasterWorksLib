@@ -16,10 +16,14 @@ using Quantum.Track.Authoring;
 
 namespace Quantum.Editor.Avalonia.Services;
 
-public sealed class EditorWorkspace : IDisposable
+public sealed class EditorWorkspace : IDisposable, IAsyncDisposable
 {
     private readonly TrackDocumentFileService fileService;
     private readonly TrackSamplingService samplingService;
+    private readonly Func<TrackAuthoringSession, TrackAuthoringEvaluationCoordinator>
+        evaluationCoordinatorFactory;
+    private readonly object coordinatorRetirementGate = new();
+    private readonly List<Task> coordinatorRetirementTasks = new();
     private TrackEditorDocument? observedDocument;
     private TrackAuthoringSession? authoringSession;
     private TrackAuthoringEvaluationCoordinator? evaluationCoordinator;
@@ -50,7 +54,10 @@ public sealed class EditorWorkspace : IDisposable
         UndoRedoService? undoRedo = null,
         ViewportService? viewport = null,
         TrackDocumentFileService? fileService = null,
-        TrackSamplingService? samplingService = null)
+        TrackSamplingService? samplingService = null,
+        Func<TrackAuthoringSession, TrackAuthoringEvaluationCoordinator>?
+            evaluationCoordinatorFactory = null,
+        StraightLengthScrubSensitivity? straightLengthScrubSensitivity = null)
     {
         Documents = documents ?? new DocumentService();
         Commands = commands ?? new CommandService();
@@ -59,6 +66,21 @@ public sealed class EditorWorkspace : IDisposable
         Viewport = viewport ?? new ViewportService();
         this.fileService = fileService ?? new TrackDocumentFileService();
         this.samplingService = samplingService ?? new TrackSamplingService();
+        this.evaluationCoordinatorFactory = evaluationCoordinatorFactory ??
+            (session => new TrackAuthoringEvaluationCoordinator(
+                session,
+                AuthoringEvaluationSchedulerOptions.SerializedBackground));
+        StraightLengthScrubSensitivity = straightLengthScrubSensitivity ??
+            StraightLengthScrubSensitivity.Default;
+
+        UndoRedo.DelegateHistory(
+            () => authoringSession?.CanUndo == true,
+            () => authoringSession?.CanRedo == true,
+            () => authoringSession?.UndoDescription,
+            () => authoringSession?.RedoDescription,
+            UndoAuthoringHistory,
+            RedoAuthoringHistory,
+            ClearAuthoringHistory);
 
         Documents.ActiveDocumentChanged += OnActiveDocumentChanged;
         Selection.SelectionChanged += OnSelectionChanged;
@@ -81,6 +103,8 @@ public sealed class EditorWorkspace : IDisposable
     public UndoRedoService UndoRedo { get; }
 
     public ViewportService Viewport { get; }
+
+    public StraightLengthScrubSensitivity StraightLengthScrubSensitivity { get; }
 
     public TrackEditorDocument? ActiveDocument => Documents.ActiveDocument as TrackEditorDocument;
 
@@ -170,7 +194,9 @@ public sealed class EditorWorkspace : IDisposable
             return false;
         }
 
-        PreparedTrackGraphState beforeState = document.CaptureGraphState();
+        TrackAuthoringSession session = authoringSession ??
+            throw new InvalidOperationException("The active document has no authoring session.");
+        PreparedTrackGraphState beforeState = session.CommittedState.PreparedState;
         TrackAuthoringGraph beforeGraph = beforeState.Graph;
 
         TrackAuthoringGraph candidateGraph;
@@ -232,11 +258,19 @@ public sealed class EditorWorkspace : IDisposable
                 }
             }
 
-            UndoRedo.Execute(new TrackGraphSnapshotOperation(
-                description,
+            AuthoringCommitResult commit = session.CommitPreparedEdit(description, afterState);
+            if (!commit.Succeeded || commit.CommittedState is null)
+            {
+                SetStatus("Edit rejected: " + string.Join(
+                    " ",
+                    commit.Diagnostics.Select(diagnostic => diagnostic.Message)));
+                return false;
+            }
+
+            ApplySessionStateToDocument(
                 document,
-                beforeState,
-                afterState));
+                commit.CommittedState.PreparedState);
+            UndoRedo.NotifyStateChanged();
             SetStatus(description + ".");
             return true;
         }
@@ -564,6 +598,52 @@ public sealed class EditorWorkspace : IDisposable
         return result;
     }
 
+    private bool UndoAuthoringHistory()
+    {
+        TrackAuthoringSession? session = authoringSession;
+        TrackEditorDocument? document = ActiveDocument;
+        if (session is null || document is null || !session.Undo())
+        {
+            return false;
+        }
+
+        ApplySessionStateToDocument(document, session.CommittedState.PreparedState);
+        return true;
+    }
+
+    private bool RedoAuthoringHistory()
+    {
+        TrackAuthoringSession? session = authoringSession;
+        TrackEditorDocument? document = ActiveDocument;
+        if (session is null || document is null || !session.Redo())
+        {
+            return false;
+        }
+
+        ApplySessionStateToDocument(document, session.CommittedState.PreparedState);
+        return true;
+    }
+
+    private void ClearAuthoringHistory()
+    {
+        authoringSession?.ClearHistory();
+    }
+
+    private void ApplySessionStateToDocument(
+        TrackEditorDocument document,
+        PreparedTrackGraphState preparedState)
+    {
+        applyingSessionCommitToDocument = true;
+        try
+        {
+            document.ReplaceGraphState(preparedState);
+        }
+        finally
+        {
+            applyingSessionCommitToDocument = false;
+        }
+    }
+
     public void SetStatus(string message)
     {
         statusMessage = string.IsNullOrWhiteSpace(message) ? "Ready" : message;
@@ -749,19 +829,8 @@ public sealed class EditorWorkspace : IDisposable
             {
                 TrackEditorDocument document = ActiveDocument ??
                     throw new InvalidOperationException("The edited document is no longer active.");
-                applyingSessionCommitToDocument = true;
-                try
-                {
-                    UndoRedo.Execute(new TrackGraphSnapshotOperation(
-                        $"Edit straight length {edit.NodeId}",
-                        document,
-                        edit.BeforeState,
-                        afterState));
-                }
-                finally
-                {
-                    applyingSessionCommitToDocument = false;
-                }
+                ApplySessionStateToDocument(document, afterState);
+                UndoRedo.NotifyStateChanged();
             }
 
             ProjectPreparedState(afterState);
@@ -813,7 +882,11 @@ public sealed class EditorWorkspace : IDisposable
             scheduler.Stale,
             scheduler.SubmitToPresentTime,
             straightLengthFinalCommitWait,
-            scheduler.CompilerInvocationCount);
+            scheduler.CompilerInvocationCount,
+            scheduler.SubmitToPresentSamples,
+            straightLengthFinalCommitWait == TimeSpan.Zero
+                ? Array.Empty<TimeSpan>()
+                : new[] { straightLengthFinalCommitWait });
     }
 
     private void ActivateDocument(TrackEditorDocument document, string message)
@@ -875,8 +948,7 @@ public sealed class EditorWorkspace : IDisposable
             observedDocument.Changed -= OnDocumentChanged;
         }
 
-        evaluationCoordinator?.Dispose();
-        evaluationCoordinator = null;
+        RetireEvaluationCoordinator();
         authoringSession = null;
         observedDocument = ActiveDocument;
         if (observedDocument != null)
@@ -887,9 +959,7 @@ public sealed class EditorWorkspace : IDisposable
                 authoringSession = new TrackAuthoringSession(
                     observedDocument.CaptureGraphState(),
                     markClean: !observedDocument.IsDirty);
-                evaluationCoordinator = new TrackAuthoringEvaluationCoordinator(
-                    authoringSession,
-                    AuthoringEvaluationSchedulerOptions.SerializedBackground);
+                evaluationCoordinator = evaluationCoordinatorFactory(authoringSession);
             }
         }
 
@@ -1130,11 +1200,33 @@ public sealed class EditorWorkspace : IDisposable
 
     public void Dispose()
     {
+        BeginDispose();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        BeginDispose();
+        await WaitForLifecycleCompletionAsync().ConfigureAwait(false);
+    }
+
+    public Task WaitForLifecycleCompletionAsync()
+    {
+        lock (coordinatorRetirementGate)
+        {
+            return coordinatorRetirementTasks.Count == 0
+                ? Task.CompletedTask
+                : Task.WhenAll(coordinatorRetirementTasks.ToArray());
+        }
+    }
+
+    private void BeginDispose()
+    {
         if (disposed)
         {
             return;
         }
 
+        disposed = true;
         CancelStraightLengthEdit();
         Documents.ActiveDocumentChanged -= OnActiveDocumentChanged;
         Selection.SelectionChanged -= OnSelectionChanged;
@@ -1144,11 +1236,40 @@ public sealed class EditorWorkspace : IDisposable
             observedDocument.Changed -= OnDocumentChanged;
         }
 
-        evaluationCoordinator?.Dispose();
-        evaluationCoordinator = null;
+        RetireEvaluationCoordinator();
         authoringSession = null;
         observedDocument = null;
-        disposed = true;
+    }
+
+    private void RetireEvaluationCoordinator()
+    {
+        TrackAuthoringEvaluationCoordinator? coordinator = evaluationCoordinator;
+        evaluationCoordinator = null;
+        if (coordinator is null)
+        {
+            return;
+        }
+
+        Task retirement = ObserveCoordinatorRetirementAsync(coordinator);
+        lock (coordinatorRetirementGate)
+        {
+            coordinatorRetirementTasks.Add(retirement);
+        }
+    }
+
+    private static async Task ObserveCoordinatorRetirementAsync(
+        TrackAuthoringEvaluationCoordinator coordinator)
+    {
+        try
+        {
+            await coordinator.DisposeAsync().ConfigureAwait(false);
+        }
+        catch (Exception)
+        {
+            // Coordinator evaluation faults are converted into outcomes. This
+            // defensive observation prevents a teardown failure from becoming an
+            // unobserved task exception during process shutdown.
+        }
     }
 
     private static IReadOnlyList<EditorGraphNode> BuildGraphNodes(

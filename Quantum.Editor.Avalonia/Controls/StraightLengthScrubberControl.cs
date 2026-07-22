@@ -1,4 +1,5 @@
 using Avalonia;
+using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Media;
@@ -19,6 +20,39 @@ internal sealed class StraightLengthScrubDeltaEventArgs : EventArgs
     internal KeyModifiers Modifiers { get; }
 }
 
+internal sealed class StraightLengthKeyboardIncrementEventArgs : EventArgs
+{
+    internal StraightLengthKeyboardIncrementEventArgs(int direction, KeyModifiers modifiers)
+    {
+        Direction = direction;
+        Modifiers = modifiers;
+    }
+
+    internal int Direction { get; }
+
+    internal KeyModifiers Modifiers { get; }
+}
+
+internal sealed class StraightLengthScrubCommitEventArgs : EventArgs
+{
+    internal StraightLengthScrubCommitEventArgs(bool wasKeyboardGesture)
+    {
+        WasKeyboardGesture = wasKeyboardGesture;
+    }
+
+    internal bool WasKeyboardGesture { get; }
+}
+
+internal sealed class StraightLengthScrubCancelEventArgs : EventArgs
+{
+    internal StraightLengthScrubCancelEventArgs(bool wasKeyboardGesture)
+    {
+        WasKeyboardGesture = wasKeyboardGesture;
+    }
+
+    internal bool WasKeyboardGesture { get; }
+}
+
 /// <summary>
 /// Avalonia-only pointer-capture surface for the first live authoring gesture.
 /// It reports total displacement; absolute-value derivation remains with the Inspector.
@@ -28,6 +62,7 @@ internal sealed class StraightLengthScrubberControl : Border
     private Point startPosition;
     private IPointer? capturedPointer;
     private bool releasingCapture;
+    private ScrubInputKind inputKind;
 
     internal StraightLengthScrubberControl()
     {
@@ -40,7 +75,21 @@ internal sealed class StraightLengthScrubberControl : Border
         BorderBrush = Brush.Parse("#45657D");
         BorderThickness = new Thickness(1);
         Cursor = new Cursor(StandardCursorType.SizeWestEast);
-        ToolTip.SetTip(this, "Drag horizontally to preview Length. Shift: fine, Ctrl: coarse.");
+        ToolTip.SetTip(
+            this,
+            "Drag horizontally or use Left/Right to preview Length. Enter commits; Escape cancels. Shift: fine, Ctrl: coarse.");
+        AutomationProperties.SetAutomationId(this, "straightLengthLiveEditor");
+        AutomationProperties.SetName(this, "Straight section length live editor");
+        AutomationProperties.SetHelpText(
+            this,
+            "Use Left or Right Arrow to adjust length. Shift is fine, Control is coarse, Enter commits, and Escape cancels.");
+        LostFocus += (_, _) =>
+        {
+            if (IsKeyboardScrubbing)
+            {
+                Cancel();
+            }
+        };
         Child = new TextBlock
         {
             Text = "↔",
@@ -55,11 +104,17 @@ internal sealed class StraightLengthScrubberControl : Border
 
     internal event EventHandler<StraightLengthScrubDeltaEventArgs>? ScrubDelta;
 
-    internal event EventHandler? CommitRequested;
+    internal event EventHandler<StraightLengthKeyboardIncrementEventArgs>?
+        KeyboardIncrementRequested;
 
-    internal event EventHandler? CancelRequested;
+    internal event EventHandler<StraightLengthScrubCommitEventArgs>? CommitRequested;
+
+    internal event EventHandler<StraightLengthScrubCancelEventArgs>? CancelRequested;
 
     internal bool IsScrubbing { get; private set; }
+
+    internal bool IsKeyboardScrubbing =>
+        IsScrubbing && inputKind == ScrubInputKind.Keyboard;
 
     internal bool IsInvalid
     {
@@ -80,6 +135,7 @@ internal sealed class StraightLengthScrubberControl : Border
         }
 
         IsScrubbing = true;
+        inputKind = ScrubInputKind.Pointer;
         startPosition = point.Position;
         capturedPointer = eventArgs.Pointer;
         Focus();
@@ -91,7 +147,7 @@ internal sealed class StraightLengthScrubberControl : Border
     protected override void OnPointerMoved(PointerEventArgs eventArgs)
     {
         base.OnPointerMoved(eventArgs);
-        if (!IsScrubbing)
+        if (!IsScrubbing || inputKind != ScrubInputKind.Pointer)
         {
             return;
         }
@@ -108,22 +164,60 @@ internal sealed class StraightLengthScrubberControl : Border
     protected override void OnPointerReleased(PointerReleasedEventArgs eventArgs)
     {
         base.OnPointerReleased(eventArgs);
-        if (!IsScrubbing || eventArgs.InitialPressMouseButton != MouseButton.Left)
+        if (!IsScrubbing || inputKind != ScrubInputKind.Pointer ||
+            eventArgs.InitialPressMouseButton != MouseButton.Left)
         {
             return;
         }
 
-        EndCapture();
-        CommitRequested?.Invoke(this, EventArgs.Empty);
+        EndScrub();
+        IsEnabled = false;
+        CommitRequested?.Invoke(
+            this,
+            new StraightLengthScrubCommitEventArgs(wasKeyboardGesture: false));
         eventArgs.Handled = true;
     }
 
     protected override void OnKeyDown(KeyEventArgs eventArgs)
     {
         base.OnKeyDown(eventArgs);
-        if (IsScrubbing && eventArgs.Key == Key.Escape)
+        if (eventArgs.Key == Key.Escape && IsScrubbing)
         {
             Cancel();
+            eventArgs.Handled = true;
+            return;
+        }
+
+        if (eventArgs.Key == Key.Enter && IsKeyboardScrubbing)
+        {
+            EndScrub();
+            IsEnabled = false;
+            CommitRequested?.Invoke(
+                this,
+                new StraightLengthScrubCommitEventArgs(wasKeyboardGesture: true));
+            eventArgs.Handled = true;
+            return;
+        }
+
+        if (eventArgs.Key != Key.Left && eventArgs.Key != Key.Right)
+        {
+            return;
+        }
+
+        if (!IsScrubbing)
+        {
+            IsScrubbing = true;
+            inputKind = ScrubInputKind.Keyboard;
+            ScrubStarted?.Invoke(this, EventArgs.Empty);
+        }
+
+        if (IsKeyboardScrubbing)
+        {
+            KeyboardIncrementRequested?.Invoke(
+                this,
+                new StraightLengthKeyboardIncrementEventArgs(
+                    eventArgs.Key == Key.Right ? 1 : -1,
+                    eventArgs.KeyModifiers));
             eventArgs.Handled = true;
         }
     }
@@ -131,11 +225,14 @@ internal sealed class StraightLengthScrubberControl : Border
     protected override void OnPointerCaptureLost(PointerCaptureLostEventArgs eventArgs)
     {
         base.OnPointerCaptureLost(eventArgs);
-        if (IsScrubbing && !releasingCapture)
+        if (IsScrubbing && inputKind == ScrubInputKind.Pointer && !releasingCapture)
         {
             IsScrubbing = false;
+            inputKind = ScrubInputKind.None;
             capturedPointer = null;
-            CancelRequested?.Invoke(this, EventArgs.Empty);
+            CancelRequested?.Invoke(
+                this,
+                new StraightLengthScrubCancelEventArgs(wasKeyboardGesture: false));
         }
     }
 
@@ -156,8 +253,11 @@ internal sealed class StraightLengthScrubberControl : Border
             return;
         }
 
-        EndCapture();
-        CancelRequested?.Invoke(this, EventArgs.Empty);
+        bool wasKeyboardGesture = IsKeyboardScrubbing;
+        EndScrub();
+        CancelRequested?.Invoke(
+            this,
+            new StraightLengthScrubCancelEventArgs(wasKeyboardGesture));
     }
 
     internal void ReleasePointerCapture()
@@ -165,7 +265,7 @@ internal sealed class StraightLengthScrubberControl : Border
         capturedPointer?.Capture(null);
     }
 
-    private void EndCapture()
+    private void EndScrub()
     {
         if (!IsScrubbing)
         {
@@ -176,6 +276,7 @@ internal sealed class StraightLengthScrubberControl : Border
         try
         {
             IsScrubbing = false;
+            inputKind = ScrubInputKind.None;
             capturedPointer?.Capture(null);
             capturedPointer = null;
         }
@@ -183,5 +284,12 @@ internal sealed class StraightLengthScrubberControl : Border
         {
             releasingCapture = false;
         }
+    }
+
+    private enum ScrubInputKind
+    {
+        None,
+        Pointer,
+        Keyboard
     }
 }

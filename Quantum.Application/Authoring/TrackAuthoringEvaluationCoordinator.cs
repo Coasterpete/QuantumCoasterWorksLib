@@ -30,6 +30,7 @@ namespace Quantum.Application.Authoring
         private bool disposed;
         private TransactionRevision? frozenCommitTransaction;
         private ProvisionalEditRevision? frozenCommitRevision;
+        private bool frozenCommitAbandonmentRecorded;
 
         private long submitted;
         private long started;
@@ -50,6 +51,10 @@ namespace Quantum.Application.Authoring
         private TimeSpan submitToResultTime;
         private TimeSpan submitToPresentTime;
         private int compilerInvocationCount;
+        private long discardedPostLifecycleCompletions;
+        private long abandonedFinalCommits;
+        private readonly List<TimeSpan> submitToPresentSamples =
+            new List<TimeSpan>();
 
         public TrackAuthoringEvaluationCoordinator(TrackAuthoringSession session)
             : this(
@@ -215,12 +220,14 @@ namespace Quantum.Application.Authoring
 
                 frozenCommitTransaction = transactionRevision;
                 frozenCommitRevision = provisionalRevision;
+                frozenCommitAbandonmentRecorded = false;
                 if (candidate is null)
                 {
                     if (!outstanding.TryGetValue(provisionalRevision, out work))
                     {
                         frozenCommitTransaction = null;
                         frozenCommitRevision = null;
+                        frozenCommitAbandonmentRecorded = false;
                         return new AuthoringScheduledCommitResult(
                             newestCandidateRevision,
                             AuthoringEvaluationOutcomeStatus.Stale,
@@ -288,6 +295,7 @@ namespace Quantum.Application.Authoring
                     {
                         frozenCommitTransaction = null;
                         frozenCommitRevision = null;
+                        frozenCommitAbandonmentRecorded = false;
                     }
                 }
             }
@@ -299,6 +307,13 @@ namespace Quantum.Application.Authoring
             lock (gate)
             {
                 ThrowIfDisposed();
+                if (frozenCommitTransaction == transactionRevision &&
+                    !frozenCommitAbandonmentRecorded)
+                {
+                    abandonedFinalCommits++;
+                    frozenCommitAbandonmentRecorded = true;
+                }
+
                 if (pending != null &&
                     pending.Request.TransactionRevision == transactionRevision)
                 {
@@ -348,7 +363,10 @@ namespace Quantum.Application.Authoring
                     totalEvaluationTime,
                     submitToResultTime,
                     submitToPresentTime,
-                    compilerInvocationCount);
+                    compilerInvocationCount,
+                    submitToPresentSamples.ToArray(),
+                    discardedPostLifecycleCompletions,
+                    abandonedFinalCommits);
             }
         }
 
@@ -369,6 +387,13 @@ namespace Quantum.Application.Authoring
                 }
 
                 disposed = true;
+                if (frozenCommitTransaction.HasValue &&
+                    !frozenCommitAbandonmentRecorded)
+                {
+                    abandonedFinalCommits++;
+                    frozenCommitAbandonmentRecorded = true;
+                }
+
                 shutdown.Cancel();
                 pendingToComplete = pending;
                 pending = null;
@@ -571,6 +596,14 @@ namespace Quantum.Application.Authoring
             }
             catch (OperationCanceledException)
             {
+                if (product != null && shutdown.IsCancellationRequested)
+                {
+                    lock (gate)
+                    {
+                        discardedPostLifecycleCompletions++;
+                    }
+                }
+
                 status = AuthoringEvaluationOutcomeStatus.Cancelled;
             }
             catch (AuthoringEvaluationException exception)
@@ -697,6 +730,11 @@ namespace Quantum.Application.Authoring
             totalEvaluationTime += outcome.Timing.TotalEvaluationTime;
             submitToResultTime += outcome.Timing.SubmitToResultTime;
             submitToPresentTime += outcome.Timing.SubmitToPresentTime ?? TimeSpan.Zero;
+            if (outcome.Timing.SubmitToPresentTime.HasValue)
+            {
+                submitToPresentSamples.Add(outcome.Timing.SubmitToPresentTime.Value);
+            }
+
             compilerInvocationCount += outcome.Timing.CompilerInvocationCount;
         }
 
