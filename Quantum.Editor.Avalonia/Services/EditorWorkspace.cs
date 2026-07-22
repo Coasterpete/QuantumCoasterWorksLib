@@ -82,7 +82,7 @@ public sealed class EditorWorkspace
     public IReadOnlyList<EditorGraphNode> GraphNodes => graphNodes;
 
     /// <summary>
-    /// Preserved compatibility projection for non-graph callers. The Avalonia M157
+    /// Preserved compatibility projection for non-graph callers. The Avalonia
     /// surface uses <see cref="GraphNodes"/>.
     /// </summary>
     public IReadOnlyList<EditorOutlinerNode> OutlinerNodes => outlinerNodes;
@@ -105,11 +105,11 @@ public sealed class EditorWorkspace
 
     public TrackEditorDocument NewDocument()
     {
-        TrackEditorDocument document = TrackEditorDocument.Create(
-            TrackPackageFactory.CreateShowcasePackage(),
+        TrackEditorDocument document = TrackEditorDocument.CreateEmpty(
+            "Untitled Layout",
             "Untitled Layout");
         document.MarkDirty();
-        ActivateDocument(document, "Created a new graph-authoring document from the showcase layout.");
+        ActivateDocument(document, "Created a new empty track-authoring document.");
         return document;
     }
 
@@ -163,22 +163,36 @@ public sealed class EditorWorkspace
             return false;
         }
 
-        TrackAuthoringGraphCompileResult candidateCompilation =
-            TrackAuthoringGraphCompiler.Compile(candidateGraph);
-        if (!candidateCompilation.Success || candidateCompilation.Compilation is null)
+        TrackAuthoringGraphRouteResult route =
+            TrackAuthoringGraphRouteValidator.Validate(candidateGraph);
+        if (!route.Success)
         {
-            SetStatus("Edit rejected: " + FormatGraphDiagnostics(candidateCompilation.Diagnostics));
+            SetStatus("Edit rejected: " + FormatGraphDiagnostics(route.Diagnostics));
             return false;
+        }
+
+        if (candidateGraph.Nodes.Count != 0)
+        {
+            TrackAuthoringGraphCompileResult candidateCompilation =
+                TrackAuthoringGraphCompiler.Compile(candidateGraph);
+            if (!candidateCompilation.Success || candidateCompilation.Compilation is null)
+            {
+                SetStatus("Edit rejected: " + FormatGraphDiagnostics(candidateCompilation.Diagnostics));
+                return false;
+            }
         }
 
         try
         {
-            string beforeJson = document.CapturePackageJson();
-            string afterJson = document.CapturePackageJson(candidateGraph);
-            if (string.Equals(beforeJson, afterJson, StringComparison.Ordinal))
+            if (beforeGraph.Nodes.Count != 0 && candidateGraph.Nodes.Count != 0)
             {
-                SetStatus("No graph values changed.");
-                return false;
+                string beforeJson = document.CapturePackageJson();
+                string afterJson = document.CapturePackageJson(candidateGraph);
+                if (string.Equals(beforeJson, afterJson, StringComparison.Ordinal))
+                {
+                    SetStatus("No graph values changed.");
+                    return false;
+                }
             }
 
             UndoRedo.Execute(new TrackGraphSnapshotOperation(
@@ -199,9 +213,153 @@ public sealed class EditorWorkspace
         }
     }
 
+    public bool AddSection(TrackAuthoringSectionDefinition section)
+    {
+        ArgumentNullException.ThrowIfNull(section);
+        bool applied = ApplyGraphEdit(
+            $"Add section {section.Id}",
+            graph => TrackAuthoringGraphOperations.Append(graph, section));
+        if (applied)
+        {
+            SelectGraphNode(section.Id);
+        }
+
+        return applied;
+    }
+
+    public bool InsertSectionBefore(
+        string anchorNodeId,
+        TrackAuthoringSectionDefinition section)
+    {
+        ArgumentNullException.ThrowIfNull(section);
+        bool applied = ApplyGraphEdit(
+            $"Insert section {section.Id} before {anchorNodeId}",
+            graph => TrackAuthoringGraphOperations.InsertBefore(
+                graph,
+                anchorNodeId,
+                section));
+        if (applied)
+        {
+            SelectGraphNode(section.Id);
+        }
+
+        return applied;
+    }
+
+    public bool InsertSectionAfter(
+        string anchorNodeId,
+        TrackAuthoringSectionDefinition section)
+    {
+        ArgumentNullException.ThrowIfNull(section);
+        bool applied = ApplyGraphEdit(
+            $"Insert section {section.Id} after {anchorNodeId}",
+            graph => TrackAuthoringGraphOperations.InsertAfter(
+                graph,
+                anchorNodeId,
+                section));
+        if (applied)
+        {
+            SelectGraphNode(section.Id);
+        }
+
+        return applied;
+    }
+
+    public bool DeleteSection(string nodeId)
+    {
+        TrackAuthoringGraph? graph = ActiveDocument?.Graph;
+        if (graph is null)
+        {
+            SetStatus("The active document does not have an editable authoring graph.");
+            return false;
+        }
+
+        TrackAuthoringGraphRouteResult route =
+            TrackAuthoringGraphRouteValidator.Validate(graph);
+        int deletedIndex = route.OrderedNodes
+            .Select((node, index) => (node, index))
+            .Where(item => string.Equals(item.node.Id, nodeId, StringComparison.Ordinal))
+            .Select(item => item.index)
+            .DefaultIfEmpty(-1)
+            .Single();
+
+        bool applied = ApplyGraphEdit(
+            $"Delete section {nodeId}",
+            candidate => TrackAuthoringGraphOperations.Delete(candidate, nodeId));
+        if (!applied)
+        {
+            return false;
+        }
+
+        IReadOnlyList<EditorGraphNode> remaining = GraphNodes;
+        if (remaining.Count == 0)
+        {
+            Select(EditorSelection.Track);
+        }
+        else
+        {
+            int fallbackIndex = System.Math.Min(deletedIndex, remaining.Count - 1);
+            Select(remaining[fallbackIndex].Selection);
+        }
+
+        return true;
+    }
+
+    public bool MoveSectionUp(string nodeId)
+    {
+        int index = FindGraphNodeIndex(nodeId);
+        if (index <= 0)
+        {
+            SetStatus(index < 0
+                ? $"Section {nodeId} was not found."
+                : $"Section {nodeId} is already first.");
+            return false;
+        }
+
+        string previousNodeId = GraphNodes[index - 1].NodeId;
+        bool applied = ApplyGraphEdit(
+            $"Move section {nodeId} up",
+            graph => TrackAuthoringGraphOperations.MoveBefore(
+                graph,
+                nodeId,
+                previousNodeId));
+        if (applied)
+        {
+            SelectGraphNode(nodeId);
+        }
+
+        return applied;
+    }
+
+    public bool MoveSectionDown(string nodeId)
+    {
+        int index = FindGraphNodeIndex(nodeId);
+        if (index < 0 || index >= GraphNodes.Count - 1)
+        {
+            SetStatus(index < 0
+                ? $"Section {nodeId} was not found."
+                : $"Section {nodeId} is already last.");
+            return false;
+        }
+
+        string nextNodeId = GraphNodes[index + 1].NodeId;
+        bool applied = ApplyGraphEdit(
+            $"Move section {nodeId} down",
+            graph => TrackAuthoringGraphOperations.MoveAfter(
+                graph,
+                nodeId,
+                nextNodeId));
+        if (applied)
+        {
+            SelectGraphNode(nodeId);
+        }
+
+        return applied;
+    }
+
     /// <summary>
     /// Compatibility bridge for existing callers. Package edits are re-imported as a
-    /// candidate graph and enter history only as immutable graph snapshots. M157 does
+    /// candidate graph and enter history only as immutable graph snapshots. This path does
     /// not permit this bridge to change non-graph ancillary state.
     /// </summary>
     public bool ApplyPackageEdit(
@@ -231,7 +389,7 @@ public sealed class EditorWorkspace
 
             if (!AncillaryStateEquals(document.AncillaryState, import.AncillaryState))
             {
-                SetStatus("Edit rejected: M157 package compatibility edits cannot change metadata or heartline state.");
+                SetStatus("Edit rejected: package compatibility edits cannot change metadata or heartline state.");
                 return false;
             }
 
@@ -476,7 +634,25 @@ public sealed class EditorWorkspace
             }
         }
 
+        NormalizeSelectionAfterProjection();
         WorkspaceChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void NormalizeSelectionAfterProjection()
+    {
+        EditorSelection? selection = CurrentSelection;
+        if (selection?.Kind != EditorSelectionKind.Section || selection.NodeId is null)
+        {
+            return;
+        }
+
+        if (GraphNodes.Any(node =>
+                string.Equals(node.NodeId, selection.NodeId, StringComparison.Ordinal)))
+        {
+            return;
+        }
+
+        Select(EditorSelection.Track);
     }
 
     private static IReadOnlyList<EditorGraphNode> BuildGraphNodes(
@@ -485,7 +661,8 @@ public sealed class EditorWorkspace
         var result = new EditorGraphNode[orderedNodes.Count];
         for (int routeIndex = 0; routeIndex < orderedNodes.Count; routeIndex++)
         {
-            GeometricSectionDefinition section = orderedNodes[routeIndex].Section;
+            GeometricSectionDefinition section =
+                (GeometricSectionDefinition)orderedNodes[routeIndex].Section;
             result[routeIndex] = new EditorGraphNode(
                 section.Id,
                 routeIndex,
@@ -496,13 +673,36 @@ public sealed class EditorWorkspace
         return result;
     }
 
+    private void SelectGraphNode(string nodeId)
+    {
+        int index = FindGraphNodeIndex(nodeId);
+        if (index >= 0)
+        {
+            Select(GraphNodes[index].Selection);
+        }
+    }
+
+    private int FindGraphNodeIndex(string nodeId)
+    {
+        for (int i = 0; i < GraphNodes.Count; i++)
+        {
+            if (string.Equals(GraphNodes[i].NodeId, nodeId, StringComparison.Ordinal))
+            {
+                return i;
+            }
+        }
+
+        return -1;
+    }
+
     private static IReadOnlyList<EditorOutlinerNode> BuildOutliner(TrackEditorDocument document)
     {
         IReadOnlyList<TrackAuthoringGraphNode> route = document.GraphCompileResult!.OrderedNodes;
         var sectionNodes = new List<EditorOutlinerNode>(route.Count);
         for (int sectionIndex = 0; sectionIndex < route.Count; sectionIndex++)
         {
-            GeometricSectionDefinition section = route[sectionIndex].Section;
+            GeometricSectionDefinition section =
+                (GeometricSectionDefinition)route[sectionIndex].Section;
             var controlPointNodes = new List<EditorOutlinerNode>();
             if (section is SpatialSectionDefinition spatial)
             {

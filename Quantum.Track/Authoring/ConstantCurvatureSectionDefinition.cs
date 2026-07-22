@@ -18,19 +18,10 @@ namespace Quantum.Track.Authoring
             double rollRadians = 0.0)
             : base(id, length, rollRadians)
         {
-            if (!AuthoringValidation.IsFinite(radius) || radius == 0.0)
-            {
-                throw new ArgumentOutOfRangeException(
-                    nameof(radius),
-                    radius,
-                    "Section radius must be finite and non-zero.");
-            }
-
-            double curvature = 1.0 / radius;
+            double curvature = TrackAuthoringScalarCurvature.FromSignedRadius(radius);
             double sweepRadians = length * curvature;
 
-            if (!AuthoringValidation.IsFinite(curvature) ||
-                !AuthoringValidation.IsFinite(sweepRadians))
+            if (!AuthoringValidation.IsFinite(sweepRadians))
             {
                 throw new ArgumentOutOfRangeException(
                     nameof(radius),
@@ -50,5 +41,7 @@ namespace Quantum.Track.Authoring
         /// Alias that makes the signed-radius convention explicit.
         /// </summary>
         public double SignedRadius => Radius;
+
+        public override string TypeId => TrackAuthoringSectionTypeIds.ConstantCurvature;
     }
 }

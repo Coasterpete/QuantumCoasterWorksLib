@@ -69,5 +69,7 @@ namespace Quantum.Track.Authoring
         /// Distance-domain interpolation applied between the endpoint curvatures.
         /// </summary>
         public CurvatureTransitionInterpolationMode InterpolationMode { get; }
+
+        public override string TypeId => TrackAuthoringSectionTypeIds.CurvatureTransition;
     }
 }

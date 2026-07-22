@@ -176,7 +176,8 @@ namespace Quantum.IO.TrackLayout.V2
             var sections = new TrackLayoutSectionV2Dto[graphCompilation.OrderedNodes.Count];
             for (int i = 0; i < graphCompilation.OrderedNodes.Count; i++)
             {
-                sections[i] = MapSection(graphCompilation.OrderedNodes[i].Section);
+                sections[i] = MapSection(
+                    (GeometricSectionDefinition)graphCompilation.OrderedNodes[i].Section);
             }
 
             var dto = new TrackLayoutPackageV2Dto

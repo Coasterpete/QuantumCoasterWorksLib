@@ -10,7 +10,9 @@ namespace Quantum.Track.Authoring
         MultipleOutgoingEdges = 5,
         CycleDetected = 6,
         DisconnectedNode = 7,
-        AuthoringCompilationFailed = 8
+        AuthoringCompilationFailed = 8,
+        UnsupportedSectionFamily = 9,
+        CandidateOperationFailed = 10
     }
 
     /// <summary>

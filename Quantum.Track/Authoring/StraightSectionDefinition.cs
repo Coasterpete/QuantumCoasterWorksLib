@@ -12,5 +12,7 @@ namespace Quantum.Track.Authoring
             : base(id, length, rollRadians)
         {
         }
+
+        public override string TypeId => TrackAuthoringSectionTypeIds.Straight;
     }
 }

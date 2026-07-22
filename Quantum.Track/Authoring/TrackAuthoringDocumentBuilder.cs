@@ -202,7 +202,7 @@ namespace Quantum.Track.Authoring
             {
                 return new GeometricSection(
                     definition.Length,
-                    curvature: 1.0 / arc.Radius,
+                    curvature: TrackAuthoringScalarCurvature.FromSignedRadius(arc.Radius),
                     roll: definition.RollRadians);
             }
 

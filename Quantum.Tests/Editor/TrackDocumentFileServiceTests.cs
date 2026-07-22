@@ -7,6 +7,64 @@ namespace Quantum.Tests;
 public sealed class TrackDocumentFileServiceTests
 {
     [Fact]
+    public void EmptyToAuthoredWorkflow_SaveOpenPreservesCreatedTypesOrderAndParameters()
+    {
+        string tempDirectory = CreateTempDirectory();
+        string path = Path.Combine(tempDirectory, "m166-authored.qcwtrack.json");
+        var workspace = new EditorWorkspace();
+
+        try
+        {
+            TrackEditorDocument document = workspace.NewDocument();
+            Assert.False(document.CanSave);
+            Assert.True(workspace.AddSection(
+                new StraightSectionDefinition("entry", 8.0, 0.1)));
+            Assert.True(workspace.InsertSectionAfter(
+                "entry",
+                new CurvatureTransitionSectionDefinition(
+                    "transition",
+                    6.0,
+                    0.0,
+                    0.04,
+                    rollRadians: 0.2)));
+            Assert.True(workspace.InsertSectionAfter(
+                "transition",
+                new ConstantCurvatureSectionDefinition(
+                    "curve",
+                    10.0,
+                    -25.0,
+                    0.3)));
+
+            workspace.SaveDocument(path);
+            TrackEditorDocument reopened = workspace.OpenDocument(path);
+
+            Assert.False(reopened.IsDirty);
+            Assert.True(reopened.CanSave);
+            Assert.Equal(
+                new[] { "entry", "transition", "curve" },
+                workspace.GraphNodes.Select(node => node.NodeId));
+            Assert.IsType<StraightSectionDefinition>(
+                reopened.GraphCompileResult!.OrderedNodes[0].Section);
+            CurvatureTransitionSectionDefinition transition =
+                Assert.IsType<CurvatureTransitionSectionDefinition>(
+                    reopened.GraphCompileResult.OrderedNodes[1].Section);
+            ConstantCurvatureSectionDefinition curve =
+                Assert.IsType<ConstantCurvatureSectionDefinition>(
+                    reopened.GraphCompileResult.OrderedNodes[2].Section);
+            Assert.Equal(0.04, transition.EndCurvature, 12);
+            Assert.Equal(-25.0, curve.Radius, 12);
+            Assert.Equal(24.0, reopened.Compilation!.TotalLength, 12);
+        }
+        finally
+        {
+            if (Directory.Exists(tempDirectory))
+            {
+                Directory.Delete(tempDirectory, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
     public void SaveAndOpen_PreservesEditedGraphPackageCompilationAndCleanState()
     {
         string tempDirectory = CreateTempDirectory();
@@ -54,7 +112,8 @@ public sealed class TrackDocumentFileServiceTests
 
         try
         {
-            TrackEditorDocument document = workspace.NewDocument();
+            TrackEditorDocument document =
+                EditorTestDocumentFactory.ActivateShowcase(workspace, markDirty: true);
             workspace.SaveDocument(path);
             Assert.False(document.IsDirty);
 

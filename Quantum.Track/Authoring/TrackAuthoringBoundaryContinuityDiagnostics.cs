@@ -276,40 +276,28 @@ namespace Quantum.Track.Authoring
 
         private static double GetStartCurvature(GeometricSectionDefinition section)
         {
-            switch (section)
+            if (TrackAuthoringScalarCurvature.TryGetStartCurvature(
+                    section,
+                    out double curvature))
             {
-                case StraightSectionDefinition _:
-                    return 0.0;
-
-                case ConstantCurvatureSectionDefinition constantCurvature:
-                    return 1.0 / constantCurvature.Radius;
-
-                case CurvatureTransitionSectionDefinition transition:
-                    return transition.StartCurvature;
-
-                default:
-                    throw new NotSupportedException(
-                        $"Unsupported authoring section type '{section.GetType().FullName}'.");
+                return curvature;
             }
+
+            throw new NotSupportedException(
+                $"Authoring section type '{section.GetType().FullName}' does not expose supported scalar curvature.");
         }
 
         private static double GetEndCurvature(GeometricSectionDefinition section)
         {
-            switch (section)
+            if (TrackAuthoringScalarCurvature.TryGetEndCurvature(
+                    section,
+                    out double curvature))
             {
-                case StraightSectionDefinition _:
-                    return 0.0;
-
-                case ConstantCurvatureSectionDefinition constantCurvature:
-                    return 1.0 / constantCurvature.Radius;
-
-                case CurvatureTransitionSectionDefinition transition:
-                    return transition.EndCurvature;
-
-                default:
-                    throw new NotSupportedException(
-                        $"Unsupported authoring section type '{section.GetType().FullName}'.");
+                return curvature;
             }
+
+            throw new NotSupportedException(
+                $"Authoring section type '{section.GetType().FullName}' does not expose supported scalar curvature.");
         }
 
         private static double GetShortestFullTurnDelta(double deltaRadians)

@@ -14,6 +14,8 @@ namespace Quantum.Editor.Avalonia.Controls;
 public partial class InspectorPaneControl : UserControl
 {
     private readonly Dictionary<string, TextBox> inspectorFields = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, NumericUpDown> numericInspectorFields =
+        new(StringComparer.Ordinal);
     private EditorWorkspace? workspace;
 
     public InspectorPaneControl()
@@ -33,11 +35,12 @@ public partial class InspectorPaneControl : UserControl
     {
         EditorWorkspace currentWorkspace = GetWorkspace();
         inspectorFields.Clear();
+        numericInspectorFields.Clear();
         InspectorFieldsPanel.Children.Clear();
 
         TrackEditorDocument? document = currentWorkspace.ActiveDocument;
         EditorSelection? selection = currentWorkspace.CurrentSelection;
-        if (document?.Graph is null || document.GraphCompileResult is null || selection is null)
+        if (document?.Graph is null || selection is null)
         {
             InspectorTitleText.Text = "Nothing selected";
             AddInspectorNote("Select a section, Math Plot station, or viewport sample.");
@@ -57,11 +60,11 @@ public partial class InspectorPaneControl : UserControl
                 break;
             case EditorSelectionKind.BankingKey:
                 InspectorTitleText.Text = "Banking key";
-                AddInspectorNote("Banking-key editing is outside the M157 graph-authoring vertical slice.");
+                AddInspectorNote("Banking-key editing is outside the M166 authoring scope.");
                 break;
             case EditorSelectionKind.ControlPoint:
                 InspectorTitleText.Text = "Spatial control point";
-                AddInspectorNote("Control-point editing is outside the M157 graph-authoring vertical slice.");
+                AddInspectorNote("Control-point editing is outside the M166 authoring scope.");
                 break;
         }
     }
@@ -100,18 +103,19 @@ public partial class InspectorPaneControl : UserControl
         {
             AddInspectorField(
                 "heartlineNormal",
-                "Heartline normal",
-                heartline.Value.NormalOffsetMeters.ToString("G17", CultureInfo.InvariantCulture),
+                "Heartline normal (m)",
+                heartline.Value.NormalOffsetMeters.ToString("0.######", CultureInfo.InvariantCulture),
                 editable: false);
             AddInspectorField(
                 "heartlineLateral",
-                "Heartline lateral",
-                heartline.Value.LateralOffsetMeters.ToString("G17", CultureInfo.InvariantCulture),
+                "Heartline lateral (m)",
+                heartline.Value.LateralOffsetMeters.ToString("0.######", CultureInfo.InvariantCulture),
                 editable: false);
         }
 
-        AddInspectorNote(
-            "M157 edits section nodes through the authoring graph. Document metadata remains read-only.");
+        AddInspectorNote(document.IsEmpty
+            ? "Use Add in the Route pane to create the first geometric section."
+            : "Section edits compile atomically through the backend authoring graph.");
     }
 
     private void BuildGraphNodeInspector(
@@ -135,49 +139,69 @@ public partial class InspectorPaneControl : UserControl
             return;
         }
 
-        GeometricSectionDefinition section = node.Section;
+        GeometricSectionDefinition section =
+            (GeometricSectionDefinition)node.Section;
+        bool supportsParameterEditing =
+            section is StraightSectionDefinition ||
+            section is ConstantCurvatureSectionDefinition ||
+            section is CurvatureTransitionSectionDefinition;
         InspectorTitleText.Text = "Section: " + section.Id;
         AddInspectorField("id", "Section ID", section.Id, editable: false);
         AddInspectorField("kind", "Section type", DescribeSectionKind(section), editable: false);
-        AddInspectorField(
-            "sectionLength",
-            "Length (m)",
-            section.Length.ToString("G17", CultureInfo.InvariantCulture),
-            editable: false);
-        AddInspectorField(
-            "rollDegrees",
-            "Section roll (deg)",
-            (section.RollRadians * 180.0 / System.Math.PI).ToString("G17", CultureInfo.InvariantCulture),
-            editable: false);
+        if (supportsParameterEditing)
+        {
+            AddInspectorNumericField(
+                "sectionLength",
+                "Length (m)",
+                section.Length,
+                AuthoringNumericParameterKind.LengthMeters);
+            AddInspectorNumericField(
+                "rollDegrees",
+                "Section roll (deg)",
+                section.RollRadians * 180.0 / System.Math.PI,
+                AuthoringNumericParameterKind.RollDegrees);
+        }
+        else
+        {
+            AddInspectorField(
+                "sectionLength",
+                "Length (m)",
+                section.Length.ToString("0.######", CultureInfo.InvariantCulture),
+                editable: false);
+            AddInspectorField(
+                "rollDegrees",
+                "Section roll (deg)",
+                (section.RollRadians * 180.0 / System.Math.PI).ToString(
+                    "0.###",
+                    CultureInfo.InvariantCulture),
+                editable: false);
+        }
 
         if (section is ConstantCurvatureSectionDefinition arc)
         {
-            AddInspectorField(
+            AddInspectorNumericField(
                 "radius",
                 "Signed radius (m)",
-                arc.Radius.ToString("G17", CultureInfo.InvariantCulture));
-            AddInspectorNote(
-                "Changing signed radius recompiles the complete graph through the existing backend pipeline.");
-            AddApplyButton("Apply radius", () => ApplyRadiusInspector(node.Id));
+                arc.Radius,
+                AuthoringNumericParameterKind.SignedRadiusMeters);
         }
         else if (section is CurvatureTransitionSectionDefinition transition)
         {
-            AddInspectorField(
+            AddInspectorNumericField(
                 "startCurvature",
-                "Start curvature",
-                transition.StartCurvature.ToString("G17", CultureInfo.InvariantCulture),
-                editable: false);
-            AddInspectorField(
+                "Start curvature (1/m)",
+                transition.StartCurvature,
+                AuthoringNumericParameterKind.CurvaturePerMeter);
+            AddInspectorNumericField(
                 "endCurvature",
-                "End curvature",
-                transition.EndCurvature.ToString("G17", CultureInfo.InvariantCulture),
-                editable: false);
+                "End curvature (1/m)",
+                transition.EndCurvature,
+                AuthoringNumericParameterKind.CurvaturePerMeter);
             AddInspectorField(
                 "interpolation",
                 "Interpolation",
                 transition.InterpolationMode.ToString(),
                 editable: false);
-            AddInspectorNote("Transition editing is intentionally deferred beyond M157.");
         }
         else if (section is SpatialSectionDefinition spatial)
         {
@@ -191,12 +215,18 @@ public partial class InspectorPaneControl : UserControl
                 "Control points",
                 spatial.ControlPoints.Count.ToString(CultureInfo.InvariantCulture),
                 editable: false);
-            AddInspectorNote("Spatial control-point editing is intentionally deferred beyond M157.");
+            AddInspectorNote("Spatial control-point editing is intentionally deferred beyond M166.");
         }
         else
         {
+            AddInspectorNote("Straight sections use the common length and roll parameters.");
+        }
+
+        if (supportsParameterEditing)
+        {
             AddInspectorNote(
-                "Straight-node length editing is deferred because authored banking shares the total station domain.");
+                "Applying parameters validates and recompiles the complete immutable route.");
+            AddApplyButton("Apply section", () => ApplySectionInspector(node.Id));
         }
 
         int sectionIndex = currentWorkspace.GraphNodes
@@ -281,12 +311,16 @@ public partial class InspectorPaneControl : UserControl
             AddInspectorField(
                 keyPrefix + "SectionType",
                 "Section type",
-                sectionNode is null ? "Unavailable" : DescribeSectionKind(sectionNode.Section),
+                sectionNode?.Section is GeometricSectionDefinition geometricSection
+                    ? DescribeSectionKind(geometricSection)
+                    : "Unavailable",
                 editable: false);
             AddInspectorField(
                 keyPrefix + "SectionLength",
                 "Section length",
-                sectionNode is null ? "Unavailable" : $"{sectionNode.Section.Length:F3} m",
+                sectionNode?.Section is GeometricSectionDefinition sectionDefinition
+                    ? $"{sectionDefinition.Length:F3} m"
+                    : "Unavailable",
                 editable: false);
         }
 
@@ -336,7 +370,7 @@ public partial class InspectorPaneControl : UserControl
             : "Unavailable";
     }
 
-    private void AddInspectorField(string key, string label, string value, bool editable = true)
+    private void AddInspectorField(string key, string label, string value, bool editable = false)
     {
         var grid = new Grid
         {
@@ -363,6 +397,34 @@ public partial class InspectorPaneControl : UserControl
         inspectorFields[key] = field;
     }
 
+    private void AddInspectorNumericField(
+        string key,
+        string label,
+        double value,
+        AuthoringNumericParameterKind kind)
+    {
+        var grid = new Grid
+        {
+            ColumnDefinitions = new ColumnDefinitions("118,*"),
+            ColumnSpacing = 8
+        };
+        var labelBlock = new TextBlock
+        {
+            Text = label,
+            VerticalAlignment = VerticalAlignment.Center,
+            Foreground = Brush.Parse("#8FA5B9"),
+            TextWrapping = TextWrapping.Wrap
+        };
+        NumericUpDown field = AuthoringNumericControls.Create(key, kind, value);
+        field.Classes.Add("inspectorField");
+
+        Grid.SetColumn(field, 1);
+        grid.Children.Add(labelBlock);
+        grid.Children.Add(field);
+        InspectorFieldsPanel.Children.Add(grid);
+        numericInspectorFields[key] = field;
+    }
+
     private void AddInspectorNote(string text)
     {
         InspectorFieldsPanel.Children.Add(new TextBlock
@@ -386,26 +448,45 @@ public partial class InspectorPaneControl : UserControl
         InspectorFieldsPanel.Children.Add(button);
     }
 
-    private void ApplyRadiusInspector(string nodeId)
+    private void ApplySectionInspector(string nodeId)
     {
         EditorWorkspace currentWorkspace = GetWorkspace();
         try
         {
-            double radius = NumberField("radius");
-            currentWorkspace.ApplyGraphEdit($"Edit {nodeId} radius", graph =>
+            double length = NumberField("sectionLength");
+            double rollRadians = NumberField("rollDegrees") * System.Math.PI / 180.0;
+            currentWorkspace.ApplyGraphEdit($"Edit section {nodeId}", graph =>
             {
                 TrackAuthoringGraphNode node = graph.Nodes.Single(candidate =>
                     string.Equals(candidate.Id, nodeId, StringComparison.Ordinal));
-                ConstantCurvatureSectionDefinition arc =
-                    node.Section as ConstantCurvatureSectionDefinition ??
-                    throw new InvalidOperationException(
-                        $"Graph node ID '{nodeId}' is not a constant-curvature section.");
-                var replacement = new ConstantCurvatureSectionDefinition(
-                    arc.Id,
-                    arc.Length,
-                    radius,
-                    arc.RollRadians);
-                return graph.WithSection(nodeId, replacement);
+                TrackAuthoringSectionDefinition replacement = node.Section switch
+                {
+                    StraightSectionDefinition straight =>
+                        new StraightSectionDefinition(
+                            straight.Id,
+                            length,
+                            rollRadians),
+                    ConstantCurvatureSectionDefinition arc =>
+                        new ConstantCurvatureSectionDefinition(
+                            arc.Id,
+                            length,
+                            NumberField("radius"),
+                            rollRadians),
+                    CurvatureTransitionSectionDefinition transition =>
+                        new CurvatureTransitionSectionDefinition(
+                            transition.Id,
+                            length,
+                            NumberField("startCurvature"),
+                            NumberField("endCurvature"),
+                            transition.InterpolationMode,
+                            rollRadians),
+                    _ => throw new NotSupportedException(
+                        $"Section type '{node.TypeId}' does not have an M166 Inspector editor.")
+                };
+                return TrackAuthoringGraphOperations.Replace(
+                    graph,
+                    nodeId,
+                    replacement);
             });
         }
         catch (Exception exception) when (exception is FormatException || exception is OverflowException)
@@ -414,24 +495,12 @@ public partial class InspectorPaneControl : UserControl
         }
     }
 
-    private string Field(string key)
-    {
-        return inspectorFields.TryGetValue(key, out TextBox? field)
-            ? field.Text ?? string.Empty
-            : throw new InvalidOperationException($"Inspector field '{key}' is unavailable.");
-    }
-
     private double NumberField(string key)
     {
-        string value = Field(key);
-        if (!double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out double number) ||
-            double.IsNaN(number) ||
-            double.IsInfinity(number))
-        {
-            throw new FormatException($"'{value}' is not a finite invariant-culture number for {key}.");
-        }
-
-        return number;
+        return numericInspectorFields.TryGetValue(key, out NumericUpDown? field)
+            ? AuthoringNumericControls.ReadFiniteDouble(field, key)
+            : throw new InvalidOperationException(
+                $"Inspector numeric field '{key}' is unavailable.");
     }
 
     private EditorWorkspace GetWorkspace()

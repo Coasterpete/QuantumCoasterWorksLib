@@ -25,7 +25,7 @@
         Background="#151C24"
         BorderBrush="#2B3948"
         BorderThickness="0,0,1,0">
-        <Grid RowDefinitions="Auto,Auto,*">
+        <Grid RowDefinitions="Auto,Auto,Auto,*">
             <Border Padding="12,10" BorderBrush="#2B3948" BorderThickness="0,0,0,1">
                 <StackPanel Spacing="3">
                     <TextBlock Classes="panelTitle" Text="TRACK WORKSPACE" />
@@ -34,9 +34,37 @@
                 </StackPanel>
             </Border>
             <TextBlock Grid.Row="1" Margin="12,10,12,6" Classes="panelTitle" Text="OUTLINER / AUTHORING ROUTE" />
+            <StackPanel Grid.Row="2" Margin="8,2,8,9" Spacing="6">
+                <Grid ColumnDefinitions="*,*,*" ColumnSpacing="6">
+                    <Button x:Name="AddSectionButton" Content="Add" Click="OnAddSectionClick" />
+                    <Button
+                        x:Name="InsertBeforeButton"
+                        Grid.Column="1"
+                        Content="Before"
+                        Click="OnInsertBeforeClick" />
+                    <Button
+                        x:Name="InsertAfterButton"
+                        Grid.Column="2"
+                        Content="After"
+                        Click="OnInsertAfterClick" />
+                </Grid>
+                <Grid ColumnDefinitions="*,*,*" ColumnSpacing="6">
+                    <Button x:Name="MoveUpButton" Content="Move Up" Click="OnMoveUpClick" />
+                    <Button
+                        x:Name="MoveDownButton"
+                        Grid.Column="1"
+                        Content="Move Down"
+                        Click="OnMoveDownClick" />
+                    <Button
+                        x:Name="DeleteSectionButton"
+                        Grid.Column="2"
+                        Content="Delete"
+                        Click="OnDeleteSectionClick" />
+                </Grid>
+            </StackPanel>
             <ScrollViewer
                 x:Name="GraphScrollViewer"
-                Grid.Row="2"
+                Grid.Row="3"
                 Margin="4,0,4,8"
                 HorizontalScrollBarVisibility="Disabled">
                 <StackPanel x:Name="GraphNodesPanel" />

@@ -11,7 +11,7 @@ namespace Quantum.Tests;
 public sealed class EditorWorkspaceTests
 {
     [Fact]
-    public void NewDocument_CreatesAuthoritativeConnectedGraphAndVisibleCompilation()
+    public void NewDocument_CreatesEmptyAuthoringGraphWithoutCompiledOrPersistablePreview()
     {
         var workspace = new EditorWorkspace();
 
@@ -19,45 +19,141 @@ public sealed class EditorWorkspaceTests
 
         Assert.True(document.IsDirty);
         Assert.NotNull(document.Graph);
-        Assert.NotNull(document.GraphCompileResult);
-        Assert.NotNull(document.Compilation);
-        Assert.Equal(
-            new[]
-            {
-                "launch",
-                "curve-in",
-                "sweeper",
-                "reverse-transition",
-                "return-curve",
-                "curve-out",
-                "brake-run"
-            },
-            workspace.GraphNodes.Select(node => node.NodeId));
-        Assert.Equal(7, document.Graph!.Nodes.Count);
-        Assert.Equal(6, document.Graph.Edges.Count);
-        Assert.Equal(195.0, document.Compilation!.TotalLength, 9);
-        Assert.True(workspace.ViewportSnapshot.Samples.Count > 100);
-        Assert.Equal(document.Compilation.TotalLength, workspace.ViewportSnapshot.TotalLength, 9);
-        EngineeringSnapshot snapshot = Assert.IsType<EngineeringSnapshot>(workspace.EngineeringSnapshot);
-        Assert.Equal(snapshot.SampleCount, workspace.ViewportSnapshot.Samples.Count);
-        Assert.Equal(snapshot.Geometry[20].Position, workspace.ViewportSnapshot.Samples[20].Position);
-        Assert.Equal(snapshot.Geometry[20].Tangent, workspace.ViewportSnapshot.Samples[20].Tangent);
-        Assert.Equal(snapshot.BankingRollRadians[20] * 180.0 / System.Math.PI,
-            workspace.ViewportSnapshot.Samples[20].RollDegrees,
-            9);
-        Assert.NotEmpty(workspace.ViewportSnapshot.Diagnostics);
-        Assert.Contains(
-            workspace.ViewportSnapshot.Diagnostics,
-            diagnostic => diagnostic.StartsWith("Math Plot snapshot ", StringComparison.Ordinal));
+        Assert.True(document.IsEmpty);
+        Assert.False(document.CanSave);
+        Assert.Null(document.GraphCompileResult);
+        Assert.Null(document.Compilation);
+        Assert.Null(document.Package);
+        Assert.Empty(document.Graph!.Nodes);
+        Assert.Empty(document.Graph.Edges);
+        Assert.Empty(workspace.GraphNodes);
+        Assert.Empty(workspace.ViewportSnapshot.Samples);
+        Assert.Null(workspace.EngineeringSnapshot);
         Assert.Equal(EditorSelection.Track, workspace.CurrentSelection);
-        Assert.Single(workspace.OutlinerNodes);
+        Assert.Empty(workspace.OutlinerNodes);
+    }
+
+    [Fact]
+    public void AddFirstSection_CompilesSelectsAndSupportsUndoRedoBackToEmpty()
+    {
+        var workspace = new EditorWorkspace();
+        TrackEditorDocument document = workspace.NewDocument();
+
+        bool added = workspace.AddSection(
+            new StraightSectionDefinition("straight-1", 10.0));
+
+        Assert.True(added);
+        Assert.False(document.IsEmpty);
+        Assert.True(document.CanSave);
+        Assert.NotNull(document.Compilation);
+        Assert.Equal(10.0, document.Compilation!.TotalLength, 9);
+        Assert.Equal("straight-1", Assert.Single(workspace.GraphNodes).NodeId);
+        Assert.Equal("straight-1", workspace.CurrentSelection!.NodeId);
+        Assert.True(workspace.UndoRedo.CanUndo);
+
+        Assert.True(workspace.UndoLast());
+        Assert.True(document.IsEmpty);
+        Assert.False(document.CanSave);
+        Assert.Null(document.Compilation);
+        Assert.Empty(workspace.GraphNodes);
+        Assert.Empty(workspace.ViewportSnapshot.Samples);
+
+        Assert.True(workspace.RedoLast());
+        Assert.True(document.CanSave);
+        Assert.Equal("straight-1", Assert.Single(workspace.GraphNodes).NodeId);
+        Assert.Equal(10.0, document.Compilation!.TotalLength, 9);
+    }
+
+    [Fact]
+    public void StructuralSectionWorkflow_InsertsMovesDeletesAndKeepsSelectionStable()
+    {
+        var workspace = new EditorWorkspace();
+        TrackEditorDocument document = workspace.NewDocument();
+        Assert.True(workspace.AddSection(
+            new StraightSectionDefinition("a", 5.0)));
+        Assert.True(workspace.InsertSectionAfter(
+            "a",
+            new ConstantCurvatureSectionDefinition("c", 5.0, 20.0)));
+        Assert.True(workspace.InsertSectionBefore(
+            "c",
+            new CurvatureTransitionSectionDefinition("b", 5.0, 0.0, 0.05)));
+
+        Assert.Equal(
+            new[] { "a", "b", "c" },
+            workspace.GraphNodes.Select(node => node.NodeId));
+        Assert.Equal("b", workspace.CurrentSelection!.NodeId);
+        Assert.Equal(15.0, document.Compilation!.TotalLength, 9);
+
+        Assert.True(workspace.MoveSectionDown("a"));
+        Assert.Equal(
+            new[] { "b", "a", "c" },
+            workspace.GraphNodes.Select(node => node.NodeId));
+        Assert.Equal("a", workspace.CurrentSelection!.NodeId);
+
+        Assert.True(workspace.DeleteSection("a"));
+        Assert.Equal(
+            new[] { "b", "c" },
+            workspace.GraphNodes.Select(node => node.NodeId));
+        Assert.Equal("c", workspace.CurrentSelection!.NodeId);
+        Assert.Equal(10.0, document.Compilation!.TotalLength, 9);
+
+        Assert.True(workspace.UndoLast());
+        Assert.Equal(
+            new[] { "b", "a", "c" },
+            workspace.GraphNodes.Select(node => node.NodeId));
+    }
+
+    [Fact]
+    public void AddSection_InvalidOrDuplicateDefinitionPreservesCompiledTrackAndHistory()
+    {
+        var workspace = new EditorWorkspace();
+        TrackEditorDocument document = workspace.NewDocument();
+        Assert.True(workspace.AddSection(
+            new StraightSectionDefinition("section", 5.0)));
+        workspace.UndoRedo.Clear();
+        TrackAuthoringGraph beforeGraph = document.Graph!;
+        TrackAuthoringCompilation beforeCompilation = document.Compilation!;
+        TrackViewportSnapshot beforeViewport = workspace.ViewportSnapshot;
+
+        bool duplicate = workspace.AddSection(
+            new StraightSectionDefinition("section", 2.0));
+
+        Assert.False(duplicate);
+        Assert.Same(beforeGraph, document.Graph);
+        Assert.Same(beforeCompilation, document.Compilation);
+        Assert.Same(beforeViewport, workspace.ViewportSnapshot);
+        Assert.False(workspace.UndoRedo.CanUndo);
+        Assert.StartsWith("Edit rejected:", workspace.StatusMessage);
+    }
+
+    [Fact]
+    public void LengthChangingStructuralEdit_WithExplicitBankingIsRejectedWithoutRemapping()
+    {
+        var workspace = new EditorWorkspace();
+        TrackEditorDocument document =
+            EditorTestDocumentFactory.ActivateShowcase(workspace);
+        document.MarkClean();
+        TrackAuthoringGraph beforeGraph = document.Graph!;
+        TrackAuthoringCompilation beforeCompilation = document.Compilation!;
+
+        bool inserted = workspace.InsertSectionAfter(
+            "launch",
+            new StraightSectionDefinition("inserted", 5.0));
+
+        Assert.False(inserted);
+        Assert.Same(beforeGraph, document.Graph);
+        Assert.Same(beforeCompilation, document.Compilation);
+        Assert.False(document.IsDirty);
+        Assert.False(workspace.UndoRedo.CanUndo);
+        Assert.Contains("AuthoringCompilationFailed", workspace.StatusMessage);
+        Assert.Equal(5, document.Graph!.Banking!.Keys.Count);
     }
 
     [Fact]
     public void ApplyGraphEdit_CompilesRefreshesViewportAndSupportsAtomicUndoRedo()
     {
         var workspace = new EditorWorkspace();
-        TrackEditorDocument document = workspace.NewDocument();
+        TrackEditorDocument document = EditorTestDocumentFactory.ActivateShowcase(workspace);
         document.MarkClean();
         TrackAuthoringGraph beforeGraph = document.Graph!;
         var beforeCompilation = document.Compilation;
@@ -99,7 +195,7 @@ public sealed class EditorWorkspaceTests
     public void ApplyGraphEdit_InvalidTopologyCannotChangeDocumentDirtyStateViewportOrHistory()
     {
         var workspace = new EditorWorkspace();
-        TrackEditorDocument document = workspace.NewDocument();
+        TrackEditorDocument document = EditorTestDocumentFactory.ActivateShowcase(workspace);
         document.MarkClean();
         TrackAuthoringGraph beforeGraph = document.Graph!;
         var beforeCompilation = document.Compilation;
@@ -131,7 +227,7 @@ public sealed class EditorWorkspaceTests
     public void ApplyGraphEdit_InvalidSectionConstructionCannotEnterHistory()
     {
         var workspace = new EditorWorkspace();
-        TrackEditorDocument document = workspace.NewDocument();
+        TrackEditorDocument document = EditorTestDocumentFactory.ActivateShowcase(workspace);
         document.MarkClean();
         TrackAuthoringGraph beforeGraph = document.Graph!;
 
@@ -151,7 +247,7 @@ public sealed class EditorWorkspaceTests
     public void ApplyPackageEdit_CompatibilityBridgeCommitsOnlyGraphSnapshots()
     {
         var workspace = new EditorWorkspace();
-        TrackEditorDocument document = workspace.NewDocument();
+        TrackEditorDocument document = EditorTestDocumentFactory.ActivateShowcase(workspace);
         document.MarkClean();
         TrackAuthoringGraph beforeGraph = document.Graph!;
 
@@ -172,7 +268,7 @@ public sealed class EditorWorkspaceTests
     public void SetStationCursor_UsesCanonicalEngineeringStationAndNotifiesOnce()
     {
         var workspace = new EditorWorkspace();
-        workspace.NewDocument();
+        EditorTestDocumentFactory.ActivateShowcase(workspace);
         EngineeringSnapshot snapshot = workspace.EngineeringSnapshot!;
         int notifications = 0;
         workspace.StationCursorChanged += (_, _) => notifications++;
@@ -191,7 +287,7 @@ public sealed class EditorWorkspaceTests
     public void SelectStationAt_UsesNearestCanonicalSampleAndSynchronizesEditorSelection()
     {
         var workspace = new EditorWorkspace();
-        TrackEditorDocument document = workspace.NewDocument();
+        TrackEditorDocument document = EditorTestDocumentFactory.ActivateShowcase(workspace);
         EngineeringSnapshot snapshot = workspace.EngineeringSnapshot!;
         TrackViewportSnapshot viewport = workspace.ViewportSnapshot;
         TrackAuthoringGraph graph = document.Graph!;
@@ -223,7 +319,7 @@ public sealed class EditorWorkspaceTests
     public void SectionHighlight_HoverOverridesSelectionAndRestoresItAcrossAllViews()
     {
         var workspace = new EditorWorkspace();
-        workspace.NewDocument();
+        EditorTestDocumentFactory.ActivateShowcase(workspace);
         EditorGraphNode selected = workspace.GraphNodes.Single(node => node.NodeId == "sweeper");
         EditorSelection selectedSection = selected.Selection;
         EngineeringSnapshot snapshot = workspace.EngineeringSnapshot!;
@@ -250,7 +346,7 @@ public sealed class EditorWorkspaceTests
     public void SelectedMathPlotStation_ExposesCanonicalInspectorValuesFromSharedSnapshot()
     {
         var workspace = new EditorWorkspace();
-        TrackEditorDocument document = workspace.NewDocument();
+        TrackEditorDocument document = EditorTestDocumentFactory.ActivateShowcase(workspace);
         const int sampleIndex = 64;
 
         workspace.SelectStationSample(sampleIndex);
@@ -272,14 +368,14 @@ public sealed class EditorWorkspaceTests
         Assert.True(double.IsFinite(
             EngineeringPlotProjection.GetValue(snapshot, EngineeringPlotKind.Yaw, sampleIndex)!.Value));
         Assert.Equal(workspace.CurrentSelection.NodeId, section.Id);
-        Assert.True(section.Section.Length > 0.0);
+        Assert.True(Assert.IsAssignableFrom<GeometricSectionDefinition>(section.Section).Length > 0.0);
     }
 
     [Fact]
     public void ApplyPackageEdit_AncillaryMutationIsRejectedWithoutHistory()
     {
         var workspace = new EditorWorkspace();
-        TrackEditorDocument document = workspace.NewDocument();
+        TrackEditorDocument document = EditorTestDocumentFactory.ActivateShowcase(workspace);
         document.MarkClean();
         TrackAuthoringGraph beforeGraph = document.Graph!;
 
@@ -299,7 +395,7 @@ public sealed class EditorWorkspaceTests
     public void GraphNodeSelectionUsesStableNodeIdAndRouteIndex()
     {
         var workspace = new EditorWorkspace();
-        workspace.NewDocument();
+        EditorTestDocumentFactory.ActivateShowcase(workspace);
         EditorGraphNode sweeper = workspace.GraphNodes.Single(node => node.NodeId == "sweeper");
 
         workspace.Select(sweeper.Selection);
