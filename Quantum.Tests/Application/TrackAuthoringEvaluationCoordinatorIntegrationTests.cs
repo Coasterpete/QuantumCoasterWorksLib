@@ -165,6 +165,41 @@ public sealed class TrackAuthoringEvaluationCoordinatorIntegrationTests
     }
 
     [Fact]
+    public async Task ThrottledPendingRevisionStartsWithoutAnotherSubmissionSignal()
+    {
+        var session = new TrackAuthoringSession(
+            CreateStraightState(length: 10.0, banking: null));
+        InteractiveAuthoringTransaction transaction = Begin(session, "straight");
+        await using var coordinator = new TrackAuthoringEvaluationCoordinator(
+            session,
+            new AuthoringEvaluationSchedulerOptions(
+                AuthoringEvaluationExecutionMode.SerializedBackground,
+                TimeSpan.FromMilliseconds(40)));
+
+        await coordinator.SubmitProvisionalEdit(
+            transaction.Revision,
+            TrackAuthoringCandidateOperation.Replace(
+                "straight",
+                new StraightSectionDefinition("straight", 11.0))).Completion;
+        await coordinator.SubmitProvisionalEdit(
+            transaction.Revision,
+            TrackAuthoringCandidateOperation.Replace(
+                "straight",
+                new StraightSectionDefinition("straight", 12.0))).Completion;
+        AuthoringEvaluationOutcome final = await coordinator.SubmitProvisionalEdit(
+            transaction.Revision,
+            TrackAuthoringCandidateOperation.Replace(
+                "straight",
+                new StraightSectionDefinition("straight", 13.0)))
+            .Completion
+            .WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.Equal(AuthoringEvaluationOutcomeStatus.Accepted, final.Status);
+        Assert.Equal(3, coordinator.CaptureSnapshot().Started);
+        Assert.Equal(0, coordinator.CaptureSnapshot().PendingDepth);
+    }
+
+    [Fact]
     public async Task ProductionBackgroundPipelineNeverOverlapsCandidateWork()
     {
         var session = new TrackAuthoringSession(

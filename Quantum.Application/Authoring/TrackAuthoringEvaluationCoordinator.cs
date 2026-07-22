@@ -465,11 +465,24 @@ namespace Quantum.Application.Authoring
 
                     if (delay > TimeSpan.Zero)
                     {
-                        Task delayTask = clock.Delay(delay, shutdown.Token);
-                        Task signalTask = workSignal.WaitAsync(shutdown.Token);
+                        using (var waitCancellation =
+                            CancellationTokenSource.CreateLinkedTokenSource(shutdown.Token))
                         try
                         {
-                            await Task.WhenAny(delayTask, signalTask).ConfigureAwait(false);
+                            Task delayTask = clock.Delay(delay, waitCancellation.Token);
+                            Task signalTask = workSignal.WaitAsync(waitCancellation.Token);
+                            Task completed = await Task.WhenAny(
+                                delayTask,
+                                signalTask).ConfigureAwait(false);
+                            waitCancellation.Cancel();
+                            try
+                            {
+                                await completed.ConfigureAwait(false);
+                            }
+                            catch (OperationCanceledException) when (
+                                !shutdown.IsCancellationRequested)
+                            {
+                            }
                         }
                         catch (OperationCanceledException)
                         {

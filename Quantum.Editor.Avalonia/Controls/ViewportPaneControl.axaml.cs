@@ -72,6 +72,14 @@ public partial class ViewportPaneControl : UserControl, IViewportSurface
         ViewportControl.FitToTrack();
     }
 
+    public void BeginDocumentPresentation()
+    {
+        ViewportControl.BeginDocumentPresentation();
+    }
+
+    internal TrackViewportCameraState CaptureCameraState() =>
+        ViewportControl.CaptureCameraState();
+
     private void UpdatePresentation()
     {
         ViewportStatsText.Text = snapshot.Samples.Count == 0

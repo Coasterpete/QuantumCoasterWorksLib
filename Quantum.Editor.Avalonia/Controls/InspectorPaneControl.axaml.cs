@@ -1,9 +1,13 @@
 using System.Globalization;
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Media;
+using Avalonia.Threading;
+using Quantum.Application.Authoring;
 using Quantum.Editor.Avalonia.Models;
 using Quantum.Editor.Avalonia.Services;
+using Quantum.Editor.Avalonia.Services.Authoring;
 using Quantum.Editor.Avalonia.Services.Documents;
 using Quantum.Editor.Avalonia.Services.Plots;
 using Quantum.Track;
@@ -17,6 +21,11 @@ public partial class InspectorPaneControl : UserControl
     private readonly Dictionary<string, NumericUpDown> numericInspectorFields =
         new(StringComparer.Ordinal);
     private EditorWorkspace? workspace;
+    private StraightLengthScrubberControl? lengthScrubber;
+    private TextBlock? lengthScrubStatus;
+    private string? activeInspectorNodeId;
+    private double scrubStartLength;
+    private double? lastSubmittedLength;
 
     public InspectorPaneControl()
     {
@@ -28,6 +37,12 @@ public partial class InspectorPaneControl : UserControl
     public void Refresh(EditorWorkspace editorWorkspace)
     {
         workspace = editorWorkspace ?? throw new ArgumentNullException(nameof(editorWorkspace));
+        if (CanRefreshActiveScrubInPlace(editorWorkspace))
+        {
+            RefreshActiveScrubPresentation();
+            return;
+        }
+
         RebuildInspector();
     }
 
@@ -36,6 +51,9 @@ public partial class InspectorPaneControl : UserControl
         EditorWorkspace currentWorkspace = GetWorkspace();
         inspectorFields.Clear();
         numericInspectorFields.Clear();
+        lengthScrubber = null;
+        lengthScrubStatus = null;
+        activeInspectorNodeId = null;
         InspectorFieldsPanel.Children.Clear();
 
         TrackEditorDocument? document = currentWorkspace.ActiveDocument;
@@ -123,7 +141,9 @@ public partial class InspectorPaneControl : UserControl
         EditorSelection selection)
     {
         EditorWorkspace currentWorkspace = GetWorkspace();
-        IReadOnlyList<TrackAuthoringGraphNode> route = document.GraphCompileResult!.OrderedNodes;
+        IReadOnlyList<TrackAuthoringGraphNode> route =
+            currentWorkspace.PresentedState?.GraphCompileResult?.OrderedNodes ??
+            document.GraphCompileResult!.OrderedNodes;
         TrackAuthoringGraphNode? node = selection.NodeId is null
             ? null
             : route.FirstOrDefault(candidate =>
@@ -150,11 +170,32 @@ public partial class InspectorPaneControl : UserControl
         AddInspectorField("kind", "Section type", DescribeSectionKind(section), editable: false);
         if (supportsParameterEditing)
         {
+            Control? lengthAdornment = null;
+            if (section is StraightSectionDefinition)
+            {
+                lengthScrubber = CreateLengthScrubber();
+                lengthAdornment = lengthScrubber;
+                activeInspectorNodeId = node.Id;
+            }
+
             AddInspectorNumericField(
                 "sectionLength",
                 "Length (m)",
                 section.Length,
-                AuthoringNumericParameterKind.LengthMeters);
+                AuthoringNumericParameterKind.LengthMeters,
+                lengthAdornment);
+            if (lengthScrubber is not null)
+            {
+                lengthScrubStatus = new TextBlock
+                {
+                    Foreground = Brush.Parse("#7F94A8"),
+                    TextWrapping = TextWrapping.Wrap,
+                    FontSize = 11
+                };
+                InspectorFieldsPanel.Children.Add(lengthScrubStatus);
+                RefreshActiveScrubPresentation();
+            }
+
             AddInspectorNumericField(
                 "rollDegrees",
                 "Section roll (deg)",
@@ -401,11 +442,13 @@ public partial class InspectorPaneControl : UserControl
         string key,
         string label,
         double value,
-        AuthoringNumericParameterKind kind)
+        AuthoringNumericParameterKind kind,
+        Control? adornment = null)
     {
         var grid = new Grid
         {
-            ColumnDefinitions = new ColumnDefinitions("118,*"),
+            ColumnDefinitions = new ColumnDefinitions(
+                adornment is null ? "118,*" : "118,*,Auto"),
             ColumnSpacing = 8
         };
         var labelBlock = new TextBlock
@@ -421,9 +464,195 @@ public partial class InspectorPaneControl : UserControl
         Grid.SetColumn(field, 1);
         grid.Children.Add(labelBlock);
         grid.Children.Add(field);
+        if (adornment is not null)
+        {
+            Grid.SetColumn(adornment, 2);
+            grid.Children.Add(adornment);
+        }
+
         InspectorFieldsPanel.Children.Add(grid);
         numericInspectorFields[key] = field;
     }
+
+    private StraightLengthScrubberControl CreateLengthScrubber()
+    {
+        var scrubber = new StraightLengthScrubberControl();
+        scrubber.ScrubStarted += OnLengthScrubStarted;
+        scrubber.ScrubDelta += OnLengthScrubDelta;
+        scrubber.CommitRequested += OnLengthScrubCommitRequested;
+        scrubber.CancelRequested += OnLengthScrubCancelRequested;
+        return scrubber;
+    }
+
+    private void OnLengthScrubStarted(object? sender, EventArgs eventArgs)
+    {
+        EditorWorkspace currentWorkspace = GetWorkspace();
+        if (activeInspectorNodeId is null ||
+            !currentWorkspace.BeginStraightLengthEdit(activeInspectorNodeId))
+        {
+            lengthScrubber?.Cancel();
+            return;
+        }
+
+        scrubStartLength = currentWorkspace.StraightLengthEdit!.CommittedLength;
+        lastSubmittedLength = null;
+        SubmitLengthPreview(scrubStartLength);
+    }
+
+    private void OnLengthScrubDelta(
+        object? sender,
+        StraightLengthScrubDeltaEventArgs eventArgs)
+    {
+        EditorWorkspace currentWorkspace = GetWorkspace();
+        currentWorkspace.RecordStraightLengthPointerUpdate();
+        double sensitivity = (eventArgs.Modifiers & KeyModifiers.Shift) != 0
+            ? 0.01
+            : (eventArgs.Modifiers & KeyModifiers.Control) != 0
+                ? 1.0
+                : 0.1;
+        double absoluteLength =
+            scrubStartLength + (eventArgs.TotalHorizontalDelta * sensitivity);
+        SubmitLengthPreview(absoluteLength);
+    }
+
+    private void SubmitLengthPreview(double absoluteLength)
+    {
+        if (lastSubmittedLength.HasValue &&
+            lastSubmittedLength.Value.Equals(absoluteLength))
+        {
+            return;
+        }
+
+        lastSubmittedLength = absoluteLength;
+        try
+        {
+            AuthoringEvaluationSubmission submission =
+                GetWorkspace().SubmitStraightLengthEdit(absoluteLength);
+            _ = ObserveSubmissionAsync(submission);
+        }
+        catch (Exception exception) when (
+            exception is InvalidOperationException ||
+            exception is ObjectDisposedException)
+        {
+            GetWorkspace().SetStatus("Live edit failed: " + exception.Message);
+            lengthScrubber?.Cancel();
+        }
+    }
+
+    private async Task ObserveSubmissionAsync(AuthoringEvaluationSubmission submission)
+    {
+        AuthoringEvaluationOutcome outcome = await submission.Completion.ConfigureAwait(false);
+        await Dispatcher.UIThread.InvokeAsync(() =>
+        {
+            EditorWorkspace? currentWorkspace = workspace;
+            if (currentWorkspace is not null &&
+                currentWorkspace.PublishStraightLengthOutcome(outcome))
+            {
+                RefreshActiveScrubPresentation();
+            }
+        });
+    }
+
+    private async void OnLengthScrubCommitRequested(object? sender, EventArgs eventArgs)
+    {
+        try
+        {
+            await GetWorkspace().CommitStraightLengthEditAsync();
+        }
+        catch (OperationCanceledException)
+        {
+            GetWorkspace().CancelStraightLengthEdit();
+        }
+        catch (Exception exception) when (
+            exception is InvalidOperationException ||
+            exception is ObjectDisposedException)
+        {
+            GetWorkspace().CancelStraightLengthEdit();
+            GetWorkspace().SetStatus("Live edit commit failed: " + exception.Message);
+        }
+    }
+
+    private void OnLengthScrubCancelRequested(object? sender, EventArgs eventArgs)
+    {
+        GetWorkspace().CancelStraightLengthEdit();
+    }
+
+    private bool CanRefreshActiveScrubInPlace(EditorWorkspace editorWorkspace)
+    {
+        StraightLengthEditState? edit = editorWorkspace.StraightLengthEdit;
+        return lengthScrubber?.IsScrubbing == true &&
+               edit is not null &&
+               string.Equals(edit.NodeId, activeInspectorNodeId, StringComparison.Ordinal) &&
+               editorWorkspace.CurrentSelection?.Kind == EditorSelectionKind.Section &&
+               string.Equals(
+                   editorWorkspace.CurrentSelection.NodeId,
+                   edit.NodeId,
+                   StringComparison.Ordinal);
+    }
+
+    private void RefreshActiveScrubPresentation()
+    {
+        if (lengthScrubber is null ||
+            !numericInspectorFields.TryGetValue("sectionLength", out NumericUpDown? field))
+        {
+            return;
+        }
+
+        StraightLengthEditState? edit = workspace?.StraightLengthEdit;
+        if (edit is null)
+        {
+            lengthScrubber.IsInvalid = false;
+            if (lengthScrubStatus is not null)
+            {
+                lengthScrubStatus.Text =
+                    "Drag ↔ for live preview. Shift: fine, Ctrl: coarse.";
+            }
+
+            return;
+        }
+
+        string rawText = edit.RawLength.ToString("0.######", CultureInfo.InvariantCulture);
+        field.Text = rawText;
+        if (double.IsFinite(edit.RawLength))
+        {
+            try
+            {
+                field.Value = (decimal)edit.RawLength;
+                field.Text = rawText;
+            }
+            catch (OverflowException)
+            {
+                field.Value = null;
+            }
+        }
+        else
+        {
+            field.Value = null;
+        }
+
+        field.BorderBrush = Brush.Parse(edit.IsInvalid ? "#FF6B6B" : "#45657D");
+        lengthScrubber.IsInvalid = edit.IsInvalid;
+        if (lengthScrubStatus is not null)
+        {
+            string accepted = edit.AcceptedPreviewLength.HasValue
+                ? edit.AcceptedPreviewLength.Value.ToString(
+                    "0.######",
+                    CultureInfo.InvariantCulture) + " m"
+                : "none";
+            lengthScrubStatus.Text =
+                $"{edit.StatusText}  |  Committed {edit.CommittedLength:0.######} m" +
+                $"  |  Accepted {accepted}" +
+                (edit.Diagnostics.Count == 0
+                    ? string.Empty
+                    : Environment.NewLine + string.Join(" ", edit.Diagnostics));
+            lengthScrubStatus.Foreground = Brush.Parse(
+                edit.IsInvalid ? "#FF8F8F" : "#7F94A8");
+        }
+    }
+
+    internal StraightLengthScrubberControl? LengthScrubber => lengthScrubber;
+
+    internal string? LengthScrubStatusText => lengthScrubStatus?.Text;
 
     private void AddInspectorNote(string text)
     {

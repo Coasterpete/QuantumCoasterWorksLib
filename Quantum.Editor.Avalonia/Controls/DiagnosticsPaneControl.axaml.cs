@@ -7,6 +7,7 @@ namespace Quantum.Editor.Avalonia.Controls;
 public partial class DiagnosticsPaneControl : UserControl
 {
     private TrackViewportSnapshot snapshot = TrackViewportSnapshot.Empty;
+    private IReadOnlyList<string> liveAuthoringDiagnostics = Array.Empty<string>();
 
     public DiagnosticsPaneControl()
     {
@@ -24,9 +25,21 @@ public partial class DiagnosticsPaneControl : UserControl
         }
     }
 
+    public IReadOnlyList<string> LiveAuthoringDiagnostics
+    {
+        get => liveAuthoringDiagnostics;
+        set
+        {
+            liveAuthoringDiagnostics = value ?? Array.Empty<string>();
+            UpdatePresentation();
+        }
+    }
+
     private void UpdatePresentation()
     {
         var lines = new List<string>(snapshot.Diagnostics);
+        lines.AddRange(liveAuthoringDiagnostics.Select(diagnostic =>
+            "Live edit: " + diagnostic));
         TrackFrameContinuityReport? continuity = snapshot.ContinuityReport;
         if (continuity != null)
         {
@@ -39,7 +52,9 @@ public partial class DiagnosticsPaneControl : UserControl
         }
 
         DiagnosticsList.ItemsSource = lines;
-        DiagnosticSummaryText.Text = continuity is null
+        DiagnosticSummaryText.Text = liveAuthoringDiagnostics.Count != 0
+            ? $"{liveAuthoringDiagnostics.Count} live authoring diagnostic(s)"
+            : continuity is null
             ? "No compiled diagnostics"
             : $"{continuity.IntervalCount} intervals | {continuity.Issues.Count} issues";
     }

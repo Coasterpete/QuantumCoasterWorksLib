@@ -8,6 +8,13 @@ using Quantum.Math;
 
 namespace Quantum.Editor.Avalonia.Controls;
 
+internal readonly record struct TrackViewportCameraState(
+    TrackViewportProjection Projection,
+    Point WorldCenter,
+    Vector Pan,
+    double Scale,
+    bool FitPending);
+
 public sealed class TrackViewportControl : Control, IViewportSurface
 {
     private static readonly Color[] SectionColors =
@@ -29,6 +36,7 @@ public sealed class TrackViewportControl : Control, IViewportSurface
     private TrackViewportProjection projection = TrackViewportProjection.Isometric;
     private bool showFrames = true;
     private bool fitPending = true;
+    private bool fitOnNextNonEmptySnapshot = true;
     private bool panning;
     private Point lastPointerPosition;
     private Point worldCenter;
@@ -64,7 +72,11 @@ public sealed class TrackViewportControl : Control, IViewportSurface
                 stationCursorSampleIndex = -1;
             }
 
-            fitPending = true;
+            if (snapshot.Samples.Count != 0 && fitOnNextNonEmptySnapshot)
+            {
+                fitPending = true;
+                fitOnNextNonEmptySnapshot = false;
+            }
             InvalidateVisual();
         }
     }
@@ -133,6 +145,7 @@ public sealed class TrackViewportControl : Control, IViewportSurface
 
             projection = value;
             fitPending = true;
+            fitOnNextNonEmptySnapshot = false;
             InvalidateVisual();
         }
     }
@@ -150,6 +163,38 @@ public sealed class TrackViewportControl : Control, IViewportSurface
     public void FitToTrack()
     {
         fitPending = true;
+        fitOnNextNonEmptySnapshot = false;
+        InvalidateVisual();
+    }
+
+    internal void BeginDocumentPresentation()
+    {
+        fitOnNextNonEmptySnapshot = true;
+    }
+
+    internal TrackViewportCameraState CaptureCameraState() =>
+        new TrackViewportCameraState(
+            projection,
+            worldCenter,
+            pan,
+            scale,
+            fitPending);
+
+    internal void SetCameraState(
+        Point replacementWorldCenter,
+        Vector replacementPan,
+        double replacementScale)
+    {
+        if (!double.IsFinite(replacementScale) || replacementScale <= 0.0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(replacementScale));
+        }
+
+        worldCenter = replacementWorldCenter;
+        pan = replacementPan;
+        scale = replacementScale;
+        fitPending = false;
+        fitOnNextNonEmptySnapshot = false;
         InvalidateVisual();
     }
 

@@ -43,6 +43,7 @@ public partial class MainWindow : Window
     private readonly TrainConfigurationPaneControl TrainConfigurationPane;
     private readonly TrainPreviewPaneControl TrainPreviewPane;
     private readonly TrainSummaryPaneControl TrainSummaryPane;
+    private TrackEditorDocument? presentedViewportDocument;
 
     public MainWindow()
         : this(
@@ -324,7 +325,12 @@ public partial class MainWindow : Window
         RoutePane.DocumentPath = document?.FilePath ?? "Unsaved Track Layout Package V2";
         RoutePane.GraphNodes = workspace.GraphNodes;
         RoutePane.Selection = selection;
-        bool canSaveTrack = document?.CanSave == true;
+        bool interactionActive = workspace.IsInteractiveEditActive;
+        bool canSaveTrack = document?.CanSave == true && !interactionActive;
+        NewButton.IsEnabled = !interactionActive;
+        OpenButton.IsEnabled = !interactionActive;
+        NewTrackMenuItem.IsEnabled = !interactionActive;
+        OpenTrackMenuItem.IsEnabled = !interactionActive;
         SaveButton.IsEnabled = canSaveTrack;
         SaveTrackMenuItem.IsEnabled = canSaveTrack;
         SaveTrackAsMenuItem.IsEnabled = canSaveTrack;
@@ -346,22 +352,30 @@ public partial class MainWindow : Window
             SelectionText.Text = $"{trainConsistSession.CurrentDefinition.CarCount} car consist";
         }
 
-        UndoButton.IsEnabled = workspace.UndoRedo.CanUndo;
-        RedoButton.IsEnabled = workspace.UndoRedo.CanRedo;
+        UndoButton.IsEnabled = !interactionActive && workspace.UndoRedo.CanUndo;
+        RedoButton.IsEnabled = !interactionActive && workspace.UndoRedo.CanRedo;
         UndoButton.Content = workspace.UndoRedo.UndoDescription is null
             ? "Undo"
             : "Undo " + workspace.UndoRedo.UndoDescription;
         RedoButton.Content = workspace.UndoRedo.RedoDescription is null
             ? "Redo"
             : "Redo " + workspace.UndoRedo.RedoDescription;
-        UndoMenuItem.IsEnabled = workspace.UndoRedo.CanUndo;
-        RedoMenuItem.IsEnabled = workspace.UndoRedo.CanRedo;
+        UndoMenuItem.IsEnabled = !interactionActive && workspace.UndoRedo.CanUndo;
+        RedoMenuItem.IsEnabled = !interactionActive && workspace.UndoRedo.CanRedo;
 
+        RoutePane.SourceEditingEnabled = !interactionActive;
+        if (!ReferenceEquals(presentedViewportDocument, document))
+        {
+            presentedViewportDocument = document;
+            ViewportPane.BeginDocumentPresentation();
+        }
         ViewportPane.Snapshot = snapshot;
         ViewportPane.Selection = selection;
         MathPlotsPane.Snapshot = workspace.EngineeringSnapshot;
         InspectorPane.Refresh(workspace);
         DiagnosticsPane.Snapshot = snapshot;
+        DiagnosticsPane.LiveAuthoringDiagnostics =
+            workspace.StraightLengthEdit?.Diagnostics ?? Array.Empty<string>();
         RefreshTrainWorkspaceView();
         UpdateStationCursorView();
         UpdateSectionHighlightView();
@@ -545,6 +559,7 @@ public partial class MainWindow : Window
     private void OnWindowClosing(object? sender, WindowClosingEventArgs eventArgs)
     {
         docking.TrySaveLayout();
+        workspace.Dispose();
     }
 
     private void OnProjectionChanged(object? sender, SelectionChangedEventArgs eventArgs)
