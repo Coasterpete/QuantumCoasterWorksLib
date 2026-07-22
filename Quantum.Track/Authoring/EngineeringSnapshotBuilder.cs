@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 
 namespace Quantum.Track.Authoring
 {
@@ -9,6 +10,22 @@ namespace Quantum.Track.Authoring
     public static class EngineeringSnapshotBuilder
     {
         public static EngineeringSnapshot Build(
+            TrackAuthoringCompilation compilation,
+            EngineeringSnapshotRequest request)
+        {
+            var stopwatch = Stopwatch.StartNew();
+            try
+            {
+                return BuildCore(compilation, request);
+            }
+            finally
+            {
+                stopwatch.Stop();
+                TrackAuthoringPipelineMeasurement.RecordEngineeringSnapshotBuild(stopwatch.Elapsed);
+            }
+        }
+
+        private static EngineeringSnapshot BuildCore(
             TrackAuthoringCompilation compilation,
             EngineeringSnapshotRequest request)
         {

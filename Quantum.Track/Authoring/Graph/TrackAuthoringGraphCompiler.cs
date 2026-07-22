@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 
 namespace Quantum.Track.Authoring
@@ -11,6 +12,20 @@ namespace Quantum.Track.Authoring
     public static class TrackAuthoringGraphCompiler
     {
         public static TrackAuthoringGraphCompileResult Compile(TrackAuthoringGraph graph)
+        {
+            var stopwatch = Stopwatch.StartNew();
+            try
+            {
+                return CompileCore(graph);
+            }
+            finally
+            {
+                stopwatch.Stop();
+                TrackAuthoringPipelineMeasurement.RecordGraphCompilation(stopwatch.Elapsed);
+            }
+        }
+
+        private static TrackAuthoringGraphCompileResult CompileCore(TrackAuthoringGraph graph)
         {
             if (graph is null)
             {
