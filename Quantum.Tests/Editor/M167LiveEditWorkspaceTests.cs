@@ -193,9 +193,13 @@ public sealed class M167LiveEditWorkspaceTests
 
         Assert.False(workspace.Commands.CanExecute(
             Quantum.Editor.Avalonia.Services.Commands.EditorCommandIds.SaveDocument));
+        string provisionalSavePath = Path.Combine(
+            Path.GetTempPath(),
+            Guid.NewGuid().ToString("N") + ".qcwtrack.json");
         InvalidOperationException exception = Assert.Throws<InvalidOperationException>(
-            () => workspace.SaveDocument(Path.GetTempFileName()));
+            () => workspace.SaveDocument(provisionalSavePath));
         Assert.Contains("disabled", exception.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.False(File.Exists(provisionalSavePath));
         Assert.Equal(committedJson, document.CapturePackageJson());
     }
 

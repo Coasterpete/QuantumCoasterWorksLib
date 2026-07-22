@@ -483,6 +483,18 @@ namespace Quantum.Application.Authoring
                                 !shutdown.IsCancellationRequested)
                             {
                             }
+
+                            Task interrupted = ReferenceEquals(completed, delayTask)
+                                ? signalTask
+                                : delayTask;
+                            try
+                            {
+                                await interrupted.ConfigureAwait(false);
+                            }
+                            catch (OperationCanceledException) when (
+                                !shutdown.IsCancellationRequested)
+                            {
+                            }
                         }
                         catch (OperationCanceledException)
                         {
