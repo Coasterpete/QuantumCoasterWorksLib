@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 
 namespace Quantum.Track.Authoring
@@ -12,6 +13,20 @@ namespace Quantum.Track.Authoring
     {
         public static TrackAuthoringGraphCompileResult Compile(TrackAuthoringGraph graph)
         {
+            var stopwatch = Stopwatch.StartNew();
+            try
+            {
+                return CompileCore(graph);
+            }
+            finally
+            {
+                stopwatch.Stop();
+                TrackAuthoringPipelineMeasurement.RecordGraphCompilation(stopwatch.Elapsed);
+            }
+        }
+
+        private static TrackAuthoringGraphCompileResult CompileCore(TrackAuthoringGraph graph)
+        {
             if (graph is null)
             {
                 throw new ArgumentNullException(nameof(graph));
@@ -23,14 +38,14 @@ namespace Quantum.Track.Authoring
                 diagnostics.Add(new TrackAuthoringGraphDiagnostic(
                     TrackAuthoringGraphDiagnosticCode.EmptyGraph,
                     "The authoring graph must contain at least one section node."));
-                return Failure(diagnostics);
+                return Failure(graph, diagnostics);
             }
 
             TrackAuthoringGraphRouteResult route =
                 TrackAuthoringGraphRouteValidator.Validate(graph);
             if (!route.Success)
             {
-                return Failure(route.Diagnostics, route.OrderedNodes);
+                return Failure(graph, route.Diagnostics, route.OrderedNodes);
             }
 
             var orderedNodes = new List<TrackAuthoringGraphNode>(route.OrderedNodes);
@@ -50,7 +65,7 @@ namespace Quantum.Track.Authoring
 
             if (diagnostics.Count != 0)
             {
-                return Failure(diagnostics, orderedNodes);
+                return Failure(graph, diagnostics, orderedNodes);
             }
 
             TrackAuthoringDefinition definition;
@@ -69,7 +84,7 @@ namespace Quantum.Track.Authoring
                 exception is NotSupportedException)
             {
                 diagnostics.Add(CreateCompilationDiagnostic(exception));
-                return Failure(diagnostics, orderedNodes);
+                return Failure(graph, diagnostics, orderedNodes);
             }
 
             try
@@ -77,6 +92,7 @@ namespace Quantum.Track.Authoring
                 TrackAuthoringCompilation compilation =
                     TrackAuthoringDocumentBuilder.Compile(definition);
                 return new TrackAuthoringGraphCompileResult(
+                    graph,
                     true,
                     orderedNodes,
                     definition,
@@ -90,6 +106,7 @@ namespace Quantum.Track.Authoring
             {
                 diagnostics.Add(CreateCompilationDiagnostic(exception));
                 return new TrackAuthoringGraphCompileResult(
+                    graph,
                     false,
                     orderedNodes,
                     definition,
@@ -107,10 +124,12 @@ namespace Quantum.Track.Authoring
         }
 
         private static TrackAuthoringGraphCompileResult Failure(
+            TrackAuthoringGraph sourceGraph,
             IEnumerable<TrackAuthoringGraphDiagnostic> diagnostics,
             IEnumerable<TrackAuthoringGraphNode>? orderedNodes = null)
         {
             return new TrackAuthoringGraphCompileResult(
+                sourceGraph,
                 false,
                 orderedNodes ?? Array.Empty<TrackAuthoringGraphNode>(),
                 null,

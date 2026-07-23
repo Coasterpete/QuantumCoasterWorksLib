@@ -165,6 +165,40 @@ namespace Quantum.IO.TrackLayout.V2
 
             TrackAuthoringGraphCompileResult graphCompilation =
                 TrackAuthoringGraphCompiler.Compile(graph);
+            return Export(graph, ancillaryState, graphCompilation);
+        }
+
+        /// <summary>
+        /// Exports a graph using the successful compilation produced for that exact
+        /// immutable graph instance.
+        /// </summary>
+        public static TrackLayoutPackageV2GraphExportResult Export(
+            TrackAuthoringGraph graph,
+            TrackLayoutPackageV2GraphAncillaryState ancillaryState,
+            TrackAuthoringGraphCompileResult graphCompilation)
+        {
+            if (graph is null)
+            {
+                throw new ArgumentNullException(nameof(graph));
+            }
+
+            if (ancillaryState is null)
+            {
+                throw new ArgumentNullException(nameof(ancillaryState));
+            }
+
+            if (graphCompilation is null)
+            {
+                throw new ArgumentNullException(nameof(graphCompilation));
+            }
+
+            if (!ReferenceEquals(graphCompilation.SourceGraph, graph))
+            {
+                throw new ArgumentException(
+                    "The supplied compilation was not produced for the graph being exported.",
+                    nameof(graphCompilation));
+            }
+
             if (!graphCompilation.Success)
             {
                 return new TrackLayoutPackageV2GraphExportResult(

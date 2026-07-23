@@ -1,5 +1,7 @@
 using System.Globalization;
+using Quantum.Application.Authoring;
 using Quantum.Editor.Avalonia.Models;
+using Quantum.Editor.Avalonia.Services.Authoring;
 using Quantum.Editor.Avalonia.Services.Commands;
 using Quantum.Editor.Avalonia.Services.Documents;
 using Quantum.Editor.Avalonia.Services.Selection;
@@ -14,11 +16,23 @@ using Quantum.Track.Authoring;
 
 namespace Quantum.Editor.Avalonia.Services;
 
-public sealed class EditorWorkspace
+public sealed class EditorWorkspace : IDisposable, IAsyncDisposable
 {
     private readonly TrackDocumentFileService fileService;
     private readonly TrackSamplingService samplingService;
+    private readonly Func<TrackAuthoringSession, TrackAuthoringEvaluationCoordinator>
+        evaluationCoordinatorFactory;
+    private readonly object coordinatorRetirementGate = new();
+    private readonly List<Task> coordinatorRetirementTasks = new();
     private TrackEditorDocument? observedDocument;
+    private TrackAuthoringSession? authoringSession;
+    private TrackAuthoringEvaluationCoordinator? evaluationCoordinator;
+    private StraightLengthEditState? straightLengthEdit;
+    private bool applyingSessionCommitToDocument;
+    private bool disposed;
+    private long straightLengthRawPointerUpdates;
+    private long straightLengthAcceptedPreviews;
+    private TimeSpan straightLengthFinalCommitWait;
 
     private TrackAuthoringCompilation? projectedCompilation;
 
@@ -40,7 +54,10 @@ public sealed class EditorWorkspace
         UndoRedoService? undoRedo = null,
         ViewportService? viewport = null,
         TrackDocumentFileService? fileService = null,
-        TrackSamplingService? samplingService = null)
+        TrackSamplingService? samplingService = null,
+        Func<TrackAuthoringSession, TrackAuthoringEvaluationCoordinator>?
+            evaluationCoordinatorFactory = null,
+        StraightLengthScrubSensitivity? straightLengthScrubSensitivity = null)
     {
         Documents = documents ?? new DocumentService();
         Commands = commands ?? new CommandService();
@@ -49,6 +66,21 @@ public sealed class EditorWorkspace
         Viewport = viewport ?? new ViewportService();
         this.fileService = fileService ?? new TrackDocumentFileService();
         this.samplingService = samplingService ?? new TrackSamplingService();
+        this.evaluationCoordinatorFactory = evaluationCoordinatorFactory ??
+            (session => new TrackAuthoringEvaluationCoordinator(
+                session,
+                AuthoringEvaluationSchedulerOptions.SerializedBackground));
+        StraightLengthScrubSensitivity = straightLengthScrubSensitivity ??
+            StraightLengthScrubSensitivity.Default;
+
+        UndoRedo.DelegateHistory(
+            () => authoringSession?.CanUndo == true,
+            () => authoringSession?.CanRedo == true,
+            () => authoringSession?.UndoDescription,
+            () => authoringSession?.RedoDescription,
+            UndoAuthoringHistory,
+            RedoAuthoringHistory,
+            ClearAuthoringHistory);
 
         Documents.ActiveDocumentChanged += OnActiveDocumentChanged;
         Selection.SelectionChanged += OnSelectionChanged;
@@ -72,7 +104,19 @@ public sealed class EditorWorkspace
 
     public ViewportService Viewport { get; }
 
+    public StraightLengthScrubSensitivity StraightLengthScrubSensitivity { get; }
+
     public TrackEditorDocument? ActiveDocument => Documents.ActiveDocument as TrackEditorDocument;
+
+    public TrackAuthoringSession? AuthoringSession => authoringSession;
+
+    public TrackAuthoringEvaluationCoordinator? EvaluationCoordinator => evaluationCoordinator;
+
+    public PreparedTrackGraphState? PresentedState => authoringSession?.PresentedState;
+
+    public StraightLengthEditState? StraightLengthEdit => straightLengthEdit;
+
+    public bool IsInteractiveEditActive => straightLengthEdit is not null;
 
     public EditorSelection? CurrentSelection =>
         Selection.SelectedItems.Count == 0
@@ -105,6 +149,7 @@ public sealed class EditorWorkspace
 
     public TrackEditorDocument NewDocument()
     {
+        CancelStraightLengthEdit();
         TrackEditorDocument document = TrackEditorDocument.CreateEmpty(
             "Untitled Layout",
             "Untitled Layout");
@@ -115,6 +160,7 @@ public sealed class EditorWorkspace
 
     public TrackEditorDocument OpenDocument(string filePath)
     {
+        CancelStraightLengthEdit();
         TrackEditorDocument document = fileService.Open(filePath);
         ActivateDocument(document, $"Opened {document.FilePath}.");
         return document;
@@ -122,6 +168,7 @@ public sealed class EditorWorkspace
 
     public void SaveDocument(string? filePath = null)
     {
+        ThrowIfInteractiveEditActive("Save is disabled while a live edit is active.");
         TrackEditorDocument document = ActiveDocument ??
             throw new InvalidOperationException("There is no active track document to save.");
         fileService.Save(document, filePath);
@@ -134,13 +181,23 @@ public sealed class EditorWorkspace
     {
         ArgumentNullException.ThrowIfNull(edit);
 
+        if (IsInteractiveEditActive)
+        {
+            SetStatus("Source edits are disabled while a live edit is active.");
+            return false;
+        }
+
         TrackEditorDocument? document = ActiveDocument;
-        TrackAuthoringGraph? beforeGraph = document?.Graph;
-        if (document is null || beforeGraph is null)
+        if (document?.Graph is null)
         {
             SetStatus("The active document does not have an editable authoring graph.");
             return false;
         }
+
+        TrackAuthoringSession session = authoringSession ??
+            throw new InvalidOperationException("The active document has no authoring session.");
+        PreparedTrackGraphState beforeState = session.CommittedState.PreparedState;
+        TrackAuthoringGraph beforeGraph = beforeState.Graph;
 
         TrackAuthoringGraph candidateGraph;
         try
@@ -171,9 +228,10 @@ public sealed class EditorWorkspace
             return false;
         }
 
+        TrackAuthoringGraphCompileResult? candidateCompilation = null;
         if (candidateGraph.Nodes.Count != 0)
         {
-            TrackAuthoringGraphCompileResult candidateCompilation =
+            candidateCompilation =
                 TrackAuthoringGraphCompiler.Compile(candidateGraph);
             if (!candidateCompilation.Success || candidateCompilation.Compilation is null)
             {
@@ -184,22 +242,35 @@ public sealed class EditorWorkspace
 
         try
         {
-            if (beforeGraph.Nodes.Count != 0 && candidateGraph.Nodes.Count != 0)
+            PreparedTrackGraphState afterState = document.PrepareGraphState(
+                candidateGraph,
+                candidateCompilation);
+            if (beforeState.CanonicalPackageJson is not null &&
+                afterState.CanonicalPackageJson is not null)
             {
-                string beforeJson = document.CapturePackageJson();
-                string afterJson = document.CapturePackageJson(candidateGraph);
-                if (string.Equals(beforeJson, afterJson, StringComparison.Ordinal))
+                if (string.Equals(
+                    beforeState.CanonicalPackageJson,
+                    afterState.CanonicalPackageJson,
+                    StringComparison.Ordinal))
                 {
                     SetStatus("No graph values changed.");
                     return false;
                 }
             }
 
-            UndoRedo.Execute(new TrackGraphSnapshotOperation(
-                description,
+            AuthoringCommitResult commit = session.CommitPreparedEdit(description, afterState);
+            if (!commit.Succeeded || commit.CommittedState is null)
+            {
+                SetStatus("Edit rejected: " + string.Join(
+                    " ",
+                    commit.Diagnostics.Select(diagnostic => diagnostic.Message)));
+                return false;
+            }
+
+            ApplySessionStateToDocument(
                 document,
-                beforeGraph,
-                candidateGraph));
+                commit.CommittedState.PreparedState);
+            UndoRedo.NotifyStateChanged();
             SetStatus(description + ".");
             return true;
         }
@@ -407,6 +478,12 @@ public sealed class EditorWorkspace
 
     public void Select(EditorSelection? selection)
     {
+        if (IsInteractiveEditActive && !MatchesActiveStraightSelection(selection))
+        {
+            SetStatus("Selection changes are disabled while a live edit is active.");
+            return;
+        }
+
         if (selection is null)
         {
             Selection.Clear();
@@ -487,6 +564,12 @@ public sealed class EditorWorkspace
 
     public bool UndoLast()
     {
+        if (IsInteractiveEditActive)
+        {
+            SetStatus("Undo is disabled while a live edit is active.");
+            return false;
+        }
+
         string? description = UndoRedo.UndoDescription;
         bool result = UndoRedo.Undo();
         if (result)
@@ -499,6 +582,12 @@ public sealed class EditorWorkspace
 
     public bool RedoLast()
     {
+        if (IsInteractiveEditActive)
+        {
+            SetStatus("Redo is disabled while a live edit is active.");
+            return false;
+        }
+
         string? description = UndoRedo.RedoDescription;
         bool result = UndoRedo.Redo();
         if (result)
@@ -509,14 +598,300 @@ public sealed class EditorWorkspace
         return result;
     }
 
+    private bool UndoAuthoringHistory()
+    {
+        TrackAuthoringSession? session = authoringSession;
+        TrackEditorDocument? document = ActiveDocument;
+        if (session is null || document is null || !session.Undo())
+        {
+            return false;
+        }
+
+        ApplySessionStateToDocument(document, session.CommittedState.PreparedState);
+        return true;
+    }
+
+    private bool RedoAuthoringHistory()
+    {
+        TrackAuthoringSession? session = authoringSession;
+        TrackEditorDocument? document = ActiveDocument;
+        if (session is null || document is null || !session.Redo())
+        {
+            return false;
+        }
+
+        ApplySessionStateToDocument(document, session.CommittedState.PreparedState);
+        return true;
+    }
+
+    private void ClearAuthoringHistory()
+    {
+        authoringSession?.ClearHistory();
+    }
+
+    private void ApplySessionStateToDocument(
+        TrackEditorDocument document,
+        PreparedTrackGraphState preparedState)
+    {
+        applyingSessionCommitToDocument = true;
+        try
+        {
+            document.ReplaceGraphState(preparedState);
+        }
+        finally
+        {
+            applyingSessionCommitToDocument = false;
+        }
+    }
+
     public void SetStatus(string message)
     {
         statusMessage = string.IsNullOrWhiteSpace(message) ? "Ready" : message;
         WorkspaceChanged?.Invoke(this, EventArgs.Empty);
     }
 
+    public bool BeginStraightLengthEdit(string nodeId)
+    {
+        ThrowIfDisposed();
+        if (straightLengthEdit is not null)
+        {
+            return false;
+        }
+
+        TrackAuthoringSession session = authoringSession ??
+            throw new InvalidOperationException("The active document has no authoring session.");
+        TrackAuthoringGraphNode node = session.CommittedState.SourceGraph.Nodes
+            .Single(candidate => string.Equals(candidate.Id, nodeId, StringComparison.Ordinal));
+        StraightSectionDefinition straight = node.Section as StraightSectionDefinition ??
+            throw new InvalidOperationException(
+                $"Graph node '{nodeId}' is not a straight section.");
+        InteractiveAuthoringTransaction transaction = session.BeginTransaction(
+            nodeId,
+            "StraightSectionDefinition.Length",
+            $"Edit straight length {nodeId}");
+        straightLengthEdit = new StraightLengthEditState(
+            transaction.Revision,
+            transaction.BeforeState,
+            nodeId,
+            straight.Length,
+            straight.Length,
+            straight.Length,
+            StraightLengthEditStatus.Ready,
+            Array.Empty<string>(),
+            RawPointerUpdates: 0,
+            AcceptedPreviews: 0,
+            FinalCommitWait: TimeSpan.Zero);
+        straightLengthRawPointerUpdates = 0;
+        straightLengthAcceptedPreviews = 0;
+        straightLengthFinalCommitWait = TimeSpan.Zero;
+        SetStatus($"Editing straight length {nodeId}.");
+        return true;
+    }
+
+    public void RecordStraightLengthPointerUpdate()
+    {
+        if (straightLengthEdit is not null)
+        {
+            straightLengthRawPointerUpdates++;
+            straightLengthEdit = straightLengthEdit with
+            {
+                RawPointerUpdates = straightLengthEdit.RawPointerUpdates + 1
+            };
+        }
+    }
+
+    public AuthoringEvaluationSubmission SubmitStraightLengthEdit(double absoluteLength)
+    {
+        ThrowIfDisposed();
+        StraightLengthEditState edit = straightLengthEdit ??
+            throw new InvalidOperationException("There is no active straight-length edit.");
+        TrackAuthoringEvaluationCoordinator coordinator = evaluationCoordinator ??
+            throw new InvalidOperationException("The active document has no evaluation coordinator.");
+
+        AuthoringEvaluationSubmission submission = coordinator.SubmitProvisionalEdit(
+            edit.TransactionRevision,
+            new SetStraightLengthCandidateOperation(edit.NodeId, absoluteLength));
+        bool rawInvalid = !double.IsFinite(absoluteLength) || absoluteLength <= 0.0;
+        straightLengthEdit = edit with
+        {
+            RawLength = absoluteLength,
+            Status = rawInvalid
+                ? StraightLengthEditStatus.Invalid
+                : StraightLengthEditStatus.Evaluating,
+            Diagnostics = rawInvalid
+                ? new[] { "Section length must be finite and greater than zero." }
+                : Array.Empty<string>()
+        };
+        SetStatus(straightLengthEdit.StatusText);
+        return submission;
+    }
+
+    /// <summary>
+    /// Called by the Avalonia dispatcher after an immutable completion is awaited.
+    /// The outcome never supplies presentation directly; the session is re-read and
+    /// remains the sole freshness authority.
+    /// </summary>
+    public bool PublishStraightLengthOutcome(AuthoringEvaluationOutcome outcome)
+    {
+        ArgumentNullException.ThrowIfNull(outcome);
+        StraightLengthEditState? edit = straightLengthEdit;
+        TrackAuthoringSession? session = authoringSession;
+        if (edit is null || session is null ||
+            outcome.Request.TransactionRevision != edit.TransactionRevision)
+        {
+            return false;
+        }
+
+        InteractiveAuthoringTransaction? transaction = session.ActiveTransaction;
+        if (transaction is null || transaction.Revision != edit.TransactionRevision ||
+            transaction.NewestProvisionalRevision != outcome.Request.ProvisionalEditRevision)
+        {
+            return false;
+        }
+
+        if (outcome.Status == AuthoringEvaluationOutcomeStatus.Accepted &&
+            outcome.Candidate?.PreparedState is not null &&
+            ReferenceEquals(session.PresentedState, outcome.Candidate.PreparedState))
+        {
+            PreparedTrackGraphState presented = session.PresentedState;
+            double acceptedLength = GetStraightLength(presented.Graph, edit.NodeId);
+            straightLengthEdit = edit with
+            {
+                AcceptedPreviewLength = acceptedLength,
+                Status = StraightLengthEditStatus.Accepted,
+                Diagnostics = Array.Empty<string>(),
+                AcceptedPreviews = edit.AcceptedPreviews + 1
+            };
+            straightLengthAcceptedPreviews++;
+            ProjectPreparedState(presented);
+            SetStatus($"Live preview: {acceptedLength:0.######} m.");
+            return true;
+        }
+
+        if (outcome.Status == AuthoringEvaluationOutcomeStatus.Rejected)
+        {
+            IReadOnlyList<string> diagnostics = BuildOutcomeDiagnostics(outcome);
+            straightLengthEdit = edit with
+            {
+                Status = StraightLengthEditStatus.Invalid,
+                Diagnostics = diagnostics
+            };
+            SetStatus("Last valid preview — current value is invalid. " +
+                string.Join(" ", diagnostics));
+            return true;
+        }
+
+        if (outcome.Status == AuthoringEvaluationOutcomeStatus.Faulted)
+        {
+            string message = outcome.Fault?.Message ?? "Preview evaluation faulted.";
+            straightLengthEdit = edit with
+            {
+                Status = StraightLengthEditStatus.Invalid,
+                Diagnostics = new[] { message }
+            };
+            SetStatus("Last valid preview — current value is invalid. " + message);
+            return true;
+        }
+
+        return false;
+    }
+
+    public async Task<AuthoringScheduledCommitResult?> CommitStraightLengthEditAsync(
+        CancellationToken cancellationToken = default)
+    {
+        ThrowIfDisposed();
+        StraightLengthEditState? edit = straightLengthEdit;
+        TrackAuthoringEvaluationCoordinator? coordinator = evaluationCoordinator;
+        if (edit is null || coordinator is null)
+        {
+            return null;
+        }
+
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+        AuthoringScheduledCommitResult result = await coordinator.CommitLatestAsync(
+            edit.TransactionRevision,
+            cancellationToken);
+        stopwatch.Stop();
+        if (!ReferenceEquals(edit, straightLengthEdit) &&
+            straightLengthEdit?.TransactionRevision != edit.TransactionRevision)
+        {
+            return result;
+        }
+
+        edit = straightLengthEdit ?? edit;
+        straightLengthFinalCommitWait = stopwatch.Elapsed;
+        straightLengthEdit = edit with { FinalCommitWait = stopwatch.Elapsed };
+        if (result.Succeeded && result.CommitResult?.CommittedState is not null)
+        {
+            AuthoringCommitResult commit = result.CommitResult;
+            PreparedTrackGraphState afterState = commit.CommittedState.PreparedState;
+            if (commit.Changed)
+            {
+                TrackEditorDocument document = ActiveDocument ??
+                    throw new InvalidOperationException("The edited document is no longer active.");
+                ApplySessionStateToDocument(document, afterState);
+                UndoRedo.NotifyStateChanged();
+            }
+
+            ProjectPreparedState(afterState);
+            straightLengthEdit = null;
+            SetStatus(commit.Changed
+                ? $"Committed straight length {edit.NodeId}."
+                : "No graph values changed.");
+            return result;
+        }
+
+        coordinator.CancelTransaction(edit.TransactionRevision);
+        ProjectPreparedState(authoringSession!.CommittedState.PreparedState);
+        straightLengthEdit = null;
+        SetStatus("Straight length was not committed; the committed value was restored.");
+        return result;
+    }
+
+    public bool CancelStraightLengthEdit()
+    {
+        StraightLengthEditState? edit = straightLengthEdit;
+        if (edit is null)
+        {
+            return false;
+        }
+
+        bool cancelled = evaluationCoordinator?.CancelTransaction(edit.TransactionRevision) == true;
+        PreparedTrackGraphState? committed = authoringSession?.CommittedState.PreparedState;
+        straightLengthEdit = null;
+        if (committed is not null && ReferenceEquals(observedDocument, ActiveDocument))
+        {
+            ProjectPreparedState(committed);
+        }
+
+        SetStatus("Live straight-length edit cancelled.");
+        return cancelled;
+    }
+
+    public StraightLengthInteractionMetrics CaptureStraightLengthMetrics()
+    {
+        EvaluationSchedulerSnapshot scheduler = evaluationCoordinator?.CaptureSnapshot() ??
+            throw new InvalidOperationException("The active document has no evaluation coordinator.");
+        StraightLengthEditState? edit = straightLengthEdit;
+        return new StraightLengthInteractionMetrics(
+            straightLengthRawPointerUpdates,
+            scheduler.Submitted,
+            scheduler.Coalesced,
+            scheduler.Started,
+            straightLengthAcceptedPreviews,
+            scheduler.Stale,
+            scheduler.SubmitToPresentTime,
+            straightLengthFinalCommitWait,
+            scheduler.CompilerInvocationCount,
+            scheduler.SubmitToPresentSamples,
+            straightLengthFinalCommitWait == TimeSpan.Zero
+                ? Array.Empty<TimeSpan>()
+                : new[] { straightLengthFinalCommitWait });
+    }
+
     private void ActivateDocument(TrackEditorDocument document, string message)
     {
+        CancelStraightLengthEdit();
         TrackEditorDocument? previousDocument = ActiveDocument;
         UndoRedo.Clear();
         if (previousDocument != null)
@@ -533,53 +908,91 @@ public sealed class EditorWorkspace
     {
         Commands.Register(new EditorCommand(
             EditorCommandIds.NewDocument,
-            _ => NewDocument()));
+            _ => NewDocument(),
+            _ => !IsInteractiveEditActive));
         Commands.Register(new EditorCommand(
             EditorCommandIds.OpenDocument,
             parameter => OpenDocument((string)parameter!),
-            parameter => parameter is string path && !string.IsNullOrWhiteSpace(path)));
+            parameter => !IsInteractiveEditActive &&
+                         parameter is string path && !string.IsNullOrWhiteSpace(path)));
         Commands.Register(new EditorCommand(
             EditorCommandIds.SaveDocument,
             parameter => SaveDocument(parameter as string),
-            _ => ActiveDocument?.CanSave == true));
+            _ => !IsInteractiveEditActive && ActiveDocument?.CanSave == true));
         Commands.Register(new EditorCommand(
             EditorCommandIds.SaveDocumentAs,
             parameter => SaveDocument((string)parameter!),
-            parameter => ActiveDocument?.CanSave == true &&
+            parameter => !IsInteractiveEditActive &&
+                         ActiveDocument?.CanSave == true &&
                          parameter is string path &&
                          !string.IsNullOrWhiteSpace(path)));
         Commands.Register(new EditorCommand(
             EditorCommandIds.Undo,
             _ => UndoLast(),
-            _ => UndoRedo.CanUndo));
+            _ => !IsInteractiveEditActive && UndoRedo.CanUndo));
         Commands.Register(new EditorCommand(
             EditorCommandIds.Redo,
             _ => RedoLast(),
-            _ => UndoRedo.CanRedo));
+            _ => !IsInteractiveEditActive && UndoRedo.CanRedo));
         Commands.Register(new EditorCommand(
             EditorCommandIds.Select,
             parameter => Select((EditorSelection?)parameter),
-            parameter => parameter is EditorSelection));
+            parameter => !IsInteractiveEditActive && parameter is EditorSelection));
     }
 
     private void OnActiveDocumentChanged(object? sender, EventArgs eventArgs)
     {
+        CancelStraightLengthEdit();
         if (observedDocument != null)
         {
             observedDocument.Changed -= OnDocumentChanged;
         }
 
+        RetireEvaluationCoordinator();
+        authoringSession = null;
         observedDocument = ActiveDocument;
         if (observedDocument != null)
         {
             observedDocument.Changed += OnDocumentChanged;
+            if (observedDocument.Graph is not null)
+            {
+                authoringSession = new TrackAuthoringSession(
+                    observedDocument.CaptureGraphState(),
+                    markClean: !observedDocument.IsDirty);
+                evaluationCoordinator = evaluationCoordinatorFactory(authoringSession);
+            }
         }
 
+        projectedCompilation = null;
+        stationCursor = null;
         RefreshDocumentProjection();
     }
 
     private void OnDocumentChanged(object? sender, EventArgs eventArgs)
     {
+        TrackEditorDocument? document = ActiveDocument;
+        if (!applyingSessionCommitToDocument &&
+            straightLengthEdit is null &&
+            document?.Graph is not null &&
+            authoringSession is not null)
+        {
+            PreparedTrackGraphState documentState = document.CaptureGraphState();
+            PreparedTrackGraphState sessionState = authoringSession.CommittedState.PreparedState;
+            if (!ReferenceEquals(documentState.Graph, sessionState.Graph) ||
+                !ReferenceEquals(
+                    documentState.GraphCompileResult,
+                    sessionState.GraphCompileResult))
+            {
+                authoringSession.ReplaceSessionState(
+                    documentState,
+                    markClean: !document.IsDirty);
+            }
+            else if (!document.IsDirty)
+            {
+                authoringSession.MarkClean();
+            }
+        }
+
         RefreshDocumentProjection();
     }
 
@@ -596,7 +1009,8 @@ public sealed class EditorWorkspace
     private void RefreshDocumentProjection()
     {
         TrackEditorDocument? document = ActiveDocument;
-        if (document?.Graph is null || document.GraphCompileResult is null)
+        PreparedTrackGraphState? state = authoringSession?.PresentedState;
+        if (document?.Graph is null || state is null)
         {
             graphNodes = Array.Empty<EditorGraphNode>();
             outlinerNodes = Array.Empty<EditorOutlinerNode>();
@@ -608,11 +1022,85 @@ public sealed class EditorWorkspace
         }
         else
         {
-            graphNodes = BuildGraphNodes(document.GraphCompileResult.OrderedNodes);
-            outlinerNodes = BuildOutliner(document);
-            TrackAuthoringCompilation compilation = document.Compilation!;
+            ProjectPreparedState(state, notify: false);
+        }
+
+        NormalizeSelectionAfterProjection();
+        WorkspaceChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void NormalizeSelectionAfterProjection()
+    {
+        EditorSelection? selection = CurrentSelection;
+        if (selection?.Kind == EditorSelectionKind.Sample && stationCursor.HasValue)
+        {
+            int sampleIndex = stationCursor.Value.SampleIndex;
+            if (sampleIndex >= 0 && sampleIndex < viewportSnapshot.Samples.Count)
+            {
+                TrackViewportSample sample = viewportSnapshot.Samples[sampleIndex];
+                string? nodeId = graphNodes
+                    .FirstOrDefault(node => node.RouteIndex == sample.SectionIndex)
+                    ?.NodeId;
+                EditorSelection replacement = EditorSelection.Sample(
+                    sampleIndex,
+                    sample.SectionIndex,
+                    nodeId);
+                if (replacement != selection)
+                {
+                    Selection.SetSelection(new object[] { replacement });
+                }
+            }
+
+            return;
+        }
+
+        if (selection?.Kind != EditorSelectionKind.Section || selection.NodeId is null)
+        {
+            return;
+        }
+
+        EditorGraphNode? currentNode = GraphNodes.FirstOrDefault(node =>
+            string.Equals(node.NodeId, selection.NodeId, StringComparison.Ordinal));
+        if (currentNode is not null)
+        {
+            if (selection.SectionIndex != currentNode.RouteIndex)
+            {
+                Selection.SetSelection(new object[] { currentNode.Selection });
+            }
+
+            return;
+        }
+
+        Select(EditorSelection.Track);
+    }
+
+    private void ProjectPreparedState(
+        PreparedTrackGraphState state,
+        bool notify = true)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        TrackEditorDocument? document = ActiveDocument;
+        EngineeringStationCursor? previousCursor = stationCursor;
+
+        if (state.GraphCompileResult?.Compilation is not TrackAuthoringCompilation compilation)
+        {
+            graphNodes = Array.Empty<EditorGraphNode>();
+            outlinerNodes = Array.Empty<EditorOutlinerNode>();
+            viewportSnapshot = TrackViewportSnapshot.Empty;
+            engineeringSnapshot = null;
+            stationCursor = null;
+            hoveredSectionIndex = -1;
+            projectedCompilation = null;
+        }
+        else
+        {
+            graphNodes = BuildGraphNodes(state.GraphCompileResult.OrderedNodes);
+            outlinerNodes = document is null
+                ? Array.Empty<EditorOutlinerNode>()
+                : BuildOutliner(document, state);
             if (!ReferenceEquals(projectedCompilation, compilation))
             {
+                double? previousStation = stationCursor?.Station;
                 projectedCompilation = compilation;
                 compilationRevision++;
                 snapshotRevision++;
@@ -623,9 +1111,17 @@ public sealed class EditorWorkspace
                         snapshotRevision,
                         samplingService.GetSampleCount(compilation.TotalLength)));
                 viewportSnapshot = samplingService.CreateViewportSnapshot(engineeringSnapshot);
-                stationCursor = new EngineeringStationCursor(
-                    0,
-                    engineeringSnapshot.StationGrid[0]);
+                double remappedStation = previousStation.HasValue
+                    ? System.Math.Clamp(previousStation.Value, 0.0, engineeringSnapshot.TotalLength)
+                    : 0.0;
+                int remappedIndex = EngineeringSnapshotNavigation.FindNearestSampleIndex(
+                    engineeringSnapshot,
+                    remappedStation);
+                stationCursor = remappedIndex < 0
+                    ? null
+                    : new EngineeringStationCursor(
+                        remappedIndex,
+                        engineeringSnapshot.StationGrid[remappedIndex]);
             }
 
             if (hoveredSectionIndex >= graphNodes.Count)
@@ -635,24 +1131,145 @@ public sealed class EditorWorkspace
         }
 
         NormalizeSelectionAfterProjection();
+        if (!notify)
+        {
+            return;
+        }
+
+        if (previousCursor != stationCursor)
+        {
+            StationCursorChanged?.Invoke(this, EventArgs.Empty);
+        }
+
         WorkspaceChanged?.Invoke(this, EventArgs.Empty);
     }
 
-    private void NormalizeSelectionAfterProjection()
+    private bool MatchesActiveStraightSelection(EditorSelection? selection)
     {
-        EditorSelection? selection = CurrentSelection;
-        if (selection?.Kind != EditorSelectionKind.Section || selection.NodeId is null)
+        return straightLengthEdit is not null &&
+               selection?.Kind == EditorSelectionKind.Section &&
+               string.Equals(
+                   selection.NodeId,
+                   straightLengthEdit.NodeId,
+                   StringComparison.Ordinal);
+    }
+
+    private static double GetStraightLength(TrackAuthoringGraph graph, string nodeId)
+    {
+        TrackAuthoringGraphNode node = graph.Nodes.Single(candidate =>
+            string.Equals(candidate.Id, nodeId, StringComparison.Ordinal));
+        return (node.Section as StraightSectionDefinition ??
+            throw new InvalidOperationException(
+                $"Graph node '{nodeId}' is not a straight section.")).Length;
+    }
+
+    private static IReadOnlyList<string> BuildOutcomeDiagnostics(
+        AuthoringEvaluationOutcome outcome)
+    {
+        var diagnostics = new List<string>();
+        if (outcome.Candidate is not null)
+        {
+            diagnostics.AddRange(outcome.Candidate.GraphDiagnostics.Select(diagnostic =>
+                $"{diagnostic.Code}: {diagnostic.Message}"));
+        }
+
+        diagnostics.AddRange(outcome.Diagnostics.Select(diagnostic =>
+            $"{diagnostic.Code}: {diagnostic.Message}"));
+        if (outcome.Fault is not null)
+        {
+            diagnostics.Add($"{outcome.Fault.Phase}: {outcome.Fault.Message}");
+        }
+
+        return diagnostics.Count == 0
+            ? new[] { "The provisional straight length is invalid." }
+            : diagnostics.Distinct(StringComparer.Ordinal).ToArray();
+    }
+
+    private void ThrowIfInteractiveEditActive(string message)
+    {
+        if (IsInteractiveEditActive)
+        {
+            throw new InvalidOperationException(message);
+        }
+    }
+
+    private void ThrowIfDisposed()
+    {
+        ObjectDisposedException.ThrowIf(disposed, this);
+    }
+
+    public void Dispose()
+    {
+        BeginDispose();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        BeginDispose();
+        await WaitForLifecycleCompletionAsync().ConfigureAwait(false);
+    }
+
+    public Task WaitForLifecycleCompletionAsync()
+    {
+        lock (coordinatorRetirementGate)
+        {
+            return coordinatorRetirementTasks.Count == 0
+                ? Task.CompletedTask
+                : Task.WhenAll(coordinatorRetirementTasks.ToArray());
+        }
+    }
+
+    private void BeginDispose()
+    {
+        if (disposed)
         {
             return;
         }
 
-        if (GraphNodes.Any(node =>
-                string.Equals(node.NodeId, selection.NodeId, StringComparison.Ordinal)))
+        disposed = true;
+        CancelStraightLengthEdit();
+        Documents.ActiveDocumentChanged -= OnActiveDocumentChanged;
+        Selection.SelectionChanged -= OnSelectionChanged;
+        UndoRedo.StateChanged -= OnUndoRedoStateChanged;
+        if (observedDocument is not null)
+        {
+            observedDocument.Changed -= OnDocumentChanged;
+        }
+
+        RetireEvaluationCoordinator();
+        authoringSession = null;
+        observedDocument = null;
+    }
+
+    private void RetireEvaluationCoordinator()
+    {
+        TrackAuthoringEvaluationCoordinator? coordinator = evaluationCoordinator;
+        evaluationCoordinator = null;
+        if (coordinator is null)
         {
             return;
         }
 
-        Select(EditorSelection.Track);
+        Task retirement = ObserveCoordinatorRetirementAsync(coordinator);
+        lock (coordinatorRetirementGate)
+        {
+            coordinatorRetirementTasks.Add(retirement);
+        }
+    }
+
+    private static async Task ObserveCoordinatorRetirementAsync(
+        TrackAuthoringEvaluationCoordinator coordinator)
+    {
+        try
+        {
+            await coordinator.DisposeAsync().ConfigureAwait(false);
+        }
+        catch (Exception)
+        {
+            // Coordinator evaluation faults are converted into outcomes. This
+            // defensive observation prevents a teardown failure from becoming an
+            // unobserved task exception during process shutdown.
+        }
     }
 
     private static IReadOnlyList<EditorGraphNode> BuildGraphNodes(
@@ -695,9 +1312,12 @@ public sealed class EditorWorkspace
         return -1;
     }
 
-    private static IReadOnlyList<EditorOutlinerNode> BuildOutliner(TrackEditorDocument document)
+    private static IReadOnlyList<EditorOutlinerNode> BuildOutliner(
+        TrackEditorDocument document,
+        PreparedTrackGraphState state)
     {
-        IReadOnlyList<TrackAuthoringGraphNode> route = document.GraphCompileResult!.OrderedNodes;
+        IReadOnlyList<TrackAuthoringGraphNode> route =
+            state.GraphCompileResult?.OrderedNodes ?? Array.Empty<TrackAuthoringGraphNode>();
         var sectionNodes = new List<EditorOutlinerNode>(route.Count);
         for (int sectionIndex = 0; sectionIndex < route.Count; sectionIndex++)
         {
@@ -722,7 +1342,7 @@ public sealed class EditorWorkspace
 
         var bankingNodes = new List<EditorOutlinerNode>();
         IReadOnlyList<BankingProfileKey> bankingKeys =
-            document.Graph!.Banking?.Keys ?? Array.Empty<BankingProfileKey>();
+            state.Graph.Banking?.Keys ?? Array.Empty<BankingProfileKey>();
         for (int keyIndex = 0; keyIndex < bankingKeys.Count; keyIndex++)
         {
             BankingProfileKey key = bankingKeys[keyIndex];
@@ -731,7 +1351,7 @@ public sealed class EditorWorkspace
                 EditorSelection.BankingKey(keyIndex)));
         }
 
-        HeartlineOffset? heartline = document.AncillaryState?.HeartlineOffset;
+        HeartlineOffset? heartline = state.AncillaryState.HeartlineOffset;
         return new[]
         {
             new EditorOutlinerNode(

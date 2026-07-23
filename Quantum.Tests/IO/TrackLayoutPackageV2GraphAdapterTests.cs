@@ -61,6 +61,54 @@ public sealed class TrackLayoutPackageV2GraphAdapterTests
     }
 
     [Fact]
+    public void Export_WithExistingCompilationPreservesCanonicalV2JsonWithoutRecompiling()
+    {
+        TrackLayoutPackageV2Dto dto = CreateRepresentativeDto();
+        TrackLayoutPackageV2GraphImportResult import = TrackLayoutPackageV2GraphAdapter.Import(dto);
+        TrackAuthoringGraphCompileResult compilation =
+            TrackAuthoringGraphCompiler.Compile(import.Graph!);
+        string expected = TrackLayoutPackageV2Json.Serialize(dto, indented: true);
+
+        using TrackAuthoringPipelineMeasurement measurement =
+            TrackAuthoringPipelineMeasurement.Begin();
+
+        TrackLayoutPackageV2GraphExportResult export = TrackLayoutPackageV2GraphAdapter.Export(
+            import.Graph!,
+            import.AncillaryState!,
+            compilation);
+
+        Assert.True(export.Success);
+        Assert.Equal(0, measurement.GraphCompilerInvocationCount);
+        Assert.Equal(
+            expected,
+            TrackLayoutPackageV2Json.Serialize(export.Package!, indented: true));
+    }
+
+    [Fact]
+    public void Export_WithCompilationForAnotherGraphIsRejected()
+    {
+        TrackLayoutPackageV2GraphImportResult import = TrackLayoutPackageV2GraphAdapter.Import(
+            CreateRepresentativeDto());
+        TrackAuthoringGraphCompileResult compilation =
+            TrackAuthoringGraphCompiler.Compile(import.Graph!);
+        TrackAuthoringGraph changed = import.Graph!.WithSection(
+            "turn",
+            new ConstantCurvatureSectionDefinition(
+                "turn",
+                length: 12.0,
+                radius: -45.0,
+                rollRadians: -0.2));
+
+        ArgumentException exception = Assert.Throws<ArgumentException>(() =>
+            TrackLayoutPackageV2GraphAdapter.Export(
+                changed,
+                import.AncillaryState!,
+                compilation));
+
+        Assert.Equal("graphCompilation", exception.ParamName);
+    }
+
+    [Fact]
     public void Export_UsesGraphRouteAndReplacementSectionAsOnlySectionSource()
     {
         TrackLayoutPackageV2GraphImportResult import = TrackLayoutPackageV2GraphAdapter.Import(

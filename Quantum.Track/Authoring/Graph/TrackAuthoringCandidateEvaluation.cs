@@ -16,7 +16,9 @@ namespace Quantum.Track.Authoring
             TrackAuthoringGraph? candidateGraph,
             TrackAuthoringGraphRouteResult? routeResult,
             TrackAuthoringGraphCompileResult? compileResult,
-            IEnumerable<TrackAuthoringGraphDiagnostic> diagnostics)
+            IEnumerable<TrackAuthoringGraphDiagnostic> diagnostics,
+            TimeSpan candidateApplicationElapsed,
+            TimeSpan validationAndCompilationElapsed)
         {
             SourceGraph = sourceGraph ?? throw new ArgumentNullException(nameof(sourceGraph));
             Operation = operation ?? throw new ArgumentNullException(nameof(operation));
@@ -24,6 +26,8 @@ namespace Quantum.Track.Authoring
             RouteResult = routeResult;
             CompileResult = compileResult;
             Compilation = compileResult?.Compilation;
+            CandidateApplicationElapsed = candidateApplicationElapsed;
+            ValidationAndCompilationElapsed = validationAndCompilationElapsed;
             _diagnostics = new List<TrackAuthoringGraphDiagnostic>(
                 diagnostics ?? throw new ArgumentNullException(nameof(diagnostics))).AsReadOnly();
         }
@@ -42,11 +46,15 @@ namespace Quantum.Track.Authoring
 
         public IReadOnlyList<TrackAuthoringGraphDiagnostic> Diagnostics => _diagnostics;
 
+        public TimeSpan CandidateApplicationElapsed { get; }
+
+        public TimeSpan ValidationAndCompilationElapsed { get; }
+
         public bool CommitEligible =>
             CandidateGraph != null &&
             RouteResult?.Success == true &&
-            CompileResult?.Success == true &&
-            Compilation != null;
+            (CandidateGraph.Nodes.Count == 0 ||
+             (CompileResult?.Success == true && Compilation != null));
 
         /// <summary>
         /// Conservatively detects whether the active immutable graph snapshot changed

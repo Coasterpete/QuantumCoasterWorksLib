@@ -15,7 +15,8 @@ public sealed class BackendDependencyContractTests
         "Quantum.Physics",
         "Quantum.FVD",
         "Quantum.IO",
-        "Quantum.Debug"
+        "Quantum.Debug",
+        "Quantum.Application"
     };
 
     private static readonly string[] BackendProjectPaths =
@@ -27,7 +28,8 @@ public sealed class BackendDependencyContractTests
         "Quantum.Physics/Quantum.Physics.csproj",
         "Quantum.FVD/Quantum.FVD.csproj",
         "Quantum.IO/Quantum.IO.csproj",
-        "Quantum.Debug/Quantum.Debug.csproj"
+        "Quantum.Debug/Quantum.Debug.csproj",
+        "Quantum.Application/Quantum.Application.csproj"
     };
 
     private static readonly string[] ForbiddenFrontendOrRendererNames =
@@ -110,6 +112,20 @@ public sealed class BackendDependencyContractTests
                 }
             }
         }
+    }
+
+    [Fact]
+    public void QuantumApplication_ReferencesOnlyTrackAndPersistenceQuantumAssemblies()
+    {
+        Assembly application = Assembly.Load(new AssemblyName("Quantum.Application"));
+        string[] quantumReferences = application.GetReferencedAssemblies()
+            .Select(reference => reference.Name)
+            .Where(name => name != null && name.StartsWith("Quantum.", StringComparison.Ordinal))
+            .Cast<string>()
+            .OrderBy(name => name, StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.Equal(new[] { "Quantum.IO", "Quantum.Track" }, quantumReferences);
     }
 
     [Fact]

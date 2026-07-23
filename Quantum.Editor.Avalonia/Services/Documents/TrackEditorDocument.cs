@@ -1,3 +1,4 @@
+using Quantum.Application.Authoring;
 using Quantum.IO.TrackLayout.V2;
 using Quantum.Track;
 using Quantum.Track.Authoring;
@@ -8,6 +9,7 @@ public sealed class TrackEditorDocument : IEditorDocument
 {
     private TrackAuthoringGraph? graph;
     private TrackLayoutPackageV2GraphAncillaryState? ancillaryState;
+    private string? currentPackageJson;
     private string? cleanPackageJson;
     private bool explicitlyDirty;
 
@@ -32,7 +34,10 @@ public sealed class TrackEditorDocument : IEditorDocument
         GraphCompileResult = graphCompileResult;
         Compilation = graphCompileResult?.Compilation;
         FilePath = filePath;
-        cleanPackageJson = CanSave ? CapturePackageJson() : null;
+        currentPackageJson = CanSave
+            ? SerializePackage(graph, ancillaryState, graphCompileResult!)
+            : null;
+        cleanPackageJson = currentPackageJson;
     }
 
     public event EventHandler? Changed;
@@ -60,7 +65,7 @@ public sealed class TrackEditorDocument : IEditorDocument
     public TrackLayoutPackageV2Dto? Package =>
         !CanSave
             ? null
-            : ExportPackage(graph!, ancillaryState!);
+            : ExportPackage(graph!, ancillaryState!, GraphCompileResult!);
 
     public TrackAuthoringCompilation? Compilation { get; private set; }
 
@@ -137,10 +142,27 @@ public sealed class TrackEditorDocument : IEditorDocument
                 "A non-empty successfully compiled route is required before saving Track Layout Package V2.");
         }
 
-        return SerializePackage(graph!, ancillaryState!);
+        return currentPackageJson!;
     }
 
-    internal string CapturePackageJson(TrackAuthoringGraph candidateGraph)
+    internal PreparedTrackGraphState CaptureGraphState()
+    {
+        if (graph is null)
+        {
+            throw new InvalidOperationException(
+                "This editor document does not have an editable authoring graph.");
+        }
+
+        return PreparedTrackGraphState.FromPreparedData(
+            graph,
+            ancillaryState!,
+            GraphCompileResult,
+            currentPackageJson);
+    }
+
+    internal PreparedTrackGraphState PrepareGraphState(
+        TrackAuthoringGraph candidateGraph,
+        TrackAuthoringGraphCompileResult? candidateCompilation)
     {
         ArgumentNullException.ThrowIfNull(candidateGraph);
         if (ancillaryState is null)
@@ -149,7 +171,27 @@ public sealed class TrackEditorDocument : IEditorDocument
                 "This editor document does not have Track Layout Package V2 ancillary state.");
         }
 
-        return SerializePackage(candidateGraph, ancillaryState);
+        if (candidateGraph.Nodes.Count == 0)
+        {
+            return PreparedTrackGraphState.FromEvaluation(
+                candidateGraph,
+                ancillaryState,
+                graphCompileResult: null);
+        }
+
+        if (candidateCompilation is null ||
+            !candidateCompilation.Success ||
+            candidateCompilation.Compilation is null)
+        {
+            throw new ArgumentException(
+                "A non-empty graph requires a successful compilation.",
+                nameof(candidateCompilation));
+        }
+
+        return PreparedTrackGraphState.FromEvaluation(
+            candidateGraph,
+            ancillaryState,
+            candidateCompilation);
     }
 
     public void ReplaceGraph(TrackAuthoringGraph candidateGraph)
@@ -172,8 +214,7 @@ public sealed class TrackEditorDocument : IEditorDocument
 
         if (candidateGraph.Nodes.Count == 0)
         {
-            bool emptyIsDirty = explicitlyDirty || cleanPackageJson != null;
-            CommitEmptyGraph(candidateGraph, emptyIsDirty);
+            ReplaceGraphState(PrepareGraphState(candidateGraph, null));
             return;
         }
 
@@ -186,11 +227,34 @@ public sealed class TrackEditorDocument : IEditorDocument
                 candidateCompilation.Diagnostics));
         }
 
-        string candidatePackageJson = CapturePackageJson(candidateGraph);
+        ReplaceGraphState(PrepareGraphState(candidateGraph, candidateCompilation));
+    }
+
+    internal void ReplaceGraphState(PreparedTrackGraphState candidateState)
+    {
+        ArgumentNullException.ThrowIfNull(candidateState);
+        if (graph is null || ancillaryState is null)
+        {
+            throw new InvalidOperationException(
+                "This editor document does not have an editable authoring graph.");
+        }
+
         bool candidateIsDirty = explicitlyDirty ||
-            cleanPackageJson is null ||
-            !string.Equals(cleanPackageJson, candidatePackageJson, StringComparison.Ordinal);
-        CommitCompiledGraph(candidateGraph, candidateCompilation, candidateIsDirty);
+            !string.Equals(
+                cleanPackageJson,
+                candidateState.CanonicalPackageJson,
+                StringComparison.Ordinal);
+        if (candidateState.GraphCompileResult is null)
+        {
+            CommitEmptyGraph(candidateState.Graph, candidateIsDirty);
+            return;
+        }
+
+        CommitCompiledGraph(
+            candidateState.Graph,
+            candidateState.GraphCompileResult,
+            candidateState.CanonicalPackageJson!,
+            candidateIsDirty);
     }
 
     public void ReplacePackageJson(string json, bool markDirty = true)
@@ -216,9 +280,13 @@ public sealed class TrackEditorDocument : IEditorDocument
                 import.Diagnostics);
         }
 
-        string replacementPackageJson = SerializePackage(import.Graph, import.AncillaryState);
+        string replacementPackageJson = SerializePackage(
+            import.Graph,
+            import.AncillaryState,
+            candidateCompilation);
         graph = import.Graph;
         ancillaryState = import.AncillaryState;
+        currentPackageJson = replacementPackageJson;
         GraphCompileResult = candidateCompilation;
         Compilation = candidateCompilation.Compilation;
         TrackDocument = candidateCompilation.Compilation.Document;
@@ -262,7 +330,7 @@ public sealed class TrackEditorDocument : IEditorDocument
     public void MarkClean()
     {
         explicitlyDirty = false;
-        cleanPackageJson = CanSave ? CapturePackageJson() : null;
+        cleanPackageJson = currentPackageJson;
         if (!IsDirty)
         {
             return;
@@ -275,9 +343,11 @@ public sealed class TrackEditorDocument : IEditorDocument
     private void CommitCompiledGraph(
         TrackAuthoringGraph candidateGraph,
         TrackAuthoringGraphCompileResult candidateCompilation,
+        string candidatePackageJson,
         bool candidateIsDirty)
     {
         graph = candidateGraph;
+        currentPackageJson = candidatePackageJson;
         GraphCompileResult = candidateCompilation;
         Compilation = candidateCompilation.Compilation;
         TrackDocument = candidateCompilation.Compilation!.Document;
@@ -290,6 +360,7 @@ public sealed class TrackEditorDocument : IEditorDocument
         bool candidateIsDirty)
     {
         graph = candidateGraph;
+        currentPackageJson = null;
         GraphCompileResult = null;
         Compilation = null;
         TrackDocument = new TrackDocument();
@@ -299,19 +370,24 @@ public sealed class TrackEditorDocument : IEditorDocument
 
     private static string SerializePackage(
         TrackAuthoringGraph sourceGraph,
-        TrackLayoutPackageV2GraphAncillaryState sourceAncillaryState)
+        TrackLayoutPackageV2GraphAncillaryState sourceAncillaryState,
+        TrackAuthoringGraphCompileResult graphCompilation)
     {
         return TrackLayoutPackageV2Json.Serialize(
-            ExportPackage(sourceGraph, sourceAncillaryState),
+            ExportPackage(sourceGraph, sourceAncillaryState, graphCompilation),
             indented: true);
     }
 
     private static TrackLayoutPackageV2Dto ExportPackage(
         TrackAuthoringGraph sourceGraph,
-        TrackLayoutPackageV2GraphAncillaryState sourceAncillaryState)
+        TrackLayoutPackageV2GraphAncillaryState sourceAncillaryState,
+        TrackAuthoringGraphCompileResult graphCompilation)
     {
         TrackLayoutPackageV2GraphExportResult export =
-            TrackLayoutPackageV2GraphAdapter.Export(sourceGraph, sourceAncillaryState);
+            TrackLayoutPackageV2GraphAdapter.Export(
+                sourceGraph,
+                sourceAncillaryState,
+                graphCompilation);
         if (!export.Success || export.Package is null)
         {
             if (export.GraphDiagnostics.Count != 0)

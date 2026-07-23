@@ -14,6 +14,7 @@ public partial class RoutePaneControl : UserControl
     private readonly Dictionary<int, Button> graphNodeButtons = new();
     private EditorSelection? selection;
     private int highlightedSectionIndex = -1;
+    private bool sourceEditingEnabled = true;
 
     public RoutePaneControl()
     {
@@ -74,6 +75,21 @@ public partial class RoutePaneControl : UserControl
         set
         {
             highlightedSectionIndex = value < -1 ? -1 : value;
+            UpdateNodeAppearance();
+        }
+    }
+
+    public bool SourceEditingEnabled
+    {
+        get => sourceEditingEnabled;
+        set
+        {
+            if (sourceEditingEnabled == value)
+            {
+                return;
+            }
+
+            sourceEditingEnabled = value;
             UpdateNodeAppearance();
         }
     }
@@ -184,15 +200,18 @@ public partial class RoutePaneControl : UserControl
                 highlighted ? "#3A3421" : selected ? "#203B50" : "#18232E");
             button.BorderBrush = Brush.Parse(
                 highlighted ? "#F4D35E" : selected ? "#59B5E8" : "#34495C");
+            button.IsEnabled = sourceEditingEnabled;
         }
 
         EditorGraphNode? selectedNode = SelectedNode();
         bool hasSelection = selectedNode != null;
-        InsertBeforeButton.IsEnabled = hasSelection;
-        InsertAfterButton.IsEnabled = hasSelection;
-        DeleteSectionButton.IsEnabled = hasSelection;
-        MoveUpButton.IsEnabled = selectedNode?.RouteIndex > 0;
+        AddSectionButton.IsEnabled = sourceEditingEnabled;
+        InsertBeforeButton.IsEnabled = sourceEditingEnabled && hasSelection;
+        InsertAfterButton.IsEnabled = sourceEditingEnabled && hasSelection;
+        DeleteSectionButton.IsEnabled = sourceEditingEnabled && hasSelection;
+        MoveUpButton.IsEnabled = sourceEditingEnabled && selectedNode?.RouteIndex > 0;
         MoveDownButton.IsEnabled =
+            sourceEditingEnabled &&
             selectedNode != null && selectedNode.RouteIndex < graphNodes.Count - 1;
     }
 

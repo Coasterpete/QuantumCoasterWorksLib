@@ -1,6 +1,7 @@
 using Quantum.Editor.Avalonia.Models;
 using Quantum.Track;
 using Quantum.Track.Authoring;
+using System.Diagnostics;
 
 namespace Quantum.Editor.Avalonia.Services.Viewport;
 
@@ -24,6 +25,20 @@ public sealed class TrackSamplingService
     }
 
     public TrackViewportSnapshot CreateViewportSnapshot(EngineeringSnapshot snapshot)
+    {
+        var stopwatch = Stopwatch.StartNew();
+        try
+        {
+            return CreateViewportSnapshotCore(snapshot);
+        }
+        finally
+        {
+            stopwatch.Stop();
+            EditorViewportPipelineMeasurement.RecordViewportProjectionBuild(stopwatch.Elapsed);
+        }
+    }
+
+    private static TrackViewportSnapshot CreateViewportSnapshotCore(EngineeringSnapshot snapshot)
     {
         ArgumentNullException.ThrowIfNull(snapshot);
         if (snapshot.SampleCount == 0 || snapshot.TotalLength <= 0.0)

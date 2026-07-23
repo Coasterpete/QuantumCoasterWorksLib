@@ -21,6 +21,7 @@ QuantumCoasterWorks.sln
 - Quantum.FVD = force vector design systems
 - Quantum.IO = save/load/import/export
 - Quantum.Debug = diagnostics
+- Quantum.Application = frontend-neutral authoring session, transaction, revision, history, dirty-state, and canonical persistence orchestration
 - Quantum.Editor.Avalonia = standalone Avalonia technical editor and Track Layout Package V2 workspace
 
 ## Frontend / Host Direction
